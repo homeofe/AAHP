@@ -92,8 +92,8 @@ Then, instruct your AI agent (Claude, ChatGPT, etc.) with this system prompt:
 
 ## RFC & Documentation
 
-*   [RFC — English](./RFC-en.md) (Draft)
-*   [RFC — Deutsch](./RFC-de.md) (Draft)
+*   [RFC English](./RFC-en.md) (Draft)
+*   [RFC Deutsch](./RFC-de.md) (Draft)
 
 ## Background & Philosophy
 

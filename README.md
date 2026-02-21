@@ -33,6 +33,9 @@ AAHP is implemented by adding a `.ai/handoff/` directory to the root of your pro
 
 ### 1. The Directory Structure
 
+> ⚠️ **Important:** All AAHP files live under **`.ai/handoff/`** — not `.ai/` directly.
+> Agents and tools must reference this exact path.
+
 **Mandatory (core protocol):**
 
 ```bash

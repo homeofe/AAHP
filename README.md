@@ -33,12 +33,26 @@ AAHP is implemented by adding a `.ai/handoff/` directory to the root of your pro
 
 ### 1. The Directory Structure
 
+**Mandatory (core protocol):**
+
 ```bash
 .ai/handoff/
 ├── STATUS.md          # The "State of the Nation"
 ├── NEXT_ACTIONS.md    # The prioritized work queue
 └── LOG.md             # The append-only session journal
 ```
+
+**Optional (extended protocol — recommended for autonomous multi-agent pipelines):**
+
+```bash
+.ai/handoff/
+├── DASHBOARD.md       # Live build health + open task queue with priority + pipeline state
+├── CONVENTIONS.md     # Code style, branching, architecture rules all agents must follow
+├── TRUST.md           # Verification register — what is tested vs. assumed vs. unknown
+└── WORKFLOW.md        # Pipeline definition — agent roles, phases, autonomy boundaries
+```
+
+See [`templates/`](./templates/) for ready-to-use starter files for all optional documents.
 
 ### 2. File Definitions
 
@@ -75,6 +89,39 @@ In a multi-agent world, hallucinations are a risk. AAHP introduces a simple "Tru
 
 ---
 
+## Extended Protocol: Autonomous Multi-Agent Pipelines
+
+The three core files cover single-agent or light multi-agent use. For **fully autonomous pipelines** — where agents run overnight, self-select tasks, and notify humans only on completion — four additional files provide the structure needed:
+
+### `DASHBOARD.md` — The Control Tower
+
+Replaces a plain backlog with a **live build state + prioritized task queue**. Agents update it after every completed task. Key features:
+
+- **Build health table** — every service/component with test counts and status
+- **Open tasks with strategic priority** — agents pick the top unblocked task
+- **Blocked task policy** — skip blocked tasks, notify owner only when everything is stuck
+- **Pipeline state** — current task, phase, rate limits
+
+### `CONVENTIONS.md` — The Rulebook
+
+Ensures every agent (across sessions, models, and vendors) follows the same code style, branching conventions, and architecture principles — without relying on system prompts alone.
+
+### `TRUST.md` — The Verification Register
+
+In long-running pipelines, claims in `STATUS.md` can become stale. `TRUST.md` makes confidence levels explicit:
+
+| Level | Meaning |
+|-------|---------|
+| **verified** | Agent ran code/tests to confirm this |
+| **assumed** | Derived from docs/chat, not directly tested |
+| **untested** | Status unknown |
+
+### `WORKFLOW.md` — The Pipeline Definition
+
+Documents agent roles, pipeline phases (Research → Architect → Implement → Review → Fix), autonomy boundaries, and notification rules. Lives in `.ai/handoff/` alongside the other files so agents always find it.
+
+---
+
 ## Quick Start Implementation
 
 To make your repository AAHP-compliant immediately, run:
@@ -82,6 +129,16 @@ To make your repository AAHP-compliant immediately, run:
 ```bash
 mkdir -p .ai/handoff
 touch .ai/handoff/STATUS.md .ai/handoff/NEXT_ACTIONS.md .ai/handoff/LOG.md
+```
+
+For the full autonomous pipeline setup, copy the starter templates:
+
+```bash
+# Clone or download this repo, then:
+cp templates/DASHBOARD.md   your-project/.ai/handoff/
+cp templates/CONVENTIONS.md your-project/.ai/handoff/
+cp templates/TRUST.md       your-project/.ai/handoff/
+cp templates/WORKFLOW.md    your-project/.ai/handoff/
 ```
 
 Then, instruct your AI agent (Claude, ChatGPT, etc.) with this system prompt:

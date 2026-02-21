@@ -131,15 +131,25 @@ mkdir -p .ai/handoff
 touch .ai/handoff/STATUS.md .ai/handoff/NEXT_ACTIONS.md .ai/handoff/LOG.md
 ```
 
-For the full autonomous pipeline setup, copy the starter templates:
+For the full autonomous pipeline setup, copy all templates at once:
 
 ```bash
-# Clone or download this repo, then:
-cp templates/DASHBOARD.md   your-project/.ai/handoff/
-cp templates/CONVENTIONS.md your-project/.ai/handoff/
-cp templates/TRUST.md       your-project/.ai/handoff/
-cp templates/WORKFLOW.md    your-project/.ai/handoff/
+# Clone this repo, then run from its root:
+mkdir -p your-project/.ai/handoff
+
+# Core files (mandatory)
+cp templates/STATUS.md       your-project/.ai/handoff/
+cp templates/NEXT_ACTIONS.md your-project/.ai/handoff/
+cp templates/LOG.md          your-project/.ai/handoff/
+
+# Extended files (optional, recommended for autonomous pipelines)
+cp templates/DASHBOARD.md    your-project/.ai/handoff/
+cp templates/CONVENTIONS.md  your-project/.ai/handoff/
+cp templates/TRUST.md        your-project/.ai/handoff/
+cp templates/WORKFLOW.md     your-project/.ai/handoff/
 ```
+
+Then open each file and replace the `[PROJECT]` placeholder with your project name.
 
 Then, instruct your AI agent (Claude, ChatGPT, etc.) with this system prompt:
 

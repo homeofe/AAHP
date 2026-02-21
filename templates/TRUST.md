@@ -1,4 +1,4 @@
-# [PROJECT] — Trust Register
+# [PROJECT]: Trust Register
 
 > Tracks verification status of critical system properties.
 > In multi-agent pipelines, hallucinations and drift are real risks.
@@ -11,7 +11,7 @@
 | Level | Meaning |
 |-------|---------|
 | **verified** | An agent executed code, ran tests, or observed output to confirm this |
-| **assumed** | Derived from docs, config files, or chat — not directly tested |
+| **assumed** | Derived from docs, config files, or chat, not directly tested |
 | **untested** | Status unknown; needs verification |
 
 ---
@@ -20,10 +20,10 @@
 
 | Property | Status | Last Verified | Agent | Notes |
 |----------|--------|---------------|-------|-------|
-| `build` passes | untested | — | — | |
-| `test` passes | untested | — | — | |
-| `lint` passes | untested | — | — | |
-| `type-check` passes | untested | — | — | |
+| `build` passes | untested | - | - | |
+| `test` passes | untested | - | - | |
+| `lint` passes | untested | - | - | |
+| `type-check` passes | untested | - | - | |
 
 ---
 
@@ -31,10 +31,10 @@
 
 | Property | Status | Last Verified | Agent | Notes |
 |----------|--------|---------------|-------|-------|
-| Local dev stack boots | untested | — | — | |
-| All health endpoints respond | untested | — | — | |
-| Database connection works | untested | — | — | |
-| Auth flow completes | untested | — | — | |
+| Local dev stack boots | untested | - | - | |
+| All health endpoints respond | untested | - | - | |
+| Database connection works | untested | - | - | |
+| Auth flow completes | untested | - | - | |
 
 ---
 
@@ -42,8 +42,8 @@
 
 | Property | Status | Last Verified | Agent | Notes |
 |----------|--------|---------------|-------|-------|
-| External API A reachable | untested | — | — | |
-| Webhook delivery confirmed | untested | — | — | |
+| External API A reachable | untested | - | - | |
+| Webhook delivery confirmed | untested | - | - | |
 
 ---
 
@@ -51,9 +51,9 @@
 
 | Property | Status | Last Verified | Agent | Notes |
 |----------|--------|---------------|-------|-------|
-| No secrets in source | assumed | — | — | Pre-commit hooks configured |
-| Auth tokens expire correctly | untested | — | — | |
-| PII not logged | untested | — | — | |
+| No secrets in source | assumed | - | - | Pre-commit hooks configured |
+| Auth tokens expire correctly | untested | - | - | |
+| PII not logged | untested | - | - | |
 
 ---
 

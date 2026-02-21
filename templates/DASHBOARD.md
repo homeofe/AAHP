@@ -1,4 +1,4 @@
-# [PROJECT] — Build Dashboard
+# [PROJECT]: Build Dashboard
 
 > Single source of truth for build health, test coverage, and pipeline state.
 > Updated by agents at the end of every completed task.
@@ -9,9 +9,9 @@
 
 | Name | Version | Build | Tests | Status | Notes |
 |------|---------|-------|-------|--------|-------|
-| service-a | — | ✅ | — | ✅ | |
-| service-b | — | ✅ | 42/42 ✅ | ✅ | |
-| service-c | — | ❌ | — | 🔴 Broken | See LOG.md |
+| service-a | - | ✅ | - | ✅ | |
+| service-b | - | ✅ | 42/42 ✅ | ✅ | |
+| service-c | - | ❌ | - | 🔴 Broken | See LOG.md |
 
 **Legend:** ✅ passing · ❌ failing · 🔵 stub/mock · ⏳ pending · 🔴 blocked
 
@@ -21,9 +21,9 @@
 
 | Suite | Tests | Status | Last Run |
 |-------|-------|--------|----------|
-| unit | — | — | — |
-| integration | — | — | — |
-| e2e | — | — | — |
+| unit | - | - | - |
+| integration | - | - | - |
+| e2e | - | - | - |
 
 ---
 
@@ -31,7 +31,7 @@
 
 | Component | Status | Blocker |
 |-----------|--------|---------|
-| Local dev stack | ✅ | — |
+| Local dev stack | ✅ | - |
 | Staging | ⏳ Not deployed | Needs credentials |
 | Production | ⏳ Not deployed | Needs credentials |
 
@@ -41,9 +41,9 @@
 
 | Field | Value |
 |-------|-------|
-| Current task | — |
+| Current task | - |
 | Phase | idle |
-| Last completed | — |
+| Last completed | - |
 | Rate limit | None |
 
 ---
@@ -52,7 +52,7 @@
 
 | # | Task | Priority | Blocked by | Ready? |
 |---|------|----------|-----------|--------|
-| 1 | Describe task here | 🔴 HIGH | — | ✅ Ready |
+| 1 | Describe task here | 🔴 HIGH | - | ✅ Ready |
 | 2 | Another task | 🟠 MEDIUM | Waiting for X | 🔴 Blocked |
 
 ---

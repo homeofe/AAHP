@@ -1,4 +1,4 @@
-# [PROJECT] — Agent Journal
+# [PROJECT]: Agent Journal
 
 > **Append-only.** Never delete or edit past entries.
 > Every agent session adds a new entry at the top.
@@ -6,7 +6,7 @@
 
 ---
 
-<!-- EXAMPLE ENTRIES — delete these before using in production -->
+<!-- EXAMPLE ENTRIES, delete these before using in production -->
 
 ## [YYYY-MM-DD] [Agent]: [Task Name]
 
@@ -17,7 +17,7 @@
 ### What was done
 
 - Created `src/feature.ts` with XYZ logic
-- Added 12 unit tests — all passing
+- Added 12 unit tests, all passing
 - Updated `STATUS.md` and `NEXT_ACTIONS.md`
 
 ### Decisions made

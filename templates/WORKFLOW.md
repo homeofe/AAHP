@@ -1,4 +1,4 @@
-# [PROJECT] — Autonomous Multi-Agent Workflow
+# [PROJECT]: Autonomous Multi-Agent Workflow
 
 > Based on the [AAHP Protocol](https://github.com/homeofe/AAHP).
 > No manual triggers. Agents read `handoff/DASHBOARD.md` and work autonomously.
@@ -20,7 +20,7 @@
 
 ## The Pipeline
 
-### Phase 1 — Research & Context
+### Phase 1: Research & Context
 
 ```
 Reads:   handoff/NEXT_ACTIONS.md or DASHBOARD.md (top unblocked task)
@@ -33,7 +33,7 @@ Does:    Researches relevant OSS libraries / APIs / compliance requirements
 Writes:  handoff/LOG.md — research findings + sources + recommendation
 ```
 
-### Phase 2 — Architecture Decision
+### Phase 2: Architecture Decision
 
 ```
 Reads:   Research output from LOG.md
@@ -55,7 +55,7 @@ ADR format:
   **Instructions for Implementer:** [numbered steps]
 ```
 
-### Phase 3 — Implementation
+### Phase 3: Implementation
 
 ```
 Reads:   ADR from LOG.md
@@ -76,7 +76,7 @@ Commit format:
   fix(scope): description [AAHP-fix]
 ```
 
-### Phase 4 — Discussion Round
+### Phase 4: Discussion Round
 
 ```
 All agents review the completed code on the feature branch.
@@ -91,7 +91,7 @@ Outcome:
   - Everything documented in LOG.md
 ```
 
-### Phase 5 — Completion & Handoff
+### Phase 5: Completion & Handoff
 
 ```
 DASHBOARD.md:    Update build status, test counts, pipeline state
@@ -121,7 +121,7 @@ Notify:  Project owner — only on fully completed tasks, not phase transitions
 
 ## Task Selection Rules
 
-1. Read `DASHBOARD.md` — take the top task where `Ready? = ✅`
+1. Read `DASHBOARD.md`, take the top task where `Ready? = ✅`
 2. If a task is **blocked** → skip it, take the next unblocked one
 3. If **all tasks are blocked** → notify the project owner, pause
 4. Never start a task without reading `STATUS.md` first

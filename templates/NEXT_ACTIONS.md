@@ -1,7 +1,7 @@
-# [PROJECT] — Next Actions for Incoming Agent
+# [PROJECT]: Next Actions for Incoming Agent
 
 > Priority order. Work top-down.
-> Each item should be self-contained — the agent must be able to start without asking questions.
+> Each item should be self-contained, the agent must be able to start without asking questions.
 > Blocked tasks go to the bottom. Completed tasks move to "Recently Completed".
 
 ---
@@ -15,13 +15,13 @@
 - What has already been tried or decided?
 
 **What to do:**
-1. Step one — be specific (file path, command, expected output)
+1. Step one, be specific (file path, command, expected output)
 2. Step two
 3. Step three
 
 **Files:**
-- `path/to/relevant/file.ts` — what it does
-- `path/to/config.yml` — what it configures
+- `path/to/relevant/file.ts`: what it does
+- `path/to/config.yml`: what it configures
 
 **Definition of done:**
 - [ ] Tests pass
@@ -45,7 +45,7 @@
 
 | Item | Resolution |
 |------|-----------|
-| Example task | Implemented in feat/example — 42/42 tests ✅ |
+| Example task | Implemented in feat/example, 42/42 tests ✅ |
 
 ---
 

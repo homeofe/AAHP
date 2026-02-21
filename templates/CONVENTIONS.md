@@ -1,4 +1,4 @@
-# [PROJECT] — Agent Conventions
+# [PROJECT]: Agent Conventions
 
 > Every agent working on this project must read and follow these conventions.
 > Update this file whenever a new standard is established.
@@ -35,9 +35,9 @@ Commit format:
 
 <!-- Document your non-negotiable design rules here -->
 
-- Example: **Zero-Persistence** — no PII written to disk
-- Example: **Human-in-the-Loop** — AI assists, humans decide
-- Example: **Open Source First** — evaluate OSS before building custom
+- Example: **Zero-Persistence**, no PII written to disk
+- Example: **Human-in-the-Loop**, AI assists, humans decide
+- Example: **Open Source First**, evaluate OSS before building custom
 
 ## Testing
 

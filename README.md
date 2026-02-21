@@ -1,4 +1,4 @@
-# AAHP — AI-to-AI Handoff Protocol
+# AAHP: AI-to-AI Handoff Protocol
 
 **A lightweight, file-based standard for sequential context handoff between AI agents.**
 
@@ -33,7 +33,7 @@ AAHP is implemented by adding a `.ai/handoff/` directory to the root of your pro
 
 ### 1. The Directory Structure
 
-> ⚠️ **Important:** All AAHP files live under **`.ai/handoff/`** — not `.ai/` directly.
+> ⚠️ **Important:** All AAHP files live under **`.ai/handoff/`**, not `.ai/` directly.
 > Agents and tools must reference this exact path.
 
 **Mandatory (core protocol):**
@@ -45,7 +45,7 @@ AAHP is implemented by adding a `.ai/handoff/` directory to the root of your pro
 └── LOG.md             # The append-only session journal
 ```
 
-**Optional (extended protocol — recommended for autonomous multi-agent pipelines):**
+**Optional (extended protocol, recommended for autonomous multi-agent pipelines):**
 
 ```bash
 .ai/handoff/
@@ -94,22 +94,22 @@ In a multi-agent world, hallucinations are a risk. AAHP introduces a simple "Tru
 
 ## Extended Protocol: Autonomous Multi-Agent Pipelines
 
-The three core files cover single-agent or light multi-agent use. For **fully autonomous pipelines** — where agents run overnight, self-select tasks, and notify humans only on completion — four additional files provide the structure needed:
+The three core files cover single-agent or light multi-agent use. For **fully autonomous pipelines**, where agents run overnight, self-select tasks, and notify humans only on completion, four additional files provide the structure needed:
 
-### `DASHBOARD.md` — The Control Tower
+### `DASHBOARD.md`: The Control Tower
 
 Replaces a plain backlog with a **live build state + prioritized task queue**. Agents update it after every completed task. Key features:
 
-- **Build health table** — every service/component with test counts and status
-- **Open tasks with strategic priority** — agents pick the top unblocked task
-- **Blocked task policy** — skip blocked tasks, notify owner only when everything is stuck
-- **Pipeline state** — current task, phase, rate limits
+- **Build health table**: every service/component with test counts and status
+- **Open tasks with strategic priority**: agents pick the top unblocked task
+- **Blocked task policy**: skip blocked tasks, notify owner only when everything is stuck
+- **Pipeline state**: current task, phase, rate limits
 
-### `CONVENTIONS.md` — The Rulebook
+### `CONVENTIONS.md`: The Rulebook
 
-Ensures every agent (across sessions, models, and vendors) follows the same code style, branching conventions, and architecture principles — without relying on system prompts alone.
+Ensures every agent (across sessions, models, and vendors) follows the same code style, branching conventions, and architecture principles, without relying on system prompts alone.
 
-### `TRUST.md` — The Verification Register
+### `TRUST.md`: The Verification Register
 
 In long-running pipelines, claims in `STATUS.md` can become stale. `TRUST.md` makes confidence levels explicit:
 
@@ -119,7 +119,7 @@ In long-running pipelines, claims in `STATUS.md` can become stale. `TRUST.md` ma
 | **assumed** | Derived from docs/chat, not directly tested |
 | **untested** | Status unknown |
 
-### `WORKFLOW.md` — The Pipeline Definition
+### `WORKFLOW.md`: The Pipeline Definition
 
 Documents agent roles, pipeline phases (Research → Architect → Implement → Review → Fix), autonomy boundaries, and notification rules. Lives in `.ai/handoff/` alongside the other files so agents always find it.
 
@@ -162,11 +162,11 @@ Then, instruct your AI agent (Claude, ChatGPT, etc.) with this system prompt:
 
 ## Real-World Example
 
-**[failprompt](https://github.com/homeofe/failprompt)** — A CLI tool built end-to-end by an AAHP multi-agent pipeline.
+**[failprompt](https://github.com/homeofe/failprompt)**, A CLI tool built end-to-end by an AAHP multi-agent pipeline.
 
 > Parse GitHub Actions CI failure logs and generate LLM-ready prompts in one command.
 
-The entire development history is documented in `.ai/handoff/LOG.md` — every Sonar research note, every Opus architecture decision, every Sonnet implementation, every review finding, every fix. All 7 AAHP handoff files are present and populated with project-specific content.
+The entire development history is documented in `.ai/handoff/LOG.md`, every Sonar research note, every Opus architecture decision, every Sonnet implementation, every review finding, every fix. All 7 AAHP handoff files are present and populated with project-specific content.
 
 Clone it to see AAHP in action on a real codebase.
 

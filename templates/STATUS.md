@@ -1,10 +1,10 @@
-# [PROJECT] — Current State of the Nation
+# [PROJECT]: Current State of the Nation
 
 > Last updated: [DATE] by [Agent/Human]
 > Commit: [hash]
 >
 > **Rule:** This file is rewritten (not appended) at the end of every session.
-> It reflects the *current* reality — not history. History lives in LOG.md.
+> It reflects the *current* reality, not history. History lives in LOG.md.
 
 ---
 
@@ -24,8 +24,8 @@
 | Component | Location | State |
 |-----------|----------|-------|
 | Local dev stack | `docker-compose.yml` | ✅ Running / ⏳ Not started |
-| Staging | — | ⏳ Not deployed |
-| Production | — | ⏳ Not deployed |
+| Staging | - | ⏳ Not deployed |
+| Production | - | ⏳ Not deployed |
 
 ---
 
@@ -35,7 +35,7 @@
 |---------|------|-------|-------|
 | service-a | 3000 | ✅ Implemented | |
 | service-b | 8080 | 🔵 Stubbed | Mock responses only |
-| service-c | — | ❌ Not started | |
+| service-c | - | ❌ Not started | |
 
 ---
 
@@ -59,6 +59,6 @@
 
 ## Trust Levels
 
-- **(Verified)** — confirmed by running code/tests
-- **(Assumed)** — derived from docs/config, not directly tested
-- **(Unknown)** — needs verification
+- **(Verified)**: confirmed by running code/tests
+- **(Assumed)**: derived from docs/config, not directly tested
+- **(Unknown)**: needs verification

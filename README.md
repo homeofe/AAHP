@@ -160,6 +160,18 @@ Then, instruct your AI agent (Claude, ChatGPT, etc.) with this system prompt:
 
 ---
 
+## Real-World Example
+
+**[failprompt](https://github.com/homeofe/failprompt)** — A CLI tool built end-to-end by an AAHP multi-agent pipeline.
+
+> Parse GitHub Actions CI failure logs and generate LLM-ready prompts in one command.
+
+The entire development history is documented in `.ai/handoff/LOG.md` — every Sonar research note, every Opus architecture decision, every Sonnet implementation, every review finding, every fix. All 7 AAHP handoff files are present and populated with project-specific content.
+
+Clone it to see AAHP in action on a real codebase.
+
+---
+
 ## RFC & Documentation
 
 *   [RFC English](./RFC-en.md) (Draft)

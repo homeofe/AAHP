@@ -9,14 +9,16 @@
 
 | Name | Path | Build | Tests | Status | Notes |
 |------|------|-------|-------|--------|-------|
-| v2/v3 Specification | `README.md` | ✅ | n/a | ✅ | v3 task IDs + dependency graphs added |
-| Templates (10) | `templates/` | ✅ | n/a | ✅ | Updated with task ID format |
-| Shared Library | `scripts/_aahp-lib.sh` | ✅ | manual | ✅ | Checksum, mtime, summary, tokens |
-| Manifest Generator | `scripts/aahp-manifest.sh` | ✅ | manual | ✅ | v3: preserves tasks on regeneration |
-| Migration Script | `scripts/aahp-migrate-v2.sh` | ✅ | manual | ✅ | Delegates to aahp-manifest.sh |
-| Lint Script | `scripts/lint-handoff.sh` | ✅ | manual | ✅ | 6 checks |
-| JSON Schema | `schema/aahp-manifest.schema.json` | ✅ | n/a | ✅ | v3: tasks + next_task_id fields |
-| .aiignore Template | `templates/.aiignore` | ✅ | n/a | ✅ | Secrets, PII, injection patterns |
+| v2/v3 Specification | `README.md` | ✅ | n/a | ✅ | Updated title/refs for v3 |
+| Templates (10) | `templates/` | ✅ | n/a | ✅ | T-xxx ID format |
+| Shared Library | `scripts/_aahp-lib.sh` | ✅ | ✅ 18 | ✅ | Tested via manifest.bats |
+| Manifest Generator | `scripts/aahp-manifest.sh` | ✅ | ✅ 18 | ✅ | 18 bats tests |
+| Migration Script | `scripts/aahp-migrate-v2.sh` | ✅ | ✅ 12 | ✅ | 12 bats tests |
+| Lint Script | `scripts/lint-handoff.sh` | ✅ | ✅ 18 | ✅ | 18 bats tests |
+| JSON Schema | `schema/aahp-manifest.schema.json` | ✅ | n/a | ✅ | v3: tasks + next_task_id |
+| .aiignore Template | `templates/.aiignore` | ✅ | n/a | ✅ | Secrets, PII patterns |
+| CLI (npx aahp) | `bin/aahp.js` | ✅ | manual | ✅ | init, manifest, lint, migrate |
+| CI Pipeline | `.github/workflows/ci.yml` | ✅ | n/a | ✅ | shellcheck + lint + schema |
 
 **Legend:** ✅ passing / complete · ❌ failing · ⏳ pending · manual = tested manually only
 
@@ -26,9 +28,13 @@
 
 | Suite | Tests | Status | Last Run |
 |-------|-------|--------|----------|
-| script tests | 0 | ⏳ Not created | - |
-| shellcheck | 0 | ⏳ Not run | - |
+| manifest.bats | 18 | ✅ All pass | 2026-02-26 |
+| lint.bats | 18 | ✅ All pass | 2026-02-26 |
+| migrate.bats | 12 | ✅ All pass | 2026-02-26 |
+| shellcheck | - | ⏳ In CI | Not yet run |
 | schema validation | manual | ✅ | 2026-02-26 |
+
+**Total: 48 tests, 48 passing**
 
 ---
 
@@ -37,8 +43,8 @@
 | Component | Status | Blocker |
 |-----------|--------|---------|
 | GitHub repo | ✅ | - |
-| GitHub Actions CI | ⏳ Not created | Needs workflow file (T-003) |
-| npm package | ⏳ Not created | Needs package.json (T-004) |
+| GitHub Actions CI | ✅ Created | Not yet triggered (T-007) |
+| npm package | ⏳ Not published | Needs npm login (T-006) |
 
 ---
 
@@ -46,9 +52,9 @@
 
 | Field | Value |
 |-------|-------|
-| Current task | T-001 + T-002 (v3 implementation) |
+| Current task | All original tasks complete (T-001 through T-005) |
 | Phase | implementation |
-| Last completed | T-001, T-002 |
+| Last completed | T-003, T-004, T-005 |
 | Rate limit | None |
 
 ---
@@ -57,9 +63,9 @@
 
 | ID | Task | Priority | Depends on | Ready? |
 |----|------|----------|-----------|--------|
-| T-003 | Add GitHub Actions CI pipeline | MEDIUM | - | ✅ Ready |
-| T-004 | Create npx-distributable CLI | MEDIUM | - | ✅ Ready |
-| T-005 | Add automated script tests (bats) | MEDIUM | - | ✅ Ready |
+| T-006 | Publish npm package | LOW | - | ✅ Ready |
+| T-007 | Fix shellcheck warnings | LOW | - | ✅ Ready |
+| T-008 | Add bats tests to CI | LOW | T-007 | ⏳ Blocked |
 
 ## Completed Tasks
 
@@ -67,6 +73,9 @@
 |----|------|-----------|
 | T-001 | Design v3 task dependency graph schema | 2026-02-26 |
 | T-002 | Add task IDs to templates | 2026-02-26 |
+| T-003 | Add GitHub Actions CI pipeline | 2026-02-26 |
+| T-004 | Create npx-distributable CLI | 2026-02-26 |
+| T-005 | Add automated script tests (bats) | 2026-02-26 |
 
 ---
 

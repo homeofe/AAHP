@@ -6,83 +6,63 @@
 
 ---
 
-## T-003: Add GitHub Actions CI Pipeline
+## T-006: Publish npm package
 
-**Goal:** Automate validation of AAHP handoff files on every push.
+**Goal:** Publish the `aahp` CLI to the npm registry so users can `npx aahp init`.
 
 **Context:**
-- lint-handoff.sh exists but is only run manually
-- Schema validation requires ajv (npm) or Python jsonschema
-- No CI pipeline exists yet
+- `package.json` and `bin/aahp.js` are complete and tested
+- All subcommands work: init, manifest, lint, migrate
+- Package name `aahp` may or may not be available on npm
 
 **What to do:**
-1. Create `.github/workflows/lint.yml`
-2. Run `lint-handoff.sh` on the project's own `.ai/handoff/`
-3. Validate `schema/aahp-manifest.schema.json` with ajv
-4. Run shellcheck on all scripts
-
-**Files:**
-- `.github/workflows/lint.yml`: new CI workflow
-- `scripts/`: all scripts validated by shellcheck
+1. Verify `aahp` is available on npm (`npm view aahp` — should return 404)
+2. If taken, use `@aahp/cli` as scoped package name
+3. Run `npm publish` (requires npm login with publish access)
+4. Test with `npx aahp --version` from a clean directory
 
 **Definition of done:**
-- [ ] GitHub Actions workflow passes
+- [ ] Package published to npm
+- [ ] `npx aahp init` works from any directory
+
+---
+
+## T-007: Fix shellcheck warnings in CI
+
+**Goal:** Ensure all scripts pass shellcheck when CI runs.
+
+**Context:**
+- CI workflow (`.github/workflows/ci.yml`) runs shellcheck on all 4 scripts
+- Scripts have not been validated with shellcheck locally
+- Common issues: unquoted variables, unused vars, non-portable constructs
+
+**What to do:**
+1. Run `shellcheck scripts/*.sh` locally
+2. Fix all warnings (SC2034, SC2086, etc.)
+3. Verify CI passes after fixes
+
+**Definition of done:**
 - [ ] All scripts pass shellcheck
-- [ ] Schema validation runs in CI
+- [ ] CI pipeline is green
 
 ---
 
-## T-004: Create npx-distributable CLI
+## T-008: Add bats tests to CI pipeline
 
-**Goal:** Allow users to run `npx aahp init`, `npx aahp manifest`, `npx aahp lint` from any project.
-
-**Context:**
-- Currently scripts must be copied or the AAHP repo cloned
-- npm distribution would make adoption easier
-- Thin wrapper around existing bash scripts
-
-**What to do:**
-1. Create `package.json` with bin entries
-2. Create `bin/aahp.js` dispatcher
-3. Wrap existing bash scripts as subcommands: init, manifest, migrate, lint
-4. Publish to npm as `@aahp/cli` or `aahp`
-
-**Files:**
-- `package.json`: new
-- `bin/aahp.js`: new CLI entry point
-
-**Definition of done:**
-- [ ] `npx aahp init` copies templates to `.ai/handoff/`
-- [ ] `npx aahp manifest` generates MANIFEST.json
-- [ ] `npx aahp lint` runs validation
-
----
-
-## T-005: Add Automated Script Tests
-
-**Goal:** Create a test harness for all bash scripts to prevent regressions.
+**Goal:** Run the 48 bats tests as part of CI.
 
 **Context:**
-- Scripts are tested manually but have no automated test suite
-- Edge cases (missing files, corrupted JSON, macOS vs Linux) untested
-- Could use bats (Bash Automated Testing System) or simple bash assertions
+- Tests exist in `tests/` (manifest.bats, lint.bats, migrate.bats)
+- CI workflow currently runs shellcheck + lint + schema validation
+- Tests need `bats` installed (available via npm: `npx bats`)
 
 **What to do:**
-1. Install or vendor bats-core
-2. Write tests for aahp-manifest.sh (valid output, missing dir, custom flags, task preservation)
-3. Write tests for lint-handoff.sh (injection detection, secret detection, checksum validation)
-4. Write tests for aahp-migrate-v2.sh (v1 to v2 migration)
-5. Add test runner to CI pipeline
-
-**Files:**
-- `tests/`: new test directory
-- `tests/manifest.bats`: manifest generator tests
-- `tests/lint.bats`: lint script tests
-- `tests/migrate.bats`: migration script tests
+1. Add a step to `.github/workflows/ci.yml` to install and run bats tests
+2. Verify tests pass in Ubuntu CI environment
 
 **Definition of done:**
-- [ ] All scripts have test coverage
-- [ ] Tests run in CI
+- [ ] Bats tests run in CI
+- [ ] All 48 tests pass
 
 ---
 
@@ -90,11 +70,13 @@
 
 | ID | Item | Resolution |
 |----|------|-----------|
-| T-001 | Design v3 task dependency graph schema | Schema extended, README Section 8 added, manifest generator updated |
+| T-003 | Add GitHub Actions CI pipeline | `.github/workflows/ci.yml` with shellcheck, lint, schema validation |
+| T-004 | Create npx-distributable CLI | `bin/aahp.js` + `package.json` — init, manifest, lint, migrate subcommands |
+| T-005 | Add automated script tests (bats) | 48 tests: 18 lint + 18 manifest + 12 migrate, all passing |
+| T-001 | Design v3 task dependency graph schema | Schema extended, README Section 8 added |
 | T-002 | Add task IDs to templates | T-xxx format in NEXT_ACTIONS.md headings and DASHBOARD.md tables |
-| - | Resolve open questions 1-4 | Implemented aahp-manifest.sh, lint Check 6, documented decisions |
-| - | Merge AAHP-v2-PROPOSAL.md | Merged into README.md, deleted duplicate |
-| - | Dogfood AAHP protocol | Implemented .ai/handoff/ for the AAHP project itself |
+| - | Update README for v3 | Title, version refs, agent names, section headers updated |
+| - | Fix cross-platform issues | Python detection (Windows Store alias), Unicode encoding (cp1252) |
 
 ---
 
@@ -106,5 +88,8 @@
 | Templates | `templates/` |
 | Scripts | `scripts/` |
 | JSON Schema | `schema/aahp-manifest.schema.json` |
+| CLI entry point | `bin/aahp.js` |
+| CI workflow | `.github/workflows/ci.yml` |
+| Test suite | `tests/` |
 | License | `LICENSE` (MIT) |
 | Own handoff files | `.ai/handoff/` |

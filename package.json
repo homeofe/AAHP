@@ -1,0 +1,33 @@
+{
+  "name": "aahp",
+  "version": "3.0.0",
+  "description": "AI-to-AI Handoff Protocol — CLI tools for managing agent handoff files",
+  "bin": {
+    "aahp": "./bin/aahp.js"
+  },
+  "keywords": [
+    "ai",
+    "handoff",
+    "protocol",
+    "agent",
+    "llm"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/homeofe/AAHP"
+  },
+  "files": [
+    "bin/",
+    "scripts/",
+    "templates/",
+    "schema/"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "type": "module",
+  "devDependencies": {
+    "bats": "^1.13.0"
+  }
+}

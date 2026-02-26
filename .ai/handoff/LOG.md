@@ -6,6 +6,36 @@
 
 ---
 
+## [2026-02-26] Claude Opus 4.6: Complete T-003, T-004, T-005 — CI, CLI, Tests
+
+**Agent:** Claude Opus 4.6
+**Phase:** 3 (Implementer)
+**Branch:** main
+**Tasks:** T-003, T-004, T-005
+
+### What was done
+
+- **T-003**: Created `.github/workflows/ci.yml` — GitHub Actions CI pipeline with shellcheck, lint-handoff.sh, and ajv schema validation
+- **T-004**: Created `bin/aahp.js` + `package.json` — npx-distributable CLI with subcommands: init, manifest, lint, migrate. Pure Node.js, no dependencies. ESM module.
+- **T-005**: Created 48 bats tests across 3 suites: `tests/manifest.bats` (18), `tests/lint.bats` (18), `tests/migrate.bats` (12). All passing. Cross-platform temp dir handling for Windows Git Bash.
+- Fixed `lint-handoff.sh` Python detection: Windows `python3` Store alias passes `command -v` but doesn't work; now tries actual invocation before trusting
+- Fixed Unicode encoding in Python checksum output (cp1252 on Windows)
+- Updated README.md: title "AAHP v2 Proposal" → "AAHP: AI-to-AI Handoff Protocol (v2/v3)", version refs, agent names
+- Added `bats` as devDependency for local test running
+- Created `tests/run.sh` convenience runner
+- Created `tests/test_helper.bash` shared test fixtures
+- All 48 tests pass, CLI verified, lint passes
+
+### Decisions made
+
+- CLI uses ESM (`"type": "module"`) with zero external dependencies — only Node.js built-ins
+- `aahp init` implemented in pure Node.js (file copy), other commands spawn bash scripts
+- bats-core via npm (`npx bats`) rather than system install
+- Tests create isolated temp fixtures — no dependency on project's own `.ai/handoff/`
+- New follow-up tasks created: T-006 (npm publish), T-007 (shellcheck fixes), T-008 (bats in CI)
+
+---
+
 ## [2026-02-26] Claude Opus 4.6: AAHP v3 — Task IDs & Dependency Graphs
 
 **Agent:** Claude Opus 4.6

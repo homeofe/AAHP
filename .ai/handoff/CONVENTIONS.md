@@ -52,6 +52,10 @@ Commit format:
 - Validate generated JSON with `python3 -c "import json; json.load(open(...))"` or `jq .`
 - Run `lint-handoff.sh` against the project's own `.ai/handoff/` directory
 
+## Formatting
+
+- **No em dashes (`—`)**: Never use Unicode em dashes in any file (code, docs, comments, templates). They break shell scripts, cause encoding errors on Windows (cp1252), and corrupt JSON. Use a regular hyphen (`-`) instead.
+
 ## What Agents Must NOT Do
 
 - Push directly to `main` without human approval
@@ -59,6 +63,7 @@ Commit format:
 - Write secrets, credentials, or PII into any handoff file
 - Delete existing scripts without providing a replacement
 - Break backward compatibility with v1 (MANIFEST.json-less projects must still work)
+- Use em dashes (`—`) anywhere in the codebase
 
 ---
 

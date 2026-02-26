@@ -45,12 +45,17 @@ Commit format:
 - `pnpm test` / `go test ./...` must pass before every commit
 - Type-check must pass before every commit
 
+## Formatting
+
+- **No em dashes (`—`)**: Never use Unicode em dashes in any file (code, docs, comments, templates). They break shell scripts, cause encoding errors on Windows (cp1252), and corrupt JSON. Use a regular hyphen (`-`) instead.
+
 ## What Agents Must NOT Do
 
 - Push directly to `main`
 - Install new dependencies without documenting the reason
 - Write secrets or credentials into source files
 - Delete existing tests (fix or replace instead)
+- Use em dashes (`—`) anywhere in the codebase
 
 ---
 

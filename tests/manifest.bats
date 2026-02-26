@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# manifest.bats — Tests for scripts/aahp-manifest.sh
+# manifest.bats -Tests for scripts/aahp-manifest.sh
 
 setup() {
     load test_helper
@@ -39,7 +39,7 @@ _detect_python() {
         run $PYTHON_CMD -c "import json; json.load(open('$TEST_TMPDIR/.ai/handoff/MANIFEST.json'))"
         [ "$status" -eq 0 ]
     else
-        # Fallback: basic structural check — valid JSON starts with { and ends with }
+        # Fallback: basic structural check -valid JSON starts with { and ends with }
         manifest_content=$(cat "$TEST_TMPDIR/.ai/handoff/MANIFEST.json")
         [[ "$manifest_content" == "{"* ]]
         [[ "$manifest_content" == *"}" ]]
@@ -167,7 +167,7 @@ _detect_python() {
     manifest_content=$(cat "$TEST_TMPDIR/.ai/handoff/MANIFEST.json")
 
     # If node couldn't read the path (Windows tmpdir issue), tasks won't be preserved.
-    # Skip rather than fail in that case — it's a platform limitation, not a code bug.
+    # Skip rather than fail in that case -it's a platform limitation, not a code bug.
     if [[ "$manifest_content" != *'"tasks"'* ]]; then
         skip "tasks not preserved (likely node cannot resolve tmpdir path on this platform)"
     fi

@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# _aahp-lib.sh — Shared functions for AAHP tooling
+# _aahp-lib.sh -Shared functions for AAHP tooling
 # Not intended to be run directly. Source this from other scripts.
 
 # Standard AAHP handoff files, in canonical order
 # shellcheck disable=SC2034
 AAHP_HANDOFF_FILES=(STATUS.md NEXT_ACTIONS.md LOG.md DASHBOARD.md TRUST.md CONVENTIONS.md WORKFLOW.md)
 
-# Colors (safe to re-source — same variable names used across scripts)
+# Colors (safe to re-source -same variable names used across scripts)
 # shellcheck disable=SC2034
 RED='\033[0;31m'
 # shellcheck disable=SC2034
@@ -65,7 +65,7 @@ aahp_estimate_tokens() {
 }
 
 # Generate a JSON file entry block for MANIFEST.json
-# Outputs raw JSON (no trailing comma — caller handles commas)
+# Outputs raw JSON (no trailing comma -caller handles commas)
 aahp_file_entry_json() {
     local file="$1"
     local filepath="$2"

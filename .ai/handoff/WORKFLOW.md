@@ -30,7 +30,7 @@ Does:    Researches relevant standards, protocols, prior art
          Checks compatibility with existing AAHP tooling
          Clarifies ambiguities in the task
 
-Writes:  handoff/LOG.md — research findings + sources + recommendation
+Writes:  handoff/LOG.md -research findings + sources + recommendation
 ```
 
 ### Phase 2: Architecture Decision
@@ -44,7 +44,7 @@ Does:    Decides on schema extensions, template changes, script modifications
          Chooses branch name
          Defines exactly what the Implementer should build
 
-Writes:  handoff/LOG.md — ADR (Architecture Decision Record)
+Writes:  handoff/LOG.md -ADR (Architecture Decision Record)
 ```
 
 ### Phase 3: Implementation
@@ -91,7 +91,7 @@ LOG.md:          Append session summary
 NEXT_ACTIONS.md: Check off completed task, add newly discovered tasks
 
 Git:     Branch pushed, PR-ready
-Notify:  Project owner — only on fully completed tasks
+Notify:  Project owner -only on fully completed tasks
 ```
 
 ---

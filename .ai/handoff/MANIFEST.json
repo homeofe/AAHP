@@ -3,28 +3,28 @@
   "project": "AAHP",
   "last_session": {
     "agent": "claude-opus-4.6",
-    "session_id": "cli-1772139926",
-    "timestamp": "2026-02-26T21:05:26Z",
-    "commit": "d3735d7",
+    "session_id": "cli-1772142518",
+    "timestamp": "2026-02-26T21:48:38Z",
+    "commit": "bedce57",
     "phase": "fix",
     "duration_minutes": 0
   },
   "files": {
     "STATUS.md": {
-      "checksum": "sha256:8534122543735279bc53c0b166db41a66f5815149872867e219c382c1a7e8d1e",
-      "updated": "2026-02-26T20:48:25Z",
+      "checksum": "sha256:c36d80b8dbc1be19bde206dd73f8ada286934504a7780adeb6541adb0ea7658f",
+      "updated": "2026-02-26T21:48:14Z",
       "lines": 83,
       "summary": "(no summary available)"
     },
     "NEXT_ACTIONS.md": {
-      "checksum": "sha256:b9edd474236706c88b8c1de45c5005bd016d018c5104137893efce9a91b226b0",
-      "updated": "2026-02-26T20:48:46Z",
+      "checksum": "sha256:fe1e628a2a1e99c1d72c61da62e40d1ff6b8ebdbeae08d1982bb67ef64c3904d",
+      "updated": "2026-02-26T21:48:14Z",
       "lines": 95,
       "summary": "(no summary available)"
     },
     "LOG.md": {
-      "checksum": "sha256:c38c932cba8662cfa9e6c1114cf91407944dd5edf6807cc876a607f4dcf9d36d",
-      "updated": "2026-02-26T20:49:26Z",
+      "checksum": "sha256:591faa1c14802ee8fc2653ababcc962538c8b9d9ff08228e07b734372c4a7cc9",
+      "updated": "2026-02-26T21:48:14Z",
       "lines": 132,
       "summary": "(no summary available)"
     },
@@ -41,23 +41,23 @@
       "summary": "(no summary available)"
     },
     "CONVENTIONS.md": {
-      "checksum": "sha256:31c9c8354a70a6693516cb8504fb50c67c051f354d4877eaf29bab15578e6523",
-      "updated": "2026-02-26T19:34:49Z",
+      "checksum": "sha256:20148ad9c04d303a0b2a46047baf6819fdf4066f8b2d362bc09ac92c8cd6b1ee",
+      "updated": "2026-02-26T21:48:14Z",
       "lines": 65,
       "summary": "(no summary available)"
     },
     "WORKFLOW.md": {
-      "checksum": "sha256:8479f659af62c033589e08c96e6a0777dadf9f46eebd035622392b64bbb6659d",
-      "updated": "2026-02-26T19:35:25Z",
+      "checksum": "sha256:e2962a475033810c7db203f17d2b20a64ce2c5e3756b00489193be4dbe476350",
+      "updated": "2026-02-26T21:47:52Z",
       "lines": 131,
       "summary": "(no summary available)"
     }
   },
-  "quick_context": "All 5 original tasks complete. Fixed shellcheck SC2034, SC1091, SC2086 warnings. CI pipeline, npx CLI, 48 bats tests.",
+  "quick_context": "All 5 original tasks complete. CI pipeline, npx CLI, 48 bats tests. Em dashes removed.",
   "token_budget": {
     "manifest_only": 85,
-    "manifest_plus_core": 1542,
-    "full_read": 5226
+    "manifest_plus_core": 1536,
+    "full_read": 5201
   }
   ,"next_task_id": 9
   ,"tasks": {"T-001":{"title":"Design v3 task dependency graph schema","status":"done","priority":"high","depends_on":[],"created":"2026-02-26T19:34:00Z","completed":"2026-02-26T20:30:00Z"},"T-002":{"title":"Add task IDs to NEXT_ACTIONS.md and DASHBOARD.md","status":"done","priority":"high","depends_on":[],"created":"2026-02-26T19:34:00Z","completed":"2026-02-26T20:30:00Z"},"T-003":{"title":"Add GitHub Actions CI pipeline","status":"done","priority":"medium","depends_on":[],"created":"2026-02-26T19:34:00Z","completed":"2026-02-26T20:45:00Z"},"T-004":{"title":"Create npx-distributable CLI","status":"done","priority":"medium","depends_on":[],"created":"2026-02-26T19:34:00Z","completed":"2026-02-26T20:45:00Z"},"T-005":{"title":"Add automated script tests (bats)","status":"done","priority":"medium","depends_on":[],"created":"2026-02-26T19:34:00Z","completed":"2026-02-26T20:45:00Z"},"T-006":{"title":"Publish npm package","status":"ready","priority":"low","depends_on":[],"created":"2026-02-26T20:49:00Z"},"T-007":{"title":"Fix shellcheck warnings in CI","status":"ready","priority":"low","depends_on":[],"created":"2026-02-26T20:49:00Z"},"T-008":{"title":"Add bats tests to CI pipeline","status":"blocked","priority":"low","depends_on":["T-007"],"created":"2026-02-26T20:49:00Z"}}

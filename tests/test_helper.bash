@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# test_helper.bash — Shared setup/teardown for AAHP bats tests
+# test_helper.bash -Shared setup/teardown for AAHP bats tests
 
 # Resolve the repo root (parent of tests/)
 AAHP_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

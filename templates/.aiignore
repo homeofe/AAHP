@@ -1,4 +1,4 @@
-# .aiignore — AAHP v2 Safety Firewall
+# .aiignore -AAHP v2 Safety Firewall
 # Patterns that must NEVER appear in handoff files.
 # Validated by CI hooks and agents before committing.
 

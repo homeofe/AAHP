@@ -61,7 +61,7 @@ Step 3: Decide which files to read based on task:
         - First session ever?  → Full read (one-time cost)
 ```
 
-**Token savings**: For a typical follow-up session, this cuts orientation cost from ~2,800 tokens to ~350 tokens — an **87% reduction**.
+**Token savings**: For a typical follow-up session, this cuts orientation cost from ~2,800 tokens to ~350 tokens -an **87% reduction**.
 
 ### 1.2 Sectioned Files with `<!-- SECTION: name -->` Markers
 
@@ -86,7 +86,7 @@ Build green. 5/7 services running. Auth complete. CORS open.
 <!-- /SECTION: what_is_missing -->
 ```
 
-An agent can be instructed: "Read only the `summary` section of `STATUS.md`" — pulling 2 lines instead of 87.
+An agent can be instructed: "Read only the `summary` section of `STATUS.md`" -pulling 2 lines instead of 87.
 
 ### 1.3 LOG.md: Reverse Chronological + Entry Limit
 
@@ -322,7 +322,7 @@ This takes ~100 tokens but prevents cascading failures.
 
 ## 5. Migration from v1 → v2/v3
 
-v2/v3 is fully backward compatible. An agent encountering a v1 directory (no `MANIFEST.json`) simply falls back to reading all files — which is exactly v1 behavior. v3 adds optional task IDs and dependency graphs on top of v2 — see Section 8.
+v2/v3 is fully backward compatible. An agent encountering a v1 directory (no `MANIFEST.json`) simply falls back to reading all files -which is exactly v1 behavior. v3 adds optional task IDs and dependency graphs on top of v2 -see Section 8.
 
 **Migration steps:**
 
@@ -332,7 +332,7 @@ v2/v3 is fully backward compatible. An agent encountering a v1 directory (no `MA
 3. Split LOG.md if it exceeds 10 entries
 4. Add TTL column to TRUST.md
 5. Add .aiignore
-6. Done — no breaking changes
+6. Done -no breaking changes
 ```
 
 A migration script can be included in the repo:
@@ -390,7 +390,7 @@ Agents should always regenerate the manifest as the final step before committing
 
 ### 7.2 Checksums cover entire files
 
-Whole-file SHA-256 is the AAHP v2 standard. The schema (`aahp-manifest.schema.json`), lint tool, and migration script all enforce `sha256:<64-hex-chars>` format. Section-level checksums were considered but add complexity without proportional benefit — if a section changes, the whole-file checksum changes too, which is sufficient for detecting drift.
+Whole-file SHA-256 is the AAHP v2 standard. The schema (`aahp-manifest.schema.json`), lint tool, and migration script all enforce `sha256:<64-hex-chars>` format. Section-level checksums were considered but add complexity without proportional benefit -if a section changes, the whole-file checksum changes too, which is sufficient for detecting drift.
 
 ### 7.3 Parallel agents use branch-based isolation
 
@@ -404,13 +404,13 @@ File-level locking (e.g., `flock`) was considered but rejected: it adds OS-speci
 
 The lint tool (`lint-handoff.sh`) detects `HANDOFF.lock` files across branches as an advisory warning.
 
-### 7.4 Dependency graphs — implemented in v3
+### 7.4 Dependency graphs -implemented in v3
 
 See **Section 8** below for the full v3 task ID and dependency graph specification.
 
 ---
 
-## 8. v3 — Task IDs and Dependency Graphs
+## 8. v3 -Task IDs and Dependency Graphs
 
 v3 extends the protocol with stable task identifiers and a machine-readable dependency graph, enabling agents to autonomously select parallelizable work and detect blocked tasks programmatically.
 
@@ -420,7 +420,7 @@ Every task gets a stable identifier: `T-001`, `T-002`, etc.
 
 **Rules:**
 - Format: `T-` followed by a zero-padded sequential number (minimum 3 digits)
-- IDs are **never reused** — even after a task is completed or deleted
+- IDs are **never reused** -even after a task is completed or deleted
 - The next available ID is tracked in `MANIFEST.json` as `next_task_id`
 - Agents assign IDs when creating tasks; the counter increments automatically
 - Task IDs appear in `NEXT_ACTIONS.md` headings and `DASHBOARD.md` tables
@@ -444,7 +444,7 @@ Every task gets a stable identifier: `T-001`, `T-002`, etc.
 
 ### 8.2 Dependency Graph in MANIFEST.json
 
-The dependency graph lives in `MANIFEST.json` as structured data — not in Markdown. This makes it machine-parseable while keeping Markdown files human-readable.
+The dependency graph lives in `MANIFEST.json` as structured data -not in Markdown. This makes it machine-parseable while keeping Markdown files human-readable.
 
 ```json
 {
@@ -517,7 +517,7 @@ Each task in the `tasks` object has the following fields:
 ### 8.5 Backward Compatibility
 
 - `tasks` and `next_task_id` are **optional** fields in the schema
-- v2 projects (no `tasks` field) continue to work — agents fall back to reading `NEXT_ACTIONS.md` linearly
+- v2 projects (no `tasks` field) continue to work -agents fall back to reading `NEXT_ACTIONS.md` linearly
 - `aahp-manifest.sh` preserves existing task data when regenerating the manifest
 - The `aahp_version` field distinguishes v2 (`"2.0"`) from v3 (`"3.0"`) projects
 
@@ -528,7 +528,7 @@ When `aahp-manifest.sh` regenerates `MANIFEST.json`, it:
 2. Regenerates all file entries (checksums, line counts, summaries, token budgets)
 3. Writes the new manifest, preserving the existing task data
 
-Task data is managed by agents directly — the CLI tool never creates or modifies tasks.
+Task data is managed by agents directly -the CLI tool never creates or modifies tasks.
 
 ---
 

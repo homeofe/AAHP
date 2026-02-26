@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# lint-handoff.sh — Validate AAHP handoff files for safety violations
+# lint-handoff.sh -Validate AAHP handoff files for safety violations
 #
 # Usage: ./scripts/lint-handoff.sh [path-to-project]
 #        Defaults to current directory if no path given.

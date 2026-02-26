@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-// aahp — AI-to-AI Handoff Protocol CLI
+// aahp -AI-to-AI Handoff Protocol CLI
 // Usage: npx aahp <command> [path] [options]
 //
 // Commands:
@@ -35,7 +35,7 @@ function getVersion() {
 function printHelp() {
   const version = getVersion()
   console.log(`
-aahp v${version} — AI-to-AI Handoff Protocol CLI
+aahp v${version} -AI-to-AI Handoff Protocol CLI
 
 Usage:
   aahp <command> [path] [options]
@@ -106,7 +106,7 @@ function extractPathAndFlags(rest) {
       targetPath = arg
       pathFound = true
     } else {
-      // Extra positional arg — pass through as-is
+      // Extra positional arg -pass through as-is
       flags.push(arg)
     }
   }
@@ -115,7 +115,7 @@ function extractPathAndFlags(rest) {
 }
 
 // ---------------------------------------------------------------------------
-// init command — implemented in Node.js
+// init command -implemented in Node.js
 // ---------------------------------------------------------------------------
 
 function cmdInit(targetPath, flags) {
@@ -169,7 +169,7 @@ function cmdInit(targetPath, flags) {
 }
 
 // ---------------------------------------------------------------------------
-// Shell script commands — spawn bash scripts
+// Shell script commands -spawn bash scripts
 //
 // The bash scripts already handle their own argument parsing, including
 // the optional [path] first positional argument and all --flags.

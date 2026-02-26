@@ -33,11 +33,11 @@ Commit format:
 
 ## File Organization
 
-- `templates/` — Handoff file templates (users copy these to their projects)
-- `scripts/` — CLI tools (aahp-manifest.sh, aahp-migrate-v2.sh, lint-handoff.sh)
-- `scripts/_aahp-lib.sh` — Shared functions (sourced, not executed directly)
-- `schema/` — JSON Schema files for validation
-- `.ai/handoff/` — AAHP's own handoff files (dogfooding)
+- `templates/` -Handoff file templates (users copy these to their projects)
+- `scripts/` -CLI tools (aahp-manifest.sh, aahp-migrate-v2.sh, lint-handoff.sh)
+- `scripts/_aahp-lib.sh` -Shared functions (sourced, not executed directly)
+- `schema/` -JSON Schema files for validation
+- `.ai/handoff/` -AAHP's own handoff files (dogfooding)
 
 ## Architecture Principles
 

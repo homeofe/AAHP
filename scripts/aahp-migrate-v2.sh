@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# aahp-migrate-v2.sh — Migrate an AAHP v1 handoff directory to v2
+# aahp-migrate-v2.sh -Migrate an AAHP v1 handoff directory to v2
 #
 # Usage: ./scripts/aahp-migrate-v2.sh [path-to-project]
 #        Defaults to current directory if no path given.
@@ -84,13 +84,13 @@ if [ -f "$HANDOFF_DIR/LOG.md" ]; then
     if [ "$ENTRY_COUNT" -gt 10 ]; then
         echo -e "${YELLOW}  → LOG.md has $ENTRY_COUNT entries (limit: 10). Splitting...${NC}"
 
-        # This is a simplified split — keeps last 10 entries in LOG.md
+        # This is a simplified split -keeps last 10 entries in LOG.md
         # Moves everything else to LOG-ARCHIVE.md
         # A production version should be smarter about entry boundaries
 
         echo "  → Automatic splitting requires manual review."
         echo "  → Recommendation: Move entries older than the last 10 to LOG-ARCHIVE.md"
-        CHANGES+=("LOG.md has $ENTRY_COUNT entries — manual split recommended")
+        CHANGES+=("LOG.md has $ENTRY_COUNT entries -manual split recommended")
     else
         echo "  → LOG.md has $ENTRY_COUNT entries. No split needed."
     fi
@@ -122,7 +122,7 @@ if [ -f "$HANDOFF_DIR/TRUST.md" ]; then
     if ! grep -q "TTL" "$HANDOFF_DIR/TRUST.md"; then
         echo -e "${YELLOW}  → No TTL columns found. Adding TTL is recommended but requires manual editing.${NC}"
         echo "  → See README.md section 2.5 for the TTL format."
-        CHANGES+=("TRUST.md needs TTL columns — manual update recommended")
+        CHANGES+=("TRUST.md needs TTL columns -manual update recommended")
     else
         echo "  → TTL columns already present."
     fi

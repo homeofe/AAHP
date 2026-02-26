@@ -16,7 +16,7 @@
 - Package name `aahp` may or may not be available on npm
 
 **What to do:**
-1. Verify `aahp` is available on npm (`npm view aahp` — should return 404)
+1. Verify `aahp` is available on npm (`npm view aahp` -should return 404)
 2. If taken, use `@aahp/cli` as scoped package name
 3. Run `npm publish` (requires npm login with publish access)
 4. Test with `npx aahp --version` from a clean directory
@@ -71,7 +71,7 @@
 | ID | Item | Resolution |
 |----|------|-----------|
 | T-003 | Add GitHub Actions CI pipeline | `.github/workflows/ci.yml` with shellcheck, lint, schema validation |
-| T-004 | Create npx-distributable CLI | `bin/aahp.js` + `package.json` — init, manifest, lint, migrate subcommands |
+| T-004 | Create npx-distributable CLI | `bin/aahp.js` + `package.json` -init, manifest, lint, migrate subcommands |
 | T-005 | Add automated script tests (bats) | 48 tests: 18 lint + 18 manifest + 12 migrate, all passing |
 | T-001 | Design v3 task dependency graph schema | Schema extended, README Section 8 added |
 | T-002 | Add task IDs to templates | T-xxx format in NEXT_ACTIONS.md headings and DASHBOARD.md tables |

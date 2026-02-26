@@ -6,7 +6,7 @@
 
 ---
 
-## [2026-02-26] Claude Opus 4.6: Complete T-003, T-004, T-005 — CI, CLI, Tests
+## [2026-02-26] Claude Opus 4.6: Complete T-003, T-004, T-005 -CI, CLI, Tests
 
 **Agent:** Claude Opus 4.6
 **Phase:** 3 (Implementer)
@@ -15,8 +15,8 @@
 
 ### What was done
 
-- **T-003**: Created `.github/workflows/ci.yml` — GitHub Actions CI pipeline with shellcheck, lint-handoff.sh, and ajv schema validation
-- **T-004**: Created `bin/aahp.js` + `package.json` — npx-distributable CLI with subcommands: init, manifest, lint, migrate. Pure Node.js, no dependencies. ESM module.
+- **T-003**: Created `.github/workflows/ci.yml` -GitHub Actions CI pipeline with shellcheck, lint-handoff.sh, and ajv schema validation
+- **T-004**: Created `bin/aahp.js` + `package.json` -npx-distributable CLI with subcommands: init, manifest, lint, migrate. Pure Node.js, no dependencies. ESM module.
 - **T-005**: Created 48 bats tests across 3 suites: `tests/manifest.bats` (18), `tests/lint.bats` (18), `tests/migrate.bats` (12). All passing. Cross-platform temp dir handling for Windows Git Bash.
 - Fixed `lint-handoff.sh` Python detection: Windows `python3` Store alias passes `command -v` but doesn't work; now tries actual invocation before trusting
 - Fixed Unicode encoding in Python checksum output (cp1252 on Windows)
@@ -28,15 +28,15 @@
 
 ### Decisions made
 
-- CLI uses ESM (`"type": "module"`) with zero external dependencies — only Node.js built-ins
+- CLI uses ESM (`"type": "module"`) with zero external dependencies -only Node.js built-ins
 - `aahp init` implemented in pure Node.js (file copy), other commands spawn bash scripts
 - bats-core via npm (`npx bats`) rather than system install
-- Tests create isolated temp fixtures — no dependency on project's own `.ai/handoff/`
+- Tests create isolated temp fixtures -no dependency on project's own `.ai/handoff/`
 - New follow-up tasks created: T-006 (npm publish), T-007 (shellcheck fixes), T-008 (bats in CI)
 
 ---
 
-## [2026-02-26] Claude Opus 4.6: AAHP v3 — Task IDs & Dependency Graphs
+## [2026-02-26] Claude Opus 4.6: AAHP v3 -Task IDs & Dependency Graphs
 
 **Agent:** Claude Opus 4.6
 **Phase:** 3 (Implementer)
@@ -59,7 +59,7 @@
 
 - Task IDs use `T-xxx` format (short, readable, sortable) over `AAHP-xxx` (too project-specific)
 - Dependency graph lives in MANIFEST.json (structured data) not in Markdown (human text)
-- `tasks` and `next_task_id` are optional — v2 projects continue to work without them
+- `tasks` and `next_task_id` are optional -v2 projects continue to work without them
 - `aahp-manifest.sh` preserves task data using Node.js JSON parsing (available on most systems)
 - `aahp_version` bumped to `"3.0"` in generated manifests
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# aahp-manifest.sh — (Re)generate MANIFEST.json from existing handoff files
+# aahp-manifest.sh -(Re)generate MANIFEST.json from existing handoff files
 #
 # Usage: ./scripts/aahp-manifest.sh [path-to-project] [options]
 #        Defaults to current directory if no path given.

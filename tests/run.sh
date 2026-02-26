@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# run.sh — Run all AAHP bats test suites
+# run.sh -Run all AAHP bats test suites
 #
 # Usage:
 #   ./tests/run.sh              # Run all tests

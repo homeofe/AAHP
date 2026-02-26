@@ -30,7 +30,7 @@ Does:    Researches relevant OSS libraries / APIs / compliance requirements
          Checks whether similar solutions already exist in the project
          Clarifies ambiguities in the task
 
-Writes:  handoff/LOG.md — research findings + sources + recommendation
+Writes:  handoff/LOG.md -research findings + sources + recommendation
 ```
 
 ### Phase 2: Architecture Decision
@@ -44,7 +44,7 @@ Does:    Decides architecture and interface design
          Chooses branch name
          Defines exactly what the Implementer should build
 
-Writes:  handoff/LOG.md — ADR (Architecture Decision Record)
+Writes:  handoff/LOG.md -ADR (Architecture Decision Record)
 
 ADR format:
   ## [DATE] ADR: [Feature Name]
@@ -100,8 +100,8 @@ LOG.md:          Append session summary
 NEXT_ACTIONS.md: Check off completed task, add newly discovered tasks
 
 Git:     Branch pushed, PR-ready
-Notify:  Project owner — only on fully completed tasks, not phase transitions
-         Format: "✅ [Feature] done — Branch: feat/... — Tests: X/X"
+Notify:  Project owner -only on fully completed tasks, not phase transitions
+         Format: "✅ [Feature] done -Branch: feat/... -Tests: X/X"
 ```
 
 ---

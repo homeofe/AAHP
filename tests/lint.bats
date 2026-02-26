@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# lint.bats — Tests for scripts/lint-handoff.sh
+# lint.bats -Tests for scripts/lint-handoff.sh
 
 setup() {
     load test_helper
@@ -102,7 +102,7 @@ teardown() {
     if [ "$status" -eq 1 ]; then
         [[ "$output" == *"secret pattern"* ]]
     else
-        # grep treated the pattern as flags — known limitation.
+        # grep treated the pattern as flags -known limitation.
         # The script should use `grep -- "$pattern"` to fix this.
         skip "grep interprets leading dashes in pattern as options (known lint script limitation)"
     fi
@@ -154,7 +154,7 @@ teardown() {
     # Do NOT create MANIFEST.json
 
     run bash "$SCRIPTS_DIR/lint-handoff.sh" "$TEST_TMPDIR"
-    # Missing MANIFEST.json is a warning, not a violation — exit 0
+    # Missing MANIFEST.json is a warning, not a violation -exit 0
     [[ "$output" == *"MANIFEST.json not found"* ]]
 }
 

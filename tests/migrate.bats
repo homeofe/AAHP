@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# migrate.bats — Tests for scripts/aahp-migrate-v2.sh
+# migrate.bats -Tests for scripts/aahp-migrate-v2.sh
 
 setup() {
     load test_helper
@@ -21,7 +21,7 @@ teardown() {
     # Verify MANIFEST.json does not exist yet
     [ ! -f "$TEST_TMPDIR/.ai/handoff/MANIFEST.json" ]
 
-    # Run the migration — pipe 'y' to handle the prompt if MANIFEST already exists
+    # Run the migration -pipe 'y' to handle the prompt if MANIFEST already exists
     # (shouldn't be needed here but safe)
     run bash -c "echo n | bash '$SCRIPTS_DIR/aahp-migrate-v2.sh' '$TEST_TMPDIR'"
     [ "$status" -eq 0 ]

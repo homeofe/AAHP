@@ -68,8 +68,8 @@ Cross-platform fixes applied (Windows Python detection, Unicode encoding).
 
 | ID | Item | Resolution |
 |----|------|-----------|
-| T-003 | GitHub Actions CI pipeline | `.github/workflows/ci.yml` — shellcheck, lint, schema validation |
-| T-004 | npx-distributable CLI | `bin/aahp.js` + `package.json` — init, manifest, lint, migrate |
+| T-003 | GitHub Actions CI pipeline | `.github/workflows/ci.yml` -shellcheck, lint, schema validation |
+| T-004 | npx-distributable CLI | `bin/aahp.js` + `package.json` -init, manifest, lint, migrate |
 | T-005 | Automated script tests | 48 bats tests: `tests/manifest.bats`, `tests/lint.bats`, `tests/migrate.bats` |
 | T-001 | v3 task dependency graph schema | Schema extended, README Section 8 written |
 | T-002 | Task IDs in templates | T-xxx format in headings and tables |

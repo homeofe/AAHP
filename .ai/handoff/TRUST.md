@@ -53,7 +53,7 @@
 | Property | Status | Last Verified | Agent | TTL | Expires | Notes |
 |----------|--------|---------------|-------|-----|---------|-------|
 | No secrets in source | assumed | 2026-02-26 | Claude Opus 4.6 | 7d | 2026-03-05 | lint-handoff.sh checks this |
-| MIT LICENSE correct | verified | 2026-02-26 | Claude Opus 4.6 | 30d | 2026-03-28 | |
+| CC BY 4.0 LICENSE correct | verified | 2026-02-26 | Claude Opus 4.6 | 30d | 2026-03-28 | Changed from MIT |
 | README.md is single source of truth | verified | 2026-02-26 | Claude Opus 4.6 | 7d | 2026-03-05 | AAHP-v2-PROPOSAL.md merged |
 
 ---

@@ -123,7 +123,7 @@
 - Created `scripts/lint-handoff.sh` (5 validation checks)
 - Created `schema/aahp-manifest.schema.json` (JSON Schema Draft 2020-12)
 - Created `AAHP-v2-PROPOSAL.md` with full v2 specification
-- Set up MIT LICENSE, .gitignore
+- Set up LICENSE (now CC BY 4.0, originally MIT), .gitignore
 
 ### Decisions made
 

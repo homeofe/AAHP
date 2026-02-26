@@ -12,7 +12,7 @@
     "agent",
     "llm"
   ],
-  "license": "MIT",
+  "license": "CC-BY-4.0",
   "repository": {
     "type": "git",
     "url": "https://github.com/homeofe/AAHP"

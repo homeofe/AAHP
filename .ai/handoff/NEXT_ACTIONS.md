@@ -91,5 +91,5 @@
 | CLI entry point | `bin/aahp.js` |
 | CI workflow | `.github/workflows/ci.yml` |
 | Test suite | `tests/` |
-| License | `LICENSE` (MIT) |
+| License | `LICENSE` (CC BY 4.0) |
 | Own handoff files | `.ai/handoff/` |

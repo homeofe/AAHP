@@ -1,37 +1,37 @@
 {
-  "aahp_version": "2.0",
+  "aahp_version": "3.0",
   "project": "AAHP",
   "last_session": {
     "agent": "claude-opus-4.6",
-    "session_id": "cli-1772134606",
-    "timestamp": "2026-02-26T19:36:46Z",
-    "commit": "672be62",
+    "session_id": "cli-1772135372",
+    "timestamp": "2026-02-26T19:49:33Z",
+    "commit": "bfa882e",
     "phase": "implementation",
     "duration_minutes": 0
   },
   "files": {
     "STATUS.md": {
-      "checksum": "sha256:2271c90a1fa62588f4ef6d8a20d517a78c1ef44df0c8b735c9004c645b8c3ef6",
-      "updated": "2026-02-26T19:36:19Z",
-      "lines": 79,
+      "checksum": "sha256:c8ebe47258d2396f8e3dac8ec0db6ad1216c52ef302d3004eed141e36223dc97",
+      "updated": "2026-02-26T19:49:00Z",
+      "lines": 78,
       "summary": "(no summary available)"
     },
     "NEXT_ACTIONS.md": {
-      "checksum": "sha256:84f34c36a66334df67aa7eb8d43a598722c6d7b1e334d7f7a098cead8c145687",
-      "updated": "2026-02-26T19:34:11Z",
-      "lines": 162,
+      "checksum": "sha256:913496d1f118169c5919e5e6278bbeee5c786d90d19f3756a4b7958e040ec9e8",
+      "updated": "2026-02-26T19:47:55Z",
+      "lines": 110,
       "summary": "(no summary available)"
     },
     "LOG.md": {
-      "checksum": "sha256:f5cac34bb1bb79bb66ee64a95e3d91f68bd1c42f752c02656d67da58faccb4e4",
-      "updated": "2026-02-26T19:36:28Z",
-      "lines": 73,
+      "checksum": "sha256:5e35c5fa175264a5e33057ba635ea35835314165762634a50502e730836bc083",
+      "updated": "2026-02-26T19:48:34Z",
+      "lines": 102,
       "summary": "(no summary available)"
     },
     "DASHBOARD.md": {
-      "checksum": "sha256:d8fff8a1535b21ee9c980f41d98e807d9fe1f2603ad8c56e9d66d2d350be5957",
-      "updated": "2026-02-26T19:35:45Z",
-      "lines": 81,
+      "checksum": "sha256:7ec5b8bfd171492381c9f8a944e372d58cc90d4bf22999c2a067bdfe947432ba",
+      "updated": "2026-02-26T19:48:10Z",
+      "lines": 86,
       "summary": "(no summary available)"
     },
     "TRUST.md": {
@@ -53,10 +53,50 @@
       "summary": "(no summary available)"
     }
   },
-  "quick_context": "v2 complete. All open questions resolved. Dogfooding AAHP on itself. Next: v3 planning (dependency graphs, task IDs).",
+  "quick_context": "v3 implemented. Task IDs (T-xxx) and dependency graphs added. Schema, templates, manifest generator updated. Next: CI (T-003), npm CLI (T-004), tests (T-005).",
   "token_budget": {
     "manifest_only": 85,
-    "manifest_plus_core": 1734,
-    "full_read": 4728
+    "manifest_plus_core": 1433,
+    "full_read": 4687
+  },
+  "next_task_id": 6,
+  "tasks": {
+    "T-001": {
+      "title": "Design v3 task dependency graph schema",
+      "status": "done",
+      "priority": "high",
+      "depends_on": [],
+      "created": "2026-02-26T19:34:00Z",
+      "completed": "2026-02-26T20:30:00Z"
+    },
+    "T-002": {
+      "title": "Add task IDs to NEXT_ACTIONS.md and DASHBOARD.md",
+      "status": "done",
+      "priority": "high",
+      "depends_on": [],
+      "created": "2026-02-26T19:34:00Z",
+      "completed": "2026-02-26T20:30:00Z"
+    },
+    "T-003": {
+      "title": "Add GitHub Actions CI pipeline",
+      "status": "ready",
+      "priority": "medium",
+      "depends_on": [],
+      "created": "2026-02-26T19:34:00Z"
+    },
+    "T-004": {
+      "title": "Create npx-distributable CLI",
+      "status": "ready",
+      "priority": "medium",
+      "depends_on": [],
+      "created": "2026-02-26T19:34:00Z"
+    },
+    "T-005": {
+      "title": "Add automated script tests (bats)",
+      "status": "ready",
+      "priority": "medium",
+      "depends_on": [],
+      "created": "2026-02-26T19:34:00Z"
+    }
   }
 }

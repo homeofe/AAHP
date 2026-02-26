@@ -58,5 +58,23 @@
     "manifest_only": 0,
     "manifest_plus_core": 0,
     "full_read": 0
+  },
+  "next_task_id": 3,
+  "tasks": {
+    "T-001": {
+      "title": "Example: Implement feature X",
+      "status": "done",
+      "priority": "high",
+      "depends_on": [],
+      "created": "[ISO-8601]",
+      "completed": "[ISO-8601]"
+    },
+    "T-002": {
+      "title": "Example: Add tests for feature X",
+      "status": "ready",
+      "priority": "high",
+      "depends_on": ["T-001"],
+      "created": "[ISO-8601]"
+    }
   }
 }

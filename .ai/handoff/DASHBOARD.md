@@ -9,13 +9,13 @@
 
 | Name | Path | Build | Tests | Status | Notes |
 |------|------|-------|-------|--------|-------|
-| v2 Specification | `README.md` | ✅ | n/a | ✅ | 413 lines, all sections complete |
-| Templates (10) | `templates/` | ✅ | n/a | ✅ | All handoff file templates ready |
+| v2/v3 Specification | `README.md` | ✅ | n/a | ✅ | v3 task IDs + dependency graphs added |
+| Templates (10) | `templates/` | ✅ | n/a | ✅ | Updated with task ID format |
 | Shared Library | `scripts/_aahp-lib.sh` | ✅ | manual | ✅ | Checksum, mtime, summary, tokens |
-| Manifest Generator | `scripts/aahp-manifest.sh` | ✅ | manual | ✅ | CLI with full option set |
+| Manifest Generator | `scripts/aahp-manifest.sh` | ✅ | manual | ✅ | v3: preserves tasks on regeneration |
 | Migration Script | `scripts/aahp-migrate-v2.sh` | ✅ | manual | ✅ | Delegates to aahp-manifest.sh |
 | Lint Script | `scripts/lint-handoff.sh` | ✅ | manual | ✅ | 6 checks |
-| JSON Schema | `schema/aahp-manifest.schema.json` | ✅ | n/a | ✅ | JSON Schema Draft 2020-12 |
+| JSON Schema | `schema/aahp-manifest.schema.json` | ✅ | n/a | ✅ | v3: tasks + next_task_id fields |
 | .aiignore Template | `templates/.aiignore` | ✅ | n/a | ✅ | Secrets, PII, injection patterns |
 
 **Legend:** ✅ passing / complete · ❌ failing · ⏳ pending · manual = tested manually only
@@ -37,8 +37,8 @@
 | Component | Status | Blocker |
 |-----------|--------|---------|
 | GitHub repo | ✅ | - |
-| GitHub Actions CI | ⏳ Not created | Needs workflow file |
-| npm package | ⏳ Not created | Needs package.json |
+| GitHub Actions CI | ⏳ Not created | Needs workflow file (T-003) |
+| npm package | ⏳ Not created | Needs package.json (T-004) |
 
 ---
 
@@ -46,22 +46,27 @@
 
 | Field | Value |
 |-------|-------|
-| Current task | Dogfooding: bootstrap .ai/handoff/ |
+| Current task | T-001 + T-002 (v3 implementation) |
 | Phase | implementation |
-| Last completed | Resolve open questions 1-4 |
+| Last completed | T-001, T-002 |
 | Rate limit | None |
 
 ---
 
 ## Open Tasks (strategic priority)
 
-| # | Task | Priority | Blocked by | Ready? |
-|---|------|----------|-----------|--------|
-| 1 | Design v3 task dependency graph schema | HIGH | - | ✅ Ready |
-| 2 | Add task IDs to NEXT_ACTIONS.md and DASHBOARD.md | HIGH | - | ✅ Ready |
-| 3 | Add GitHub Actions CI pipeline | MEDIUM | - | ✅ Ready |
-| 4 | Create npx-distributable CLI | MEDIUM | - | ✅ Ready |
-| 5 | Add automated script tests (bats) | MEDIUM | - | ✅ Ready |
+| ID | Task | Priority | Depends on | Ready? |
+|----|------|----------|-----------|--------|
+| T-003 | Add GitHub Actions CI pipeline | MEDIUM | - | ✅ Ready |
+| T-004 | Create npx-distributable CLI | MEDIUM | - | ✅ Ready |
+| T-005 | Add automated script tests (bats) | MEDIUM | - | ✅ Ready |
+
+## Completed Tasks
+
+| ID | Task | Completed |
+|----|------|-----------|
+| T-001 | Design v3 task dependency graph schema | 2026-02-26 |
+| T-002 | Add task IDs to templates | 2026-02-26 |
 
 ---
 
@@ -69,13 +74,13 @@
 
 After completing any task:
 
-1. Update the relevant row to ✅ with current date
-2. Update test counts
+1. Update the relevant row in Open/Completed Tasks
+2. Update component status table
 3. Update "Pipeline State"
-4. Move completed task out of "Open Tasks"
-5. Add newly discovered tasks with correct priority
+4. Add newly discovered tasks with correct priority and task ID
 
 **Pipeline rules:**
 - Blocked task → skip, take next unblocked
 - All tasks blocked → notify the project owner
 - Notify project owner only on **fully completed tasks**
+- Check `depends_on` in MANIFEST.json before starting a task

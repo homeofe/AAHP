@@ -50,10 +50,10 @@
 
 ## 📋 Open Tasks (strategic priority)
 
-| # | Task | Priority | Blocked by | Ready? |
-|---|------|----------|-----------|--------|
-| 1 | Describe task here | 🔴 HIGH | - | ✅ Ready |
-| 2 | Another task | 🟠 MEDIUM | Waiting for X | 🔴 Blocked |
+| ID | Task | Priority | Blocked by | Ready? |
+|----|------|----------|-----------|--------|
+| T-001 | Describe task here | 🔴 HIGH | - | ✅ Ready |
+| T-002 | Another task | 🟠 MEDIUM | Waiting for X | 🔴 Blocked |
 
 ---
 

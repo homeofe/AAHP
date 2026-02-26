@@ -6,6 +6,35 @@
 
 ---
 
+## [2026-02-26] Claude Opus 4.6: AAHP v3 — Task IDs & Dependency Graphs
+
+**Agent:** Claude Opus 4.6
+**Phase:** 3 (Implementer)
+**Branch:** main
+**Tasks:** T-001, T-002
+
+### What was done
+
+- Extended `schema/aahp-manifest.schema.json` with optional `tasks` and `next_task_id` fields
+- Defined task ID format: `T-001`, `T-002`, etc. (stable, never reused, zero-padded)
+- Added dependency graph structure to MANIFEST.json (`depends_on` array per task)
+- Updated `templates/MANIFEST.json` with example task entries
+- Updated `templates/NEXT_ACTIONS.md` with `T-xxx:` heading format
+- Updated `templates/DASHBOARD.md` with `ID` column in tasks table
+- Updated `scripts/aahp-manifest.sh` to preserve `tasks` and `next_task_id` on regeneration (uses Node.js for JSON parsing)
+- Added README.md Section 8: full v3 specification (task IDs, schema, agent algorithm, backward compat)
+- Dogfooded v3 on AAHP's own `.ai/handoff/` files with 5 tasks (T-001 through T-005)
+
+### Decisions made
+
+- Task IDs use `T-xxx` format (short, readable, sortable) over `AAHP-xxx` (too project-specific)
+- Dependency graph lives in MANIFEST.json (structured data) not in Markdown (human text)
+- `tasks` and `next_task_id` are optional — v2 projects continue to work without them
+- `aahp-manifest.sh` preserves task data using Node.js JSON parsing (available on most systems)
+- `aahp_version` bumped to `"3.0"` in generated manifests
+
+---
+
 ## [2026-02-26] Claude Opus 4.6: Resolve Open Questions & Dogfood Protocol
 
 **Agent:** Claude Opus 4.6

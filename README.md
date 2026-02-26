@@ -404,9 +404,131 @@ File-level locking (e.g., `flock`) was considered but rejected: it adds OS-speci
 
 The lint tool (`lint-handoff.sh`) detects `HANDOFF.lock` files across branches as an advisory warning.
 
-### 7.4 Dependency graphs deferred to v3
+### 7.4 Dependency graphs — implemented in v3
 
-The current task model (ordered list in `NEXT_ACTIONS.md`, dashboard in `DASHBOARD.md`) is sufficient for sequential handoff. A task dependency graph would enable autonomous agents to select parallelizable tasks, but this adds schema complexity and requires tooling support that is not justified for v2. When AAHP v3 is designed, the manifest schema should be extended with an optional `task_dependencies` field mapping task IDs to their prerequisite task IDs.
+See **Section 8** below for the full v3 task ID and dependency graph specification.
+
+---
+
+## 8. v3 — Task IDs and Dependency Graphs
+
+v3 extends the protocol with stable task identifiers and a machine-readable dependency graph, enabling agents to autonomously select parallelizable work and detect blocked tasks programmatically.
+
+### 8.1 Task ID Format
+
+Every task gets a stable identifier: `T-001`, `T-002`, etc.
+
+**Rules:**
+- Format: `T-` followed by a zero-padded sequential number (minimum 3 digits)
+- IDs are **never reused** — even after a task is completed or deleted
+- The next available ID is tracked in `MANIFEST.json` as `next_task_id`
+- Agents assign IDs when creating tasks; the counter increments automatically
+- Task IDs appear in `NEXT_ACTIONS.md` headings and `DASHBOARD.md` tables
+
+**In NEXT_ACTIONS.md:**
+
+```markdown
+## T-001: Implement auth middleware
+
+**Goal:** ...
+```
+
+**In DASHBOARD.md:**
+
+```markdown
+| ID | Task | Priority | Blocked by | Ready? |
+|----|------|----------|-----------|--------|
+| T-001 | Implement auth middleware | HIGH | - | Ready |
+| T-002 | Add auth tests | HIGH | T-001 | Blocked |
+```
+
+### 8.2 Dependency Graph in MANIFEST.json
+
+The dependency graph lives in `MANIFEST.json` as structured data — not in Markdown. This makes it machine-parseable while keeping Markdown files human-readable.
+
+```json
+{
+  "aahp_version": "3.0",
+  "next_task_id": 4,
+  "tasks": {
+    "T-001": {
+      "title": "Implement auth middleware",
+      "status": "done",
+      "priority": "high",
+      "depends_on": [],
+      "created": "2026-02-26T10:00:00Z",
+      "completed": "2026-02-26T14:30:00Z"
+    },
+    "T-002": {
+      "title": "Add auth tests",
+      "status": "ready",
+      "priority": "high",
+      "depends_on": ["T-001"],
+      "created": "2026-02-26T10:00:00Z"
+    },
+    "T-003": {
+      "title": "Deploy to staging",
+      "status": "blocked",
+      "priority": "medium",
+      "depends_on": ["T-001", "T-002"],
+      "blocked_by": "Waiting for staging credentials",
+      "created": "2026-02-26T10:00:00Z"
+    }
+  }
+}
+```
+
+### 8.3 Task Schema
+
+Each task in the `tasks` object has the following fields:
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `title` | string | yes | Short task description (max 200 chars) |
+| `status` | enum | yes | `ready`, `in_progress`, `blocked`, `done` |
+| `priority` | enum | no | `critical`, `high`, `medium`, `low` |
+| `depends_on` | array | no | Task IDs that must be `done` before this task can start |
+| `blocked_by` | string | no | External blocker (not a task dependency) |
+| `assigned_to` | string | no | Agent or role currently working on this task |
+| `created` | date-time | no | When the task was created |
+| `completed` | date-time | no | When the task was marked `done` |
+
+### 8.4 How Agents Use the Graph
+
+**Task selection algorithm:**
+
+```
+1. Read MANIFEST.json
+2. Filter tasks where status = "ready"
+3. For each "ready" task, check depends_on:
+   - If ALL dependencies have status = "done" → task is eligible
+   - If ANY dependency is not "done" → skip (status should be "blocked")
+4. Sort eligible tasks by priority (critical > high > medium > low)
+5. Pick the top task, set status = "in_progress", set assigned_to
+6. Work on the task
+7. On completion: set status = "done", set completed timestamp
+8. Check if any "blocked" tasks now have all dependencies met → set to "ready"
+```
+
+**Cycle detection:** Before starting work, agents should verify the graph has no cycles. A simple check: if following `depends_on` links from any task leads back to itself, the graph is invalid. Log a warning in `LOG.md` and notify the project owner.
+
+**Blocked propagation:** When a task is `blocked` (external blocker, not dependency), all tasks that depend on it are also effectively blocked. Agents skip the entire dependency chain.
+
+### 8.5 Backward Compatibility
+
+- `tasks` and `next_task_id` are **optional** fields in the schema
+- v2 projects (no `tasks` field) continue to work — agents fall back to reading `NEXT_ACTIONS.md` linearly
+- `aahp-manifest.sh` preserves existing task data when regenerating the manifest
+- The `aahp_version` field distinguishes v2 (`"2.0"`) from v3 (`"3.0"`) projects
+
+### 8.6 Manifest Regeneration
+
+When `aahp-manifest.sh` regenerates `MANIFEST.json`, it:
+1. Reads existing `tasks` and `next_task_id` from the current manifest
+2. Regenerates all file entries (checksums, line counts, summaries, token budgets)
+3. Writes the new manifest, preserving the existing task data
+
+Task data is managed by agents directly — the CLI tool never creates or modifies tasks.
 
 ---
 

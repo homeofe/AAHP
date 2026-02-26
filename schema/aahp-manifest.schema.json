@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/homeofe/AAHP/schema/aahp-manifest.schema.json",
   "title": "AAHP Manifest",
-  "description": "Schema for the AI-to-AI Handoff Protocol MANIFEST.json file (v2)",
+  "description": "Schema for the AI-to-AI Handoff Protocol MANIFEST.json file (v2/v3)",
   "type": "object",
   "required": ["aahp_version", "project", "last_session", "files", "quick_context"],
   "properties": {
@@ -102,6 +102,66 @@
           "minimum": 0
         }
       }
+    },
+    "next_task_id": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "v3: Next available task ID counter (e.g., 6 means T-001 through T-005 are assigned)"
+    },
+    "tasks": {
+      "type": "object",
+      "description": "v3: Task registry with dependency graph. Keys are task IDs (T-001, T-002, etc.)",
+      "patternProperties": {
+        "^T-\\d{3,}$": {
+          "type": "object",
+          "required": ["title", "status"],
+          "properties": {
+            "title": {
+              "type": "string",
+              "maxLength": 200,
+              "description": "Short task title"
+            },
+            "status": {
+              "type": "string",
+              "enum": ["ready", "in_progress", "blocked", "done"],
+              "description": "Current task status"
+            },
+            "priority": {
+              "type": "string",
+              "enum": ["critical", "high", "medium", "low"],
+              "description": "Task priority"
+            },
+            "depends_on": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^T-\\d{3,}$"
+              },
+              "description": "Task IDs that must complete before this task can start"
+            },
+            "blocked_by": {
+              "type": "string",
+              "maxLength": 200,
+              "description": "External blocker description (not a task dependency)"
+            },
+            "assigned_to": {
+              "type": "string",
+              "description": "Agent or role currently working on this task"
+            },
+            "created": {
+              "type": "string",
+              "format": "date-time",
+              "description": "When the task was created"
+            },
+            "completed": {
+              "type": "string",
+              "format": "date-time",
+              "description": "When the task was completed"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
     }
   },
   "additionalProperties": false

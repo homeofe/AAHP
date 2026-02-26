@@ -132,15 +132,26 @@ fi
 
 echo -e "${GREEN}[4/6]${NC} Validating MANIFEST.json..."
 
+# Detect Python command (python3 on Linux/macOS, python on Windows)
+# Note: Windows has a python3 Store alias that passes `command -v` but doesn't work,
+# so we verify with an actual invocation.
+PYTHON_CMD=""
+if python3 -c "pass" &>/dev/null 2>&1; then
+    PYTHON_CMD="python3"
+elif python -c "pass" &>/dev/null 2>&1; then
+    PYTHON_CMD="python"
+fi
+
 if [ -f "$HANDOFF_DIR/MANIFEST.json" ]; then
-    # Check it's valid JSON
-    if python3 -c "import json; json.load(open('$HANDOFF_DIR/MANIFEST.json'))" 2>/dev/null; then
+    if [ -z "$PYTHON_CMD" ]; then
+        echo -e "  ${YELLOW}⚠ Python not found. Skipping MANIFEST.json validation.${NC}"
+    elif $PYTHON_CMD -c "import json; json.load(open('$HANDOFF_DIR/MANIFEST.json'))" 2>/dev/null; then
         echo -e "  ${GREEN}✓ Valid JSON.${NC}"
 
         # Check required fields
         REQUIRED_FIELDS=("aahp_version" "project" "last_session" "files" "quick_context")
         for field in "${REQUIRED_FIELDS[@]}"; do
-            if ! python3 -c "import json; d=json.load(open('$HANDOFF_DIR/MANIFEST.json')); assert '$field' in d" 2>/dev/null; then
+            if ! $PYTHON_CMD -c "import json; d=json.load(open('$HANDOFF_DIR/MANIFEST.json')); assert '$field' in d" 2>/dev/null; then
                 echo -e "  ${RED}✗ Missing required field: $field${NC}"
                 VIOLATIONS=$((VIOLATIONS + 1))
             fi
@@ -148,8 +159,9 @@ if [ -f "$HANDOFF_DIR/MANIFEST.json" ]; then
 
         # Verify checksums
         echo "  Verifying checksums..."
-        python3 -c "
-import json, hashlib, os
+        $PYTHON_CMD -c "
+import json, hashlib, os, sys
+sys.stdout.reconfigure(errors='replace')
 manifest = json.load(open('$HANDOFF_DIR/MANIFEST.json'))
 for fname, meta in manifest.get('files', {}).items():
     fpath = os.path.join('$HANDOFF_DIR', fname)
@@ -157,14 +169,14 @@ for fname, meta in manifest.get('files', {}).items():
         actual = 'sha256:' + hashlib.sha256(open(fpath, 'rb').read()).hexdigest()
         expected = meta.get('checksum', '')
         if actual != expected:
-            print(f'  ⚠ Checksum mismatch: {fname}')
+            print(f'  ! Checksum mismatch: {fname}')
             print(f'    Expected: {expected}')
             print(f'    Actual:   {actual}')
         else:
-            print(f'  ✓ {fname}: checksum OK')
+            print(f'  OK: {fname}')
     else:
-        print(f'  ⚠ {fname}: file not found')
-" 2>/dev/null || echo -e "  ${YELLOW}⚠ Could not verify checksums (Python not available)${NC}"
+        print(f'  ! {fname}: file not found')
+" 2>/dev/null || echo -e "  ${YELLOW}⚠ Could not verify checksums (Python error)${NC}"
 
     else
         echo -e "  ${RED}✗ Invalid JSON.${NC}"

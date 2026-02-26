@@ -135,11 +135,37 @@ done
 
 FULL_TOKENS=$((MANIFEST_TOKENS + TOTAL_TOKENS))
 
+# ─── Preserve v3 task data from existing manifest ─────────────
+
+TASKS_JSON=""
+NEXT_TASK_ID=""
+
+if [ -f "$HANDOFF_DIR/MANIFEST.json" ]; then
+    # Extract tasks block and next_task_id if they exist
+    if command -v node &>/dev/null; then
+        EXISTING=$(node -e "
+            const m = JSON.parse(require('fs').readFileSync('$HANDOFF_DIR/MANIFEST.json', 'utf8'));
+            if (m.tasks) process.stdout.write(JSON.stringify(m.tasks));
+        " 2>/dev/null || true)
+        if [ -n "$EXISTING" ]; then
+            TASKS_JSON="$EXISTING"
+        fi
+        EXISTING_ID=$(node -e "
+            const m = JSON.parse(require('fs').readFileSync('$HANDOFF_DIR/MANIFEST.json', 'utf8'));
+            if (m.next_task_id) process.stdout.write(String(m.next_task_id));
+        " 2>/dev/null || true)
+        if [ -n "$EXISTING_ID" ]; then
+            NEXT_TASK_ID="$EXISTING_ID"
+        fi
+    fi
+fi
+
 # ─── Write MANIFEST.json ─────────────────────────────────────
 
-cat > "$HANDOFF_DIR/MANIFEST.json" <<MANIFEST
 {
-  "aahp_version": "2.0",
+    cat <<MANIFEST
+{
+  "aahp_version": "3.0",
   "project": "$PROJECT_NAME",
   "last_session": {
     "agent": "$AGENT",
@@ -157,8 +183,18 @@ cat > "$HANDOFF_DIR/MANIFEST.json" <<MANIFEST
     "manifest_plus_core": $CORE_TOKENS,
     "full_read": $FULL_TOKENS
   }
-}
 MANIFEST
+
+    # Append v3 task fields if they exist
+    if [ -n "$NEXT_TASK_ID" ]; then
+        echo "  ,\"next_task_id\": $NEXT_TASK_ID"
+    fi
+    if [ -n "$TASKS_JSON" ]; then
+        echo "  ,\"tasks\": $TASKS_JSON"
+    fi
+
+    echo "}"
+} > "$HANDOFF_DIR/MANIFEST.json"
 
 # ─── Output ───────────────────────────────────────────────────
 

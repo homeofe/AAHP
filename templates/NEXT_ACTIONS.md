@@ -6,7 +6,7 @@
 
 ---
 
-## 1. [Task Title]
+## T-001: [Task Title]
 
 **Goal:** One sentence describing the desired outcome.
 
@@ -30,7 +30,7 @@
 
 ---
 
-## 2. [Task Title] ⏳ Blocked
+## T-002: [Task Title] ⏳ Blocked
 
 **Goal:** ...
 

@@ -10,6 +10,7 @@
 #   3. PII patterns (emails)
 #   4. MANIFEST.json schema (basic)
 #   5. HANDOFF.lock stale check
+#   6. Parallel agent detection (advisory)
 #
 # Exit codes:
 #   0 = all checks passed
@@ -39,7 +40,7 @@ fi
 
 # ─── Check 1: Prompt Injection Patterns ──────────────────────
 
-echo -e "${GREEN}[1/5]${NC} Checking for prompt injection patterns..."
+echo -e "${GREEN}[1/6]${NC} Checking for prompt injection patterns..."
 
 INJECTION_PATTERNS=(
     "ignore all previous"
@@ -69,7 +70,7 @@ fi
 
 # ─── Check 2: Secrets & API Keys ─────────────────────────────
 
-echo -e "${GREEN}[2/5]${NC} Checking for secrets and API keys..."
+echo -e "${GREEN}[2/6]${NC} Checking for secrets and API keys..."
 
 SECRET_PATTERNS=(
     "sk-[a-zA-Z0-9]"
@@ -105,7 +106,7 @@ fi
 
 # ─── Check 3: PII Patterns ───────────────────────────────────
 
-echo -e "${GREEN}[3/5]${NC} Checking for PII..."
+echo -e "${GREEN}[3/6]${NC} Checking for PII..."
 
 PII_FOUND=0
 # Email check (excluding template/example patterns)
@@ -129,7 +130,7 @@ fi
 
 # ─── Check 4: MANIFEST.json Basic Validation ─────────────────
 
-echo -e "${GREEN}[4/5]${NC} Validating MANIFEST.json..."
+echo -e "${GREEN}[4/6]${NC} Validating MANIFEST.json..."
 
 if [ -f "$HANDOFF_DIR/MANIFEST.json" ]; then
     # Check it's valid JSON
@@ -175,7 +176,7 @@ fi
 
 # ─── Check 5: Stale HANDOFF.lock ─────────────────────────────
 
-echo -e "${GREEN}[5/5]${NC} Checking for stale HANDOFF.lock..."
+echo -e "${GREEN}[5/6]${NC} Checking for stale HANDOFF.lock..."
 
 if [ -f "$HANDOFF_DIR/HANDOFF.lock" ]; then
     echo -e "  ${RED}✗ HANDOFF.lock exists! Previous session may not have completed cleanly.${NC}"
@@ -184,6 +185,33 @@ if [ -f "$HANDOFF_DIR/HANDOFF.lock" ]; then
     VIOLATIONS=$((VIOLATIONS + 1))
 else
     echo -e "  ${GREEN}✓ No stale lock.${NC}"
+fi
+
+# ─── Check 6: Parallel Agent Detection ────────────────────────
+
+echo -e "${GREEN}[6/6]${NC} Checking for parallel agent sessions..."
+
+if command -v git &>/dev/null && git -C "$PROJECT_ROOT" rev-parse --git-dir &>/dev/null 2>&1; then
+    LOCK_BRANCHES=()
+    while IFS= read -r branch; do
+        if git -C "$PROJECT_ROOT" show "$branch:.ai/handoff/HANDOFF.lock" &>/dev/null 2>&1; then
+            LOCK_BRANCHES+=("$branch")
+        fi
+    done < <(git -C "$PROJECT_ROOT" for-each-ref --format='%(refname:short)' refs/heads/)
+
+    if [ ${#LOCK_BRANCHES[@]} -gt 1 ]; then
+        echo -e "  ${YELLOW}⚠ HANDOFF.lock found on multiple branches:${NC}"
+        for b in "${LOCK_BRANCHES[@]}"; do
+            echo "    - $b"
+        done
+        echo "  AAHP is designed for sequential handoff. Ensure agents are working in isolated branches."
+    elif [ ${#LOCK_BRANCHES[@]} -eq 1 ]; then
+        echo -e "  ${YELLOW}⚠ Active session on branch: ${LOCK_BRANCHES[0]}${NC}"
+    else
+        echo -e "  ${GREEN}✓ No active sessions detected across branches.${NC}"
+    fi
+else
+    echo -e "  ${YELLOW}⚠ Not a git repo. Skipping parallel agent check.${NC}"
 fi
 
 # ─── Summary ──────────────────────────────────────────────────

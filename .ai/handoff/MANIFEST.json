@@ -1,0 +1,62 @@
+{
+  "aahp_version": "2.0",
+  "project": "AAHP",
+  "last_session": {
+    "agent": "claude-opus-4.6",
+    "session_id": "cli-1772134606",
+    "timestamp": "2026-02-26T19:36:46Z",
+    "commit": "672be62",
+    "phase": "implementation",
+    "duration_minutes": 0
+  },
+  "files": {
+    "STATUS.md": {
+      "checksum": "sha256:2271c90a1fa62588f4ef6d8a20d517a78c1ef44df0c8b735c9004c645b8c3ef6",
+      "updated": "2026-02-26T19:36:19Z",
+      "lines": 79,
+      "summary": "(no summary available)"
+    },
+    "NEXT_ACTIONS.md": {
+      "checksum": "sha256:84f34c36a66334df67aa7eb8d43a598722c6d7b1e334d7f7a098cead8c145687",
+      "updated": "2026-02-26T19:34:11Z",
+      "lines": 162,
+      "summary": "(no summary available)"
+    },
+    "LOG.md": {
+      "checksum": "sha256:f5cac34bb1bb79bb66ee64a95e3d91f68bd1c42f752c02656d67da58faccb4e4",
+      "updated": "2026-02-26T19:36:28Z",
+      "lines": 73,
+      "summary": "(no summary available)"
+    },
+    "DASHBOARD.md": {
+      "checksum": "sha256:d8fff8a1535b21ee9c980f41d98e807d9fe1f2603ad8c56e9d66d2d350be5957",
+      "updated": "2026-02-26T19:35:45Z",
+      "lines": 81,
+      "summary": "(no summary available)"
+    },
+    "TRUST.md": {
+      "checksum": "sha256:28f45b42aa9433df33dcc8068d60353e7f836848299e9f3b0171a9146d032657",
+      "updated": "2026-02-26T19:36:12Z",
+      "lines": 73,
+      "summary": "(no summary available)"
+    },
+    "CONVENTIONS.md": {
+      "checksum": "sha256:31c9c8354a70a6693516cb8504fb50c67c051f354d4877eaf29bab15578e6523",
+      "updated": "2026-02-26T19:34:49Z",
+      "lines": 65,
+      "summary": "(no summary available)"
+    },
+    "WORKFLOW.md": {
+      "checksum": "sha256:8479f659af62c033589e08c96e6a0777dadf9f46eebd035622392b64bbb6659d",
+      "updated": "2026-02-26T19:35:25Z",
+      "lines": 131,
+      "summary": "(no summary available)"
+    }
+  },
+  "quick_context": "v2 complete. All open questions resolved. Dogfooding AAHP on itself. Next: v3 planning (dependency graphs, task IDs).",
+  "token_budget": {
+    "manifest_only": 85,
+    "manifest_plus_core": 1734,
+    "full_read": 4728
+  }
+}

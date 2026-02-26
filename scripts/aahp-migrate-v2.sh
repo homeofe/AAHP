@@ -18,11 +18,7 @@ HANDOFF_DIR="$PROJECT_ROOT/.ai/handoff"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-# Colors
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-NC='\033[0m'
+source "$SCRIPT_DIR/_aahp-lib.sh"
 
 echo ""
 echo "========================================="
@@ -54,68 +50,12 @@ CHANGES=()
 
 echo -e "${GREEN}[1/5]${NC} Generating MANIFEST.json..."
 
-generate_file_entry() {
-    local file="$1"
-    local filepath="$HANDOFF_DIR/$file"
-    if [ -f "$filepath" ]; then
-        local checksum
-        checksum=$(sha256sum "$filepath" | awk '{print $1}')
-        local updated
-        updated=$(date -r "$filepath" -u +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || stat -c '%y' "$filepath" 2>/dev/null | head -c 19)
-        local lines
-        lines=$(wc -l < "$filepath")
-        local summary
-        summary=$(head -5 "$filepath" | grep -v '^#' | grep -v '^>' | grep -v '^---' | grep -v '^$' | head -1 | cut -c1-150)
-        [ -z "$summary" ] && summary="(no summary available)"
-        echo "    \"$file\": {"
-        echo "      \"checksum\": \"sha256:$checksum\","
-        echo "      \"updated\": \"$updated\","
-        echo "      \"lines\": $lines,"
-        echo "      \"summary\": \"$summary\""
-        echo "    }"
-    fi
-}
-
-# Detect project name
-PROJECT_NAME=$(basename "$(cd "$PROJECT_ROOT" && pwd)")
-
-# Build MANIFEST.json
-{
-    echo "{"
-    echo "  \"aahp_version\": \"2.0\","
-    echo "  \"project\": \"$PROJECT_NAME\","
-    echo "  \"last_session\": {"
-    echo "    \"agent\": \"migration-script\","
-    echo "    \"session_id\": \"migrate-$(date +%s)\","
-    echo "    \"timestamp\": \"$(date -u +"%Y-%m-%dT%H:%M:%SZ")\","
-    echo "    \"commit\": \"$(cd "$PROJECT_ROOT" && git rev-parse --short HEAD 2>/dev/null || echo 'unknown')\","
-    echo "    \"phase\": \"idle\","
-    echo "    \"duration_minutes\": 0"
-    echo "  },"
-    echo "  \"files\": {"
-
-    FIRST=true
-    for file in STATUS.md NEXT_ACTIONS.md LOG.md DASHBOARD.md TRUST.md CONVENTIONS.md WORKFLOW.md; do
-        if [ -f "$HANDOFF_DIR/$file" ]; then
-            if [ "$FIRST" = true ]; then
-                FIRST=false
-            else
-                echo ","
-            fi
-            generate_file_entry "$file"
-        fi
-    done
-    echo ""
-
-    echo "  },"
-    echo "  \"quick_context\": \"Migrated from AAHP v1. Review STATUS.md and NEXT_ACTIONS.md for current state.\","
-    echo "  \"token_budget\": {"
-    echo "    \"manifest_only\": 0,"
-    echo "    \"manifest_plus_core\": 0,"
-    echo "    \"full_read\": 0"
-    echo "  }"
-    echo "}"
-} > "$HANDOFF_DIR/MANIFEST.json"
+"$SCRIPT_DIR/aahp-manifest.sh" "$PROJECT_ROOT" \
+    --agent "migration-script" \
+    --session-id "migrate-$(date +%s)" \
+    --phase idle \
+    --context "Migrated from AAHP v1. Review STATUS.md and NEXT_ACTIONS.md for current state." \
+    --quiet
 
 CHANGES+=("Created MANIFEST.json")
 

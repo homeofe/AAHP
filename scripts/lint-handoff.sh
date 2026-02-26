@@ -145,13 +145,13 @@ fi
 if [ -f "$HANDOFF_DIR/MANIFEST.json" ]; then
     if [ -z "$PYTHON_CMD" ]; then
         echo -e "  ${YELLOW}⚠ Python not found. Skipping MANIFEST.json validation.${NC}"
-    elif $PYTHON_CMD -c "import json; json.load(open('$HANDOFF_DIR/MANIFEST.json'))" 2>/dev/null; then
+    elif "$PYTHON_CMD" -c "import json; json.load(open('$HANDOFF_DIR/MANIFEST.json'))" 2>/dev/null; then
         echo -e "  ${GREEN}✓ Valid JSON.${NC}"
 
         # Check required fields
         REQUIRED_FIELDS=("aahp_version" "project" "last_session" "files" "quick_context")
         for field in "${REQUIRED_FIELDS[@]}"; do
-            if ! $PYTHON_CMD -c "import json; d=json.load(open('$HANDOFF_DIR/MANIFEST.json')); assert '$field' in d" 2>/dev/null; then
+            if ! "$PYTHON_CMD" -c "import json; d=json.load(open('$HANDOFF_DIR/MANIFEST.json')); assert '$field' in d" 2>/dev/null; then
                 echo -e "  ${RED}✗ Missing required field: $field${NC}"
                 VIOLATIONS=$((VIOLATIONS + 1))
             fi
@@ -159,7 +159,7 @@ if [ -f "$HANDOFF_DIR/MANIFEST.json" ]; then
 
         # Verify checksums
         echo "  Verifying checksums..."
-        $PYTHON_CMD -c "
+        "$PYTHON_CMD" -c "
 import json, hashlib, os, sys
 sys.stdout.reconfigure(errors='replace')
 manifest = json.load(open('$HANDOFF_DIR/MANIFEST.json'))

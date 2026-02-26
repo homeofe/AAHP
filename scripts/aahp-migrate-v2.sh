@@ -18,6 +18,7 @@ HANDOFF_DIR="$PROJECT_ROOT/.ai/handoff"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
+# shellcheck source=_aahp-lib.sh
 source "$SCRIPT_DIR/_aahp-lib.sh"
 
 echo ""

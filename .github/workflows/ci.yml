@@ -30,8 +30,8 @@ jobs:
       - name: ShellCheck scripts
         run: |
           shellcheck scripts/_aahp-lib.sh
-          shellcheck scripts/aahp-manifest.sh
-          shellcheck scripts/aahp-migrate-v2.sh
+          shellcheck -x -P scripts/ scripts/aahp-manifest.sh
+          shellcheck -x -P scripts/ scripts/aahp-migrate-v2.sh
           shellcheck scripts/lint-handoff.sh
 
       - name: Lint handoff files

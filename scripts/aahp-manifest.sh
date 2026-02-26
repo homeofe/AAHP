@@ -19,6 +19,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=_aahp-lib.sh
 source "$SCRIPT_DIR/_aahp-lib.sh"
 
 # ─── Defaults ─────────────────────────────────────────────────

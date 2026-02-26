@@ -3,10 +3,10 @@
   "project": "AAHP",
   "last_session": {
     "agent": "claude-opus-4.6",
-    "session_id": "cli-1772138994",
-    "timestamp": "2026-02-26T20:49:54Z",
-    "commit": "5822b87",
-    "phase": "implementation",
+    "session_id": "cli-1772139926",
+    "timestamp": "2026-02-26T21:05:26Z",
+    "commit": "d3735d7",
+    "phase": "fix",
     "duration_minutes": 0
   },
   "files": {
@@ -53,76 +53,12 @@
       "summary": "(no summary available)"
     }
   },
-  "quick_context": "All 5 original tasks complete (T-001 through T-005). CI pipeline, npx CLI, and 48 bats tests added. Next: npm publish (T-006), shellcheck fixes (T-007), bats in CI (T-008).",
+  "quick_context": "All 5 original tasks complete. Fixed shellcheck SC2034, SC1091, SC2086 warnings. CI pipeline, npx CLI, 48 bats tests.",
   "token_budget": {
     "manifest_only": 85,
     "manifest_plus_core": 1542,
     "full_read": 5226
-  },
-  "next_task_id": 9,
-  "tasks": {
-    "T-001": {
-      "title": "Design v3 task dependency graph schema",
-      "status": "done",
-      "priority": "high",
-      "depends_on": [],
-      "created": "2026-02-26T19:34:00Z",
-      "completed": "2026-02-26T20:30:00Z"
-    },
-    "T-002": {
-      "title": "Add task IDs to NEXT_ACTIONS.md and DASHBOARD.md",
-      "status": "done",
-      "priority": "high",
-      "depends_on": [],
-      "created": "2026-02-26T19:34:00Z",
-      "completed": "2026-02-26T20:30:00Z"
-    },
-    "T-003": {
-      "title": "Add GitHub Actions CI pipeline",
-      "status": "done",
-      "priority": "medium",
-      "depends_on": [],
-      "created": "2026-02-26T19:34:00Z",
-      "completed": "2026-02-26T20:45:00Z"
-    },
-    "T-004": {
-      "title": "Create npx-distributable CLI",
-      "status": "done",
-      "priority": "medium",
-      "depends_on": [],
-      "created": "2026-02-26T19:34:00Z",
-      "completed": "2026-02-26T20:45:00Z"
-    },
-    "T-005": {
-      "title": "Add automated script tests (bats)",
-      "status": "done",
-      "priority": "medium",
-      "depends_on": [],
-      "created": "2026-02-26T19:34:00Z",
-      "completed": "2026-02-26T20:45:00Z"
-    },
-    "T-006": {
-      "title": "Publish npm package",
-      "status": "ready",
-      "priority": "low",
-      "depends_on": [],
-      "created": "2026-02-26T20:49:00Z"
-    },
-    "T-007": {
-      "title": "Fix shellcheck warnings in CI",
-      "status": "ready",
-      "priority": "low",
-      "depends_on": [],
-      "created": "2026-02-26T20:49:00Z"
-    },
-    "T-008": {
-      "title": "Add bats tests to CI pipeline",
-      "status": "blocked",
-      "priority": "low",
-      "depends_on": [
-        "T-007"
-      ],
-      "created": "2026-02-26T20:49:00Z"
-    }
   }
+  ,"next_task_id": 9
+  ,"tasks": {"T-001":{"title":"Design v3 task dependency graph schema","status":"done","priority":"high","depends_on":[],"created":"2026-02-26T19:34:00Z","completed":"2026-02-26T20:30:00Z"},"T-002":{"title":"Add task IDs to NEXT_ACTIONS.md and DASHBOARD.md","status":"done","priority":"high","depends_on":[],"created":"2026-02-26T19:34:00Z","completed":"2026-02-26T20:30:00Z"},"T-003":{"title":"Add GitHub Actions CI pipeline","status":"done","priority":"medium","depends_on":[],"created":"2026-02-26T19:34:00Z","completed":"2026-02-26T20:45:00Z"},"T-004":{"title":"Create npx-distributable CLI","status":"done","priority":"medium","depends_on":[],"created":"2026-02-26T19:34:00Z","completed":"2026-02-26T20:45:00Z"},"T-005":{"title":"Add automated script tests (bats)","status":"done","priority":"medium","depends_on":[],"created":"2026-02-26T19:34:00Z","completed":"2026-02-26T20:45:00Z"},"T-006":{"title":"Publish npm package","status":"ready","priority":"low","depends_on":[],"created":"2026-02-26T20:49:00Z"},"T-007":{"title":"Fix shellcheck warnings in CI","status":"ready","priority":"low","depends_on":[],"created":"2026-02-26T20:49:00Z"},"T-008":{"title":"Add bats tests to CI pipeline","status":"blocked","priority":"low","depends_on":["T-007"],"created":"2026-02-26T20:49:00Z"}}
 }

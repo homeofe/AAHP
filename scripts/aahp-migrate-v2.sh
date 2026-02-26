@@ -126,7 +126,7 @@ echo -e "${GREEN}[2/5]${NC} Checking STATUS.md for section markers..."
 if [ -f "$HANDOFF_DIR/STATUS.md" ]; then
     if ! grep -q "<!-- SECTION:" "$HANDOFF_DIR/STATUS.md"; then
         echo -e "${YELLOW}  → No section markers found. Adding them is recommended but requires manual editing.${NC}"
-        echo "  → See AAHP-v2-PROPOSAL.md section 1.2 for the marker format."
+        echo "  → See README.md section 1.2 for the marker format."
     else
         echo "  → Section markers already present."
     fi
@@ -180,7 +180,7 @@ echo -e "${GREEN}[5/5]${NC} Checking TRUST.md for TTL columns..."
 if [ -f "$HANDOFF_DIR/TRUST.md" ]; then
     if ! grep -q "TTL" "$HANDOFF_DIR/TRUST.md"; then
         echo -e "${YELLOW}  → No TTL columns found. Adding TTL is recommended but requires manual editing.${NC}"
-        echo "  → See AAHP-v2-PROPOSAL.md section 2.5 for the TTL format."
+        echo "  → See README.md section 2.5 for the TTL format."
         CHANGES+=("TRUST.md needs TTL columns — manual update recommended")
     else
         echo "  → TTL columns already present."

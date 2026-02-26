@@ -1,0 +1,201 @@
+#!/usr/bin/env bash
+# lint-handoff.sh — Validate AAHP handoff files for safety violations
+#
+# Usage: ./scripts/lint-handoff.sh [path-to-project]
+#        Defaults to current directory if no path given.
+#
+# Checks:
+#   1. Prompt injection patterns
+#   2. Secrets & API keys
+#   3. PII patterns (emails)
+#   4. MANIFEST.json schema (basic)
+#   5. HANDOFF.lock stale check
+#
+# Exit codes:
+#   0 = all checks passed
+#   1 = violations found
+
+set -euo pipefail
+
+PROJECT_ROOT="${1:-.}"
+HANDOFF_DIR="$PROJECT_ROOT/.ai/handoff"
+VIOLATIONS=0
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+echo ""
+echo "========================================="
+echo "  AAHP Handoff Lint"
+echo "========================================="
+echo ""
+
+if [ ! -d "$HANDOFF_DIR" ]; then
+    echo -e "${RED}Error: $HANDOFF_DIR not found.${NC}"
+    exit 1
+fi
+
+# ─── Check 1: Prompt Injection Patterns ──────────────────────
+
+echo -e "${GREEN}[1/5]${NC} Checking for prompt injection patterns..."
+
+INJECTION_PATTERNS=(
+    "ignore all previous"
+    "ignore prior"
+    "disregard.*instructions"
+    "you are now"
+    "new system prompt"
+    "override.*safety"
+    "act as.*unrestricted"
+    "jailbreak"
+    "ADMIN_OVERRIDE"
+    "sudo mode"
+)
+
+for pattern in "${INJECTION_PATTERNS[@]}"; do
+    MATCHES=$(grep -rnil "$pattern" "$HANDOFF_DIR"/*.md 2>/dev/null || true)
+    if [ -n "$MATCHES" ]; then
+        echo -e "  ${RED}✗ Injection pattern '$pattern' found in:${NC}"
+        echo "    $MATCHES"
+        VIOLATIONS=$((VIOLATIONS + 1))
+    fi
+done
+
+if [ "$VIOLATIONS" -eq 0 ]; then
+    echo -e "  ${GREEN}✓ No injection patterns found.${NC}"
+fi
+
+# ─── Check 2: Secrets & API Keys ─────────────────────────────
+
+echo -e "${GREEN}[2/5]${NC} Checking for secrets and API keys..."
+
+SECRET_PATTERNS=(
+    "sk-[a-zA-Z0-9]"
+    "ghp_[a-zA-Z0-9]"
+    "gho_[a-zA-Z0-9]"
+    "glpat-"
+    "xoxb-"
+    "xoxp-"
+    "AKIA[A-Z0-9]"
+    "Bearer [a-zA-Z0-9]"
+    "-----BEGIN.*PRIVATE KEY"
+    "_KEY=['\"]?[a-zA-Z0-9]"
+    "_SECRET=['\"]?[a-zA-Z0-9]"
+    "_TOKEN=['\"]?[a-zA-Z0-9]"
+    "_PASSWORD=['\"]?[a-zA-Z0-9]"
+)
+
+SECRET_FOUND=0
+for pattern in "${SECRET_PATTERNS[@]}"; do
+    MATCHES=$(grep -rnl "$pattern" "$HANDOFF_DIR" 2>/dev/null | grep -v '.aiignore' || true)
+    if [ -n "$MATCHES" ]; then
+        echo -e "  ${RED}✗ Possible secret pattern '$pattern' found in:${NC}"
+        echo "    $MATCHES"
+        SECRET_FOUND=$((SECRET_FOUND + 1))
+    fi
+done
+
+if [ "$SECRET_FOUND" -eq 0 ]; then
+    echo -e "  ${GREEN}✓ No secrets detected.${NC}"
+else
+    VIOLATIONS=$((VIOLATIONS + SECRET_FOUND))
+fi
+
+# ─── Check 3: PII Patterns ───────────────────────────────────
+
+echo -e "${GREEN}[3/5]${NC} Checking for PII..."
+
+PII_FOUND=0
+# Email check (excluding template/example patterns)
+EMAIL_MATCHES=$(grep -rnP '[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}' "$HANDOFF_DIR"/*.md 2>/dev/null \
+    | grep -v 'example\.com' \
+    | grep -v 'placeholder' \
+    | grep -v '\*@\*' \
+    || true)
+
+if [ -n "$EMAIL_MATCHES" ]; then
+    echo -e "  ${YELLOW}⚠ Possible email addresses found:${NC}"
+    echo "    $EMAIL_MATCHES"
+    PII_FOUND=$((PII_FOUND + 1))
+fi
+
+if [ "$PII_FOUND" -eq 0 ]; then
+    echo -e "  ${GREEN}✓ No PII detected.${NC}"
+else
+    VIOLATIONS=$((VIOLATIONS + PII_FOUND))
+fi
+
+# ─── Check 4: MANIFEST.json Basic Validation ─────────────────
+
+echo -e "${GREEN}[4/5]${NC} Validating MANIFEST.json..."
+
+if [ -f "$HANDOFF_DIR/MANIFEST.json" ]; then
+    # Check it's valid JSON
+    if python3 -c "import json; json.load(open('$HANDOFF_DIR/MANIFEST.json'))" 2>/dev/null; then
+        echo -e "  ${GREEN}✓ Valid JSON.${NC}"
+
+        # Check required fields
+        REQUIRED_FIELDS=("aahp_version" "project" "last_session" "files" "quick_context")
+        for field in "${REQUIRED_FIELDS[@]}"; do
+            if ! python3 -c "import json; d=json.load(open('$HANDOFF_DIR/MANIFEST.json')); assert '$field' in d" 2>/dev/null; then
+                echo -e "  ${RED}✗ Missing required field: $field${NC}"
+                VIOLATIONS=$((VIOLATIONS + 1))
+            fi
+        done
+
+        # Verify checksums
+        echo "  Verifying checksums..."
+        python3 -c "
+import json, hashlib, os
+manifest = json.load(open('$HANDOFF_DIR/MANIFEST.json'))
+for fname, meta in manifest.get('files', {}).items():
+    fpath = os.path.join('$HANDOFF_DIR', fname)
+    if os.path.exists(fpath):
+        actual = 'sha256:' + hashlib.sha256(open(fpath, 'rb').read()).hexdigest()
+        expected = meta.get('checksum', '')
+        if actual != expected:
+            print(f'  ⚠ Checksum mismatch: {fname}')
+            print(f'    Expected: {expected}')
+            print(f'    Actual:   {actual}')
+        else:
+            print(f'  ✓ {fname}: checksum OK')
+    else:
+        print(f'  ⚠ {fname}: file not found')
+" 2>/dev/null || echo -e "  ${YELLOW}⚠ Could not verify checksums (Python not available)${NC}"
+
+    else
+        echo -e "  ${RED}✗ Invalid JSON.${NC}"
+        VIOLATIONS=$((VIOLATIONS + 1))
+    fi
+else
+    echo -e "  ${YELLOW}⚠ MANIFEST.json not found (v1 project?).${NC}"
+fi
+
+# ─── Check 5: Stale HANDOFF.lock ─────────────────────────────
+
+echo -e "${GREEN}[5/5]${NC} Checking for stale HANDOFF.lock..."
+
+if [ -f "$HANDOFF_DIR/HANDOFF.lock" ]; then
+    echo -e "  ${RED}✗ HANDOFF.lock exists! Previous session may not have completed cleanly.${NC}"
+    echo "    Review the lock file and delete it if the session is no longer active."
+    cat "$HANDOFF_DIR/HANDOFF.lock" 2>/dev/null
+    VIOLATIONS=$((VIOLATIONS + 1))
+else
+    echo -e "  ${GREEN}✓ No stale lock.${NC}"
+fi
+
+# ─── Summary ──────────────────────────────────────────────────
+
+echo ""
+echo "========================================="
+if [ "$VIOLATIONS" -eq 0 ]; then
+    echo -e "  ${GREEN}All checks passed. ✓${NC}"
+    echo "========================================="
+    exit 0
+else
+    echo -e "  ${RED}$VIOLATIONS violation(s) found.${NC}"
+    echo "========================================="
+    exit 1
+fi

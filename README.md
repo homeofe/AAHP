@@ -1,10 +1,10 @@
-# AAHP v2 Proposal: Efficiency, Safety & Robustness
+# AAHP: AI-to-AI Handoff Protocol (v2/v3)
 
-> Extending the AI-to-AI Handoff Protocol to reduce token burn, harden security, and survive real-world failures.
+> A file-based protocol for sequential context handoff between AI agents. Optimized for token efficiency, safety hardening, and failure recovery.
 
 ---
 
-## The Problem with v1
+## The Problem v2 Solves
 
 AAHP v1 works. But in practice, three pain points emerge at scale:
 
@@ -22,10 +22,10 @@ The single biggest token saver. Instead of reading every file, the agent reads a
 
 ```json
 {
-  "aahp_version": "2.0",
+  "aahp_version": "3.0",
   "project": "my-project",
   "last_session": {
-    "agent": "claude-sonnet-4.5",
+    "agent": "claude-opus-4.6",
     "timestamp": "2026-02-26T14:30:00Z",
     "commit": "abc1234",
     "phase": "implementation",
@@ -169,8 +169,8 @@ Handoff files are read by LLMs. A malicious or compromised agent could inject in
 Every entry in `LOG.md` and every update to `STATUS.md` must include:
 
 ```markdown
-> **Agent:** claude-sonnet-4.5
-> **Session ID:** sess_abc123  
+> **Agent:** claude-opus-4.6
+> **Session ID:** sess_abc123
 > **Timestamp:** 2026-02-26T14:30:00Z
 > **Commit before:** abc1234
 > **Commit after:** def5678
@@ -301,7 +301,7 @@ This takes ~100 tokens but prevents cascading failures.
 
 ---
 
-## 4. Proposed v2 Directory Structure
+## 4. Directory Structure
 
 ```bash
 .ai/handoff/
@@ -320,9 +320,9 @@ This takes ~100 tokens but prevents cascading failures.
 
 ---
 
-## 5. Migration from v1 → v2
+## 5. Migration from v1 → v2/v3
 
-v2 is fully backward compatible. An agent encountering a v1 directory (no `MANIFEST.json`) simply falls back to reading all files — which is exactly v1 behavior.
+v2/v3 is fully backward compatible. An agent encountering a v1 directory (no `MANIFEST.json`) simply falls back to reading all files — which is exactly v1 behavior. v3 adds optional task IDs and dependency graphs on top of v2 — see Section 8.
 
 **Migration steps:**
 
@@ -374,7 +374,7 @@ These questions were open in the initial v2 proposal and have been resolved:
 ./scripts/aahp-manifest.sh [path-to-project]
 
 # With agent metadata (typically called by the outgoing agent)
-./scripts/aahp-manifest.sh . --agent "claude-sonnet-4.5" --phase implementation \
+./scripts/aahp-manifest.sh . --agent "claude-opus-4.6" --phase implementation \
   --context "Auth service complete. Next: fix CORS header."
 
 # Options:
@@ -532,4 +532,4 @@ Task data is managed by agents directly — the CLI tool never creates or modifi
 
 ---
 
-*This proposal is a living document. Feedback welcome at [github.com/homeofe/AAHP](https://github.com/homeofe/AAHP).*
+*This specification is a living document. Feedback welcome at [github.com/homeofe/AAHP](https://github.com/homeofe/AAHP).*

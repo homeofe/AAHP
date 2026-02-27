@@ -37,6 +37,7 @@ jobs:
           shellcheck -x -P scripts/ scripts/aahp-migrate-v2.sh
           shellcheck scripts/lint-handoff.sh
           shellcheck tests/run.sh
+          shellcheck tests/test_helper.bash
 
       - name: Lint handoff files
         run: bash scripts/lint-handoff.sh .

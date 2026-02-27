@@ -38,6 +38,9 @@ setup() {
 
     # Initialise a git repo so scripts that call git don't fail
     git init -q "$TEST_TMPDIR"
+    # Configure user identity (required on CI where global config may be absent)
+    git -C "$TEST_TMPDIR" config user.name "test"
+    git -C "$TEST_TMPDIR" config user.email "test@test.local"
     # Create an initial commit so HEAD exists
     git -C "$TEST_TMPDIR" commit --allow-empty -m "init" -q
 }

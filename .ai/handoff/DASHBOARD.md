@@ -52,9 +52,9 @@
 
 | Field | Value |
 |-------|-------|
-| Current task | T-006 prepared, blocked on npm auth |
-| Phase | fix |
-| Last completed | T-006 (preparation) |
+| Current task | All tasks complete |
+| Phase | done |
+| Last completed | T-008: Add bats tests to CI (2026-02-27) |
 | Rate limit | None |
 
 ---
@@ -63,9 +63,7 @@
 
 | ID | Task | Priority | Depends on | Ready? |
 |----|------|----------|-----------|--------|
-| T-006 | Publish npm package | LOW | - | ⏳ Blocked (npm auth) |
-| T-007 | Fix shellcheck warnings | LOW | - | ✅ Ready |
-| T-008 | Add bats tests to CI | LOW | T-007 | ⏳ Blocked |
+| - | (no open tasks) | - | - | - |
 
 ## Completed Tasks
 
@@ -76,6 +74,9 @@
 | T-003 | Add GitHub Actions CI pipeline | 2026-02-26 |
 | T-004 | Create npx-distributable CLI | 2026-02-26 |
 | T-005 | Add automated script tests (bats) | 2026-02-26 |
+| T-006 | Publish npm package | 2026-02-27 |
+| T-007 | Fix shellcheck warnings in CI | 2026-02-27 |
+| T-008 | Add bats tests to CI pipeline | 2026-02-27 |
 
 ---
 

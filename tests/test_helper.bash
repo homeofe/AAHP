@@ -3,8 +3,10 @@
 
 # Resolve the repo root (parent of tests/)
 # Exported because .bats test files consume these after sourcing this helper
-export AAHP_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-export SCRIPTS_DIR="$AAHP_ROOT/scripts"
+AAHP_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+export AAHP_ROOT
+SCRIPTS_DIR="$AAHP_ROOT/scripts"
+export SCRIPTS_DIR
 
 # ─── Cross-platform path helper ─────────────────────────────
 # On Windows Git Bash, mktemp returns /tmp/... which native tools (python, node)

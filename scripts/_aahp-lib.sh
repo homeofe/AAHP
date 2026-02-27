@@ -49,7 +49,7 @@ aahp_auto_summary() {
     local summary
     summary=$(head -5 "$filepath" \
         | grep -v '^#' | grep -v '^>' | grep -v '^---' | grep -v '^$' \
-        | head -1 | cut -c1-150)
+        | head -1 | cut -c1-150 || true)
     [ -z "$summary" ] && summary="(no summary available)"
     # Escape double quotes and backslashes for JSON safety
     summary=$(echo "$summary" | sed 's/\\/\\\\/g; s/"/\\"/g')

@@ -6,6 +6,35 @@
 
 ---
 
+## [2026-02-27] Claude Opus 4.6: T-006 npm publish preparation
+
+**Agent:** Claude Opus 4.6
+**Phase:** fix
+**Branch:** main
+**Tasks:** T-006
+
+### What was done
+
+- Verified package name `aahp` is available on npm registry (404)
+- Verified `npm pack --dry-run` produces correct tarball: 19 files, 26.2 kB, all expected contents
+- Added `scripts.test` and `scripts.prepublishOnly` to `package.json` (test-before-publish)
+- Ran all 48 bats tests - all passing
+- Attempted `npm publish --access public` - blocked by npm authentication (ENEEDAUTH)
+- Attempted `npm login` - requires interactive browser authentication
+- Updated all handoff files to reflect current state
+
+### Decisions made
+
+- Added `prepublishOnly` script to prevent publishing with failing tests
+- T-006 marked as blocked: package fully prepared, npm login requires human interaction
+- Remaining steps for human: `npm login` then `npm publish --access public`
+
+### Blockers
+
+- npm authentication requires interactive browser login - cannot be completed by agent
+
+---
+
 ## [2026-02-26] Claude Opus 4.6: Complete T-003, T-004, T-005 -CI, CLI, Tests
 
 **Agent:** Claude Opus 4.6

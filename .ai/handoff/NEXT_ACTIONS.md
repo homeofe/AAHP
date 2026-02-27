@@ -6,20 +6,21 @@
 
 ---
 
-## T-006: Publish npm package
+## T-006: Publish npm package (BLOCKED - needs npm login)
 
 **Goal:** Publish the `aahp` CLI to the npm registry so users can `npx aahp init`.
 
 **Context:**
-- `package.json` and `bin/aahp.js` are complete and tested
-- All subcommands work: init, manifest, lint, migrate
-- Package name `aahp` may or may not be available on npm
+- `package.json` fully prepared: `test` and `prepublishOnly` scripts added
+- `npm pack --dry-run` verified: 19 files, 26.2 kB tarball, correct contents
+- Package name `aahp` confirmed available on npm (404 on registry)
+- All 48 bats tests pass
+- **Blocked:** npm requires interactive browser authentication (`npm login`)
 
-**What to do:**
-1. Verify `aahp` is available on npm (`npm view aahp` -should return 404)
-2. If taken, use `@aahp/cli` as scoped package name
-3. Run `npm publish` (requires npm login with publish access)
-4. Test with `npx aahp --version` from a clean directory
+**What remains (manual steps):**
+1. Run `npm login` in an interactive terminal (opens browser for auth)
+2. Run `npm publish --access public` (prepublishOnly will run tests first)
+3. Test with `npx aahp --version` from a clean directory
 
 **Definition of done:**
 - [ ] Package published to npm

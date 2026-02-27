@@ -3,47 +3,47 @@
   "project": "AAHP",
   "last_session": {
     "agent": "claude-opus-4.6",
-    "session_id": "cli-1772142518",
-    "timestamp": "2026-02-26T21:48:38Z",
-    "commit": "bedce57",
+    "session_id": "cli-1772159869",
+    "timestamp": "2026-02-27T02:37:49Z",
+    "commit": "156b08c",
     "phase": "fix",
     "duration_minutes": 0
   },
   "files": {
     "STATUS.md": {
-      "checksum": "sha256:c36d80b8dbc1be19bde206dd73f8ada286934504a7780adeb6541adb0ea7658f",
-      "updated": "2026-02-26T21:48:14Z",
-      "lines": 83,
+      "checksum": "sha256:158aaffcda9c65b0b3098429c904096e47938a89b332c8723508006a937e5bf9",
+      "updated": "2026-02-27T02:36:51Z",
+      "lines": 84,
       "summary": "(no summary available)"
     },
     "NEXT_ACTIONS.md": {
-      "checksum": "sha256:fe1e628a2a1e99c1d72c61da62e40d1ff6b8ebdbeae08d1982bb67ef64c3904d",
-      "updated": "2026-02-26T21:48:14Z",
-      "lines": 95,
+      "checksum": "sha256:de68688a26a8025dd8918dccf80fb2b0c2a02a0a7433dd7a7ca8f916cdafe79b",
+      "updated": "2026-02-27T02:37:03Z",
+      "lines": 96,
       "summary": "(no summary available)"
     },
     "LOG.md": {
-      "checksum": "sha256:591faa1c14802ee8fc2653ababcc962538c8b9d9ff08228e07b734372c4a7cc9",
-      "updated": "2026-02-26T21:48:14Z",
-      "lines": 132,
+      "checksum": "sha256:4dab506dea6233021c3df3ad4ba567ed4f2544d2061635d7baf506ed5bfcdbeb",
+      "updated": "2026-02-27T02:37:33Z",
+      "lines": 161,
       "summary": "(no summary available)"
     },
     "DASHBOARD.md": {
-      "checksum": "sha256:7bdbf94a54df73f6529d12504fb88e90b108dbd0391cdedcda175ac0553c9b59",
-      "updated": "2026-02-26T20:49:08Z",
+      "checksum": "sha256:db1743717856fb6d6c3391a9782885ba297bf1af4ad10fa1f3d9c4f80a6b36e7",
+      "updated": "2026-02-27T02:37:14Z",
       "lines": 95,
       "summary": "(no summary available)"
     },
     "TRUST.md": {
-      "checksum": "sha256:28f45b42aa9433df33dcc8068d60353e7f836848299e9f3b0171a9146d032657",
-      "updated": "2026-02-26T19:36:12Z",
+      "checksum": "sha256:a8644d3b7f6532681696afffde5247284b1d49f54790fbb153c5126b256490db",
+      "updated": "2026-02-26T22:36:19Z",
       "lines": 73,
       "summary": "(no summary available)"
     },
     "CONVENTIONS.md": {
-      "checksum": "sha256:20148ad9c04d303a0b2a46047baf6819fdf4066f8b2d362bc09ac92c8cd6b1ee",
-      "updated": "2026-02-26T21:48:14Z",
-      "lines": 65,
+      "checksum": "sha256:2de48ce88e2d7c64f8c95ce0a4bfaa4a01136f4085c48932993cd452a5b86a9f",
+      "updated": "2026-02-27T02:19:15Z",
+      "lines": 85,
       "summary": "(no summary available)"
     },
     "WORKFLOW.md": {
@@ -53,12 +53,12 @@
       "summary": "(no summary available)"
     }
   },
-  "quick_context": "All 5 original tasks complete. CI pipeline, npx CLI, 48 bats tests. Em dashes removed.",
+  "quick_context": "T-006 npm publish prepared: package verified, name available, prepublishOnly added. Blocked on npm login (interactive auth). User must run: npm login && npm publish --access public.",
   "token_budget": {
     "manifest_only": 85,
-    "manifest_plus_core": 1536,
-    "full_read": 5201
+    "manifest_plus_core": 1588,
+    "full_read": 5717
   }
   ,"next_task_id": 9
-  ,"tasks": {"T-001":{"title":"Design v3 task dependency graph schema","status":"done","priority":"high","depends_on":[],"created":"2026-02-26T19:34:00Z","completed":"2026-02-26T20:30:00Z"},"T-002":{"title":"Add task IDs to NEXT_ACTIONS.md and DASHBOARD.md","status":"done","priority":"high","depends_on":[],"created":"2026-02-26T19:34:00Z","completed":"2026-02-26T20:30:00Z"},"T-003":{"title":"Add GitHub Actions CI pipeline","status":"done","priority":"medium","depends_on":[],"created":"2026-02-26T19:34:00Z","completed":"2026-02-26T20:45:00Z"},"T-004":{"title":"Create npx-distributable CLI","status":"done","priority":"medium","depends_on":[],"created":"2026-02-26T19:34:00Z","completed":"2026-02-26T20:45:00Z"},"T-005":{"title":"Add automated script tests (bats)","status":"done","priority":"medium","depends_on":[],"created":"2026-02-26T19:34:00Z","completed":"2026-02-26T20:45:00Z"},"T-006":{"title":"Publish npm package","status":"ready","priority":"low","depends_on":[],"created":"2026-02-26T20:49:00Z"},"T-007":{"title":"Fix shellcheck warnings in CI","status":"ready","priority":"low","depends_on":[],"created":"2026-02-26T20:49:00Z"},"T-008":{"title":"Add bats tests to CI pipeline","status":"blocked","priority":"low","depends_on":["T-007"],"created":"2026-02-26T20:49:00Z"}}
+  ,"tasks": {"T-001":{"title":"Design v3 task dependency graph schema","status":"done","priority":"high","depends_on":[],"created":"2026-02-26T19:34:00Z","completed":"2026-02-26T20:30:00Z"},"T-002":{"title":"Add task IDs to NEXT_ACTIONS.md and DASHBOARD.md","status":"done","priority":"high","depends_on":[],"created":"2026-02-26T19:34:00Z","completed":"2026-02-26T20:30:00Z"},"T-003":{"title":"Add GitHub Actions CI pipeline","status":"done","priority":"medium","depends_on":[],"created":"2026-02-26T19:34:00Z","completed":"2026-02-26T20:45:00Z"},"T-004":{"title":"Create npx-distributable CLI","status":"done","priority":"medium","depends_on":[],"created":"2026-02-26T19:34:00Z","completed":"2026-02-26T20:45:00Z"},"T-005":{"title":"Add automated script tests (bats)","status":"done","priority":"medium","depends_on":[],"created":"2026-02-26T19:34:00Z","completed":"2026-02-26T20:45:00Z"},"T-006":{"title":"Publish npm package","status":"blocked","priority":"low","depends_on":[],"blocked_by":"npm login requires interactive browser authentication","created":"2026-02-26T20:49:00Z"},"T-007":{"title":"Fix shellcheck warnings in CI","status":"ready","priority":"low","depends_on":[],"created":"2026-02-26T20:49:00Z"},"T-008":{"title":"Add bats tests to CI pipeline","status":"blocked","priority":"low","depends_on":["T-007"],"created":"2026-02-26T20:49:00Z"}}
 }

@@ -1,6 +1,6 @@
 # AAHP: Current State of the Nation
 
-> Last updated: 2026-02-26 by Claude Opus 4.6
+> Last updated: 2026-02-27 by Claude Opus 4.6
 > Commit: (pending)
 >
 > **Rule:** This file is rewritten (not appended) at the end of every session.
@@ -9,10 +9,10 @@
 ---
 
 <!-- SECTION: summary -->
-AAHP v3 complete. All 5 tasks (T-001 through T-005) are done. The project now has:
-full v2/v3 specification, 10 templates, CLI tooling (`npx aahp`), GitHub Actions CI
-pipeline, and 48 automated bats tests covering all scripts. README updated for v3.
-Cross-platform fixes applied (Windows Python detection, Unicode encoding).
+AAHP v3 complete. All 5 original tasks done. T-006 (npm publish) prepared: package.json
+has test/prepublishOnly scripts, `npm pack --dry-run` verified 19 files, name `aahp`
+available on npm. Blocked on npm authentication (requires `npm login` in interactive
+terminal). 48 bats tests passing. Next: user runs `npm login` then `npm publish --access public`.
 <!-- /SECTION: summary -->
 
 ---
@@ -57,7 +57,7 @@ Cross-platform fixes applied (Windows Python detection, Unicode encoding).
 
 | Gap | Severity | Description |
 |-----|----------|-------------|
-| npm publish | LOW | Package not yet published to npm registry |
+| npm publish | LOW | Package verified and ready; needs `npm login` then `npm publish --access public` |
 | shellcheck fixes | LOW | Scripts may need fixes once shellcheck runs in CI |
 | CI run | LOW | Workflow created but not yet triggered on GitHub |
 <!-- /SECTION: what_is_missing -->
@@ -79,5 +79,6 @@ Cross-platform fixes applied (Windows Python detection, Unicode encoding).
 ## Trust Levels
 
 - **(Verified)**: All scripts produce correct output, 48/48 bats tests pass, lint passes, CLI works
-- **(Assumed)**: CI pipeline will pass on GitHub (created but not yet triggered), npm publish will work
+- **(Verified)**: `npm pack --dry-run` produces correct tarball (19 files, 26.2 kB), name `aahp` available on npm
+- **(Assumed)**: CI pipeline will pass on GitHub (created but not yet triggered)
 - **(Unknown)**: shellcheck compliance (may require script fixes), macOS shasum fallback

@@ -44,7 +44,7 @@
 |-----------|--------|---------|
 | GitHub repo | ✅ | - |
 | GitHub Actions CI | ✅ Created | Not yet triggered (T-007) |
-| npm package | ⏳ Not published | Needs npm login (T-006) |
+| npm package | ⏳ Ready to publish | Needs `npm login` then `npm publish --access public` (T-006) |
 
 ---
 
@@ -52,9 +52,9 @@
 
 | Field | Value |
 |-------|-------|
-| Current task | All original tasks complete (T-001 through T-005) |
-| Phase | implementation |
-| Last completed | T-003, T-004, T-005 |
+| Current task | T-006 prepared, blocked on npm auth |
+| Phase | fix |
+| Last completed | T-006 (preparation) |
 | Rate limit | None |
 
 ---
@@ -63,7 +63,7 @@
 
 | ID | Task | Priority | Depends on | Ready? |
 |----|------|----------|-----------|--------|
-| T-006 | Publish npm package | LOW | - | ✅ Ready |
+| T-006 | Publish npm package | LOW | - | ⏳ Blocked (npm auth) |
 | T-007 | Fix shellcheck warnings | LOW | - | ✅ Ready |
 | T-008 | Add bats tests to CI | LOW | T-007 | ⏳ Blocked |
 

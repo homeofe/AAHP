@@ -37,6 +37,10 @@
     "node": ">=18"
   },
   "type": "module",
+  "scripts": {
+    "test": "npx bats tests/",
+    "prepublishOnly": "npm test"
+  },
   "devDependencies": {
     "bats": "^1.13.0"
   }

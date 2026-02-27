@@ -47,7 +47,7 @@ Commit format:
 
 ## Formatting
 
-- **No em dashes (`—`)**: Never use Unicode em dashes in any file (code, docs, comments, templates). They break shell scripts, cause encoding errors on Windows (cp1252), and corrupt JSON. Use a regular hyphen (`-`) instead.
+- **No em dashes (`-`)**: Never use Unicode em dashes in any file (code, docs, comments, templates). They break shell scripts, cause encoding errors on Windows (cp1252), and corrupt JSON. Use a regular hyphen (`-`) instead.
 
 ## What Agents Must NOT Do
 
@@ -55,7 +55,7 @@ Commit format:
 - Install new dependencies without documenting the reason
 - Write secrets or credentials into source files
 - Delete existing tests (fix or replace instead)
-- Use em dashes (`—`) anywhere in the codebase
+- Use em dashes (`-`) anywhere in the codebase
 
 ---
 

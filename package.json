@@ -1,27 +1,37 @@
 {
   "name": "aahp",
   "version": "3.0.0",
-  "description": "AI-to-AI Handoff Protocol -CLI tools for managing agent handoff files",
+  "description": "AI-to-AI Handoff Protocol - CLI tools for managing agent handoff files",
+  "author": "Elvatis - Emre Kohler",
   "bin": {
-    "aahp": "./bin/aahp.js"
+    "aahp": "bin/aahp.js"
   },
   "keywords": [
     "ai",
     "handoff",
     "protocol",
     "agent",
-    "llm"
+    "llm",
+    "ai-agent",
+    "context-handoff",
+    "multi-agent"
   ],
   "license": "CC-BY-4.0",
   "repository": {
     "type": "git",
-    "url": "https://github.com/homeofe/AAHP"
+    "url": "git+https://github.com/homeofe/AAHP.git"
+  },
+  "homepage": "https://github.com/homeofe/AAHP#readme",
+  "bugs": {
+    "url": "https://github.com/homeofe/AAHP/issues"
   },
   "files": [
     "bin/",
     "scripts/",
     "templates/",
-    "schema/"
+    "schema/",
+    "LICENSE",
+    "README.md"
   ],
   "engines": {
     "node": ">=18"

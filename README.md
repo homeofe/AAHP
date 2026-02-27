@@ -540,4 +540,4 @@ Task data is managed by agents directly -the CLI tool never creates or modifies 
 
 **© 2026 Elvatis – Emre Kohler**
 Licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) as of 2026-02-27.
-You are free to share and adapt with attribution. Earlier commits contained an MIT license header — the CC BY 4.0 license applies to all current and future versions of this specification.
+You are free to share and adapt with attribution. Earlier commits contained an MIT license header - the CC BY 4.0 license applies to all current and future versions of this specification.

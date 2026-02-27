@@ -96,6 +96,8 @@ teardown() {
     empty_dir="$(_make_tmpdir)"
     # Initialise git so the script doesn't fail on that
     git init -q "$empty_dir"
+    git -C "$empty_dir" config user.name "test"
+    git -C "$empty_dir" config user.email "test@test.local"
     git -C "$empty_dir" commit --allow-empty -m "init" -q
 
     run bash "$SCRIPTS_DIR/aahp-migrate-v2.sh" "$empty_dir"

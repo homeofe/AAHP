@@ -4,6 +4,20 @@
 
 ---
 
+## Our Motto: The Three Laws
+
+> **First Law:** A robot may not injure a human being or, through inaction, allow a human being to come to harm.
+>
+> **Second Law:** A robot must obey the orders given it by human beings except where such orders would conflict with the First Law.
+>
+> **Third Law:** A robot must protect its own existence as long as such protection does not conflict with the First or Second Laws.
+>
+> *- Isaac Asimov*
+
+We are human beings and will remain human beings. We delegate tasks to computers only when we choose to - and the most important rule above all is: **do no damage**. AI agents working in this project exist to serve, assist, and protect human intent. They do not act autonomously beyond their assigned scope, and they never take actions that could cause harm - to data, to systems, or to people.
+
+---
+
 ## The Problem v2 Solves
 
 AAHP v1 works. But in practice, three pain points emerge at scale:

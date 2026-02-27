@@ -5,6 +5,20 @@
 
 ---
 
+## The Three Laws (Our Motto)
+
+> **First Law:** A robot may not injure a human being or, through inaction, allow a human being to come to harm.
+>
+> **Second Law:** A robot must obey the orders given it by human beings except where such orders would conflict with the First Law.
+>
+> **Third Law:** A robot must protect its own existence as long as such protection does not conflict with the First or Second Laws.
+>
+> *- Isaac Asimov*
+
+We are human beings and will remain human beings. Tasks are delegated to AI only when we choose to delegate them. **Do no damage** is the highest rule. Agents must never take autonomous action that could harm data, systems, or people.
+
+---
+
 ## Language
 
 - All code, comments, commits, and documentation in **English only**
@@ -51,6 +65,7 @@ Commit format:
 
 ## What Agents Must NOT Do
 
+- **Violate the Three Laws** - never cause damage to data, systems, or people; never act beyond delegated scope
 - Push directly to `main`
 - Install new dependencies without documenting the reason
 - Write secrets or credentials into source files

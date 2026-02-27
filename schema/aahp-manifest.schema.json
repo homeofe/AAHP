@@ -1,6 +1,6 @@
-{
+﻿{
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/homeofe/AAHP/schema/aahp-manifest.schema.json",
+  "$id": "https://github.com/elvatis/AAHP/schema/aahp-manifest.schema.json",
   "title": "AAHP Manifest",
   "description": "Schema for the AI-to-AI Handoff Protocol MANIFEST.json file (v2/v3)",
   "type": "object",

@@ -1,4 +1,4 @@
-{
+﻿{
   "name": "aahp",
   "version": "3.0.0",
   "description": "AI-to-AI Handoff Protocol - CLI tools for managing agent handoff files",
@@ -19,11 +19,11 @@
   "license": "CC-BY-4.0",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/homeofe/AAHP.git"
+    "url": "git+https://github.com/elvatis/AAHP.git"
   },
-  "homepage": "https://github.com/homeofe/AAHP#readme",
+  "homepage": "https://github.com/elvatis/AAHP#readme",
   "bugs": {
-    "url": "https://github.com/homeofe/AAHP/issues"
+    "url": "https://github.com/elvatis/AAHP/issues"
   },
   "files": [
     "bin/",

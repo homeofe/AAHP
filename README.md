@@ -1,4 +1,4 @@
-# AAHP: AI-to-AI Handoff Protocol (v2/v3)
+﻿# AAHP: AI-to-AI Handoff Protocol (v2/v3)
 
 > A file-based protocol for sequential context handoff between AI agents. Optimized for token efficiency, safety hardening, and failure recovery.
 
@@ -546,7 +546,7 @@ Task data is managed by agents directly -the CLI tool never creates or modifies 
 
 ---
 
-*This specification is a living document. Feedback welcome at [github.com/homeofe/AAHP](https://github.com/homeofe/AAHP).*
+*This specification is a living document. Feedback welcome at [github.com/elvatis/AAHP](https://github.com/elvatis/AAHP).*
 
 ---
 

@@ -23,11 +23,7 @@ teardown() {
 
     # Run the migration -pipe 'y' to handle the prompt if MANIFEST already exists
     # (shouldn't be needed here but safe)
-    run bash -c "echo n | bash '$SCRIPTS_DIR/aahp-migrate-v2.sh' '$TEST_TMPDIR' 2>&1"
-    if [ "$status" -ne 0 ]; then
-        echo "# Migration failed (status=$status). Output:" >&3
-        echo "# $output" >&3
-    fi
+    run bash -c "echo n | bash '$SCRIPTS_DIR/aahp-migrate-v2.sh' '$TEST_TMPDIR'"
     [ "$status" -eq 0 ]
 
     # Verify MANIFEST.json was created

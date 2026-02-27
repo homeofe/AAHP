@@ -51,7 +51,7 @@ CHANGES=()
 
 echo -e "${GREEN}[1/5]${NC} Generating MANIFEST.json..."
 
-"$SCRIPT_DIR/aahp-manifest.sh" "$PROJECT_ROOT" \
+bash "$SCRIPT_DIR/aahp-manifest.sh" "$PROJECT_ROOT" \
     --agent "migration-script" \
     --session-id "migrate-$(date +%s)" \
     --phase idle \

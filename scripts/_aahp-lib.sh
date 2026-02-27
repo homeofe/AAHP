@@ -34,8 +34,8 @@ aahp_checksum() {
 # Get file modification time in ISO 8601 UTC
 aahp_file_mtime() {
     local filepath="$1"
-    date -r "$filepath" -u +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null \
-        || stat -c '%y' "$filepath" 2>/dev/null | head -c 19
+    date -r "$filepath" -u +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null ||
+        stat -c '%y' "$filepath" 2>/dev/null | head -c 19
 }
 
 # Get line count

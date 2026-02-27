@@ -1,0 +1,4 @@
+# Enforce LF line endings for shell scripts (prevents CRLF shellcheck errors)
+*.sh text eol=lf
+*.bash text eol=lf
+*.bats text eol=lf

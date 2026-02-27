@@ -24,6 +24,9 @@ jobs:
         with:
           python-version: '3.x'
 
+      - name: Install dependencies
+        run: npm ci
+
       - name: Install shellcheck
         run: sudo apt-get update && sudo apt-get install -y shellcheck
 
@@ -42,3 +45,6 @@ jobs:
         run: |
           npm install --no-save ajv-cli ajv-formats
           npx ajv-cli validate --spec=draft2020 -c ajv-formats -s schema/aahp-manifest.schema.json -d .ai/handoff/MANIFEST.json
+
+      - name: Run bats tests
+        run: npm test

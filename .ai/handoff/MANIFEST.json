@@ -3,23 +3,23 @@
   "project": "AAHP",
   "last_session": {
     "agent": "claude-code",
-    "session_id": "cli-T010",
-    "timestamp": "2026-02-28T18:33:32Z",
-    "commit": "e75bcc9",
-    "phase": "fix",
-    "duration_minutes": 5
+    "session_id": "cli-T011",
+    "timestamp": "2026-02-28T18:46:55Z",
+    "commit": "cdfc0e6",
+    "phase": "implementation",
+    "duration_minutes": 0
   },
   "files": {
     "STATUS.md": {
-      "checksum": "sha256:68ba645bfb84fab4ca30a55ee9941cdfcc8b189de1fa375ef8bb90d55815d85f",
-      "updated": "2026-02-28T18:32:43Z",
-      "lines": 84,
+      "checksum": "sha256:e507fc43bed42f46b4ffbf80cea43d28f362c93119238389d2dfda196c623dae",
+      "updated": "2026-02-28T18:46:44Z",
+      "lines": 87,
       "summary": "(no summary available)"
     },
     "NEXT_ACTIONS.md": {
-      "checksum": "sha256:c945638da8f5cfd793093d5d2d3532e255c4648de82991517144f882474e4189",
-      "updated": "2026-02-28T18:33:26Z",
-      "lines": 76,
+      "checksum": "sha256:6dd66acae6a115addb1c6496b8338f48febe66e673e3a30be7067f26ab410b61",
+      "updated": "2026-02-28T18:46:19Z",
+      "lines": 86,
       "summary": "(no summary available)"
     },
     "LOG.md": {
@@ -53,11 +53,11 @@
       "summary": "﻿# AAHP: Autonomous Multi-Agent Workflow"
     }
   },
-  "quick_context": "All tasks T-001 through T-010 done. CI pipeline has shellcheck (all 6 scripts pass), lint, schema validation, and bats tests (48/48 pass). Remaining: T-011 (npm publish).",
+  "quick_context": "T-011 npm publish blocked on auth. Added publish.yml workflow. Package ready.",
   "token_budget": {
     "manifest_only": 85,
-    "manifest_plus_core": 1323,
-    "full_read": 5453
+    "manifest_plus_core": 1484,
+    "full_read": 5614
   },
   "next_task_id": 12,
   "tasks": {
@@ -144,10 +144,10 @@
       "priority": "high",
       "depends_on": [],
       "created": "2026-02-28T18:15:05.629Z",
-      "completed": "2026-02-28T19:00:00Z",
-      "notes": "All 6 scripts pass shellcheck at info-level severity with zero warnings. Existing SC2034 disable directives in _aahp-lib.sh properly handle unused variable warnings for color constants and AAHP_HANDOFF_FILES array (used by sourcing scripts).",
+      "notes": "Ensure all scripts pass shellcheck when CI runs.\n\n- CI workflow runs shellcheck on all 4 scripts\n- Common issues: unquoted variables, unused vars, non-portable constructs\n\n**From AAHP NEXT_ACTIONS**",
       "github_issue": 3,
-      "github_repo": "homeofe/AAHP"
+      "github_repo": "homeofe/AAHP",
+      "completed": "2026-02-28T18:34:32.008Z"
     },
     "T-011": {
       "title": "T-006: Publish npm package",
@@ -155,7 +155,7 @@
       "priority": "medium",
       "depends_on": [],
       "created": "2026-02-28T18:15:05.629Z",
-      "notes": "Publish the `aahp` CLI to npm so users can `npx aahp init`.\n\n- package.json prepared with test and prepublishOnly scripts\n- `npm pack --dry-run` verified: 19 files, 26.2 kB\n- Package name `aahp` confirmed available\n- All 48 bats tests pass\n- **Blocked:** npm requires interactive browser auth (`npm login`)\n\n**From AAHP NEXT_ACTIONS**",
+      "notes": "Publish the `aahp` CLI to npm so users can `npx aahp init`.\n\n- package.json prepared with test and prepublishOnly scripts\n- `npm pack --dry-run` verified: 19 files, 26.5 kB\n- Package name `aahp` confirmed available\n- All 48 bats tests pass\n- Added `.github/workflows/publish.yml` for CI-based publishing\n- **Blocked:** npm auth token expired, interactive browser login required\n\n**To complete (human action required):**\n1. Option A (CI): Create npm Access Token at npmjs.com > Settings > Access Tokens, add as `NPM_TOKEN` GitHub secret, trigger publish workflow\n2. Option B (local): Run `npm login` in an interactive terminal, then `npm publish --access public`",
       "github_issue": 2,
       "github_repo": "homeofe/AAHP"
     }

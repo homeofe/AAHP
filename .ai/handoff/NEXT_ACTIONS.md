@@ -18,27 +18,36 @@
 
 ## Ready - Work These Next
 
-### T-011: T-006: Publish npm package
+### T-011: Publish npm package
 **Priority:** medium
 
 **Goal:** Publish the `aahp` CLI to the npm registry so users can `npx aahp init`.
 
 **Context:**
-- `package.json` fully prepared: `test` and `prepublishOnly` scripts added
-- `npm pack --dry-run` verified: 19 files, 26.2 kB tarball, correct contents
+- `package.json` fully prepared: `test` and `prepublishOnly` scripts configured
+- `npm pack --dry-run` verified: 19 files, 26.5 kB tarball, correct contents
 - Package name `aahp` confirmed available on npm
 - All 48 bats tests pass
-- **Blocked on human action:** npm requires interactive browser authentication (`npm login`)
+- GitHub Actions publish workflow added at `.github/workflows/publish.yml`
+- **Blocked on human action:** npm auth token expired, interactive browser login required
 
-**What to do:**
+**What to do (two options):**
+
+Option A - CI publish (recommended):
+1. Go to npmjs.com > Settings > Access Tokens > Generate New Token (type: Automation)
+2. Add the token as a GitHub secret named `NPM_TOKEN` in the repo settings
+3. Go to Actions > "Publish to npm" > Run workflow (optionally do a dry run first)
+4. Verify with `npx aahp --version` from a clean directory
+
+Option B - Local publish:
 1. Run `npm login` in an interactive terminal (opens browser for auth)
 2. Run `npm publish --access public` (prepublishOnly will run tests first)
-3. Test with `npx aahp --version` from a clean directory
+3. Verify with `npx aahp --version` from a clean directory
 
-**Files:** `package.json`, `bin/aahp.js`
+**Files:** `package.json`, `bin/aahp.js`, `.github/workflows/publish.yml`
 
 **Definition of done:**
-- [ ] Package published to npm
+- [ ] Package published to npm registry
 - [ ] `npx aahp init` works from any directory
 
 ---
@@ -71,6 +80,7 @@
 | JSON Schema | `schema/aahp-manifest.schema.json` |
 | CLI entry point | `bin/aahp.js` |
 | CI workflow | `.github/workflows/ci.yml` |
+| Publish workflow | `.github/workflows/publish.yml` |
 | Test suite | `tests/` |
 | License | `LICENSE` (CC BY 4.0) |
 | Own handoff files | `.ai/handoff/` |

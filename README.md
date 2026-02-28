@@ -564,7 +564,7 @@ Task data is managed by agents directly -the CLI tool never creates or modifies 
 
 ---
 
-*This specification is a living document. Feedback welcome at [github.com/elvatis/AAHP](https://github.com/elvatis/AAHP).*
+*This specification is a living document. Feedback welcome at [github.com/homeofe/AAHP](https://github.com/homeofe/AAHP).*
 
 ---
 

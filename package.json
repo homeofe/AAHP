@@ -19,11 +19,11 @@
   "license": "CC-BY-4.0",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/elvatis/AAHP.git"
+    "url": "git+https://github.com/homeofe/AAHP.git"
   },
-  "homepage": "https://github.com/elvatis/AAHP#readme",
+  "homepage": "https://github.com/homeofe/AAHP#readme",
   "bugs": {
-    "url": "https://github.com/elvatis/AAHP/issues"
+    "url": "https://github.com/homeofe/AAHP/issues"
   },
   "files": [
     "bin/",

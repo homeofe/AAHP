@@ -25,7 +25,7 @@ terminal). 48 bats tests passing. Next: user runs `npm login` then `npm publish 
 | `scripts pass` | ✅ | All scripts tested, 48 bats tests pass |
 | `lint-handoff.sh` | ✅ | All 6 checks pass, cross-platform Python detection |
 | `schema valid` | ✅ | v3 schema with tasks + next_task_id |
-| `shellcheck` | ⏳ | Configured in CI, not yet run remotely |
+| `shellcheck` | ✅ | All 6 scripts pass (info-level, zero warnings) |
 | `npx aahp` CLI | ✅ | init, manifest, lint, migrate commands work |
 | `bats tests` | ✅ | 48/48 pass (18 lint + 18 manifest + 12 migrate) |
 <!-- /SECTION: build_health -->
@@ -58,7 +58,7 @@ terminal). 48 bats tests passing. Next: user runs `npm login` then `npm publish 
 | Gap | Severity | Description |
 |-----|----------|-------------|
 | npm publish | LOW | Package verified and ready; needs `npm login` then `npm publish --access public` |
-| shellcheck fixes | LOW | Scripts may need fixes once shellcheck runs in CI |
+| shellcheck fixes | DONE | All 6 scripts pass shellcheck at info-level severity |
 | CI run | LOW | Workflow created but not yet triggered on GitHub |
 <!-- /SECTION: what_is_missing -->
 

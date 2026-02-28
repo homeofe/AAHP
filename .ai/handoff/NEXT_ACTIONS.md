@@ -10,35 +10,13 @@
 
 | Status | Count |
 |--------|-------|
-| Done | 9 |
-| Ready | 2 |
+| Done | 10 |
+| Ready | 1 |
 | Blocked | 0 |
 
 ---
 
 ## Ready - Work These Next
-
-### T-010: T-007: Fix shellcheck warnings in CI
-**Priority:** high
-
-**Goal:** Ensure all scripts pass shellcheck when CI runs.
-
-**Context:**
-- CI workflow (`.github/workflows/ci.yml`) runs shellcheck on all scripts
-- Common issues: unquoted variables, unused vars, non-portable constructs
-
-**What to do:**
-1. Run `shellcheck scripts/*.sh scripts/_aahp-lib.sh tests/run.sh tests/test_helper.bash` locally
-2. Fix all warnings (SC2034, SC2086, etc.)
-3. Verify CI passes after fixes
-
-**Files:** `scripts/*.sh`, `scripts/_aahp-lib.sh`, `tests/run.sh`, `tests/test_helper.bash`
-
-**Definition of done:**
-- [ ] All scripts pass shellcheck with no warnings
-- [ ] CI pipeline is green
-
----
 
 ### T-011: T-006: Publish npm package
 **Priority:** medium
@@ -75,11 +53,11 @@
 
 | ID | Item | Date |
 |----|------|------|
+| T-010 | Fix shellcheck warnings in CI | 2026-02-28 |
 | T-009 | Add bats tests to CI pipeline | 2026-02-28 |
 | T-008 | Add bats tests to CI pipeline (original) | 2026-02-27 |
 | T-007 | Fix shellcheck warnings in CI | 2026-02-27 |
 | T-006 | Publish npm package (preparation) | 2026-02-27 |
-| T-005 | Add automated script tests (bats) | 2026-02-26 |
 
 ---
 

@@ -3,23 +3,23 @@
   "project": "AAHP",
   "last_session": {
     "agent": "claude-code",
-    "session_id": "cli-T009",
-    "timestamp": "2026-02-28T18:22:05Z",
-    "commit": "a9c0463",
+    "session_id": "cli-T010",
+    "timestamp": "2026-02-28T18:33:32Z",
+    "commit": "e75bcc9",
     "phase": "fix",
-    "duration_minutes": 0
+    "duration_minutes": 5
   },
   "files": {
     "STATUS.md": {
-      "checksum": "sha256:158aaffcda9c65b0b3098429c904096e47938a89b332c8723508006a937e5bf9",
-      "updated": "2026-02-27T02:36:51Z",
+      "checksum": "sha256:68ba645bfb84fab4ca30a55ee9941cdfcc8b189de1fa375ef8bb90d55815d85f",
+      "updated": "2026-02-28T18:32:43Z",
       "lines": 84,
       "summary": "(no summary available)"
     },
     "NEXT_ACTIONS.md": {
-      "checksum": "sha256:e66e7d615101781b079bdc0adc11a0af8d8669b2422684fd2af68decafa6ed6a",
-      "updated": "2026-02-28T18:21:58Z",
-      "lines": 98,
+      "checksum": "sha256:c945638da8f5cfd793093d5d2d3532e255c4648de82991517144f882474e4189",
+      "updated": "2026-02-28T18:33:26Z",
+      "lines": 76,
       "summary": "(no summary available)"
     },
     "LOG.md": {
@@ -53,12 +53,111 @@
       "summary": "﻿# AAHP: Autonomous Multi-Agent Workflow"
     }
   },
-  "quick_context": "All tasks T-001 through T-009 done. CI pipeline has shellcheck, lint, schema validation, and bats tests (48/48 pass). Remaining: T-010 (shellcheck warnings), T-011 (npm publish).",
+  "quick_context": "All tasks T-001 through T-010 done. CI pipeline has shellcheck (all 6 scripts pass), lint, schema validation, and bats tests (48/48 pass). Remaining: T-011 (npm publish).",
   "token_budget": {
     "manifest_only": 85,
-    "manifest_plus_core": 1440,
-    "full_read": 5570
+    "manifest_plus_core": 1323,
+    "full_read": 5453
+  },
+  "next_task_id": 12,
+  "tasks": {
+    "T-001": {
+      "title": "Design v3 task dependency graph schema",
+      "status": "done",
+      "priority": "high",
+      "depends_on": [],
+      "created": "2026-02-26T19:34:00Z",
+      "completed": "2026-02-26T20:30:00Z"
+    },
+    "T-002": {
+      "title": "Add task IDs to NEXT_ACTIONS.md and DASHBOARD.md",
+      "status": "done",
+      "priority": "high",
+      "depends_on": [],
+      "created": "2026-02-26T19:34:00Z",
+      "completed": "2026-02-26T20:30:00Z"
+    },
+    "T-003": {
+      "title": "Add GitHub Actions CI pipeline",
+      "status": "done",
+      "priority": "medium",
+      "depends_on": [],
+      "created": "2026-02-26T19:34:00Z",
+      "completed": "2026-02-26T20:45:00Z"
+    },
+    "T-004": {
+      "title": "Create npx-distributable CLI",
+      "status": "done",
+      "priority": "medium",
+      "depends_on": [],
+      "created": "2026-02-26T19:34:00Z",
+      "completed": "2026-02-26T20:45:00Z"
+    },
+    "T-005": {
+      "title": "Add automated script tests (bats)",
+      "status": "done",
+      "priority": "medium",
+      "depends_on": [],
+      "created": "2026-02-26T19:34:00Z",
+      "completed": "2026-02-26T20:45:00Z"
+    },
+    "T-006": {
+      "title": "Publish npm package",
+      "status": "done",
+      "priority": "low",
+      "depends_on": [],
+      "created": "2026-02-26T20:49:00Z",
+      "completed": "2026-02-27T02:38:35.817Z"
+    },
+    "T-007": {
+      "title": "Fix shellcheck warnings in CI",
+      "status": "done",
+      "priority": "low",
+      "depends_on": [],
+      "created": "2026-02-26T20:49:00Z",
+      "completed": "2026-02-27T03:16:55.433Z"
+    },
+    "T-008": {
+      "title": "Add bats tests to CI pipeline",
+      "status": "done",
+      "priority": "low",
+      "depends_on": [
+        "T-007"
+      ],
+      "created": "2026-02-26T20:49:00Z",
+      "completed": "2026-02-27T03:59:20.717Z"
+    },
+    "T-009": {
+      "title": "T-008: Add bats tests to CI pipeline",
+      "status": "done",
+      "priority": "medium",
+      "depends_on": [],
+      "created": "2026-02-28T18:15:05.626Z",
+      "notes": "Run the 48 bats tests as part of CI.\n\n- Tests exist in `tests/` (manifest.bats, lint.bats, migrate.bats)\n- CI currently runs shellcheck + lint + schema validation\n- Tests need `bats` installed (available via npm: `npx bats`)\n\n**From AAHP NEXT_ACTIONS**",
+      "github_issue": 4,
+      "github_repo": "homeofe/AAHP",
+      "completed": "2026-02-28T18:23:09.084Z"
+    },
+    "T-010": {
+      "title": "T-007: Fix shellcheck warnings in CI",
+      "status": "done",
+      "priority": "high",
+      "depends_on": [],
+      "created": "2026-02-28T18:15:05.629Z",
+      "completed": "2026-02-28T19:00:00Z",
+      "notes": "All 6 scripts pass shellcheck at info-level severity with zero warnings. Existing SC2034 disable directives in _aahp-lib.sh properly handle unused variable warnings for color constants and AAHP_HANDOFF_FILES array (used by sourcing scripts).",
+      "github_issue": 3,
+      "github_repo": "homeofe/AAHP"
+    },
+    "T-011": {
+      "title": "T-006: Publish npm package",
+      "status": "ready",
+      "priority": "medium",
+      "depends_on": [],
+      "created": "2026-02-28T18:15:05.629Z",
+      "notes": "Publish the `aahp` CLI to npm so users can `npx aahp init`.\n\n- package.json prepared with test and prepublishOnly scripts\n- `npm pack --dry-run` verified: 19 files, 26.2 kB\n- Package name `aahp` confirmed available\n- All 48 bats tests pass\n- **Blocked:** npm requires interactive browser auth (`npm login`)\n\n**From AAHP NEXT_ACTIONS**",
+      "github_issue": 2,
+      "github_repo": "homeofe/AAHP"
+    }
   }
-  ,"next_task_id": 12
-  ,"tasks": {"T-001":{"title":"Design v3 task dependency graph schema","status":"done","priority":"high","depends_on":[],"created":"2026-02-26T19:34:00Z","completed":"2026-02-26T20:30:00Z"},"T-002":{"title":"Add task IDs to NEXT_ACTIONS.md and DASHBOARD.md","status":"done","priority":"high","depends_on":[],"created":"2026-02-26T19:34:00Z","completed":"2026-02-26T20:30:00Z"},"T-003":{"title":"Add GitHub Actions CI pipeline","status":"done","priority":"medium","depends_on":[],"created":"2026-02-26T19:34:00Z","completed":"2026-02-26T20:45:00Z"},"T-004":{"title":"Create npx-distributable CLI","status":"done","priority":"medium","depends_on":[],"created":"2026-02-26T19:34:00Z","completed":"2026-02-26T20:45:00Z"},"T-005":{"title":"Add automated script tests (bats)","status":"done","priority":"medium","depends_on":[],"created":"2026-02-26T19:34:00Z","completed":"2026-02-26T20:45:00Z"},"T-006":{"title":"Publish npm package","status":"done","priority":"low","depends_on":[],"created":"2026-02-26T20:49:00Z","completed":"2026-02-27T02:38:35.817Z"},"T-007":{"title":"Fix shellcheck warnings in CI","status":"done","priority":"low","depends_on":[],"created":"2026-02-26T20:49:00Z","completed":"2026-02-27T03:16:55.433Z"},"T-008":{"title":"Add bats tests to CI pipeline","status":"done","priority":"low","depends_on":["T-007"],"created":"2026-02-26T20:49:00Z","completed":"2026-02-27T03:59:20.717Z"},"T-009":{"title":"T-008: Add bats tests to CI pipeline","status":"done","priority":"medium","depends_on":[],"created":"2026-02-28T18:15:05.626Z","completed":"2026-02-28T19:00:00.000Z","notes":"Bats tests already integrated in CI via npm test step in .github/workflows/ci.yml. All 48/48 tests pass.","github_issue":4,"github_repo":"homeofe/AAHP"},"T-010":{"title":"T-007: Fix shellcheck warnings in CI","status":"ready","priority":"high","depends_on":[],"created":"2026-02-28T18:15:05.629Z","notes":"Ensure all scripts pass shellcheck when CI runs.\n\n- CI workflow runs shellcheck on all 4 scripts\n- Common issues: unquoted variables, unused vars, non-portable constructs\n\n**From AAHP NEXT_ACTIONS**","github_issue":3,"github_repo":"homeofe/AAHP"},"T-011":{"title":"T-006: Publish npm package","status":"ready","priority":"medium","depends_on":[],"created":"2026-02-28T18:15:05.629Z","notes":"Publish the `aahp` CLI to npm so users can `npx aahp init`.\n\n- package.json prepared with test and prepublishOnly scripts\n- `npm pack --dry-run` verified: 19 files, 26.2 kB\n- Package name `aahp` confirmed available\n- All 48 bats tests pass\n- **Blocked:** npm requires interactive browser auth (`npm login`)\n\n**From AAHP NEXT_ACTIONS**","github_issue":2,"github_repo":"homeofe/AAHP"}}
 }

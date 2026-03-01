@@ -9,7 +9,7 @@
 ---
 
 <!-- SECTION: summary -->
-AAHP v3 complete. All 10 tasks (T-001 through T-010) done. T-011 (npm publish) blocked on
+AAHP v3 complete. 9 tasks are done and 1 task is blocked. T-006 (npm publish) is blocked on
 npm auth - token expired, interactive login required. Added GitHub Actions publish workflow
 (`.github/workflows/publish.yml`) with manual trigger and dry-run option. Package fully
 ready: 48 bats tests pass, `npm pack --dry-run` verified 19 files (26.5 kB), name `aahp`

@@ -53,7 +53,7 @@
       "summary": "﻿# AAHP: Autonomous Multi-Agent Workflow"
     }
   },
-  "quick_context": "T-011 npm publish blocked on auth. Added publish.yml workflow. Package ready.",
+  "quick_context": "T-006 npm publish blocked on auth. Added publish.yml workflow. Package ready.",
   "token_budget": {
     "manifest_only": 85,
     "manifest_plus_core": 1484,
@@ -103,11 +103,12 @@
     },
     "T-006": {
       "title": "Publish npm package",
-      "status": "done",
+      "status": "blocked",
       "priority": "low",
       "depends_on": [],
       "created": "2026-02-26T20:49:00Z",
-      "completed": "2026-02-27T02:38:35.817Z"
+      "github_issue": 2,
+      "github_repo": "homeofe/AAHP"
     },
     "T-007": {
       "title": "Fix shellcheck warnings in CI",
@@ -148,17 +149,6 @@
       "github_issue": 3,
       "github_repo": "homeofe/AAHP",
       "completed": "2026-02-28T18:34:32.008Z"
-    },
-    "T-011": {
-      "title": "T-006: Publish npm package",
-      "status": "done",
-      "priority": "medium",
-      "depends_on": [],
-      "created": "2026-02-28T18:15:05.629Z",
-      "notes": "Publish the `aahp` CLI to npm so users can `npx aahp init`.\n\n- package.json prepared with test and prepublishOnly scripts\n- `npm pack --dry-run` verified: 19 files, 26.2 kB\n- Package name `aahp` confirmed available\n- All 48 bats tests pass\n- **Blocked:** npm requires interactive browser auth (`npm login`)\n\n**From AAHP NEXT_ACTIONS**",
-      "github_issue": 2,
-      "github_repo": "homeofe/AAHP",
-      "completed": "2026-02-28T18:48:05.805Z"
     }
   }
 }

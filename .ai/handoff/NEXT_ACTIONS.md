@@ -10,15 +10,19 @@
 
 | Status | Count |
 |--------|-------|
-| Done | 10 |
-| Ready | 1 |
-| Blocked | 0 |
+| Done | 9 |
+| Ready | 0 |
+| Blocked | 1 |
 
 ---
 
 ## Ready - Work These Next
 
-### T-011: Publish npm package
+(No ready tasks)
+
+## Blocked
+
+### T-006: Publish npm package
 **Priority:** medium
 
 **Goal:** Publish the `aahp` CLI to the npm registry so users can `npx aahp init`.
@@ -52,12 +56,6 @@ Option B - Local publish:
 
 ---
 
-## Blocked
-
-(No blocked tasks)
-
----
-
 ## Recently Completed
 
 | ID | Item | Date |
@@ -66,7 +64,7 @@ Option B - Local publish:
 | T-009 | Add bats tests to CI pipeline | 2026-02-28 |
 | T-008 | Add bats tests to CI pipeline (original) | 2026-02-27 |
 | T-007 | Fix shellcheck warnings in CI | 2026-02-27 |
-| T-006 | Publish npm package (preparation) | 2026-02-27 |
+| T-005 | Add automated script tests (bats) | 2026-02-26 |
 
 ---
 

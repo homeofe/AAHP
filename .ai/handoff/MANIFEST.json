@@ -59,7 +59,7 @@
     "manifest_plus_core": 1484,
     "full_read": 5614
   },
-  "next_task_id": 12,
+  "next_task_id": 18,
   "tasks": {
     "T-001": {
       "title": "Design v3 task dependency graph schema",
@@ -149,6 +149,62 @@
       "github_issue": 3,
       "github_repo": "homeofe/AAHP",
       "completed": "2026-02-28T18:34:32.008Z"
+    },
+    "T-012": {
+      "title": "Package published to npm registry",
+      "status": "blocked",
+      "priority": "medium",
+      "depends_on": [],
+      "created": "2026-03-01T14:04:35.736Z",
+      "github_issue": 5,
+      "github_repo": "homeofe/AAHP"
+    },
+    "T-013": {
+      "title": "`npx aahp init` works from any directory",
+      "status": "blocked",
+      "priority": "medium",
+      "depends_on": [],
+      "created": "2026-03-01T14:04:35.737Z",
+      "github_issue": 6,
+      "github_repo": "homeofe/AAHP"
+    },
+    "T-014": {
+      "title": "Add CLI integration tests for bin/aahp.js [high]",
+      "status": "ready",
+      "priority": "medium",
+      "depends_on": [],
+      "created": "2026-03-02T03:24:38.876Z",
+      "github_issue": 7,
+      "github_repo": "homeofe/AAHP"
+    },
+    "T-015": {
+      "title": "Add `aahp status` quick-look command [medium]",
+      "status": "cancelled",
+      "priority": "medium",
+      "depends_on": [],
+      "created": "2026-03-02T03:24:38.876Z",
+      "github_issue": 8,
+      "github_repo": "homeofe/AAHP",
+      "notes": "Moved to aahp-runner — `aahp status` is a CLI command, bin lives in homeofe/aahp-runner."
+    },
+    "T-016": {
+      "title": "Add `aahp archive` command for LOG.md rotation [medium]",
+      "status": "cancelled",
+      "priority": "medium",
+      "depends_on": [],
+      "created": "2026-03-02T03:24:38.877Z",
+      "github_issue": 9,
+      "github_repo": "homeofe/AAHP",
+      "notes": "Moved to aahp-runner — `aahp archive` is a CLI command, bin lives in homeofe/aahp-runner."
+    },
+    "T-017": {
+      "title": "Add project-level CLAUDE.md [low]",
+      "status": "ready",
+      "priority": "medium",
+      "depends_on": [],
+      "created": "2026-03-02T03:24:38.877Z",
+      "github_issue": 10,
+      "github_repo": "homeofe/AAHP"
     }
   }
 }

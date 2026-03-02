@@ -104,7 +104,7 @@
     "T-006": {
       "title": "Publish npm package",
       "status": "blocked",
-      "priority": "low",
+      "priority": "medium",
       "depends_on": [],
       "created": "2026-02-26T20:49:00Z",
       "github_issue": 2,
@@ -171,7 +171,7 @@
     "T-014": {
       "title": "Add CLI integration tests for bin/aahp.js [high]",
       "status": "ready",
-      "priority": "medium",
+      "priority": "high",
       "depends_on": [],
       "created": "2026-03-02T03:24:38.876Z",
       "github_issue": 7,
@@ -200,7 +200,7 @@
     "T-017": {
       "title": "Add project-level CLAUDE.md [low]",
       "status": "ready",
-      "priority": "medium",
+      "priority": "low",
       "depends_on": [],
       "created": "2026-03-02T03:24:38.877Z",
       "github_issue": 10,

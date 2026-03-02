@@ -123,7 +123,7 @@
             },
             "status": {
               "type": "string",
-              "enum": ["ready", "in_progress", "blocked", "done"],
+              "enum": ["ready", "in_progress", "blocked", "done", "cancelled"],
               "description": "Current task status"
             },
             "priority": {

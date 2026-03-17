@@ -2,7 +2,7 @@
   "name": "aahp",
   "version": "3.0.0",
   "description": "AI-to-AI Handoff Protocol - CLI tools for managing agent handoff files",
-  "author": "Elvatis - Emre Kohler",
+  "author": "Elvatis <emre.kohler@elvatis.com>",
   "bin": {
     "aahp": "bin/aahp.js"
   },

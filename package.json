@@ -1,5 +1,5 @@
 {
-  "name": "aahp",
+  "name": "@elvatis_com/aahp",
   "version": "3.0.0",
   "description": "AI-to-AI Handoff Protocol - CLI tools for managing agent handoff files",
   "author": "Elvatis <emre.kohler@elvatis.com>",

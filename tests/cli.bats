@@ -198,12 +198,86 @@ _aahp() {
     [[ "$output" == *"skip"* ]]
 }
 
+@test "aahp init second run shows already-initialized message" {
+    _aahp init "$TEST_TMPDIR"
+    _aahp init "$TEST_TMPDIR"
+    [[ "$output" == *"Already initialized"* ]]
+}
+
 # ─── init: error handling ────────────────────────────────────
 
 @test "aahp init reports copy count in output" {
     _aahp init "$TEST_TMPDIR"
     # Should say "N file(s) copied"
     [[ "$output" =~ [0-9]+\ file\(s\)\ copied ]]
+}
+
+@test "aahp init fails on non-existent target directory" {
+    _aahp init "$TEST_TMPDIR/does-not-exist"
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"does not exist"* ]]
+}
+
+@test "aahp init fails with permission error on read-only directory" {
+    local readonly_dir="$TEST_TMPDIR/readonly"
+    mkdir -p "$readonly_dir"
+    chmod 444 "$readonly_dir"
+    _aahp init "$readonly_dir"
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"permission denied"* ]] || [[ "$output" == *"Error"* ]]
+    chmod 755 "$readonly_dir"  # cleanup
+}
+
+# ─── init: works from any cwd (Issue #6) ─────────────────────
+
+@test "aahp init with absolute path works regardless of cwd" {
+    local target="$TEST_TMPDIR/project-a"
+    mkdir -p "$target"
+    # Run from a completely different directory
+    local orig_dir="$PWD"
+    cd /tmp
+    run node "$AAHP_BIN" init "$target"
+    cd "$orig_dir"
+    [ "$status" -eq 0 ]
+    [ -d "$target/.ai/handoff" ]
+    [ -f "$target/.ai/handoff/STATUS.md" ]
+}
+
+@test "aahp init with relative path resolves from cwd" {
+    local target="$TEST_TMPDIR/rel-test"
+    mkdir -p "$target"
+    local orig_dir="$PWD"
+    cd "$TEST_TMPDIR"
+    run node "$AAHP_BIN" init "rel-test"
+    cd "$orig_dir"
+    [ "$status" -eq 0 ]
+    [ -d "$target/.ai/handoff" ]
+    [ -f "$target/.ai/handoff/MANIFEST.json" ]
+}
+
+@test "aahp init with no args uses process.cwd()" {
+    local target="$TEST_TMPDIR/cwd-test"
+    mkdir -p "$target"
+    local orig_dir="$PWD"
+    cd "$target"
+    run node "$AAHP_BIN" init
+    cd "$orig_dir"
+    [ "$status" -eq 0 ]
+    [ -d "$target/.ai/handoff" ]
+    [ -f "$target/.ai/handoff/STATUS.md" ]
+}
+
+@test "aahp init copies all expected template files" {
+    _aahp init "$TEST_TMPDIR"
+    [ -f "$TEST_TMPDIR/.ai/handoff/STATUS.md" ]
+    [ -f "$TEST_TMPDIR/.ai/handoff/NEXT_ACTIONS.md" ]
+    [ -f "$TEST_TMPDIR/.ai/handoff/LOG.md" ]
+    [ -f "$TEST_TMPDIR/.ai/handoff/MANIFEST.json" ]
+    [ -f "$TEST_TMPDIR/.ai/handoff/DASHBOARD.md" ]
+    [ -f "$TEST_TMPDIR/.ai/handoff/WORKFLOW.md" ]
+    [ -f "$TEST_TMPDIR/.ai/handoff/TRUST.md" ]
+    [ -f "$TEST_TMPDIR/.ai/handoff/CONVENTIONS.md" ]
+    [ -f "$TEST_TMPDIR/.ai/handoff/.aiignore" ]
 }
 
 # ─── status command (not built in - ensure helpful error) ────

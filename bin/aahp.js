@@ -129,9 +129,25 @@ function cmdInit(targetPath, flags) {
     process.exit(1)
   }
 
+  // Verify target path exists and is accessible
+  if (!existsSync(targetPath)) {
+    console.error(`Error: target directory does not exist: ${targetPath}`)
+    process.exit(1)
+  }
+
   // Create .ai/handoff/ if it does not exist
   if (!existsSync(handoffDir)) {
-    mkdirSync(handoffDir, { recursive: true })
+    try {
+      mkdirSync(handoffDir, { recursive: true })
+    } catch (err) {
+      if (err.code === 'EACCES' || err.code === 'EPERM') {
+        console.error(`Error: permission denied creating ${handoffDir}`)
+        console.error('Check that you have write access to the target directory.')
+      } else {
+        console.error(`Error: failed to create ${handoffDir}: ${err.message}`)
+      }
+      process.exit(1)
+    }
     console.log(`Created ${handoffDir}`)
   }
 
@@ -150,13 +166,27 @@ function cmdInit(targetPath, flags) {
       continue
     }
 
-    copyFileSync(src, dest)
+    try {
+      copyFileSync(src, dest)
+    } catch (err) {
+      if (err.code === 'EACCES' || err.code === 'EPERM') {
+        console.error(`Error: permission denied writing ${dest}`)
+        process.exit(1)
+      }
+      throw err
+    }
     console.log(`  copy: ${file}`)
     copied++
   }
 
   console.log()
-  console.log(`Done. ${copied} file(s) copied, ${skipped} skipped.`)
+
+  if (copied === 0 && skipped > 0) {
+    console.log(`Already initialized. ${skipped} file(s) already exist in ${handoffDir}`)
+    console.log('Use --force to overwrite existing files.')
+  } else {
+    console.log(`Done. ${copied} file(s) copied, ${skipped} skipped.`)
+  }
 
   if (copied > 0) {
     console.log()

@@ -21,7 +21,7 @@
 | Property | Status | Last Verified | Agent | TTL | Expires | Notes |
 |----------|--------|---------------|-------|-----|---------|-------|
 | aahp-manifest.sh generates valid JSON | verified | 2026-06-20 | Claude Opus 4.8 | 7d | 2026-06-27 | Re-verified via manifest.bats 18/18 |
-| aahp-migrate-v2.sh delegates correctly | verified | 2026-02-26 | Claude Opus 4.6 | 7d | 2026-03-05 | Tested end-to-end |
+| aahp-migrate-v2.sh delegates correctly | verified | 2026-06-20 | Claude Opus 4.8 | 7d | 2026-06-27 | Re-verified: delegates to aahp-manifest.sh |
 | lint-handoff.sh runs all 6 checks | verified | 2026-06-20 | Claude Opus 4.8 | 7d | 2026-06-27 | Re-verified via lint.bats 18/18 |
 | verify-handoff.sh runs all 4 layers | verified | 2026-06-20 | Claude Opus 4.8 | 7d | 2026-06-27 | verify.bats 12/12 plus end-to-end pre-commit block |
 | Content-drift gate hard-fails | verified | 2026-06-20 | Claude Opus 4.8 | 7d | 2026-06-27 | Code-without-handoff commit physically blocked |
@@ -45,7 +45,7 @@
 
 | Property | Status | Last Verified | Agent | TTL | Expires | Notes |
 |----------|--------|---------------|-------|-----|---------|-------|
-| All 10 templates present | verified | 2026-02-26 | Claude Opus 4.6 | 30d | 2026-03-28 | Stable |
+| All 10 templates present | verified | 2026-06-20 | Claude Opus 4.8 | 30d | 2026-07-20 | Re-verified: 10 files in templates/ (incl .aiignore) |
 | Templates match v2 spec | assumed | 2026-02-26 | Claude Opus 4.6 | 30d | 2026-03-28 | Reviewed but not formally validated |
 | .aiignore covers OWASP patterns | assumed | 2026-02-26 | Claude Opus 4.6 | 30d | 2026-03-28 | Comprehensive but not audited |
 
@@ -56,8 +56,8 @@
 | Property | Status | Last Verified | Agent | TTL | Expires | Notes |
 |----------|--------|---------------|-------|-----|---------|-------|
 | No secrets in source | assumed | 2026-02-26 | Claude Opus 4.6 | 7d | 2026-03-05 | lint-handoff.sh checks this |
-| CC BY 4.0 LICENSE correct | verified | 2026-02-26 | Claude Opus 4.6 | 30d | 2026-03-28 | Changed from MIT |
-| README.md is single source of truth | verified | 2026-02-26 | Claude Opus 4.6 | 7d | 2026-03-05 | AAHP-v2-PROPOSAL.md merged |
+| LICENSE matches declared license | untested | 2026-06-20 | Claude Opus 4.8 | 7d | 2026-06-27 | MISMATCH: LICENSE file is Apache 2.0 but README.md (line 644) declares CC BY 4.0. Needs a human decision on the canonical license. |
+| README.md is single source of truth | verified | 2026-06-20 | Claude Opus 4.8 | 7d | 2026-06-27 | Re-verified: 645-line README present |
 
 ---
 

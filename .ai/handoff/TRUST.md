@@ -20,11 +20,14 @@
 
 | Property | Status | Last Verified | Agent | TTL | Expires | Notes |
 |----------|--------|---------------|-------|-----|---------|-------|
-| aahp-manifest.sh generates valid JSON | verified | 2026-02-26 | Claude Opus 4.6 | 7d | 2026-03-05 | Tested against temp handoff dir |
+| aahp-manifest.sh generates valid JSON | verified | 2026-06-20 | Claude Opus 4.8 | 7d | 2026-06-27 | Re-verified via manifest.bats 18/18 |
 | aahp-migrate-v2.sh delegates correctly | verified | 2026-02-26 | Claude Opus 4.6 | 7d | 2026-03-05 | Tested end-to-end |
-| lint-handoff.sh runs all 6 checks | verified | 2026-02-26 | Claude Opus 4.6 | 7d | 2026-03-05 | Check 4 needs Python |
-| _aahp-lib.sh functions portable | assumed | 2026-02-26 | Claude Opus 4.6 | 3d | 2026-03-01 | Only tested on Git Bash (Windows) |
-| Scripts pass shellcheck | untested | - | - | 3d | - | Not yet run |
+| lint-handoff.sh runs all 6 checks | verified | 2026-06-20 | Claude Opus 4.8 | 7d | 2026-06-27 | Re-verified via lint.bats 18/18 |
+| verify-handoff.sh runs all 4 layers | verified | 2026-06-20 | Claude Opus 4.8 | 7d | 2026-06-27 | verify.bats 12/12 plus end-to-end pre-commit block |
+| Content-drift gate hard-fails | verified | 2026-06-20 | Claude Opus 4.8 | 7d | 2026-06-27 | Code-without-handoff commit physically blocked |
+| Escape hatch ignored at level ci | verified | 2026-06-20 | Claude Opus 4.8 | 30d | 2026-07-20 | AAHP_SKIP_VERIFY=1 honoured locally, not at ci |
+| _aahp-lib.sh functions portable | assumed | 2026-06-20 | Claude Opus 4.8 | 3d | 2026-06-23 | Only tested on Git Bash (Windows) |
+| Scripts pass shellcheck | assumed | 2026-06-20 | Claude Opus 4.8 | 7d | 2026-06-27 | bash -n clean; full shellcheck runs in CI |
 
 ---
 
@@ -32,9 +35,9 @@
 
 | Property | Status | Last Verified | Agent | TTL | Expires | Notes |
 |----------|--------|---------------|-------|-----|---------|-------|
-| aahp-manifest.schema.json valid JSON Schema | assumed | 2026-02-26 | Claude Opus 4.6 | 30d | 2026-03-28 | Stable, rarely changes |
-| Generated MANIFEST.json passes schema | assumed | 2026-02-26 | Claude Opus 4.6 | 7d | 2026-03-05 | No ajv available on this machine |
-| Checksums match file contents | verified | 2026-02-26 | Claude Opus 4.6 | 3d | 2026-03-01 | Verified via lint script |
+| aahp-manifest.schema.json valid JSON Schema | assumed | 2026-06-20 | Claude Opus 4.8 | 30d | 2026-07-20 | Stable, rarely changes |
+| Generated MANIFEST.json passes schema | assumed | 2026-06-20 | Claude Opus 4.8 | 7d | 2026-06-27 | No ajv on this machine; ajv runs in CI |
+| Checksums match file contents | verified | 2026-06-20 | Claude Opus 4.8 | 3d | 2026-06-23 | Re-verified via lint-handoff.sh plus verify Layer 1 |
 
 ---
 

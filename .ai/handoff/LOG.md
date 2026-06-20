@@ -6,6 +6,54 @@
 
 ---
 
+## [2026-06-20] Claude Opus 4.8 (1M context): Canonical handoff gate (aahp verify)
+
+**Agent:** Claude Opus 4.8 (1M context)
+**Phase:** implementation
+**Branch:** main
+**Tasks:** T-018, T-019, T-020, T-021
+
+### What was done
+
+- Built `scripts/verify-handoff.sh` (`aahp verify`), the single canonical gate
+  with 4 layers: MANIFEST checksum integrity (reuses lint-handoff.sh), the
+  content-drift gate (code outside .ai/handoff/ requires STATUS.md plus a
+  regenerated MANIFEST.json, else hard-fail), commit-pointer freshness, and
+  TRUST-TTL expiry (advisory).
+- Added helpers to `_aahp-lib.sh`: `aahp_manifest_field` (dotted JSON read via
+  node or python), `aahp_trust_expired` (header-aware Markdown column parse for
+  the Expires column), `aahp_python_cmd`.
+- Registered the `verify` command in `bin/aahp.js` plus help text and examples.
+- Wired hooks: `scripts/hooks/pre-commit` (fast: layers 1-2), `pre-push`
+  (full: layers 1-4), and `scripts/install-hooks.sh` to install them
+  (core.hooksPath aware; backs up non-AAHP hooks). Installed into AAHP itself.
+- Added `.github/workflows/aahp-verify.yml` running `aahp verify --level ci` as
+  the intended REQUIRED check. Committed despite Actions being OFF org-wide
+  (cost sweep); a comment documents that it activates when Actions returns.
+- Extended `ci.yml` shellcheck to cover the new scripts.
+- Wrote `scripts/ROLLOUT.md` (10 active Elvatis repos, ordered) and a README 2.7
+  section documenting the gate.
+- Tests: `tests/verify.bats` (12, all pass) plus a verify help test in cli.bats.
+
+### Decisions made
+
+- Drift gate HARD-FAILS (exit 1), per the Folgeplanung point-3 default.
+- TRUST-TTL stays advisory (warn), never blocks a commit on its own.
+- Escape hatch `AAHP_SKIP_VERIFY=1` kept, honoured locally, ignored at
+  `--level ci`, documented as "caught by the required CI check, do not use to
+  bypass CI".
+- MANIFEST regeneration stays a separate /handoff step; the gate is verify-only.
+- TTL parsed from TRUST.md (Markdown), not restructured into MANIFEST.json, to
+  avoid a schema change in this pass.
+
+### Open items
+
+- Propagate the gate to the ~9 remaining active repos in ROLLOUT.md (improvements
+  done as the first target).
+- Mark `aahp-verify` as a REQUIRED status check once Actions is re-enabled.
+
+---
+
 ## [2026-02-27] Claude Opus 4.6: T-006 npm publish preparation
 
 **Agent:** Claude Opus 4.6

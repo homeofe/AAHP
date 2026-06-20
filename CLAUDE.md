@@ -110,3 +110,10 @@ AAHP commands come in two flavors: **Node-native** (like `init`) and **bash-dele
 - Add or extend Bats coverage for new script behavior.
 - Do not edit generated or copied handoff examples without checking the matching template.
 - Do not add new dependencies unless the benefit is clear and documented in the repo.
+
+## Style Rules
+
+- Never use em dashes (—, U+2014) in any content: documentation, markdown, README, code comments, GitHub issue titles, or handoff files. Use a plain hyphen (-) instead.
+- When reviewing existing files, scan for em dashes and replace them.
+- Applies to all .md files, HTML templates, comments, and .ai/handoff files.
+- If an AI tool auto-inserts em dashes (e.g. "Title - Subtitle"), fix before committing.

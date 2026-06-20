@@ -1,6 +1,6 @@
 # AAHP: Current State of the Nation
 
-> Last updated: 2026-02-28 by Claude Opus 4.6
+> Last updated: 2026-06-20 by Claude Opus 4.8 (1M context)
 > Commit: (pending)
 >
 > **Rule:** This file is rewritten (not appended) at the end of every session.
@@ -9,12 +9,19 @@
 ---
 
 <!-- SECTION: summary -->
-AAHP v3 complete. 9 tasks are done and 1 task is blocked. T-006 (npm publish) is blocked on
-npm auth - token expired, interactive login required. Added GitHub Actions publish workflow
-(`.github/workflows/publish.yml`) with manual trigger and dry-run option. Package fully
-ready: 48 bats tests pass, `npm pack --dry-run` verified 19 files (26.5 kB), name `aahp`
-available on npm. User can publish via CI (create npm Automation token, add as `NPM_TOKEN`
-secret, trigger workflow) or locally (`npm login` then `npm publish --access public`).
+AAHP v3 plus the new canonical handoff gate. `aahp verify`
+(`scripts/verify-handoff.sh`) is now the single gate against staled handoff
+state. It runs 4 layers: (1) MANIFEST checksum integrity via lint-handoff.sh,
+(2) the content-drift gate (code changed outside .ai/handoff/ requires STATUS.md
+plus a regenerated MANIFEST.json, else HARD-FAIL), (3) commit-pointer freshness,
+(4) TRUST-TTL expiry (advisory). It is wired via a git pre-commit hook (fast:
+checksum plus drift) and a pre-push hook (full plus TTL), installable with
+`scripts/install-hooks.sh`, plus a CI workflow `.github/workflows/aahp-verify.yml`
+running `aahp verify --level ci` as the intended REQUIRED check (committed now;
+GitHub Actions is OFF org-wide for a cost sweep, so it activates when Actions is
+re-enabled). The gate is verify-only: it never regenerates MANIFEST.json, that
+stays a separate /handoff step. Escape hatch `AAHP_SKIP_VERIFY=1` skips local
+verification only and is ignored at `--level ci`.
 <!-- /SECTION: summary -->
 
 ---
@@ -24,13 +31,15 @@ secret, trigger workflow) or locally (`npm login` then `npm publish --access pub
 
 | Check | Result | Notes |
 |-------|--------|-------|
-| `scripts pass` | ✅ | All scripts tested, 48 bats tests pass |
-| `lint-handoff.sh` | ✅ | All 6 checks pass, cross-platform Python detection |
-| `schema valid` | ✅ | v3 schema with tasks + next_task_id |
-| `shellcheck` | ✅ | All 6 scripts pass (info-level, zero warnings) |
-| `npx aahp` CLI | ✅ | init, manifest, lint, migrate commands work |
-| `bats tests` | ✅ | 48/48 pass (18 lint + 18 manifest + 12 migrate) |
-| `npm publish` | ❌ | Blocked on expired npm auth token |
+| `scripts pass` | OK | All scripts syntax-checked (bash -n) |
+| `lint-handoff.sh` | OK | All 6 checks pass |
+| `aahp verify` | OK | New gate: 4 layers, verified end-to-end on a temp repo |
+| `verify.bats` | OK | 12/12 pass |
+| `lint.bats` | OK | 18/18 pass |
+| `manifest.bats` | OK | 18/18 pass |
+| `cli.bats` | OK | verify help test added; 2 pre-existing Windows-only failures (version-capture flake, read-only-dir) pass on Linux CI |
+| `npx aahp` CLI | OK | init, manifest, lint, migrate, verify commands work |
+| `shellcheck` | PENDING | Not installable offline on this machine; runs in CI (ci.yml extended to cover the new scripts) |
 <!-- /SECTION: build_health -->
 
 ---
@@ -40,18 +49,20 @@ secret, trigger workflow) or locally (`npm login` then `npm publish --access pub
 
 | Component | Path | State | Notes |
 |-----------|------|-------|-------|
-| v2/v3 Specification | `README.md` | ✅ Complete | 8 sections, updated title/refs for v3 |
-| Templates (10 files) | `templates/` | ✅ Complete | T-xxx ID format |
-| Manifest Generator | `scripts/aahp-manifest.sh` | ✅ Complete | v3: preserves tasks on regen |
-| Shared Library | `scripts/_aahp-lib.sh` | ✅ Complete | Checksum, mtime, summary, tokens |
-| Migration Script | `scripts/aahp-migrate-v2.sh` | ✅ Complete | Delegates to aahp-manifest.sh |
-| Lint Script | `scripts/lint-handoff.sh` | ✅ Complete | 6 checks, cross-platform Python |
-| JSON Schema | `schema/aahp-manifest.schema.json` | ✅ Complete | v3: tasks + next_task_id fields |
-| .aiignore Template | `templates/.aiignore` | ✅ Complete | Secrets, PII, injection patterns |
-| CLI (npx aahp) | `bin/aahp.js` + `package.json` | ✅ Complete | init, manifest, lint, migrate |
-| CI Pipeline | `.github/workflows/ci.yml` | ✅ Complete | shellcheck, lint, schema, bats tests |
-| Publish Workflow | `.github/workflows/publish.yml` | ✅ Complete | Manual trigger, dry-run option |
-| Test Suite | `tests/*.bats` | ✅ Complete | 48 tests across 3 suites |
+| Verify Gate | `scripts/verify-handoff.sh` | Complete | 4 layers, `--level precommit/prepush/full/ci` |
+| Shared Library | `scripts/_aahp-lib.sh` | Complete | Added aahp_manifest_field, aahp_trust_expired, aahp_python_cmd |
+| Pre-commit Hook | `scripts/hooks/pre-commit` | Complete | Fast: checksum plus drift gate |
+| Pre-push Hook | `scripts/hooks/pre-push` | Complete | Full verify plus TTL |
+| Hook Installer | `scripts/install-hooks.sh` | Complete | Respects core.hooksPath; backs up non-AAHP hooks |
+| Verify CI | `.github/workflows/aahp-verify.yml` | Complete | Intended REQUIRED check; activates when Actions re-enabled |
+| Rollout Plan | `scripts/ROLLOUT.md` | Complete | ~10 active Elvatis repos, ordered |
+| Verify Tests | `tests/verify.bats` | Complete | 12 tests covering all layers plus escape hatch |
+| Manifest Generator | `scripts/aahp-manifest.sh` | Complete | v3: preserves tasks on regen |
+| Migration Script | `scripts/aahp-migrate-v2.sh` | Complete | Delegates to aahp-manifest.sh |
+| Lint Script | `scripts/lint-handoff.sh` | Complete | 6 checks, cross-platform Python |
+| JSON Schema | `schema/aahp-manifest.schema.json` | Complete | v3: tasks plus next_task_id |
+| CLI (npx aahp) | `bin/aahp.js` | Complete | verify command registered |
+| CI Pipeline | `.github/workflows/ci.yml` | Complete | shellcheck now covers verify/hooks/installer |
 <!-- /SECTION: components -->
 
 ---
@@ -61,7 +72,9 @@ secret, trigger workflow) or locally (`npm login` then `npm publish --access pub
 
 | Gap | Severity | Description |
 |-----|----------|-------------|
-| npm publish | LOW | Package ready; needs npm auth token then publish via CI or local |
+| Actions disabled | LOW | aahp-verify.yml committed but inert until GitHub Actions is re-enabled org-wide; local hooks enforce in the meantime |
+| Propagation | MEDIUM | Gate applied to AAHP plus improvements; ~9 more active repos queued in ROLLOUT.md |
+| shellcheck local | LOW | Not run on this machine (offline); CI covers it |
 <!-- /SECTION: what_is_missing -->
 
 ---
@@ -70,18 +83,16 @@ secret, trigger workflow) or locally (`npm login` then `npm publish --access pub
 
 | ID | Item | Resolution |
 |----|------|-----------|
-| T-010 | Fix shellcheck warnings in CI | All 6 scripts pass shellcheck |
-| T-009 | Add bats tests to CI pipeline | 48/48 bats tests run in CI |
-| T-003 | GitHub Actions CI pipeline | `.github/workflows/ci.yml` - shellcheck, lint, schema, tests |
-| T-004 | npx-distributable CLI | `bin/aahp.js` + `package.json` - init, manifest, lint, migrate |
-| T-005 | Automated script tests | 48 bats tests across 3 suites |
+| T-018 | Build canonical aahp verify gate | scripts/verify-handoff.sh, 4 layers, 12 bats tests |
+| T-019 | Wire pre-commit and pre-push hooks | scripts/hooks/ plus install-hooks.sh, verified end-to-end |
+| T-020 | Add aahp-verify CI workflow | .github/workflows/aahp-verify.yml (level ci) |
+| T-021 | Write rollout plan | scripts/ROLLOUT.md |
 
 ---
 
 ## Trust Levels
 
-- **(Verified)**: All scripts produce correct output, 48/48 bats tests pass, lint passes, CLI works
-- **(Verified)**: `npm pack --dry-run` produces correct tarball (19 files, 26.5 kB), name `aahp` available on npm
-- **(Verified)**: CI pipeline passes (shellcheck, lint, schema validation, bats tests)
-- **(Verified)**: Publish workflow created with manual trigger and dry-run support
-- **(Blocked)**: npm auth token expired, cannot publish without human intervention
+- **(Verified)**: `aahp verify` runs all 4 layers correctly; drift gate hard-fails, escape hatch skips locally and is ignored at level ci (tested on a temp consumer repo and end-to-end via the installed pre-commit hook).
+- **(Verified)**: verify.bats 12/12, lint.bats 18/18, manifest.bats 18/18 pass locally.
+- **(Verified)**: No em-dashes (U+2014) in any file touched this session.
+- **(Assumed)**: shellcheck clean for the new scripts (syntax-checked with bash -n; full shellcheck runs in CI).

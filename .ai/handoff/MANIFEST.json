@@ -2,209 +2,63 @@
   "aahp_version": "3.0",
   "project": "AAHP",
   "last_session": {
-    "agent": "claude-code",
-    "session_id": "cli-T011",
-    "timestamp": "2026-02-28T18:48:05.805Z",
-    "commit": "cdfc0e6",
+    "agent": "claude-opus-4.8",
+    "session_id": "cli-1781959163",
+    "timestamp": "2026-06-20T12:39:23Z",
+    "commit": "7f28877",
     "phase": "implementation",
-    "duration_minutes": 2
+    "duration_minutes": 0
   },
   "files": {
     "STATUS.md": {
-      "checksum": "sha256:e507fc43bed42f46b4ffbf80cea43d28f362c93119238389d2dfda196c623dae",
-      "updated": "2026-02-28T18:46:44Z",
-      "lines": 87,
+      "checksum": "sha256:da085a2c62398317dfb3b2fe6b2fa5408d3d15594348646423b0e55d57763d5f",
+      "updated": "2026-06-20T12:38:16Z",
+      "lines": 98,
       "summary": "(no summary available)"
     },
     "NEXT_ACTIONS.md": {
-      "checksum": "sha256:6dd66acae6a115addb1c6496b8338f48febe66e673e3a30be7067f26ab410b61",
-      "updated": "2026-02-28T18:46:19Z",
-      "lines": 86,
+      "checksum": "sha256:9598b38e0317636175232a39dd4c41479263a17e318f7d5ec739d6f66a58264b",
+      "updated": "2026-04-05T17:29:32Z",
+      "lines": 202,
       "summary": "(no summary available)"
     },
     "LOG.md": {
-      "checksum": "sha256:4dab506dea6233021c3df3ad4ba567ed4f2544d2061635d7baf506ed5bfcdbeb",
-      "updated": "2026-02-27T02:37:33Z",
-      "lines": 161,
+      "checksum": "sha256:82f4ee03c126dd74339bb4fcc267e55ae558e890db3feeda3f05366d7ee9961a",
+      "updated": "2026-06-20T12:39:04Z",
+      "lines": 209,
       "summary": "(no summary available)"
     },
     "DASHBOARD.md": {
       "checksum": "sha256:8dc0650ac485d13493a982d8d5cafc8a199c52796077606235185ae4de356673",
-      "updated": "2026-02-27T22:22:51Z",
+      "updated": "2026-04-05T17:29:32Z",
       "lines": 96,
       "summary": "(no summary available)"
     },
     "TRUST.md": {
-      "checksum": "sha256:a8644d3b7f6532681696afffde5247284b1d49f54790fbb153c5126b256490db",
-      "updated": "2026-02-26T22:36:19Z",
-      "lines": 73,
+      "checksum": "sha256:34e359395915c8baabe841301383bd4e4c741110d709c2a09ac4e41a41beed42",
+      "updated": "2026-06-20T12:38:39Z",
+      "lines": 76,
       "summary": "(no summary available)"
     },
     "CONVENTIONS.md": {
-      "checksum": "sha256:2de48ce88e2d7c64f8c95ce0a4bfaa4a01136f4085c48932993cd452a5b86a9f",
-      "updated": "2026-02-27T02:19:15Z",
-      "lines": 85,
+      "checksum": "sha256:7d6d4c2d07e3a8c40bbf6329555fb0e01268a0c71a651f2596848e5f3447fef0",
+      "updated": "2026-04-05T17:29:32Z",
+      "lines": 114,
       "summary": "(no summary available)"
     },
     "WORKFLOW.md": {
-      "checksum": "sha256:1ca003d506b6bd01b9ca75dbec51212a0a8a1399bf8182093c3d685d380596c2",
-      "updated": "2026-02-27T23:16:47Z",
+      "checksum": "sha256:64fbf3e24dc7afd0d086ec6a356125ee49e09817f0ab47138ba8f14fd0a647b5",
+      "updated": "2026-04-05T17:29:32Z",
       "lines": 131,
       "summary": "﻿# AAHP: Autonomous Multi-Agent Workflow"
     }
   },
-  "quick_context": "T-006 npm publish blocked on auth. Added publish.yml workflow. Package ready.",
+  "quick_context": "Added the canonical aahp verify gate (4 layers) with pre-commit/pre-push hooks, CI workflow, rollout plan, and tests. Gate is verify-only; drift gate hard-fails.",
   "token_budget": {
     "manifest_only": 85,
-    "manifest_plus_core": 1484,
-    "full_read": 5614
-  },
-  "next_task_id": 18,
-  "tasks": {
-    "T-001": {
-      "title": "Design v3 task dependency graph schema",
-      "status": "done",
-      "priority": "high",
-      "depends_on": [],
-      "created": "2026-02-26T19:34:00Z",
-      "completed": "2026-02-26T20:30:00Z"
-    },
-    "T-002": {
-      "title": "Add task IDs to NEXT_ACTIONS.md and DASHBOARD.md",
-      "status": "done",
-      "priority": "high",
-      "depends_on": [],
-      "created": "2026-02-26T19:34:00Z",
-      "completed": "2026-02-26T20:30:00Z"
-    },
-    "T-003": {
-      "title": "Add GitHub Actions CI pipeline",
-      "status": "done",
-      "priority": "medium",
-      "depends_on": [],
-      "created": "2026-02-26T19:34:00Z",
-      "completed": "2026-02-26T20:45:00Z"
-    },
-    "T-004": {
-      "title": "Create npx-distributable CLI",
-      "status": "done",
-      "priority": "medium",
-      "depends_on": [],
-      "created": "2026-02-26T19:34:00Z",
-      "completed": "2026-02-26T20:45:00Z"
-    },
-    "T-005": {
-      "title": "Add automated script tests (bats)",
-      "status": "done",
-      "priority": "medium",
-      "depends_on": [],
-      "created": "2026-02-26T19:34:00Z",
-      "completed": "2026-02-26T20:45:00Z"
-    },
-    "T-006": {
-      "title": "Publish npm package",
-      "status": "blocked",
-      "priority": "medium",
-      "depends_on": [],
-      "created": "2026-02-26T20:49:00Z",
-      "github_issue": 2,
-      "github_repo": "homeofe/AAHP"
-    },
-    "T-007": {
-      "title": "Fix shellcheck warnings in CI",
-      "status": "done",
-      "priority": "low",
-      "depends_on": [],
-      "created": "2026-02-26T20:49:00Z",
-      "completed": "2026-02-27T03:16:55.433Z"
-    },
-    "T-008": {
-      "title": "Add bats tests to CI pipeline",
-      "status": "done",
-      "priority": "low",
-      "depends_on": [
-        "T-007"
-      ],
-      "created": "2026-02-26T20:49:00Z",
-      "completed": "2026-02-27T03:59:20.717Z"
-    },
-    "T-009": {
-      "title": "T-008: Add bats tests to CI pipeline",
-      "status": "done",
-      "priority": "medium",
-      "depends_on": [],
-      "created": "2026-02-28T18:15:05.626Z",
-      "notes": "Run the 48 bats tests as part of CI.\n\n- Tests exist in `tests/` (manifest.bats, lint.bats, migrate.bats)\n- CI currently runs shellcheck + lint + schema validation\n- Tests need `bats` installed (available via npm: `npx bats`)\n\n**From AAHP NEXT_ACTIONS**",
-      "github_issue": 4,
-      "github_repo": "homeofe/AAHP",
-      "completed": "2026-02-28T18:23:09.084Z"
-    },
-    "T-010": {
-      "title": "T-007: Fix shellcheck warnings in CI",
-      "status": "done",
-      "priority": "high",
-      "depends_on": [],
-      "created": "2026-02-28T18:15:05.629Z",
-      "notes": "Ensure all scripts pass shellcheck when CI runs.\n\n- CI workflow runs shellcheck on all 4 scripts\n- Common issues: unquoted variables, unused vars, non-portable constructs\n\n**From AAHP NEXT_ACTIONS**",
-      "github_issue": 3,
-      "github_repo": "homeofe/AAHP",
-      "completed": "2026-02-28T18:34:32.008Z"
-    },
-    "T-012": {
-      "title": "Package published to npm registry",
-      "status": "blocked",
-      "priority": "medium",
-      "depends_on": [],
-      "created": "2026-03-01T14:04:35.736Z",
-      "github_issue": 5,
-      "github_repo": "homeofe/AAHP"
-    },
-    "T-013": {
-      "title": "`npx aahp init` works from any directory",
-      "status": "blocked",
-      "priority": "medium",
-      "depends_on": [],
-      "created": "2026-03-01T14:04:35.737Z",
-      "github_issue": 6,
-      "github_repo": "homeofe/AAHP"
-    },
-    "T-014": {
-      "title": "Add CLI integration tests for bin/aahp.js [high]",
-      "status": "ready",
-      "priority": "high",
-      "depends_on": [],
-      "created": "2026-03-02T03:24:38.876Z",
-      "github_issue": 7,
-      "github_repo": "homeofe/AAHP"
-    },
-    "T-015": {
-      "title": "Add `aahp status` quick-look command [medium]",
-      "status": "cancelled",
-      "priority": "medium",
-      "depends_on": [],
-      "created": "2026-03-02T03:24:38.876Z",
-      "github_issue": 8,
-      "github_repo": "homeofe/AAHP",
-      "notes": "Moved to aahp-runner — `aahp status` is a CLI command, bin lives in homeofe/aahp-runner."
-    },
-    "T-016": {
-      "title": "Add `aahp archive` command for LOG.md rotation [medium]",
-      "status": "cancelled",
-      "priority": "medium",
-      "depends_on": [],
-      "created": "2026-03-02T03:24:38.877Z",
-      "github_issue": 9,
-      "github_repo": "homeofe/AAHP",
-      "notes": "Moved to aahp-runner — `aahp archive` is a CLI command, bin lives in homeofe/aahp-runner."
-    },
-    "T-017": {
-      "title": "Add project-level CLAUDE.md [low]",
-      "status": "ready",
-      "priority": "low",
-      "depends_on": [],
-      "created": "2026-03-02T03:24:38.877Z",
-      "github_issue": 10,
-      "github_repo": "homeofe/AAHP"
-    }
+    "manifest_plus_core": 2812,
+    "full_read": 7684
   }
+  ,"next_task_id": 22
+  ,"tasks": {"T-018":{"title":"Build canonical aahp verify gate (4 layers)","status":"done","priority":"high","depends_on":[],"created":"2026-06-20T00:00:00Z","completed":"2026-06-20T00:00:00Z"},"T-019":{"title":"Wire pre-commit and pre-push hooks plus installer","status":"done","priority":"high","depends_on":["T-018"],"created":"2026-06-20T00:00:00Z","completed":"2026-06-20T00:00:00Z"},"T-020":{"title":"Add aahp-verify CI workflow (level ci, required check)","status":"done","priority":"medium","depends_on":["T-018"],"created":"2026-06-20T00:00:00Z","completed":"2026-06-20T00:00:00Z"},"T-021":{"title":"Write ROLLOUT.md and propagate gate to improvements","status":"done","priority":"medium","depends_on":["T-018"],"created":"2026-06-20T00:00:00Z","completed":"2026-06-20T00:00:00Z"},"T-001":{"title":"Design v3 task dependency graph schema","status":"done","priority":"high","depends_on":[],"created":"2026-02-26T19:34:00Z","completed":"2026-02-26T20:30:00Z"},"T-002":{"title":"Add task IDs to NEXT_ACTIONS.md and DASHBOARD.md","status":"done","priority":"high","depends_on":[],"created":"2026-02-26T19:34:00Z","completed":"2026-02-26T20:30:00Z"},"T-003":{"title":"Add GitHub Actions CI pipeline","status":"done","priority":"medium","depends_on":[],"created":"2026-02-26T19:34:00Z","completed":"2026-02-26T20:45:00Z"},"T-004":{"title":"Create npx-distributable CLI","status":"done","priority":"medium","depends_on":[],"created":"2026-02-26T19:34:00Z","completed":"2026-02-26T20:45:00Z"},"T-005":{"title":"Add automated script tests (bats)","status":"done","priority":"medium","depends_on":[],"created":"2026-02-26T19:34:00Z","completed":"2026-02-26T20:45:00Z"},"T-006":{"title":"Publish npm package","status":"done","priority":"medium","depends_on":[],"created":"2026-02-26T20:49:00Z","github_issue":2,"github_repo":"homeofe/AAHP","completed":"2026-04-12T13:54:05.915Z"},"T-007":{"title":"Fix shellcheck warnings in CI","status":"done","priority":"low","depends_on":[],"created":"2026-02-26T20:49:00Z","completed":"2026-02-27T03:16:55.433Z"},"T-008":{"title":"Add bats tests to CI pipeline","status":"done","priority":"low","depends_on":["T-007"],"created":"2026-02-26T20:49:00Z","completed":"2026-02-27T03:59:20.717Z"},"T-009":{"title":"T-008: Add bats tests to CI pipeline","status":"done","priority":"medium","depends_on":[],"created":"2026-02-28T18:15:05.626Z","notes":"Run the 48 bats tests as part of CI.\n\n- Tests exist in `tests/` (manifest.bats, lint.bats, migrate.bats)\n- CI currently runs shellcheck + lint + schema validation\n- Tests need `bats` installed (available via npm: `npx bats`)\n\n**From AAHP NEXT_ACTIONS**","github_issue":4,"github_repo":"homeofe/AAHP","completed":"2026-02-28T18:23:09.084Z"},"T-010":{"title":"T-007: Fix shellcheck warnings in CI","status":"done","priority":"high","depends_on":[],"created":"2026-02-28T18:15:05.629Z","notes":"Ensure all scripts pass shellcheck when CI runs.\n\n- CI workflow runs shellcheck on all 4 scripts\n- Common issues: unquoted variables, unused vars, non-portable constructs\n\n**From AAHP NEXT_ACTIONS**","github_issue":3,"github_repo":"homeofe/AAHP","completed":"2026-02-28T18:34:32.008Z"},"T-012":{"title":"Package published to npm registry","status":"done","priority":"medium","depends_on":[],"created":"2026-03-01T14:04:35.736Z","github_issue":5,"github_repo":"homeofe/AAHP","completed":"2026-04-12T13:54:05.915Z"},"T-013":{"title":"`npx aahp init` works from any directory","status":"done","priority":"medium","depends_on":[],"created":"2026-03-01T14:04:35.737Z","github_issue":6,"github_repo":"homeofe/AAHP","completed":"2026-04-12T13:54:05.914Z"},"T-014":{"title":"Add CLI integration tests for bin/aahp.js [high]","status":"done","priority":"high","depends_on":[],"created":"2026-03-02T03:24:38.876Z","github_issue":7,"github_repo":"homeofe/AAHP","completed":"2026-04-12T13:54:05.914Z"},"T-015":{"title":"Add `aahp status` quick-look command [medium]","status":"cancelled","priority":"medium","depends_on":[],"created":"2026-03-02T03:24:38.876Z","github_issue":8,"github_repo":"homeofe/AAHP","notes":"Moved to aahp-runner — `aahp status` is a CLI command, bin lives in homeofe/aahp-runner."},"T-016":{"title":"Add `aahp archive` command for LOG.md rotation [medium]","status":"cancelled","priority":"medium","depends_on":[],"created":"2026-03-02T03:24:38.877Z","github_issue":9,"github_repo":"homeofe/AAHP","notes":"Moved to aahp-runner — `aahp archive` is a CLI command, bin lives in homeofe/aahp-runner."},"T-017":{"title":"Add project-level CLAUDE.md [low]","status":"done","priority":"low","depends_on":[],"created":"2026-03-02T03:24:38.877Z","github_issue":10,"github_repo":"homeofe/AAHP","completed":"2026-04-12T13:54:05.914Z"}}
 }

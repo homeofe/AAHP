@@ -37,6 +37,10 @@ jobs:
           shellcheck -x -P scripts/ scripts/aahp-manifest.sh
           shellcheck -x -P scripts/ scripts/aahp-migrate-v2.sh
           shellcheck scripts/lint-handoff.sh
+          shellcheck -x -P scripts/ scripts/verify-handoff.sh
+          shellcheck scripts/install-hooks.sh
+          shellcheck scripts/hooks/pre-commit
+          shellcheck scripts/hooks/pre-push
           shellcheck tests/run.sh
           shellcheck tests/test_helper.bash
 

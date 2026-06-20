@@ -8,6 +8,7 @@
 //   manifest [path]   (Re)generate MANIFEST.json from existing handoff files
 //   lint [path]       Validate handoff files for safety violations
 //   migrate [path]    Migrate an AAHP v1 project to v2/v3
+//   verify [path]     Run the canonical handoff gate (checksum + drift + TTL)
 //
 // Options:
 //   --help, -h        Show this help message
@@ -45,6 +46,7 @@ Commands:
   manifest [path]   (Re)generate MANIFEST.json from existing handoff files
   lint [path]       Validate handoff files for safety violations
   migrate [path]    Migrate an AAHP v1 project to v2/v3
+  verify [path]     Run the canonical handoff gate (checksum + drift + TTL)
 
 Init options:
   --force           Overwrite existing files (default: skip existing)
@@ -57,6 +59,10 @@ Manifest options:
   --duration MIN    Session duration in minutes
   --quiet           Suppress output except errors
 
+Verify options:
+  --level LEVEL     Layers to run: precommit|prepush|full|ci (default: full)
+  --quiet           Suppress per-check OK output, keep failures
+
 Global options:
   --help, -h        Show this help message
   --version, -v     Show version number
@@ -67,6 +73,7 @@ Examples:
   npx aahp manifest --phase implementation --agent claude-sonnet
   npx aahp lint ./my-project
   npx aahp migrate
+  npx aahp verify --level ci      # CI gate (no escape hatch)
 `)
 }
 
@@ -281,6 +288,10 @@ switch (command) {
 
   case 'migrate':
     runScript('aahp-migrate-v2.sh', rest)
+    break
+
+  case 'verify':
+    runScript('verify-handoff.sh', rest)
     break
 
   default:

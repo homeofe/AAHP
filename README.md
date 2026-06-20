@@ -274,6 +274,43 @@ ghp_*
 
 CI hook validates that no handoff file contains these patterns.
 
+### 2.7 The Verify Gate: `aahp verify`
+
+Linting and checksums are passive. They tell you when handoff state is malformed,
+but they do not stop an agent from committing code while leaving `STATUS.md` and
+`MANIFEST.json` untouched, which is the most common way handoff state goes stale.
+
+`aahp verify` (`scripts/verify-handoff.sh`) is the single canonical gate. It runs
+up to 4 layers:
+
+1. **MANIFEST checksum integrity** - reuses `lint-handoff.sh`.
+2. **Content-drift gate (the key check)** - if the change set touches any source
+   file OUTSIDE `.ai/handoff/`, it MUST also include `STATUS.md` AND a regenerated
+   `MANIFEST.json`. Otherwise it HARD-FAILS with:
+   `Code changed but handoff state did not. Run /handoff.`
+3. **Commit-pointer freshness** - `MANIFEST.last_session.commit` vs HEAD.
+4. **TRUST-TTL expiry** - reports expired `verified` rows (advisory).
+
+```bash
+./scripts/verify-handoff.sh [path] --level precommit   # fast: layers 1-2
+./scripts/verify-handoff.sh [path] --level prepush      # full: layers 1-4
+./scripts/verify-handoff.sh [path] --level ci           # full, no escape hatch
+```
+
+**Wiring.** `scripts/install-hooks.sh` installs a git `pre-commit` hook (fast:
+checksum + drift gate) and a `pre-push` hook (full verify + TTL). A CI workflow
+(`.github/workflows/aahp-verify.yml`) runs `aahp verify --level ci` as the
+intended REQUIRED status check, the non-bypassable off-machine backstop.
+
+**Verify-only.** The gate never regenerates `MANIFEST.json`. Regeneration stays a
+separate `/handoff` step. The gate only detects drift and tells you to run it.
+
+**Escape hatch.** `AAHP_SKIP_VERIFY=1` skips LOCAL verification only. It is
+caught by the required CI check (which ignores the hatch), so do NOT use it to
+bypass CI. Never use `git commit/push --no-verify`.
+
+See `scripts/ROLLOUT.md` for the propagation plan across consumer repos.
+
 ---
 
 ## 3. Robustness: Surviving Failures

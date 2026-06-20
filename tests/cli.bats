@@ -61,6 +61,11 @@ _aahp() {
     [[ "$output" == *"migrate"* ]]
 }
 
+@test "aahp --help lists verify command" {
+    _aahp --help
+    [[ "$output" == *"verify"* ]]
+}
+
 @test "aahp -h is an alias for --help" {
     _aahp -h
     [ "$status" -eq 0 ]

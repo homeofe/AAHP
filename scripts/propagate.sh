@@ -49,15 +49,22 @@ fi
 # 4. Regenerate MANIFEST.json (clean baseline incl. the stamped STATUS.md).
 bash "$TARGET/scripts/aahp-manifest.sh" "$TARGET" --phase fix --quiet
 
-# 5. Stage just the gate files + the handoff state that moved with them.
+# 5. Stage the gate files + the WHOLE .ai/handoff dir. Staging all of
+#    .ai/handoff (not just STATUS + MANIFEST) keeps the committed handoff
+#    consistent with the regenerated manifest even when the repo had
+#    uncommitted handoff edits. Otherwise the manifest checksums a worktree
+#    file the commit never includes, and CI fails with a checksum mismatch.
 git -C "$TARGET" add \
     scripts/verify-handoff.sh scripts/_aahp-lib.sh scripts/lint-handoff.sh \
     scripts/aahp-manifest.sh scripts/install-hooks.sh \
     scripts/hooks/pre-commit scripts/hooks/pre-push \
     .github/workflows/aahp-verify.yml \
-    .ai/handoff/STATUS.md .ai/handoff/MANIFEST.json
+    .ai/handoff
 
-# 6. Verify a clean baseline against the staged set.
-bash "$TARGET/scripts/verify-handoff.sh" "$TARGET" --level precommit
+# 6. Pre-check the baseline (non-fatal: the commit's pre-commit hook is the real
+#    gate, and a transient mid-write read can falsely fail this pre-check).
+if ! bash "$TARGET/scripts/verify-handoff.sh" "$TARGET" --level precommit; then
+    echo "==> NOTE: baseline pre-check reported an issue; the commit hook re-verifies for real."
+fi
 
 echo "==> Done. AAHP gate v$VERSION staged in $TARGET. Commit + push to finish."

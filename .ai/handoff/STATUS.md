@@ -35,7 +35,7 @@ verification only and is ignored at `--level ci`.
 | `lint-handoff.sh` | OK | All 6 checks pass |
 | `aahp verify` | OK | New gate: 4 layers, verified end-to-end on a temp repo |
 | `verify.bats` | OK | 12/12 pass |
-| `lint.bats` | OK | 18/18 pass |
+| `lint.bats` | OK | 21/21 pass (added 3 PII locale-robustness tests, T-027) |
 | `manifest.bats` | OK | 18/18 pass |
 | `cli.bats` | OK | verify help test added; 2 pre-existing Windows-only failures (version-capture flake, read-only-dir) pass on Linux CI |
 | `npx aahp` CLI | OK | init, manifest, lint, migrate, verify commands work |
@@ -59,7 +59,7 @@ verification only and is ignored at `--level ci`.
 | Verify Tests | `tests/verify.bats` | Complete | 12 tests covering all layers plus escape hatch |
 | Manifest Generator | `scripts/aahp-manifest.sh` | Complete | v3: preserves tasks on regen |
 | Migration Script | `scripts/aahp-migrate-v2.sh` | Complete | Delegates to aahp-manifest.sh |
-| Lint Script | `scripts/lint-handoff.sh` | Complete | 6 checks, cross-platform Python |
+| Lint Script | `scripts/lint-handoff.sh` | Complete | 6 checks, cross-platform Python; PII email scan locale-robust (grep -E, T-027) |
 | JSON Schema | `schema/aahp-manifest.schema.json` | Complete | v3: tasks plus next_task_id |
 | CLI (npx aahp) | `bin/aahp.js` | Complete | verify command registered |
 | CI Pipeline | `.github/workflows/ci.yml` | Complete | shellcheck now covers verify/hooks/installer |
@@ -92,12 +92,13 @@ verification only and is ignored at `--level ci`.
 | T-024 | Cut v3.0.2 release + add propagate.sh | License unified to Apache-2.0 (README fixed to match LICENSE + package.json); scripts/propagate.sh added as the reusable gate-sync function; version 3.0.1 -> 3.0.2; full-landscape rollout |
 | T-025 | Harden propagate.sh (canary findings) | Stage the whole .ai/handoff (so a repo with uncommitted handoff edits stays consistent with the regenerated manifest, else CI fails on a checksum the commit never includes); make the baseline pre-check non-fatal (commit hook is the real gate). Validated on aahp-runner, CI green. |
 | T-026 | Windows-path false-positive in lint-handoff.sh | Gate handed an absolute MSYS path (/c/Users/...) to Windows-native Python's open(), which raised FileNotFoundError; swallowed by 2>/dev/null and mislabeled "Invalid JSON", blocking Layer 1 on 6 repos. Fixed by cd into PROJECT_ROOT once and using relative paths (PROJECT_ROOT=".", HANDOFF_DIR=".ai/handoff") in lint-handoff.sh + verify-handoff.sh, so the path format no longer matters. Reproduced with /c/ path (false-fail before, passes after); bats green; v3.0.3. |
+| T-027 | PII check locale-robust + GitHub noreply exclusion | Check 3 email scan used `grep -rnP` (PCRE); under an empty/non-UTF-8 locale on Windows git-bash GNU grep -P aborts ("supports only unibyte and UTF-8 locales") and the pipeline silently passed (false PASS), while the UTF-8 locale `git commit` sets made it fire -non-deterministic by locale. Switched to `grep -rnE` (POSIX-ERE, no PCRE locale fail-open) with an internal LC_ALL=C.UTF-8 pin, so detection is byte-identical under LC_ALL= (empty), C.UTF-8, and en_US.UTF-8. Added two narrow exclusions (users.noreply.github.com co-author trailers + any *.noreply.* domain); real human/customer emails stay a HARD-FAIL, no allowlist file. 3 new lint.bats tests; bats green; v3.0.4. |
 
 ---
 
 ## Trust Levels
 
 - **(Verified)**: `aahp verify` runs all 4 layers correctly; drift gate hard-fails, escape hatch skips locally and is ignored at level ci (tested on a temp consumer repo and end-to-end via the installed pre-commit hook).
-- **(Verified)**: verify.bats 12/12, lint.bats 18/18, manifest.bats 18/18 pass locally.
+- **(Verified)**: verify.bats 12/12, lint.bats 21/21, manifest.bats 18/18 pass locally.
 - **(Verified)**: No em-dashes (U+2014) in any file touched this session.
 - **(Assumed)**: shellcheck clean for the new scripts (syntax-checked with bash -n; full shellcheck runs in CI).

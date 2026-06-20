@@ -124,11 +124,30 @@ fi
 echo -e "${GREEN}[3/6]${NC} Checking for PII..."
 
 PII_FOUND=0
-# Email check (excluding template/example patterns)
-EMAIL_MATCHES=$(grep -rnP '[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}' "$HANDOFF_DIR"/*.md 2>/dev/null \
+# Email check (excluding template/example patterns).
+#
+# Locale-robustness (T-027): the previous implementation used `grep -rnP` (PCRE).
+# On Windows git-bash under an empty or non-UTF-8 locale, GNU grep -P aborts with
+# "grep: -P supports only unibyte and UTF-8 locales" and the pipeline then finds
+# nothing -a silent FALSE PASS. Under the UTF-8 locale that `git commit` sets it
+# works and fires, so the gate was non-deterministic by locale (interactive
+# baseline passed, the commit hook blocked). The pattern is already POSIX-ERE
+# compatible, so we use `grep -E` (ERE has no PCRE locale fail-open) and pin
+# LC_ALL=C.UTF-8 for byte-for-byte identical behaviour on Windows git-bash, the
+# git commit hook, and Linux CI.
+#
+# Exclusions (intentionally narrow -PII stays a HARD-FAIL for genuine external
+# emails):
+#   - example.com / placeholder / *@* template forms
+#   - users.noreply.github.com (GitHub co-author trailers, e.g. Copilot)
+#   - any address whose domain contains ".noreply." (general no-reply form)
+# No real human/customer addresses are whitelisted, and no allowlist file is read.
+EMAIL_MATCHES=$(LC_ALL=C.UTF-8 grep -rnE '[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}' "$HANDOFF_DIR"/*.md 2>/dev/null \
     | grep -v 'example\.com' \
     | grep -v 'placeholder' \
     | grep -v '\*@\*' \
+    | grep -v '@users\.noreply\.github\.com' \
+    | grep -v '@[a-zA-Z0-9.-]*\.noreply\.[a-zA-Z0-9.-]\+' \
     || true)
 
 if [ -n "$EMAIL_MATCHES" ]; then

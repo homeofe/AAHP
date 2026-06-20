@@ -125,6 +125,42 @@ teardown() {
     [[ "$output" == *"No secrets detected"* ]]
 }
 
+# ─── PII / email detection (locale-robust, T-027) ────────────
+
+@test "PII check fires on a real external email under empty LC_ALL" {
+    create_full_handoff
+    echo "Contact stranger@gmail.com for details." >> "$TEST_TMPDIR/.ai/handoff/STATUS.md"
+
+    # Empty locale is the case where the old grep -P aborted ("supports only
+    # unibyte and UTF-8 locales") and the pipeline silently passed. grep -E with
+    # an internal LC_ALL=C.UTF-8 pin must still fire here.
+    LC_ALL= run bash "$SCRIPTS_DIR/lint-handoff.sh" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"email addresses found"* ]]
+    [[ "$output" == *"stranger@gmail.com"* ]]
+}
+
+@test "PII check fires on a real external email under LC_ALL=C.UTF-8" {
+    create_full_handoff
+    echo "Contact stranger@gmail.com for details." >> "$TEST_TMPDIR/.ai/handoff/STATUS.md"
+
+    LC_ALL=C.UTF-8 run bash "$SCRIPTS_DIR/lint-handoff.sh" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"email addresses found"* ]]
+    [[ "$output" == *"stranger@gmail.com"* ]]
+}
+
+@test "PII check does NOT fire on a GitHub noreply co-author trailer" {
+    create_full_handoff
+    echo "Co-authored-by: Copilot <123456+Copilot@users.noreply.github.com>" \
+        >> "$TEST_TMPDIR/.ai/handoff/STATUS.md"
+
+    run bash "$SCRIPTS_DIR/lint-handoff.sh" "$TEST_TMPDIR"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"No PII detected"* ]]
+    [[ "$output" != *"123456+Copilot@users.noreply.github.com"* ]]
+}
+
 # ─── Invalid JSON in MANIFEST.json ───────────────────────────
 
 @test "detects invalid JSON in MANIFEST.json" {

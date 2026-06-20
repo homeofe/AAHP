@@ -72,14 +72,19 @@ fi
 
 echo -e "${GREEN}[2/6]${NC} Checking for secrets and API keys..."
 
+# Prefix patterns carry a length floor (\{16,\}) so they only match a
+# realistic key-length run, not a "sk-"/"AKIA" prefix glued to one or two
+# ordinary characters (e.g. the "sk-to" inside "task-to-model"). Real keys
+# are far longer than 16 chars. Note: grep below runs in BRE mode, so the
+# interval must be escaped as \{16,\}.
 SECRET_PATTERNS=(
-    "sk-[a-zA-Z0-9]"
-    "ghp_[a-zA-Z0-9]"
-    "gho_[a-zA-Z0-9]"
+    "sk-[a-zA-Z0-9]\{16,\}"
+    "ghp_[a-zA-Z0-9]\{16,\}"
+    "gho_[a-zA-Z0-9]\{16,\}"
     "glpat-"
     "xoxb-"
     "xoxp-"
-    "AKIA[A-Z0-9]"
+    "AKIA[A-Z0-9]\{16,\}"
     "Bearer [a-zA-Z0-9]"
     "-----BEGIN.*PRIVATE KEY"
     "_KEY=['\"]?[a-zA-Z0-9]"

@@ -87,6 +87,7 @@ verification only and is ignored at `--level ci`.
 | T-019 | Wire pre-commit and pre-push hooks | scripts/hooks/ plus install-hooks.sh, verified end-to-end |
 | T-020 | Add aahp-verify CI workflow | .github/workflows/aahp-verify.yml (level ci) |
 | T-021 | Write rollout plan | scripts/ROLLOUT.md |
+| T-022 | Fix over-broad secret patterns in lint-handoff.sh | Length floor {16,} on sk-/ghp_/gho_/AKIA; killed the "sk-to" false positive (e.g. inside "task-to-model"); propagated to improvements; lint.bats 18/18 |
 
 ---
 

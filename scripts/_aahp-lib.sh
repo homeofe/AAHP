@@ -20,10 +20,13 @@ NC='\033[0m'
 aahp_checksum() {
     local filepath="$1"
     local hash
+    # Strip CR before hashing so a file checksums identically regardless of
+    # CRLF vs LF line endings (Windows working tree vs Linux CI checkout).
+    # Must stay in lockstep with the verifier in lint-handoff.sh.
     if command -v sha256sum &>/dev/null; then
-        hash=$(sha256sum "$filepath" | awk '{print $1}')
+        hash=$(tr -d '\r' < "$filepath" | sha256sum | awk '{print $1}')
     elif command -v shasum &>/dev/null; then
-        hash=$(shasum -a 256 "$filepath" | awk '{print $1}')
+        hash=$(tr -d '\r' < "$filepath" | shasum -a 256 | awk '{print $1}')
     else
         echo "ERROR: No SHA-256 tool found (need sha256sum or shasum)" >&2
         return 1

@@ -88,6 +88,7 @@ verification only and is ignored at `--level ci`.
 | T-020 | Add aahp-verify CI workflow | .github/workflows/aahp-verify.yml (level ci) |
 | T-021 | Write rollout plan | scripts/ROLLOUT.md |
 | T-022 | Fix over-broad secret patterns in lint-handoff.sh | Length floor {16,} on sk-/ghp_/gho_/AKIA; killed the "sk-to" false positive (e.g. inside "task-to-model"); propagated to improvements; lint.bats 18/18 |
+| T-023 | CRLF/LF checksum mismatch broke AAHP Verify CI | Strip CR before hashing in aahp_checksum (_aahp-lib.sh) + lint-handoff.sh so checksums are line-ending-agnostic (Windows working tree vs Linux CI checkout); bats 48/48 |
 
 ---
 

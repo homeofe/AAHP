@@ -171,7 +171,7 @@ manifest = json.load(open('$HANDOFF_DIR/MANIFEST.json'))
 for fname, meta in manifest.get('files', {}).items():
     fpath = os.path.join('$HANDOFF_DIR', fname)
     if os.path.exists(fpath):
-        actual = 'sha256:' + hashlib.sha256(open(fpath, 'rb').read()).hexdigest()
+        actual = 'sha256:' + hashlib.sha256(open(fpath, 'rb').read().replace(b'\r', b'')).hexdigest()
         expected = meta.get('checksum', '')
         if actual != expected:
             print(f'  ! Checksum mismatch: {fname}')

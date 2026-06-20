@@ -56,7 +56,7 @@
 | Property | Status | Last Verified | Agent | TTL | Expires | Notes |
 |----------|--------|---------------|-------|-----|---------|-------|
 | No secrets in source | assumed | 2026-02-26 | Claude Opus 4.6 | 7d | 2026-03-05 | lint-handoff.sh checks this |
-| LICENSE matches declared license | untested | 2026-06-20 | Claude Opus 4.8 | 7d | 2026-06-27 | MISMATCH: LICENSE file is Apache 2.0 but README.md (line 644) declares CC BY 4.0. Needs a human decision on the canonical license. |
+| LICENSE matches declared license | verified | 2026-06-20 | Claude Opus 4.8 | 30d | 2026-07-20 | Resolved: Apache-2.0 across LICENSE, package.json, and README (Emre decided 2026-06-20) |
 | README.md is single source of truth | verified | 2026-06-20 | Claude Opus 4.8 | 7d | 2026-06-27 | Re-verified: 645-line README present |
 
 ---

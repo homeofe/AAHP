@@ -91,6 +91,7 @@ verification only and is ignored at `--level ci`.
 | T-023 | CRLF/LF checksum mismatch broke AAHP Verify CI | Strip CR before hashing in aahp_checksum (_aahp-lib.sh) + lint-handoff.sh so checksums are line-ending-agnostic (Windows working tree vs Linux CI checkout); bats 48/48 |
 | T-024 | Cut v3.0.2 release + add propagate.sh | License unified to Apache-2.0 (README fixed to match LICENSE + package.json); scripts/propagate.sh added as the reusable gate-sync function; version 3.0.1 -> 3.0.2; full-landscape rollout |
 | T-025 | Harden propagate.sh (canary findings) | Stage the whole .ai/handoff (so a repo with uncommitted handoff edits stays consistent with the regenerated manifest, else CI fails on a checksum the commit never includes); make the baseline pre-check non-fatal (commit hook is the real gate). Validated on aahp-runner, CI green. |
+| T-026 | Windows-path false-positive in lint-handoff.sh | Gate handed an absolute MSYS path (/c/Users/...) to Windows-native Python's open(), which raised FileNotFoundError; swallowed by 2>/dev/null and mislabeled "Invalid JSON", blocking Layer 1 on 6 repos. Fixed by cd into PROJECT_ROOT once and using relative paths (PROJECT_ROOT=".", HANDOFF_DIR=".ai/handoff") in lint-handoff.sh + verify-handoff.sh, so the path format no longer matters. Reproduced with /c/ path (false-fail before, passes after); bats green; v3.0.3. |
 
 ---
 

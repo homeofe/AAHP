@@ -19,7 +19,17 @@
 set -euo pipefail
 
 PROJECT_ROOT="${1:-.}"
-HANDOFF_DIR="$PROJECT_ROOT/.ai/handoff"
+
+# Path-format-agnostic file access (cross-platform fix).
+# Windows-native Python/Node cannot open an absolute MSYS path like
+# /c/Users/...; open() raises FileNotFoundError, which the 2>/dev/null below
+# silently turns into a bogus "Invalid JSON". Resolving by changing into the
+# project root once and then using RELATIVE paths sidesteps the issue: every
+# tool opens '.ai/handoff/...' relative to the cwd, which works identically on
+# Windows git-bash and Linux CI. cd failure is fatal (clear error).
+cd "$PROJECT_ROOT" || { echo "Error: cannot cd into project root: $PROJECT_ROOT" >&2; exit 1; }
+PROJECT_ROOT="."
+HANDOFF_DIR=".ai/handoff"
 VIOLATIONS=0
 
 RED='\033[0;31m'

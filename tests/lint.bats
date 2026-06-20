@@ -161,6 +161,60 @@ teardown() {
     [[ "$output" != *"123456+Copilot@users.noreply.github.com"* ]]
 }
 
+# ─── PII line-granularity regressions (T-029) ────────────────
+# A real external email must still fire when it shares a single line with an
+# excluded token; the old line-level grep -v suppressed the whole line.
+
+@test "PII fires on a real email sharing a line with a noreply trailer (T-029)" {
+    create_full_handoff
+    echo "Contact stranger@gmail.com cc bot 1+Copilot@users.noreply.github.com same line." \
+        >> "$TEST_TMPDIR/.ai/handoff/STATUS.md"
+
+    run bash "$SCRIPTS_DIR/lint-handoff.sh" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"stranger@gmail.com"* ]]
+    [[ "$output" != *"noreply.github.com"* ]]
+}
+
+@test "PII fires on a real email sharing a line with example.com (T-029)" {
+    create_full_handoff
+    echo "victim@gmail.com discussed example.com migration today." \
+        >> "$TEST_TMPDIR/.ai/handoff/STATUS.md"
+
+    run bash "$SCRIPTS_DIR/lint-handoff.sh" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"victim@gmail.com"* ]]
+}
+
+@test "PII fires on a real email sharing a line with placeholder (T-029)" {
+    create_full_handoff
+    echo "victim2@gmail.com left a placeholder note." \
+        >> "$TEST_TMPDIR/.ai/handoff/STATUS.md"
+
+    run bash "$SCRIPTS_DIR/lint-handoff.sh" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"victim2@gmail.com"* ]]
+}
+
+@test "PII check fires on a real external email under LC_ALL=en_US.UTF-8" {
+    create_full_handoff
+    echo "Contact stranger@gmail.com for details." >> "$TEST_TMPDIR/.ai/handoff/STATUS.md"
+
+    LC_ALL=en_US.UTF-8 run bash "$SCRIPTS_DIR/lint-handoff.sh" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"stranger@gmail.com"* ]]
+}
+
+@test "PII still excludes an example.com template address alone (T-029)" {
+    create_full_handoff
+    echo "See admin@example.com for the template format." \
+        >> "$TEST_TMPDIR/.ai/handoff/STATUS.md"
+
+    run bash "$SCRIPTS_DIR/lint-handoff.sh" "$TEST_TMPDIR"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"No PII detected"* ]]
+}
+
 # ─── Invalid JSON in MANIFEST.json ───────────────────────────
 
 @test "detects invalid JSON in MANIFEST.json" {

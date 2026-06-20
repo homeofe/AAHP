@@ -142,12 +142,23 @@ PII_FOUND=0
 #   - users.noreply.github.com (GitHub co-author trailers, e.g. Copilot)
 #   - any address whose domain contains ".noreply." (general no-reply form)
 # No real human/customer addresses are whitelisted, and no allowlist file is read.
-EMAIL_MATCHES=$(LC_ALL=C.UTF-8 grep -rnE '[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}' "$HANDOFF_DIR"/*.md 2>/dev/null \
-    | grep -v 'example\.com' \
-    | grep -v 'placeholder' \
-    | grep -v '\*@\*' \
-    | grep -v '@users\.noreply\.github\.com' \
-    | grep -v '@[a-zA-Z0-9.-]*\.noreply\.[a-zA-Z0-9.-]\+' \
+#
+# Per-MATCH filtering (T-029): extract each address with grep -o, then exclude per
+# ADDRESS in awk. A line-level grep -v previously dropped the whole matched line, so
+# a genuine external email sharing a line with an excluded token (a noreply trailer,
+# example.com, or the word placeholder) was silently suppressed, a real PII false
+# negative. Filtering each extracted address means an excluded token elsewhere on
+# the same line can no longer mask a separate real address. grep -E (not -P) and the
+# pinned LC_ALL keep detection byte-for-byte identical across locales.
+EMAIL_MATCHES=$(LC_ALL=C.UTF-8 grep -rHnoE '[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}' "$HANDOFF_DIR"/*.md 2>/dev/null \
+    | awk -F: '
+        {
+            addr = $NF                            # grep -Hno => file:line:address; an address has no colon
+            if (addr ~ /\.noreply\./)       next  # GitHub co-author + any no-reply trailers
+            if (index(addr, "example.com")) next  # template/example domain
+            if (index(addr, "placeholder")) next  # template placeholder address
+            print
+        }' \
     || true)
 
 if [ -n "$EMAIL_MATCHES" ]; then

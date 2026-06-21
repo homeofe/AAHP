@@ -1,5 +1,11 @@
 ﻿# AAHP: AI-to-AI Handoff Protocol (v2/v3)
 
+[![CI](https://github.com/homeofe/AAHP/actions/workflows/ci.yml/badge.svg)](https://github.com/homeofe/AAHP/actions/workflows/ci.yml)
+[![AAHP Verify](https://github.com/homeofe/AAHP/actions/workflows/aahp-verify.yml/badge.svg)](https://github.com/homeofe/AAHP/actions/workflows/aahp-verify.yml)
+[![Security](https://github.com/homeofe/AAHP/actions/workflows/codeql.yml/badge.svg)](https://github.com/homeofe/AAHP/actions/workflows/codeql.yml)
+[![npm](https://img.shields.io/npm/v/@elvatis_com/aahp.svg)](https://www.npmjs.com/package/@elvatis_com/aahp)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+
 > A file-based protocol for sequential context handoff between AI agents. Optimized for token efficiency, safety hardening, and failure recovery.
 
 ---

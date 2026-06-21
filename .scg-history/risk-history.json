@@ -1,0 +1,74 @@
+[
+  {
+    "timestamp": "2026-04-07T15:46:34.362Z",
+    "score": 85,
+    "findingsCount": 12,
+    "criticalCount": 4
+  },
+  {
+    "timestamp": "2026-04-07T16:44:33.687Z",
+    "score": 70,
+    "findingsCount": 23,
+    "criticalCount": 16
+  },
+  {
+    "timestamp": "2026-04-07T16:44:37.101Z",
+    "score": 70,
+    "findingsCount": 23,
+    "criticalCount": 16
+  },
+  {
+    "timestamp": "2026-04-07T16:44:40.653Z",
+    "score": 70,
+    "findingsCount": 23,
+    "criticalCount": 16
+  },
+  {
+    "timestamp": "2026-04-07T16:44:45.103Z",
+    "score": 70,
+    "findingsCount": 23,
+    "criticalCount": 16
+  },
+  {
+    "timestamp": "2026-04-07T16:44:52.278Z",
+    "score": 70,
+    "findingsCount": 24,
+    "criticalCount": 16
+  },
+  {
+    "timestamp": "2026-04-07T16:44:59.731Z",
+    "score": 70,
+    "findingsCount": 24,
+    "criticalCount": 16
+  },
+  {
+    "timestamp": "2026-04-07T16:45:03.737Z",
+    "score": 70,
+    "findingsCount": 24,
+    "criticalCount": 16
+  },
+  {
+    "timestamp": "2026-04-07T16:46:54.547Z",
+    "score": 22,
+    "findingsCount": 5,
+    "criticalCount": 0
+  },
+  {
+    "timestamp": "2026-04-07T16:47:01.484Z",
+    "score": 22,
+    "findingsCount": 4,
+    "criticalCount": 0
+  },
+  {
+    "timestamp": "2026-04-07T16:47:25.352Z",
+    "score": 27,
+    "findingsCount": 5,
+    "criticalCount": 0
+  },
+  {
+    "timestamp": "2026-04-07T16:50:37.269Z",
+    "score": 27,
+    "findingsCount": 5,
+    "criticalCount": 0
+  }
+]

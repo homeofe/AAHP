@@ -106,3 +106,5 @@ verification only and is ignored at `--level ci`.
 - **(Assumed)**: shellcheck clean for the new scripts (syntax-checked with bash -n; full shellcheck runs in CI).
 
 > 2026-06-21 install-hooks.sh: recognize Windows drive-letter (C:/...) git-dir/core.hooksPath as absolute (was only matching POSIX /*), fixing the mangled doubled path + junk C: dir that broke hook install on worktrees/submodules/subdirs. Validated (unit + worktree e2e). Propagate to downstream repos via propagate.sh as rollout.
+
+> 2026-06-21 ci(aahp): fix unquoted next_task_id (invalid JSON) + lint-handoff noreply@ PII exclusion.

@@ -155,6 +155,7 @@ EMAIL_MATCHES=$(LC_ALL=C.UTF-8 grep -rHnoE '[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a
         {
             addr = $NF                            # grep -Hno => file:line:address; an address has no colon
             if (addr ~ /\.noreply\./)       next  # GitHub co-author + any no-reply trailers
+            if (addr ~ /^no-?reply@/)       next  # noreply@ / no-reply@ local-part trailers
             if (index(addr, "example.com")) next  # template/example domain
             if (index(addr, "placeholder")) next  # template placeholder address
             print

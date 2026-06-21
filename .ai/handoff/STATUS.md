@@ -104,3 +104,5 @@ verification only and is ignored at `--level ci`.
 - **(Verified)**: verify.bats 12/12, lint.bats 26 ok plus 1 pre-existing skip, manifest.bats 18/18 pass locally.
 - **(Verified)**: No em-dashes (U+2014) in any file touched this session.
 - **(Assumed)**: shellcheck clean for the new scripts (syntax-checked with bash -n; full shellcheck runs in CI).
+
+> 2026-06-21 install-hooks.sh: recognize Windows drive-letter (C:/...) git-dir/core.hooksPath as absolute (was only matching POSIX /*), fixing the mangled doubled path + junk C: dir that broke hook install on worktrees/submodules/subdirs. Validated (unit + worktree e2e). Propagate to downstream repos via propagate.sh as rollout.

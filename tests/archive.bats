@@ -80,6 +80,56 @@ EOF
     [[ "$output" == *"missing indexed archived entries"* ]]
 }
 
+
+@test "archive preserves reverse chronological order and separators across runs" {
+    _write_log_entries
+    bash "$SCRIPTS_DIR/aahp-archive.sh" "$TEST_TMPDIR" --keep 1
+    cat > "$TEST_TMPDIR/.ai/handoff/LOG.md" <<'EOF'
+# AAHP: Agent Journal
+
+> Append-only. Never delete or edit past entries.
+
+---
+
+## [2026-06-28] Agent: newest-second-run
+
+newest second body
+
+---
+
+## [2026-06-27] Agent: moved-second-run
+
+moved second body
+
+---
+
+## [2026-06-26] Agent: newest
+
+newest body without trailing separator
+EOF
+    bash "$SCRIPTS_DIR/aahp-archive.sh" "$TEST_TMPDIR" --keep 1
+    source "$SCRIPTS_DIR/_aahp-lib.sh"
+    PYTHON_CMD="$(aahp_python_cmd)"
+    "$PYTHON_CMD" - "$TEST_TMPDIR/.ai/handoff/LOG-ARCHIVE.md" <<'PY'
+from pathlib import Path
+import sys
+text = Path(sys.argv[1]).read_text(encoding='utf-8')
+expected = [
+    '## [2026-06-27] Agent: moved-second-run',
+    '## [2026-06-26] Agent: newest',
+    '## [2026-06-25] Agent: middle',
+    '## [2026-06-24] Agent: oldest',
+]
+positions = [text.index(item) for item in expected]
+if positions != sorted(positions):
+    raise SystemExit(f'archive order is not reverse chronological: {positions}')
+for left, right in zip(expected, expected[1:]):
+    chunk = text[text.index(left):text.index(right)]
+    if '\n---\n\n' not in chunk:
+        raise SystemExit(f'missing separator between {left} and {right}')
+PY
+}
+
 @test "manifest indexes LOG-ARCHIVE.md when present" {
     create_status_md
     create_next_actions_md

@@ -3,16 +3,16 @@
   "project": "AAHP",
   "last_session": {
     "agent": "codex",
-    "session_id": "cli-1782468859",
-    "timestamp": "2026-06-26T10:14:19Z",
-    "commit": "3337d32",
+    "session_id": "cli-1782469219",
+    "timestamp": "2026-06-26T10:20:19Z",
+    "commit": "785a42d",
     "phase": "fix",
     "duration_minutes": 0
   },
   "files": {
     "STATUS.md": {
-      "checksum": "sha256:a57d8a99b5a4d80c9b80792110a1bf0f0d488de18c2abda760420de969f587e7",
-      "updated": "2026-06-26T10:14:05Z",
+      "checksum": "sha256:6b210b6343bb0970700aabf3253f77e64ce7af149b2a0e829ae5efcfebcc8a79",
+      "updated": "2026-06-26T10:20:15Z",
       "lines": 114,
       "summary": "(no summary available)"
     },
@@ -23,8 +23,8 @@
       "summary": "(no summary available)"
     },
     "LOG.md": {
-      "checksum": "sha256:9e381ad20334e24cdde30d8248b5cc0c460de1975671af0f1cde108a79642dc0",
-      "updated": "2026-06-26T10:14:05Z",
+      "checksum": "sha256:58e9138f8efb556886f3f3f4bd2a6793e185536c60755cee2acb865e1d665ef1",
+      "updated": "2026-06-26T10:20:15Z",
       "lines": 274,
       "summary": "(no summary available)"
     },
@@ -59,10 +59,10 @@
       "summary": "{"
     }
   },
-  "quick_context": "Address Gemini review feedback for PR #13: CLI archive dispatch, archive ordering/index integrity, and allowlist TSV stderr isolation.",
+  "quick_context": "Finish Gemini archive review feedback with standardized LOG separators and reverse-chronological multi-run regression coverage.",
   "token_budget": {
     "manifest_only": 85,
-    "manifest_plus_core": 4035,
-    "full_read": 9372
+    "manifest_plus_core": 4041,
+    "full_read": 9378
   }
 }

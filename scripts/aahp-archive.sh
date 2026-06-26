@@ -66,7 +66,10 @@ def split_doc(text: str):
     entries = []
     for index, start in enumerate(starts):
         end = starts[index + 1] if index + 1 < len(starts) else len(lines)
-        entries.append(''.join(lines[start:end]).rstrip() + '\n\n')
+        entry_text = ''.join(lines[start:end]).rstrip()
+        while entry_text.endswith('---'):
+            entry_text = entry_text[:-3].rstrip()
+        entries.append(entry_text)
     return preamble, entries
 
 def digest(entry: str) -> str:
@@ -86,6 +89,9 @@ def read_index(path: Path):
 
 def write_index(path: Path, entries):
     path.write_text(json.dumps({'version': 1, 'entries': entries}, indent=2) + '\n', encoding='utf-8', newline='\n')
+
+def render_entries(entries):
+    return '\n\n---\n\n'.join(entry.strip() for entry in entries if entry.strip())
 
 if keep < 1:
     raise SystemExit('--keep must be >= 1')
@@ -121,8 +127,8 @@ missing = [entry for entry in move_entries if digest(entry) not in archive_hashe
 if missing:
     if not archive_preamble.strip():
         archive_preamble = '# AAHP: Archived Agent Journal\n\n> Older entries rotated from LOG.md. Append-only.\n\n---\n\n'
-    archive_body = ''.join(missing + archive_entries)
-    archive_path.write_text(archive_preamble.rstrip() + '\n\n' + archive_body, encoding='utf-8', newline='\n')
+    archive_body = render_entries(missing + archive_entries)
+    archive_path.write_text(archive_preamble.rstrip() + '\n\n' + archive_body + '\n', encoding='utf-8', newline='\n')
     known = {entry.get('sha256') for entry in index_entries}
     new_index_entries = []
     for entry in missing:
@@ -131,7 +137,8 @@ if missing:
             new_index_entries.append({'sha256': h, 'title': title(entry)})
     write_index(index_path, new_index_entries + index_entries)
 
-log_path.write_text(log_preamble.rstrip() + '\n\n' + ''.join(keep_entries), encoding='utf-8', newline='\n')
+log_body = render_entries(keep_entries)
+log_path.write_text(log_preamble.rstrip() + '\n\n' + log_body + '\n', encoding='utf-8', newline='\n')
 # Verify postcondition.
 _, post_log = split_doc(read(log_path))
 _, post_archive = split_doc(read(archive_path))

@@ -27,7 +27,7 @@
 - `node bin/aahp.js --help`
 - `bash scripts/aahp-archive.sh . --verify`
 - `bash scripts/lint-handoff.sh .`
-- `bash node_modules/bats/bin/bats tests/archive.bats tests/lint.bats tests/manifest.bats tests/verify.bats` (67 checks; 2 pre-existing manifest skips)
+- `bash node_modules/bats/bin/bats tests/archive.bats tests/lint.bats tests/manifest.bats tests/verify.bats` (68 checks; 2 pre-existing manifest skips)
 - `bash scripts/verify-handoff.sh . --level full`
 - `git diff --check`
 

@@ -35,7 +35,7 @@ verification only and is ignored at `--level ci`. AAHP v3.1.0 adds a reviewed, e
 | `lint-handoff.sh` | OK | All 6 checks pass |
 | `aahp verify` | OK | New gate: 4 layers, verified end-to-end on a temp repo |
 | `verify.bats` | OK | 12/12 pass |
-| `archive.bats` | OK | 6/6 pass; verifies LOG rotation, postcondition, truncation detection, idempotency, and MANIFEST archive/index coverage |
+| `archive.bats` | OK | 7/7 pass; verifies LOG rotation, postcondition, truncation detection, idempotency, reverse-chronological separators across repeated rotations, and MANIFEST archive/index coverage |
 | `lint.bats` | OK | 30 ok, 1 pre-existing skip; adds exact PII allowlist coverage for valid, expired, malformed, wildcard, and secret non-suppression cases |
 | `manifest.bats` | OK | 19/19 pass; optional `pii-allowlist.json` is indexed when present |
 | `cli.bats` | OK | verify help test added; 2 pre-existing Windows-only failures (version-capture flake, read-only-dir) pass on Linux CI |
@@ -105,7 +105,7 @@ verification only and is ignored at `--level ci`. AAHP v3.1.0 adds a reviewed, e
 ## Trust Levels
 
 - **(Verified)**: `aahp verify` runs all 4 layers correctly; drift gate hard-fails, escape hatch skips locally and is ignored at level ci (tested on a temp consumer repo and end-to-end via the installed pre-commit hook).
-- **(Verified)**: selected regression suites pass locally: archive/lint/manifest/verify = 67 checks with 2 pre-existing manifest skips.
+- **(Verified)**: selected regression suites pass locally: archive/lint/manifest/verify = 68 checks with 2 pre-existing manifest skips.
 - **(Verified)**: No em-dashes (U+2014) in any file touched this session.
 - **(Assumed)**: shellcheck clean for the new scripts (syntax-checked with bash -n; full shellcheck runs in CI).
 

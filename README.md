@@ -2,6 +2,10 @@
 
 [![CI](https://github.com/homeofe/AAHP/actions/workflows/ci.yml/badge.svg)](https://github.com/homeofe/AAHP/actions/workflows/ci.yml)
 [![AAHP Verify](https://github.com/homeofe/AAHP/actions/workflows/aahp-verify.yml/badge.svg)](https://github.com/homeofe/AAHP/actions/workflows/aahp-verify.yml)
+[![AAHP Lint](https://github.com/homeofe/AAHP/actions/workflows/aahp-lint.yml/badge.svg)](https://github.com/homeofe/AAHP/actions/workflows/aahp-lint.yml)
+[![AAHP Manifest](https://github.com/homeofe/AAHP/actions/workflows/aahp-manifest.yml/badge.svg)](https://github.com/homeofe/AAHP/actions/workflows/aahp-manifest.yml)
+[![AAHP Archive](https://github.com/homeofe/AAHP/actions/workflows/aahp-archive.yml/badge.svg)](https://github.com/homeofe/AAHP/actions/workflows/aahp-archive.yml)
+[![AAHP PII Allowlist](https://github.com/homeofe/AAHP/actions/workflows/aahp-pii-allowlist.yml/badge.svg)](https://github.com/homeofe/AAHP/actions/workflows/aahp-pii-allowlist.yml)
 [![Security](https://github.com/homeofe/AAHP/actions/workflows/codeql.yml/badge.svg)](https://github.com/homeofe/AAHP/actions/workflows/codeql.yml)
 [![npm](https://img.shields.io/npm/v/@elvatis_com/aahp.svg)](https://www.npmjs.com/package/@elvatis_com/aahp)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
@@ -280,7 +284,23 @@ ghp_*
 
 CI hook validates that no handoff file contains these patterns.
 
-### 2.7 The Verify Gate: `aahp verify`
+### 2.7 Reviewed PII Allowlist
+
+A repository may retain a genuinely necessary operational email only in
+`.ai/handoff/pii-allowlist.json`. The file is optional, but when present it is
+validated during every lint/verify run and is indexed in `MANIFEST.json`.
+
+```json
+{"version":1,"entries":[{"value":"owner@company.example","kind":"email","reason":"Required escalation contact","owner":"Platform Operations","expires":"2026-12-31"}]}
+```
+
+Each entry is an exact email value and must include a reason, owner, and future
+expiry date. Wildcards, domains, regular expressions, duplicate values, and
+expired entries fail verification. An allowed match suppresses only that exact
+PII finding; secrets and all other verification layers still fail normally.
+The canonical schema is `schema/aahp-pii-allowlist.schema.json`.
+
+### 2.8 The Verify Gate: `aahp verify`
 
 Linting and checksums are passive. They tell you when handoff state is malformed,
 but they do not stop an agent from committing code while leaving `STATUS.md` and
@@ -318,6 +338,18 @@ bypass CI. Never use `git commit/push --no-verify`.
 See `scripts/ROLLOUT.md` for the propagation plan across consumer repos.
 
 ---
+
+### 2.9 LOG Archive Integrity
+
+`LOG.md` is append-only during normal work, but it should stay small enough for
+agents to read quickly. Older entries are rotated into `LOG-ARCHIVE.md` with:
+
+```bash
+aahp archive              # keeps the 10 newest entries
+aahp archive --verify     # fails if LOG.md has more than 10 active entries
+```
+
+A canonical log entry starts with `## [YYYY-MM-DD]`. The default flow keeps the 10 newest entries in `LOG.md`. Entry 11 and older are moved automatically into `LOG-ARCHIVE.md`, and the postcondition verifies by entry hash that no rotated entry was dropped. `LOG-ARCHIVE.index.json` stores the hashes of archived entries so `--verify` also detects later truncation or tampering. `LOG-ARCHIVE.md` and the index are included in `MANIFEST.json` whenever present, so archive changes stay inside the checksum boundary.
 
 ## 3. Robustness: Surviving Failures
 

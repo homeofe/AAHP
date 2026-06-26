@@ -4,7 +4,7 @@
 
 # Standard AAHP handoff files, in canonical order
 # shellcheck disable=SC2034
-AAHP_HANDOFF_FILES=(STATUS.md NEXT_ACTIONS.md LOG.md DASHBOARD.md TRUST.md CONVENTIONS.md WORKFLOW.md)
+AAHP_HANDOFF_FILES=(STATUS.md NEXT_ACTIONS.md LOG.md LOG-ARCHIVE.md LOG-ARCHIVE.index.json DASHBOARD.md TRUST.md CONVENTIONS.md WORKFLOW.md pii-allowlist.json)
 
 # Colors (safe to re-source -same variable names used across scripts)
 # shellcheck disable=SC2034
@@ -51,6 +51,7 @@ aahp_auto_summary() {
     local filepath="$1"
     local summary
     summary=$(head -5 "$filepath" \
+        | tr -d '\r' \
         | grep -v '^#' | grep -v '^>' | grep -v '^---' | grep -v '^$' \
         | head -1 | cut -c1-150 || true)
     [ -z "$summary" ] && summary="(no summary available)"

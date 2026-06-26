@@ -46,6 +46,22 @@ first so the repo starts from a clean, in-sync state.
   committed so it activates when Actions is re-enabled. Until then, the local
   hooks are the live enforcement.
 
+## Reviewed PII allowlist rollout
+
+Use `.ai/handoff/pii-allowlist.json` only for reviewed operational context. It
+is not a bypass: entries are exact, expiring, and MANIFEST-indexed.
+
+| Repository | Current blocker | Accountable owner | Required action |
+|---|---|---|---|
+| `atlas` | Scan/report operational addresses | Atlas product team | Redact or approve exact expiring entries, then regenerate MANIFEST. |
+| `elvatis-security-platform` | Shield support/operator addresses | Shield product team | Redact or approve each address individually. |
+| `elvatis-client-portal` | Customer-portal operational addresses | Client Portal team | Redact or approve each address individually. |
+| `elvatis-awareness` | Training/demo operational addresses | Awareness product team | Redact or approve each address individually. |
+
+Consumer upgrade: propagate the validator, schema, template, and refreshed
+scripts; add reviewed exact entries; run `aahp manifest`; then run
+`aahp verify --level full`. Do not use `AAHP_SKIP_VERIFY` or `--no-verify`. Run `aahp archive` before `/handoff` whenever `LOG.md` grows past 10 active entries.
+
 ## CI strategy per wave
 
 - Wave 1 repos: commit the workflow now; once Actions is re-enabled, mark

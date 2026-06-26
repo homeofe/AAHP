@@ -157,7 +157,7 @@ teardown() {
 
     run bash "$SCRIPTS_DIR/lint-handoff.sh" "$TEST_TMPDIR"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"No PII detected"* ]]
+    [[ "$output" == *"No unapproved PII detected"* ]]
     [[ "$output" != *"123456+Copilot@users.noreply.github.com"* ]]
 }
 
@@ -212,10 +212,65 @@ teardown() {
 
     run bash "$SCRIPTS_DIR/lint-handoff.sh" "$TEST_TMPDIR"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"No PII detected"* ]]
+    [[ "$output" == *"No unapproved PII detected"* ]]
 }
 
-# ─── Invalid JSON in MANIFEST.json ───────────────────────────
+# ??? Reviewed PII allowlist (issue #21) ??????????????????????
+
+@test "allows one exact non-expired email and reports its matching entry" {
+    create_full_handoff
+    cat > "$TEST_TMPDIR/.ai/handoff/pii-allowlist.json" <<'JSON'
+{"version":1,"entries":[{"value":"owner@company.test","kind":"email","reason":"Required operational owner reference","owner":"Platform Operations","expires":"2099-01-01"}]}
+JSON
+    bash "$SCRIPTS_DIR/aahp-manifest.sh" "$TEST_TMPDIR" --quiet
+    bash "$SCRIPTS_DIR/aahp-manifest.sh" "$TEST_TMPDIR" --quiet
+    echo "Contact owner@company.test for escalation." >> "$TEST_TMPDIR/.ai/handoff/STATUS.md"
+    run bash "$SCRIPTS_DIR/lint-handoff.sh" "$TEST_TMPDIR"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Allowed PII email 'owner@company.test'"* ]]
+}
+
+@test "rejects an expired PII allowlist entry" {
+    create_full_handoff
+    cat > "$TEST_TMPDIR/.ai/handoff/pii-allowlist.json" <<'JSON'
+{"version":1,"entries":[{"value":"owner@company.test","kind":"email","reason":"Required operational owner reference","owner":"Platform Operations","expires":"2000-01-01"}]}
+JSON
+    run bash "$SCRIPTS_DIR/lint-handoff.sh" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"expired on 2000-01-01"* ]]
+}
+
+@test "rejects malformed and wildcard PII allowlist entries" {
+    create_full_handoff
+    cat > "$TEST_TMPDIR/.ai/handoff/pii-allowlist.json" <<'JSON'
+{"version":1,"entries":[{"value":"*@company.test","kind":"email","reason":"Wildcard should never be accepted","owner":"Platform Operations","expires":"2099-01-01"}]}
+JSON
+    run bash "$SCRIPTS_DIR/lint-handoff.sh" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"one exact email address"* ]]
+    cat > "$TEST_TMPDIR/.ai/handoff/pii-allowlist.json" <<'JSON'
+{"version":1,"entries":[{"value":"owner@company.test","kind":"email","reason":"Missing owner","expires":"2099-01-01"}]}
+JSON
+    run bash "$SCRIPTS_DIR/lint-handoff.sh" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"must contain exactly value, kind, reason, owner, and expires"* ]]
+}
+
+@test "PII allowlist never suppresses secret detection" {
+    create_full_handoff
+    cat > "$TEST_TMPDIR/.ai/handoff/pii-allowlist.json" <<'JSON'
+{"version":1,"entries":[{"value":"owner@company.test","kind":"email","reason":"Required operational owner reference","owner":"Platform Operations","expires":"2099-01-01"}]}
+JSON
+    bash "$SCRIPTS_DIR/aahp-manifest.sh" "$TEST_TMPDIR" --quiet
+    bash "$SCRIPTS_DIR/aahp-manifest.sh" "$TEST_TMPDIR" --quiet
+    echo "Contact owner@company.test. API_KEY=sk-abcdef1234567890abcdef" >> "$TEST_TMPDIR/.ai/handoff/STATUS.md"
+    run bash "$SCRIPTS_DIR/lint-handoff.sh" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"secret pattern"* ]]
+    [[ "$output" == *"Allowed PII email 'owner@company.test'"* ]]
+}
+
+# ??? Invalid JSON in MANIFEST.json ???????????????????????????
 
 @test "detects invalid JSON in MANIFEST.json" {
     create_full_handoff

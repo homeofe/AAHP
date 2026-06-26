@@ -6,6 +6,86 @@
 
 ---
 
+## [2026-06-26] Codex: Fix manifest badge schema for AAHP JSON files
+
+**Agent:** Codex
+**Phase:** fix
+**Branch:** codex/issue-21-pii-allowlist
+**Tasks:** AAHP PR #13 merge blocker
+
+### What was done
+
+- Fixed `schema/aahp-manifest.schema.json` so MANIFEST file entries can include AAHP-owned JSON handoff files.
+- Allowed `pii-allowlist.json` and `LOG-ARCHIVE.index.json` while keeping unknown JSON files rejected.
+- Reproduced the GitHub Actions `AAHP Manifest` validation locally with `ajv-cli` and confirmed `.ai/handoff/MANIFEST.json valid`.
+
+---
+
+## [2026-06-26] Codex: Gemini review fixes for AAHP PR #13
+
+**Agent:** Codex
+**Phase:** fix
+**Branch:** codex/issue-21-pii-allowlist
+**Tasks:** AAHP PR #13 review follow-up
+
+### What was done
+
+- Fixed `bin/aahp.js` top-of-file help syntax so the CLI no longer crashes on parse.
+- Registered the `archive` command in CLI dispatch.
+- Hardened the Node CLI wrapper on Windows to prefer Git Bash over the WSL `bash.exe` shim when available.
+- Adjusted LOG archive rendering to preserve clean separators and newest-first archive order.
+- Kept allowlist TSV stdout clean by separating validator stderr from successful parser output.
+
+### Validation
+
+- `node --check bin/aahp.js`
+- `node bin/aahp.js --help`
+- `bash scripts/aahp-archive.sh . --verify`
+- `bash scripts/lint-handoff.sh .`
+- `bash node_modules/bats/bin/bats tests/archive.bats tests/lint.bats tests/manifest.bats tests/verify.bats` (68 checks; 2 pre-existing manifest skips)
+- `bash scripts/verify-handoff.sh . --level full`
+- `git diff --check`
+
+---
+
+## [2026-06-26] Codex: LOG archive flow and reusable badge workflows
+
+**Agent:** Codex
+**Phase:** implementation
+**Branch:** codex/issue-21-pii-allowlist
+**Tasks:** AAHP issues #11 and #12
+
+### What was done
+
+- Added `aahp archive` with the canonical default flow: keep the 10 newest `LOG.md` entries and move entry 11+ to `LOG-ARCHIVE.md`.
+- Added `aahp archive --verify` for CI and local checks.
+- Added archive regression tests for rotation, missing rotation, verification, truncation detection, idempotency, and MANIFEST archive/index coverage.
+- Added stable per-check workflows: AAHP Lint, Manifest, Archive, and PII Allowlist; AAHP Verify remains the umbrella gate.
+- Documented reusable README badge snippets for downstream repos.
+
+---
+
+## [2026-06-26] Codex: Reviewed, expiring PII allowlist (issue #21)
+
+**Agent:** Codex
+**Phase:** implementation
+**Branch:** codex/issue-21-pii-allowlist
+**Task:** T-031
+
+### What was done
+
+- Added `pii-allowlist.json` schema, template, and cross-platform validator.
+- Allowed only exact, non-expired email matches with a reason and accountable owner.
+- Kept the optional allowlist in MANIFEST checksum coverage.
+- Added regression tests for valid, expired, malformed, wildcard, and secret non-suppression cases.
+- Documented rollout owners for the currently blocked consumer repositories.
+
+### Security decision
+
+An allowlist suppresses only the matching PII finding. Secret detection and every other AAHP verify layer remain non-bypassable.
+
+---
+
 ## [2026-06-20] Claude Opus 4.8 (1M context): Canonical handoff gate (aahp verify)
 
 **Agent:** Claude Opus 4.8 (1M context)
@@ -184,26 +264,3 @@
 ### Decisions made
 
 - Single source of truth: README.md is the v2 specification document
-
----
-
-## [2026-02-26] Previous: AAHP v2 Tooling Implementation
-
-**Agent:** (prior session)
-**Phase:** 3 (Implementer)
-**Branch:** main
-
-### What was done
-
-- Created all 10 template files in `templates/`
-- Created `scripts/aahp-migrate-v2.sh` (v1 to v2 migration)
-- Created `scripts/lint-handoff.sh` (5 validation checks)
-- Created `schema/aahp-manifest.schema.json` (JSON Schema Draft 2020-12)
-- Created `AAHP-v2-PROPOSAL.md` with full v2 specification
-- Set up LICENSE (now CC BY 4.0, originally MIT), .gitignore
-
-### Decisions made
-
-- Bash-only tooling (no Node.js/Python dependency for core scripts)
-- JSON Schema Draft 2020-12 for manifest validation
-- Pre-commit hook pattern for safety linting

@@ -82,7 +82,17 @@ _detect_python() {
     [[ "$manifest_content" == *'"full_read"'* ]]
 }
 
-# ─── CLI flag: --agent ───────────────────────────────────────
+@test "indexes an optional pii allowlist in MANIFEST.json" {
+    create_status_md
+    create_next_actions_md
+    create_log_md
+    echo '{"version":1,"entries":[]}' > "$TEST_TMPDIR/.ai/handoff/pii-allowlist.json"
+    run bash "$SCRIPTS_DIR/aahp-manifest.sh" "$TEST_TMPDIR" --quiet
+    [ "$status" -eq 0 ]
+    grep -q '"pii-allowlist.json"' "$TEST_TMPDIR/.ai/handoff/MANIFEST.json"
+}
+
+# ??? CLI flag: --agent ???????????????????????????????????????
 
 @test "--agent flag sets agent name in output" {
     create_status_md

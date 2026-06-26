@@ -26,7 +26,7 @@ if [ $# -gt 0 ]; then
     # Run a specific test suite
     suite="$1"
     case "$suite" in
-        manifest|lint|migrate)
+        manifest|lint|migrate|archive)
             echo "Running $suite tests..."
             $BATS "$SCRIPT_DIR/${suite}.bats"
             ;;

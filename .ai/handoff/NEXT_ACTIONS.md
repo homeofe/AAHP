@@ -39,7 +39,7 @@
 
 ## Ready - Work These Next
 
-### T-014: Add CLI integration tests for bin/aahp.js [high] (issue #7)
+### T-014: Add CLI integration tests for bin/aahp.js [high] (issue #14)
 **Priority:** high
 
 **Goal:** Test the Node.js CLI entry point end-to-end so the primary user interface has automated coverage.
@@ -71,7 +71,7 @@
 
 ---
 
-### T-015: Add `aahp status` quick-look command [medium] (issue #8)
+### T-015: Add `aahp status` quick-look command [medium] (issue #15)
 **Priority:** medium
 
 **Goal:** Add a `status` subcommand that reads MANIFEST.json and prints a concise project summary, so agents and humans can orient instantly without opening files manually.
@@ -99,7 +99,7 @@
 
 ---
 
-### T-016: Add `aahp archive` command for LOG.md rotation [medium] (issue #9)
+### T-016: Add `aahp archive` command for LOG.md rotation [medium] (issue #16)
 **Priority:** medium
 
 **Goal:** Automate the LOG.md to LOG-ARCHIVE.md split described in README Section 1.3, keeping LOG.md lean for token efficiency.
@@ -131,7 +131,7 @@
 
 ---
 
-### T-017: Add project-level CLAUDE.md [low] (issue #10)
+### T-017: Add project-level CLAUDE.md [low] (issue #17)
 **Priority:** low
 
 **Goal:** Create an AAHP-specific CLAUDE.md so AI agents working on this project get correct conventions without relying solely on the workspace-level file.
@@ -161,7 +161,7 @@
 
 ## Blocked
 
-### T-006: Publish npm package (issue #2)
+### T-006: Publish npm package (issue #18)
 **Priority:** medium
 
 **Goal:** Publish the `aahp` CLI to the npm registry so users can `npx aahp init`.

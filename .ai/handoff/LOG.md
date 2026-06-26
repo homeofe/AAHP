@@ -6,6 +6,27 @@
 
 ---
 
+## [2026-06-26] Codex: Reviewed, expiring PII allowlist (issue #21)
+
+**Agent:** Codex
+**Phase:** implementation
+**Branch:** codex/issue-21-pii-allowlist
+**Task:** T-031
+
+### What was done
+
+- Added `pii-allowlist.json` schema, template, and cross-platform validator.
+- Allowed only exact, non-expired email matches with a reason and accountable owner.
+- Kept the optional allowlist in MANIFEST checksum coverage.
+- Added regression tests for valid, expired, malformed, wildcard, and secret non-suppression cases.
+- Documented rollout owners for the currently blocked consumer repositories.
+
+### Security decision
+
+An allowlist suppresses only the matching PII finding. Secret detection and every other AAHP verify layer remain non-bypassable.
+
+---
+
 ## [2026-06-20] Claude Opus 4.8 (1M context): Canonical handoff gate (aahp verify)
 
 **Agent:** Claude Opus 4.8 (1M context)

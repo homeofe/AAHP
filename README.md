@@ -280,7 +280,23 @@ ghp_*
 
 CI hook validates that no handoff file contains these patterns.
 
-### 2.7 The Verify Gate: `aahp verify`
+### 2.7 Reviewed PII Allowlist
+
+A repository may retain a genuinely necessary operational email only in
+`.ai/handoff/pii-allowlist.json`. The file is optional, but when present it is
+validated during every lint/verify run and is indexed in `MANIFEST.json`.
+
+```json
+{"version":1,"entries":[{"value":"owner@company.example","kind":"email","reason":"Required escalation contact","owner":"Platform Operations","expires":"2026-12-31"}]}
+```
+
+Each entry is an exact email value and must include a reason, owner, and future
+expiry date. Wildcards, domains, regular expressions, duplicate values, and
+expired entries fail verification. An allowed match suppresses only that exact
+PII finding; secrets and all other verification layers still fail normally.
+The canonical schema is `schema/aahp-pii-allowlist.schema.json`.
+
+### 2.8 The Verify Gate: `aahp verify`
 
 Linting and checksums are passive. They tell you when handoff state is malformed,
 but they do not stop an agent from committing code while leaving `STATUS.md` and

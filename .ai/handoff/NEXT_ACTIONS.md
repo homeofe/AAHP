@@ -10,9 +10,19 @@
 
 | Status | Count |
 |--------|-------|
-| Done | 9 |
+| Done | 10 |
 | Ready | 4 |
 | Blocked | 1 |
+
+---
+
+## Recently Completed
+
+### T-031: Reviewed, expiring PII allowlist [high] (ideabase issue #21)
+
+- Added a strict exact-email allowlist with owner, reason, and expiry fields.
+- Integrated it into `aahp lint` and MANIFEST integrity; it cannot suppress secrets.
+- Added schema, template, rollout owners, and regression tests.
 
 ---
 

@@ -1,7 +1,7 @@
 # AAHP: Current State of the Nation
 
-> Last updated: 2026-06-20 by Claude Opus 4.8 (1M context)
-> Commit: (pending)
+> Last updated: 2026-06-26 by Codex
+> Commit: (pending #21)
 >
 > **Rule:** This file is rewritten (not appended) at the end of every session.
 > It reflects the *current* reality, not history. History lives in LOG.md.
@@ -21,7 +21,7 @@ running `aahp verify --level ci` as the intended REQUIRED check (committed now;
 GitHub Actions is OFF org-wide for a cost sweep, so it activates when Actions is
 re-enabled). The gate is verify-only: it never regenerates MANIFEST.json, that
 stays a separate /handoff step. Escape hatch `AAHP_SKIP_VERIFY=1` skips local
-verification only and is ignored at `--level ci`.
+verification only and is ignored at `--level ci`. AAHP v3.1.0 adds a reviewed, exact-value, expiring PII email allowlist that is MANIFEST-indexed and cannot suppress secrets.
 <!-- /SECTION: summary -->
 
 ---
@@ -35,8 +35,8 @@ verification only and is ignored at `--level ci`.
 | `lint-handoff.sh` | OK | All 6 checks pass |
 | `aahp verify` | OK | New gate: 4 layers, verified end-to-end on a temp repo |
 | `verify.bats` | OK | 12/12 pass |
-| `lint.bats` | OK | 26 ok, 1 pre-existing skip (added 5 PII line-granularity tests, T-029) |
-| `manifest.bats` | OK | 18/18 pass |
+| `lint.bats` | OK | 30 ok, 1 pre-existing skip; adds exact PII allowlist coverage for valid, expired, malformed, wildcard, and secret non-suppression cases |
+| `manifest.bats` | OK | 19/19 pass; optional `pii-allowlist.json` is indexed when present |
 | `cli.bats` | OK | verify help test added; 2 pre-existing Windows-only failures (version-capture flake, read-only-dir) pass on Linux CI |
 | `npx aahp` CLI | OK | init, manifest, lint, migrate, verify commands work |
 | `shellcheck` | PENDING | Not installable offline on this machine; runs in CI (ci.yml extended to cover the new scripts) |
@@ -59,8 +59,8 @@ verification only and is ignored at `--level ci`.
 | Verify Tests | `tests/verify.bats` | Complete | 12 tests covering all layers plus escape hatch |
 | Manifest Generator | `scripts/aahp-manifest.sh` | Complete | v3: preserves tasks on regen |
 | Migration Script | `scripts/aahp-migrate-v2.sh` | Complete | Delegates to aahp-manifest.sh |
-| Lint Script | `scripts/lint-handoff.sh` | Complete | 6 checks, cross-platform Python; PII email scan locale-robust (grep -E, T-027) and per-match filtered (grep -rHnoE + awk, T-029) |
-| JSON Schema | `schema/aahp-manifest.schema.json` | Complete | v3: tasks plus next_task_id |
+| Lint Script | `scripts/lint-handoff.sh` | Complete | 6 checks, locale-robust per-match PII scan, reviewed exact/expiring email allowlist, and secret non-suppression |
+| JSON Schemas | `schema/aahp-manifest.schema.json`, `schema/aahp-pii-allowlist.schema.json` | Complete | v3 manifest plus strict reviewed PII allowlist schema |
 | CLI (npx aahp) | `bin/aahp.js` | Complete | verify command registered |
 | CI Pipeline | `.github/workflows/ci.yml` | Complete | shellcheck now covers verify/hooks/installer |
 <!-- /SECTION: components -->
@@ -95,6 +95,7 @@ verification only and is ignored at `--level ci`.
 | T-027 | PII check locale-robust + GitHub noreply exclusion | Check 3 email scan used `grep -rnP` (PCRE); under an empty/non-UTF-8 locale on Windows git-bash GNU grep -P aborts ("supports only unibyte and UTF-8 locales") and the pipeline silently passed (false PASS), while the UTF-8 locale `git commit` sets made it fire -non-deterministic by locale. Switched to `grep -rnE` (POSIX-ERE, no PCRE locale fail-open) with an internal LC_ALL=C.UTF-8 pin, so detection is byte-identical under LC_ALL= (empty), C.UTF-8, and en_US.UTF-8. Added two narrow exclusions (users.noreply.github.com co-author trailers + any *.noreply.* domain); real human/customer emails stay a HARD-FAIL, no allowlist file. 3 new lint.bats tests; bats green; v3.0.4. |
 | T-029 | PII check switched to per-match filtering (line-granularity false-negative) | Check 3 extracted whole matched lines and dropped any line containing an excluded token via a line-level `grep -v`, so a genuine external email sharing a single line with an excluded token (a `.noreply.` co-author trailer, `example.com`, or the word `placeholder`) was silently suppressed -a real PII false negative. Switched to per-MATCH filtering: extract each address with `grep -rHnoE` and exclude per ADDRESS in `awk`, so an excluded token elsewhere on the same line can no longer mask a separate real address. Locale-determinism preserved (`grep -E` not `-P`, LC_ALL=C.UTF-8 pin); detection stays byte-identical across locales. 5 new lint.bats T-029 regression tests; bats green; v3.0.5. |
 | T-030 | Add README status-badge block (2026-06-21) | Inserted auto-detected badges after the H1: CI (ci.yml), AAHP Verify (aahp-verify.yml), Security (codeql.yml), npm (@elvatis_com/aahp, published v3.0.5), License Apache-2.0. README change is code outside .ai/handoff, so routed through the drift gate (STATUS.md note + regenerated MANIFEST.json). |
+| T-031 | Reviewed, expiring PII allowlist | Added v3.1.0 allowlist schema/template/validator, exact-match lint support, MANIFEST indexing, rollout owners, and regression tests. |
 
 ---
 

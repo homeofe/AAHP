@@ -285,7 +285,17 @@ _aahp() {
     [ -f "$TEST_TMPDIR/.ai/handoff/.aiignore" ]
 }
 
-# ─── status command (not built in - ensure helpful error) ────
+
+@test "aahp init does not copy pii-allowlist.json without explicit flag" {
+    _aahp init "$TEST_TMPDIR"
+    [ ! -f "$TEST_TMPDIR/.ai/handoff/pii-allowlist.json" ]
+}
+
+@test "aahp init copies pii-allowlist.json with --with-pii-allowlist" {
+    _aahp init "$TEST_TMPDIR" --with-pii-allowlist
+    [ -f "$TEST_TMPDIR/.ai/handoff/pii-allowlist.json" ]
+}
+# status command (not built in - ensure helpful error)
 
 @test "aahp status exits non-zero (unknown command)" {
     _aahp status
@@ -350,3 +360,4 @@ _aahp() {
     [ "$status" -eq 0 ]
     grep -q '"phase": "review"' "$TEST_TMPDIR/.ai/handoff/MANIFEST.json"
 }
+

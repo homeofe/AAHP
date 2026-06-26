@@ -52,6 +52,7 @@ Commands:
 
 Init options:
   --force           Overwrite existing files (default: skip existing)
+  --with-pii-allowlist  Copy pii-allowlist.json template when needed
 
 Manifest options:
   --agent NAME      Agent identifier (default: "cli-tool")
@@ -130,6 +131,7 @@ function extractPathAndFlags(rest) {
 
 function cmdInit(targetPath, flags) {
   const force = flags.includes('--force')
+  const includePiiAllowlist = flags.includes('--with-pii-allowlist')
   const handoffDir = join(targetPath, '.ai', 'handoff')
   const templatesDir = join(PACKAGE_ROOT, 'templates')
 
@@ -169,6 +171,12 @@ function cmdInit(targetPath, flags) {
   for (const file of templateFiles) {
     const src = join(templatesDir, file)
     const dest = join(handoffDir, file)
+
+    if (file === 'pii-allowlist.json' && !includePiiAllowlist) {
+      console.log(`  skip: ${file} (optional; use --with-pii-allowlist to include)`)
+      skipped++
+      continue
+    }
 
     if (existsSync(dest) && !force) {
       console.log(`  skip: ${file} (already exists, use --force to overwrite)`)
@@ -339,3 +347,5 @@ switch (command) {
     console.error('Run "aahp --help" for usage information.')
     process.exit(1)
 }
+
+

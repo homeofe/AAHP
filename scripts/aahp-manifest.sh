@@ -155,7 +155,7 @@ if [ -f "$HANDOFF_DIR/MANIFEST.json" ]; then
             const m = JSON.parse(require('fs').readFileSync('$HANDOFF_DIR/MANIFEST.json', 'utf8'));
             if (m.next_task_id) process.stdout.write(String(m.next_task_id));
         " 2>/dev/null || true)
-        if [ -n "$EXISTING_ID" ]; then
+        if [ -n "$EXISTING_ID" ] && [[ "$EXISTING_ID" =~ ^[0-9]+$ ]]; then
             NEXT_TASK_ID="$EXISTING_ID"
         fi
     fi
@@ -188,7 +188,7 @@ MANIFEST
 
     # Append v3 task fields if they exist
     if [ -n "$NEXT_TASK_ID" ]; then
-        echo "  ,\"next_task_id\": \"$NEXT_TASK_ID\""
+        echo "  ,\"next_task_id\": $NEXT_TASK_ID"
     fi
     if [ -n "$TASKS_JSON" ]; then
         echo "  ,\"tasks\": $TASKS_JSON"
@@ -203,3 +203,5 @@ if [ "$QUIET" = false ]; then
     echo "MANIFEST.json generated: $FILES_FOUND files indexed, checksums current."
     echo "  Token budget: manifest=$MANIFEST_TOKENS, core=$CORE_TOKENS, full=$FULL_TOKENS"
 fi
+
+

@@ -3,16 +3,16 @@
   "project": "AAHP",
   "last_session": {
     "agent": "codex",
-    "session_id": "cli-1782469219",
-    "timestamp": "2026-06-26T10:20:19Z",
-    "commit": "785a42d",
+    "session_id": "cli-1782469977",
+    "timestamp": "2026-06-26T10:32:57Z",
+    "commit": "393b31a",
     "phase": "fix",
     "duration_minutes": 0
   },
   "files": {
     "STATUS.md": {
-      "checksum": "sha256:6b210b6343bb0970700aabf3253f77e64ce7af149b2a0e829ae5efcfebcc8a79",
-      "updated": "2026-06-26T10:20:15Z",
+      "checksum": "sha256:f464e66bc3c681da09ac5d1a9f1abafa9a06bea41b7bbbe5b5f72d6efce73dcf",
+      "updated": "2026-06-26T10:32:53Z",
       "lines": 114,
       "summary": "(no summary available)"
     },
@@ -23,9 +23,9 @@
       "summary": "(no summary available)"
     },
     "LOG.md": {
-      "checksum": "sha256:58e9138f8efb556886f3f3f4bd2a6793e185536c60755cee2acb865e1d665ef1",
-      "updated": "2026-06-26T10:20:15Z",
-      "lines": 274,
+      "checksum": "sha256:7579c9cd7c87eb2454f4902bc45c024a9bcb54274daccdf4701d353c82a9eb81",
+      "updated": "2026-06-26T10:32:53Z",
+      "lines": 289,
       "summary": "(no summary available)"
     },
     "DASHBOARD.md": {
@@ -59,10 +59,10 @@
       "summary": "{"
     }
   },
-  "quick_context": "Finish Gemini archive review feedback with standardized LOG separators and reverse-chronological multi-run regression coverage.",
+  "quick_context": "Fix AAHP Manifest badge schema so AAHP-owned JSON handoff files validate in GitHub Actions.",
   "token_budget": {
     "manifest_only": 85,
-    "manifest_plus_core": 4041,
-    "full_read": 9378
+    "manifest_plus_core": 4070,
+    "full_read": 9494
   }
 }

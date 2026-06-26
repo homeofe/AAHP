@@ -6,6 +6,21 @@
 
 ---
 
+## [2026-06-26] Codex: Fix manifest badge schema for AAHP JSON files
+
+**Agent:** Codex
+**Phase:** fix
+**Branch:** codex/issue-21-pii-allowlist
+**Tasks:** AAHP PR #13 merge blocker
+
+### What was done
+
+- Fixed `schema/aahp-manifest.schema.json` so MANIFEST file entries can include AAHP-owned JSON handoff files.
+- Allowed `pii-allowlist.json` and `LOG-ARCHIVE.index.json` while keeping unknown JSON files rejected.
+- Reproduced the GitHub Actions `AAHP Manifest` validation locally with `ajv-cli` and confirmed `.ai/handoff/MANIFEST.json valid`.
+
+---
+
 ## [2026-06-26] Codex: Gemini review fixes for AAHP PR #13
 
 **Agent:** Codex

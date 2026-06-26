@@ -21,7 +21,7 @@ running `aahp verify --level ci` as the intended REQUIRED check (committed now;
 GitHub Actions is OFF org-wide for a cost sweep, so it activates when Actions is
 re-enabled). The gate is verify-only: it never regenerates MANIFEST.json, that
 stays a separate /handoff step. Escape hatch `AAHP_SKIP_VERIFY=1` skips local
-verification only and is ignored at `--level ci`. AAHP v3.1.0 adds a reviewed, exact-value, expiring PII email allowlist that is MANIFEST-indexed and cannot suppress secrets. AAHP v3.2.0 adds the canonical LOG archive flow: `LOG.md` keeps the 10 newest entries and entry 11+ is moved to `LOG-ARCHIVE.md`; `LOG-ARCHIVE.index.json` records archived-entry hashes so truncation/tampering is detected; reusable per-check badge workflows are now split out for downstream repos. Gemini Code Assist review findings on PR #13 were addressed: the CLI help syntax is fixed, `archive` is registered in command dispatch, archive ordering/separators are stable, and allowlist TSV parsing ignores Python stderr warnings on success.
+verification only and is ignored at `--level ci`. AAHP v3.1.0 adds a reviewed, exact-value, expiring PII email allowlist that is MANIFEST-indexed and cannot suppress secrets. AAHP v3.2.0 adds the canonical LOG archive flow: `LOG.md` keeps the 10 newest entries and entry 11+ is moved to `LOG-ARCHIVE.md`; `LOG-ARCHIVE.index.json` records archived-entry hashes so truncation/tampering is detected; reusable per-check badge workflows are now split out for downstream repos. Gemini Code Assist review findings on PR #13 were addressed: the CLI help syntax is fixed, `archive` is registered in command dispatch, archive ordering/separators are stable, allowlist TSV parsing ignores Python stderr warnings on success, and the manifest schema now permits AAHP-owned JSON handoff files such as `pii-allowlist.json` and `LOG-ARCHIVE.index.json`.
 <!-- /SECTION: summary -->
 
 ---
@@ -37,7 +37,7 @@ verification only and is ignored at `--level ci`. AAHP v3.1.0 adds a reviewed, e
 | `verify.bats` | OK | 12/12 pass |
 | `archive.bats` | OK | 7/7 pass; verifies LOG rotation, postcondition, truncation detection, idempotency, reverse-chronological separators across repeated rotations, and MANIFEST archive/index coverage |
 | `lint.bats` | OK | 30 ok, 1 pre-existing skip; adds exact PII allowlist coverage for valid, expired, malformed, wildcard, and secret non-suppression cases |
-| `manifest.bats` | OK | 19/19 pass; optional `pii-allowlist.json` is indexed when present |
+| `manifest.bats` | OK | 19/19 pass; optional `pii-allowlist.json` is indexed when present; manifest schema validates the AAHP-owned JSON handoff entries |
 | `cli.bats` | OK | verify help test added; 2 pre-existing Windows-only failures (version-capture flake, read-only-dir) pass on Linux CI |
 | `npx aahp` CLI | OK | init, manifest, lint, migrate, verify, and archive commands registered; source syntax and help verified locally |
 | `shellcheck` | PENDING | Not installable offline on this machine; runs in CI (ci.yml extended to cover the new scripts) |

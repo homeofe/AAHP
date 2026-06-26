@@ -1,7 +1,7 @@
 # AAHP: Current State of the Nation
 
 > Last updated: 2026-06-26 by Codex
-> Commit: (pending #21)
+> Commit: (pending #11/#12)
 >
 > **Rule:** This file is rewritten (not appended) at the end of every session.
 > It reflects the *current* reality, not history. History lives in LOG.md.
@@ -21,7 +21,7 @@ running `aahp verify --level ci` as the intended REQUIRED check (committed now;
 GitHub Actions is OFF org-wide for a cost sweep, so it activates when Actions is
 re-enabled). The gate is verify-only: it never regenerates MANIFEST.json, that
 stays a separate /handoff step. Escape hatch `AAHP_SKIP_VERIFY=1` skips local
-verification only and is ignored at `--level ci`. AAHP v3.1.0 adds a reviewed, exact-value, expiring PII email allowlist that is MANIFEST-indexed and cannot suppress secrets.
+verification only and is ignored at `--level ci`. AAHP v3.1.0 adds a reviewed, exact-value, expiring PII email allowlist that is MANIFEST-indexed and cannot suppress secrets. AAHP v3.2.0 adds the canonical LOG archive flow: `LOG.md` keeps the 10 newest entries and entry 11+ is moved to `LOG-ARCHIVE.md`; reusable per-check badge workflows are now split out for downstream repos.
 <!-- /SECTION: summary -->
 
 ---
@@ -35,6 +35,7 @@ verification only and is ignored at `--level ci`. AAHP v3.1.0 adds a reviewed, e
 | `lint-handoff.sh` | OK | All 6 checks pass |
 | `aahp verify` | OK | New gate: 4 layers, verified end-to-end on a temp repo |
 | `verify.bats` | OK | 12/12 pass |
+| `archive.bats` | OK | 5/5 pass; verifies LOG rotation, postcondition, idempotency, and MANIFEST archive indexing |
 | `lint.bats` | OK | 30 ok, 1 pre-existing skip; adds exact PII allowlist coverage for valid, expired, malformed, wildcard, and secret non-suppression cases |
 | `manifest.bats` | OK | 19/19 pass; optional `pii-allowlist.json` is indexed when present |
 | `cli.bats` | OK | verify help test added; 2 pre-existing Windows-only failures (version-capture flake, read-only-dir) pass on Linux CI |
@@ -96,6 +97,8 @@ verification only and is ignored at `--level ci`. AAHP v3.1.0 adds a reviewed, e
 | T-029 | PII check switched to per-match filtering (line-granularity false-negative) | Check 3 extracted whole matched lines and dropped any line containing an excluded token via a line-level `grep -v`, so a genuine external email sharing a single line with an excluded token (a `.noreply.` co-author trailer, `example.com`, or the word `placeholder`) was silently suppressed -a real PII false negative. Switched to per-MATCH filtering: extract each address with `grep -rHnoE` and exclude per ADDRESS in `awk`, so an excluded token elsewhere on the same line can no longer mask a separate real address. Locale-determinism preserved (`grep -E` not `-P`, LC_ALL=C.UTF-8 pin); detection stays byte-identical across locales. 5 new lint.bats T-029 regression tests; bats green; v3.0.5. |
 | T-030 | Add README status-badge block (2026-06-21) | Inserted auto-detected badges after the H1: CI (ci.yml), AAHP Verify (aahp-verify.yml), Security (codeql.yml), npm (@elvatis_com/aahp, published v3.0.5), License Apache-2.0. README change is code outside .ai/handoff, so routed through the drift gate (STATUS.md note + regenerated MANIFEST.json). |
 | T-031 | Reviewed, expiring PII allowlist | Added v3.1.0 allowlist schema/template/validator, exact-match lint support, MANIFEST indexing, rollout owners, and regression tests. |
+| T-032 | LOG archive integrity | Added `aahp archive`, default keep=10 flow, `--verify`, tests, README docs, and LOG-ARCHIVE MANIFEST coverage. |
+| T-033 | Reusable AAHP badge workflows | Added per-check workflows for Verify, Lint, Manifest, Archive, and PII Allowlist plus README badge snippets. |
 
 ---
 

@@ -6,6 +6,23 @@
 
 ---
 
+## [2026-06-26] Codex: LOG archive flow and reusable badge workflows
+
+**Agent:** Codex
+**Phase:** implementation
+**Branch:** codex/issue-21-pii-allowlist
+**Tasks:** AAHP issues #11 and #12
+
+### What was done
+
+- Added `aahp archive` with the canonical default flow: keep the 10 newest `LOG.md` entries and move entry 11+ to `LOG-ARCHIVE.md`.
+- Added `aahp archive --verify` for CI and local checks.
+- Added archive regression tests for rotation, missing rotation, verification, idempotency, and MANIFEST archive indexing.
+- Added stable per-check workflows: AAHP Lint, Manifest, Archive, and PII Allowlist; AAHP Verify remains the umbrella gate.
+- Documented reusable README badge snippets for downstream repos.
+
+---
+
 ## [2026-06-26] Codex: Reviewed, expiring PII allowlist (issue #21)
 
 **Agent:** Codex

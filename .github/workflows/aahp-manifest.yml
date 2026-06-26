@@ -1,0 +1,33 @@
+name: AAHP Manifest
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  aahp-manifest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Set up Python 3
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - name: Validate MANIFEST JSON
+        run: python -m json.tool .ai/handoff/MANIFEST.json > /dev/null
+      - name: Validate MANIFEST schema
+        run: |
+          npm install --no-save ajv-cli ajv-formats
+          npx ajv-cli validate --spec=draft2020 -c ajv-formats -s schema/aahp-manifest.schema.json -d .ai/handoff/MANIFEST.json
+      - name: Check generated MANIFEST is current
+        run: |
+          bash scripts/aahp-manifest.sh . --quiet --phase implementation
+          git diff --exit-code -- .ai/handoff/MANIFEST.json

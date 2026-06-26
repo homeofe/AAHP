@@ -10,13 +10,24 @@
 
 | Status | Count |
 |--------|-------|
-| Done | 10 |
+| Done | 12 |
 | Ready | 4 |
 | Blocked | 1 |
 
 ---
 
 ## Recently Completed
+
+### T-033: Reusable AAHP badge workflows [medium] (issue #12)
+
+- Added stable per-check workflows for AAHP Verify, Lint, Manifest, Archive, and PII Allowlist.
+- Documented badge snippets for downstream repositories.
+
+### T-032: LOG archive integrity [medium] (issue #11)
+
+- Added `aahp archive` with default keep=10 behavior and `--verify`.
+- Added archive tests and MANIFEST coverage for `LOG-ARCHIVE.md`.
+
 
 ### T-031: Reviewed, expiring PII allowlist [high] (ideabase issue #21)
 
@@ -185,6 +196,17 @@ Option B - Local publish:
 ---
 
 ## Recently Completed
+
+### T-033: Reusable AAHP badge workflows [medium] (issue #12)
+
+- Added stable per-check workflows for AAHP Verify, Lint, Manifest, Archive, and PII Allowlist.
+- Documented badge snippets for downstream repositories.
+
+### T-032: LOG archive integrity [medium] (issue #11)
+
+- Added `aahp archive` with default keep=10 behavior and `--verify`.
+- Added archive tests and MANIFEST coverage for `LOG-ARCHIVE.md`.
+
 
 | ID | Item | Date |
 |----|------|------|

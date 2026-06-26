@@ -60,7 +60,7 @@ is not a bypass: entries are exact, expiring, and MANIFEST-indexed.
 
 Consumer upgrade: propagate the validator, schema, template, and refreshed
 scripts; add reviewed exact entries; run `aahp manifest`; then run
-`aahp verify --level full`. Do not use `AAHP_SKIP_VERIFY` or `--no-verify`.
+`aahp verify --level full`. Do not use `AAHP_SKIP_VERIFY` or `--no-verify`. Run `aahp archive` before `/handoff` whenever `LOG.md` grows past 10 active entries.
 
 ## CI strategy per wave
 

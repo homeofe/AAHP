@@ -38,11 +38,15 @@ jobs:
           shellcheck -x -P scripts/ scripts/aahp-migrate-v2.sh
           shellcheck scripts/lint-handoff.sh
           shellcheck -x -P scripts/ scripts/verify-handoff.sh
+          shellcheck -x -P scripts/ scripts/aahp-archive.sh
           shellcheck scripts/install-hooks.sh
           shellcheck scripts/hooks/pre-commit
           shellcheck scripts/hooks/pre-push
           shellcheck tests/run.sh
           shellcheck tests/test_helper.bash
+
+      - name: Compile Python validators
+        run: python -m py_compile scripts/validate-pii-allowlist.py
 
       - name: Lint handoff files
         run: bash scripts/lint-handoff.sh .

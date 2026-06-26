@@ -9,6 +9,7 @@
 //   lint [path]       Validate handoff files for safety violations
 //   migrate [path]    Migrate an AAHP v1 project to v2/v3
 //   verify [path]     Run the canonical handoff gate (checksum + drift + TTL)
+  archive [path]    Rotate or verify LOG.md -> LOG-ARCHIVE.md
 //
 // Options:
 //   --help, -h        Show this help message
@@ -47,6 +48,7 @@ Commands:
   lint [path]       Validate handoff files for safety violations
   migrate [path]    Migrate an AAHP v1 project to v2/v3
   verify [path]     Run the canonical handoff gate (checksum + drift + TTL)
+  archive [path]    Rotate or verify LOG.md -> LOG-ARCHIVE.md
 
 Init options:
   --force           Overwrite existing files (default: skip existing)
@@ -74,6 +76,7 @@ Examples:
   npx aahp lint ./my-project
   npx aahp migrate
   npx aahp verify --level ci      # CI gate (no escape hatch)
+  npx aahp archive --verify       # Verify LOG archive integrity
 `)
 }
 

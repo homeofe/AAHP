@@ -9,14 +9,14 @@
 //   lint [path]       Validate handoff files for safety violations
 //   migrate [path]    Migrate an AAHP v1 project to v2/v3
 //   verify [path]     Run the canonical handoff gate (checksum + drift + TTL)
-  archive [path]    Rotate or verify LOG.md -> LOG-ARCHIVE.md
+//   archive [path]    Rotate or verify LOG.md -> LOG-ARCHIVE.md
 //
 // Options:
 //   --help, -h        Show this help message
 //   --version, -v     Show version number
 
 import { fileURLToPath } from 'node:url'
-import { dirname, join, resolve } from 'node:path'
+import { dirname, join, resolve, relative, isAbsolute } from 'node:path'
 import { existsSync, mkdirSync, copyFileSync, readdirSync, readFileSync } from 'node:fs'
 import { spawn } from 'node:child_process'
 
@@ -216,6 +216,37 @@ function cmdInit(targetPath, flags) {
 // We pass the arguments through directly so the scripts see them unchanged.
 // ---------------------------------------------------------------------------
 
+function toBashScriptArg(scriptPath) {
+  if (process.platform !== 'win32') {
+    return scriptPath
+  }
+
+  const relativePath = relative(process.cwd(), scriptPath)
+  if (relativePath && !relativePath.startsWith('..') && !isAbsolute(relativePath)) {
+    return relativePath.replace(/\\/g, '/')
+  }
+
+  const drivePath = scriptPath.match(/^([A-Za-z]):\\(.*)$/)
+  if (drivePath) {
+    return `/${drivePath[1].toLowerCase()}/${drivePath[2].replace(/\\/g, '/')}`
+  }
+
+  return scriptPath.replace(/\\/g, '/')
+}
+
+function findBashExecutable() {
+  if (process.platform !== 'win32') {
+    return 'bash'
+  }
+
+  const candidates = [
+    'C:\\Program Files\\Git\\bin\\bash.exe',
+    'C:\\Program Files\\Git\\usr\\bin\\bash.exe',
+    'C:\\Program Files (x86)\\Git\\bin\\bash.exe',
+  ]
+  return candidates.find((candidate) => existsSync(candidate)) ?? 'bash'
+}
+
 function runScript(scriptName, rest) {
   const scriptPath = join(PACKAGE_ROOT, 'scripts', scriptName)
 
@@ -224,10 +255,12 @@ function runScript(scriptName, rest) {
     process.exit(1)
   }
 
-  // Pass all arguments after the subcommand directly to the bash script
-  const args = [scriptPath, ...rest]
+  // Pass all arguments after the subcommand directly to the bash script.
+  // On Windows, prefer Git Bash over the WSL bash shim and avoid raw C:\... script arguments.
+  const args = [toBashScriptArg(scriptPath), ...rest]
+  const bashExecutable = findBashExecutable()
 
-  const child = spawn('bash', args, {
+  const child = spawn(bashExecutable, args, {
     stdio: 'inherit',
     cwd: process.cwd(),
   })
@@ -235,7 +268,7 @@ function runScript(scriptName, rest) {
   child.on('error', (err) => {
     if (err.code === 'ENOENT') {
       console.error('Error: bash is not available on this system.')
-      console.error('The manifest, lint, and migrate commands require bash.')
+      console.error('The manifest, lint, migrate, verify, and archive commands require bash.')
       console.error('On Windows, install Git for Windows or WSL.')
     } else {
       console.error(`Error spawning script: ${err.message}`)
@@ -295,6 +328,10 @@ switch (command) {
 
   case 'verify':
     runScript('verify-handoff.sh', rest)
+    break
+
+  case 'archive':
+    runScript('aahp-archive.sh', rest)
     break
 
   default:

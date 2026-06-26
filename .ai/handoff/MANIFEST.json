@@ -2,17 +2,17 @@
   "aahp_version": "3.0",
   "project": "AAHP",
   "last_session": {
-    "agent": "cli-tool",
-    "session_id": "cli-1782468097",
-    "timestamp": "2026-06-26T10:01:37Z",
-    "commit": "0aff420",
-    "phase": "implementation",
+    "agent": "codex",
+    "session_id": "cli-1782468859",
+    "timestamp": "2026-06-26T10:14:19Z",
+    "commit": "3337d32",
+    "phase": "fix",
     "duration_minutes": 0
   },
   "files": {
     "STATUS.md": {
-      "checksum": "sha256:63cd2056dfb933c7b961fc385861dd6c9d0a476d08c39718311eb8d37280f6d1",
-      "updated": "2026-06-26T10:01:33Z",
+      "checksum": "sha256:a57d8a99b5a4d80c9b80792110a1bf0f0d488de18c2abda760420de969f587e7",
+      "updated": "2026-06-26T10:14:05Z",
       "lines": 114,
       "summary": "(no summary available)"
     },
@@ -23,9 +23,9 @@
       "summary": "(no summary available)"
     },
     "LOG.md": {
-      "checksum": "sha256:df89e0dfa5f6f8eb3b7b1bb3118903059ad4665c2ba8d3d4cdbf380d16d1f16d",
-      "updated": "2026-06-26T10:01:33Z",
-      "lines": 247,
+      "checksum": "sha256:9e381ad20334e24cdde30d8248b5cc0c460de1975671af0f1cde108a79642dc0",
+      "updated": "2026-06-26T10:14:05Z",
+      "lines": 274,
       "summary": "(no summary available)"
     },
     "DASHBOARD.md": {
@@ -59,10 +59,10 @@
       "summary": "{"
     }
   },
-  "quick_context": "(no summary available) (no summary available) ",
+  "quick_context": "Address Gemini review feedback for PR #13: CLI archive dispatch, archive ordering/index integrity, and allowlist TSV stderr isolation.",
   "token_budget": {
     "manifest_only": 85,
-    "manifest_plus_core": 3960,
-    "full_read": 9116
+    "manifest_plus_core": 4035,
+    "full_read": 9372
   }
 }

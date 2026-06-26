@@ -349,9 +349,7 @@ aahp archive              # keeps the 10 newest entries
 aahp archive --verify     # fails if LOG.md has more than 10 active entries
 ```
 
-A canonical log entry starts with `## [YYYY-MM-DD]`. The default flow keeps the 10 newest entries in `LOG.md`. Entry 11 and older are moved automatically into `LOG-ARCHIVE.md`, and the postcondition verifies by entry hash that no rotated entry was dropped. `LOG-ARCHIVE.md` is included in
-`MANIFEST.json` whenever present, so archive changes stay inside the checksum
-boundary.
+A canonical log entry starts with `## [YYYY-MM-DD]`. The default flow keeps the 10 newest entries in `LOG.md`. Entry 11 and older are moved automatically into `LOG-ARCHIVE.md`, and the postcondition verifies by entry hash that no rotated entry was dropped. `LOG-ARCHIVE.index.json` stores the hashes of archived entries so `--verify` also detects later truncation or tampering. `LOG-ARCHIVE.md` and the index are included in `MANIFEST.json` whenever present, so archive changes stay inside the checksum boundary.
 
 ## 3. Robustness: Surviving Failures
 

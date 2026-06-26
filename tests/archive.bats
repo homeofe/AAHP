@@ -71,12 +71,23 @@ EOF
     [ "$before" = "$after" ]
 }
 
+@test "archive verify fails when LOG-ARCHIVE.md is truncated" {
+    _write_log_entries
+    bash "$SCRIPTS_DIR/aahp-archive.sh" "$TEST_TMPDIR" --keep 1
+    echo "# truncated" > "$TEST_TMPDIR/.ai/handoff/LOG-ARCHIVE.md"
+    run bash "$SCRIPTS_DIR/aahp-archive.sh" "$TEST_TMPDIR" --keep 1 --verify
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"missing indexed archived entries"* ]]
+}
+
 @test "manifest indexes LOG-ARCHIVE.md when present" {
     create_status_md
     create_next_actions_md
     create_log_md
     echo "# Archive" > "$TEST_TMPDIR/.ai/handoff/LOG-ARCHIVE.md"
+    echo '{"version":1,"entries":[]}' > "$TEST_TMPDIR/.ai/handoff/LOG-ARCHIVE.index.json"
     run bash "$SCRIPTS_DIR/aahp-manifest.sh" "$TEST_TMPDIR" --quiet
     [ "$status" -eq 0 ]
     grep -q '"LOG-ARCHIVE.md"' "$TEST_TMPDIR/.ai/handoff/MANIFEST.json"
+    grep -q '"LOG-ARCHIVE.index.json"' "$TEST_TMPDIR/.ai/handoff/MANIFEST.json"
 }

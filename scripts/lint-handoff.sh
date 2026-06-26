@@ -134,12 +134,20 @@ if [ -f "$ALLOWLIST_FILE" ]; then
     if [ -z "$PYTHON_CMD" ]; then
         echo -e "  ${RED}x PII allowlist exists but Python is unavailable for validation.${NC}"
         VIOLATIONS=$((VIOLATIONS + 1))
-    elif ! ALLOWLIST_ENTRIES=$("$PYTHON_CMD" "$SCRIPT_DIR/validate-pii-allowlist.py" "$ALLOWLIST_FILE" --format tsv 2>&1); then
-        echo -e "  ${RED}x $ALLOWLIST_ENTRIES${NC}"
-        ALLOWLIST_ENTRIES=""
-        VIOLATIONS=$((VIOLATIONS + 1))
     else
-        echo -e "  ${GREEN}OK Valid PII allowlist.${NC}"
+        ALLOWLIST_ERR="$(mktemp)"
+        if ALLOWLIST_ENTRIES=$("$PYTHON_CMD" "$SCRIPT_DIR/validate-pii-allowlist.py" "$ALLOWLIST_FILE" --format tsv 2>"$ALLOWLIST_ERR"); then
+            echo -e "  ${GREEN}OK Valid PII allowlist.${NC}"
+        else
+            ALLOWLIST_MESSAGE="$ALLOWLIST_ENTRIES"
+            if [ -s "$ALLOWLIST_ERR" ]; then
+                ALLOWLIST_MESSAGE="${ALLOWLIST_MESSAGE}${ALLOWLIST_MESSAGE:+$'\n'}$(cat "$ALLOWLIST_ERR")"
+            fi
+            echo -e "  ${RED}x $ALLOWLIST_MESSAGE${NC}"
+            ALLOWLIST_ENTRIES=""
+            VIOLATIONS=$((VIOLATIONS + 1))
+        fi
+        rm -f "$ALLOWLIST_ERR"
     fi
 else
     echo -e "  ${GREEN}OK No PII allowlist configured.${NC}"

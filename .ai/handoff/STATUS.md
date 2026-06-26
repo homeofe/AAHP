@@ -1,7 +1,7 @@
 # AAHP: Current State of the Nation
 
 > Last updated: 2026-06-26 by Codex
-> Commit: (pending #11/#12)
+> Commit: (pending #34/#35)
 >
 > **Rule:** This file is rewritten (not appended) at the end of every session.
 > It reflects the *current* reality, not history. History lives in LOG.md.
@@ -98,7 +98,9 @@ verification only and is ignored at `--level ci`. AAHP v3.1.0 adds a reviewed, e
 | T-030 | Add README status-badge block (2026-06-21) | Inserted auto-detected badges after the H1: CI (ci.yml), AAHP Verify (aahp-verify.yml), Security (codeql.yml), npm (@elvatis_com/aahp, published v3.0.5), License Apache-2.0. README change is code outside .ai/handoff, so routed through the drift gate (STATUS.md note + regenerated MANIFEST.json). |
 | T-031 | Reviewed, expiring PII allowlist | Added v3.1.0 allowlist schema/template/validator, exact-match lint support, MANIFEST indexing, rollout owners, and regression tests. |
 | T-032 | LOG archive integrity | Added `aahp archive`, default keep=10 flow, `--verify`, hash-index truncation detection, tests, README docs, and LOG-ARCHIVE MANIFEST coverage. |
-| T-033 | Reusable AAHP badge workflows | Added per-check workflows for Verify, Lint, Manifest, Archive, and PII Allowlist plus README badge snippets. |`r`n| T-034 | Fix NPM publish regression | Fixed prepublish `next_task_id` JSON typing and made PII allowlist template optional on `aahp init` (`--with-pii-allowlist`). |
+| T-033 | Reusable AAHP badge workflows | Added per-check workflows for Verify, Lint, Manifest, Archive, and PII Allowlist plus README badge snippets. |
+| T-034 | Fix NPM publish regression | Fixed prepublish `next_task_id` JSON typing and made PII allowlist template optional on `aahp init` (`--with-pii-allowlist`). |
+| T-035 | Add `status` CLI command | Added `aahp status` command with CLI tests and command dispatch coverage in `bin/aahp.js` + `tests/cli.bats`. |
 
 ---
 
@@ -112,4 +114,3 @@ verification only and is ignored at `--level ci`. AAHP v3.1.0 adds a reviewed, e
 > 2026-06-21 install-hooks.sh: recognize Windows drive-letter (C:/...) git-dir/core.hooksPath as absolute (was only matching POSIX /*), fixing the mangled doubled path + junk C: dir that broke hook install on worktrees/submodules/subdirs. Validated (unit + worktree e2e). Propagate to downstream repos via propagate.sh as rollout.
 
 > 2026-06-21 ci(aahp): fix unquoted next_task_id (invalid JSON) + lint-handoff noreply@ PII exclusion.
-

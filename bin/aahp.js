@@ -10,6 +10,9 @@
 //   migrate [path]    Migrate an AAHP v1 project to v2/v3
 //   verify [path]     Run the canonical handoff gate (checksum + drift + TTL)
 //   archive [path]    Rotate or verify LOG.md -> LOG-ARCHIVE.md
+
+//   status [path]     Show a quick state summary from MANIFEST.json
+
 //
 // Options:
 //   --help, -h        Show this help message
@@ -49,6 +52,7 @@ Commands:
   migrate [path]    Migrate an AAHP v1 project to v2/v3
   verify [path]     Run the canonical handoff gate (checksum + drift + TTL)
   archive [path]    Rotate or verify LOG.md -> LOG-ARCHIVE.md
+  status [path]     Show a quick state summary from MANIFEST.json
 
 Init options:
   --force           Overwrite existing files (default: skip existing)
@@ -217,6 +221,94 @@ function cmdInit(targetPath, flags) {
 }
 
 // ---------------------------------------------------------------------------
+
+function cmdStatus(targetPath) {
+  const handoffDir = join(targetPath, '.ai', 'handoff')
+  const manifestPath = join(handoffDir, 'MANIFEST.json')
+
+  if (!existsSync(manifestPath)) {
+    console.error(`Error: MANIFEST.json not found at ${manifestPath}`)
+    console.error('Run `aahp init` or `aahp manifest` first.')
+    process.exit(1)
+  }
+
+  let manifest
+  try {
+    manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
+  } catch (err) {
+    console.error(`Error: MANIFEST.json parse failed: ${err.message}`)
+    process.exit(1)
+  }
+
+  const project = manifest.project ?? '(unknown)'
+  const lastSession = manifest.last_session ?? {}
+  const phase = lastSession.phase ?? '(unknown)'
+  const agent = lastSession.agent ?? '(unknown)'
+  const sessionId = lastSession.session_id ?? '(unknown)'
+  const timestamp = lastSession.timestamp ?? '(unknown)'
+  const quickContext = String(manifest.quick_context ?? '').trim() || '(no quick_context)'
+  const files = manifest.files ?? {}
+  const tasks = manifest.tasks ?? {}
+
+  const statusPriority = ['ready', 'in_progress', 'blocked', 'done', 'cancelled', 'stale']
+  const taskStatusCounts = {
+    ready: 0,
+    in_progress: 0,
+    blocked: 0,
+    done: 0,
+    cancelled: 0,
+    stale: 0,
+    other: 0,
+  }
+
+  for (const task of Object.values(tasks)) {
+    const currentStatus = typeof task === 'object' && task !== null && 'status' in task ? String(task.status) : 'other'
+    if (currentStatus in taskStatusCounts) {
+      taskStatusCounts[currentStatus] += 1
+    } else {
+      taskStatusCounts.other += 1
+    }
+  }
+
+  const manifestPathLines = files['MANIFEST.json']?.lines
+  const nextActionsLines = files['NEXT_ACTIONS.md']?.lines
+
+  let previewTasks = Object.entries(tasks)
+    .filter(([, task]) => typeof task === 'object' && task !== null && ['ready', 'in_progress'].includes(String(task.status)))
+    .slice(0, 5)
+    .map(([id, task]) => `  ${id}: ${String(task.title ?? '(no title)')} (${String(task.status)})`)
+
+  const statusLines = statusPriority
+    .filter((status) => taskStatusCounts[status] > 0)
+    .map((status) => `${status}: ${taskStatusCounts[status]}`)
+
+  if (statusLines.length === 0 && taskStatusCounts.other > 0) {
+    statusLines.push(`other: ${taskStatusCounts.other}`)
+  } else if (statusLines.length === 0) {
+    statusLines.push('none')
+  }
+
+  if (previewTasks.length === 0) {
+    previewTasks = ['  (no ready or in_progress tasks)']
+  }
+
+  console.log(`Project: ${project}`)
+  console.log(`Path: ${targetPath}`)
+  console.log(`Phase: ${phase}`)
+  console.log(`Agent: ${agent}`)
+  console.log(`Session: ${timestamp}`)
+  console.log(`Session ID: ${sessionId}`)
+  console.log(`Commit: ${lastSession.commit ?? '(none)'}`)
+  console.log(`Manifest lines: ${manifestPathLines ?? '?'}`)
+  console.log(`Next actions lines: ${nextActionsLines ?? '?'}`)
+  console.log(`Task counts: ${statusLines.join(', ')}`)
+  console.log(`Quick context: ${quickContext}`)
+  console.log('Open ready/in_progress tasks:')
+  for (const line of previewTasks) {
+    console.log(line)
+  }
+}
+
 // Shell script commands -spawn bash scripts
 //
 // The bash scripts already handle their own argument parsing, including
@@ -342,10 +434,14 @@ switch (command) {
     runScript('aahp-archive.sh', rest)
     break
 
+  case 'status': {
+    const { targetPath } = extractPathAndFlags(rest)
+    cmdStatus(targetPath)
+    break
+  }
+
   default:
     console.error(`Unknown command: ${command}`)
     console.error('Run "aahp --help" for usage information.')
     process.exit(1)
 }
-
-

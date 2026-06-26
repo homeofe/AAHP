@@ -295,11 +295,34 @@ _aahp() {
     _aahp init "$TEST_TMPDIR" --with-pii-allowlist
     [ -f "$TEST_TMPDIR/.ai/handoff/pii-allowlist.json" ]
 }
-# status command (not built in - ensure helpful error)
+# status command
 
-@test "aahp status exits non-zero (unknown command)" {
-    _aahp status
+@test "aahp status exits non-zero when MANIFEST.json missing" {
+    _aahp status "$TEST_TMPDIR"
     [ "$status" -ne 0 ]
+    [[ "$output" == *"MANIFEST.json not found"* ]]
+}
+
+@test "aahp status exits 0 when manifest exists" {
+    create_manifest_with_tasks
+    _aahp status "$TEST_TMPDIR"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Project: TestProject"* ]]
+    [[ "$output" == *"Task counts: ready: 1, done: 1"* ]]
+    [[ "$output" == *"T-002: Add tests for feature X (ready)"* ]]
+    [[ "$output" == *"Commit: abc1234"* ]]
+}
+
+@test "aahp status supports default path via cwd" {
+    mkdir -p "$TEST_TMPDIR/project-sub"
+    mkdir -p "$TEST_TMPDIR/project-sub/.ai/handoff"
+    create_manifest_with_tasks "$TEST_TMPDIR/project-sub/.ai/handoff"
+    local orig_dir="$PWD"
+    cd "$TEST_TMPDIR/project-sub"
+    _aahp status
+    cd "$orig_dir"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Path: $TEST_TMPDIR/project-sub"* ]]
 }
 
 # ─── next command (not built in - ensure helpful error) ──────
@@ -360,4 +383,5 @@ _aahp() {
     [ "$status" -eq 0 ]
     grep -q '"phase": "review"' "$TEST_TMPDIR/.ai/handoff/MANIFEST.json"
 }
+
 

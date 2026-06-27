@@ -1,4 +1,4 @@
-﻿# [PROJECT]: Autonomous Multi-Agent Workflow
+# [PROJECT]: Autonomous Multi-Agent Workflow
 
 > Based on the [AAHP Protocol](https://github.com/homeofe/AAHP).
 > No manual triggers. Agents read `handoff/DASHBOARD.md` and work autonomously.

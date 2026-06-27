@@ -1,7 +1,7 @@
 # AAHP: Current State of the Nation
 
-> Last updated: 2026-06-26 by Codex
-> Commit: (pending #34/#35)
+> Last updated: 2026-06-27 by claude-opus-4-8
+> Commit: (pending: strip UTF-8 BOM from handoff files)
 >
 > **Rule:** This file is rewritten (not appended) at the end of every session.
 > It reflects the *current* reality, not history. History lives in LOG.md.
@@ -41,6 +41,7 @@ verification only and is ignored at `--level ci`. AAHP v3.1.0 adds a reviewed, e
 | `cli.bats` | OK | verify help test added; 2 pre-existing Windows-only failures (version-capture flake, read-only-dir) pass on Linux CI |
 | `npx aahp` CLI | OK | init, manifest, lint, migrate, verify, and archive commands registered; source syntax and help verified locally |
 | `shellcheck` | PENDING | Not installable offline on this machine; runs in CI (ci.yml extended to cover the new scripts) |
+| `BOM scan` | OK | UTF-8 BOM stripped from `.ai/handoff/WORKFLOW.md`, regenerated `MANIFEST.json` summary, and the `templates/WORKFLOW.md` init source (Gemini review). No BOM remains in `.ai/handoff/`. |
 <!-- /SECTION: build_health -->
 
 ---
@@ -114,3 +115,5 @@ verification only and is ignored at `--level ci`. AAHP v3.1.0 adds a reviewed, e
 > 2026-06-21 install-hooks.sh: recognize Windows drive-letter (C:/...) git-dir/core.hooksPath as absolute (was only matching POSIX /*), fixing the mangled doubled path + junk C: dir that broke hook install on worktrees/submodules/subdirs. Validated (unit + worktree e2e). Propagate to downstream repos via propagate.sh as rollout.
 
 > 2026-06-21 ci(aahp): fix unquoted next_task_id (invalid JSON) + lint-handoff noreply@ PII exclusion.
+
+> 2026-06-27 ci: migrate npm publish to OIDC trusted publishing (supply-chain-guard pattern); add publish + release jobs to ci.yml (semver-tag triggered, --provenance, id-token write, no NPM_TOKEN) and remove old auto-publish.yml + publish.yml.

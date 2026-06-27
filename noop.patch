@@ -1,0 +1,6 @@
+diff --git a/../aahp-swarm/noop-write.txt b/../aahp-swarm/noop-write.txt
+new file mode 100644
+index 0000000..5f3f9d0
+--- /dev/null
++++ b/../aahp-swarm/noop-write.txt
++test

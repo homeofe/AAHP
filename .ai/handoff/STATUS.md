@@ -114,3 +114,5 @@ verification only and is ignored at `--level ci`. AAHP v3.1.0 adds a reviewed, e
 > 2026-06-21 install-hooks.sh: recognize Windows drive-letter (C:/...) git-dir/core.hooksPath as absolute (was only matching POSIX /*), fixing the mangled doubled path + junk C: dir that broke hook install on worktrees/submodules/subdirs. Validated (unit + worktree e2e). Propagate to downstream repos via propagate.sh as rollout.
 
 > 2026-06-21 ci(aahp): fix unquoted next_task_id (invalid JSON) + lint-handoff noreply@ PII exclusion.
+
+> 2026-06-27 test(cli): status and archive were already in `aahp --help` and dispatch; added the missing `--help lists status/archive` listings tests plus status/archive dispatch (not-Unknown-command) coverage in tests/cli.bats.

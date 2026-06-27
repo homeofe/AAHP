@@ -120,3 +120,6 @@ verification only and is ignored at `--level ci`. AAHP v3.1.0 adds a reviewed, e
 
 <!-- SECTION: merge-main-oidc -->
 Merged main (OIDC publish migration + BOM strip) into the status/archive cli.bats coverage branch; manifest regenerated against the merged tree.
+
+<!-- SECTION: cleanup-stray-files -->
+Removed stray aahp-swarm-link gitlink and noop.patch that git add -A swept into the merge commit; ignored both to prevent re-sweeping.

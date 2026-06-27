@@ -66,6 +66,16 @@ _aahp() {
     [[ "$output" == *"verify"* ]]
 }
 
+@test "aahp --help lists archive command" {
+    _aahp --help
+    [[ "$output" == *"archive"* ]]
+}
+
+@test "aahp --help lists status command" {
+    _aahp --help
+    [[ "$output" == *"status"* ]]
+}
+
 @test "aahp -h is an alias for --help" {
     _aahp -h
     [ "$status" -eq 0 ]
@@ -297,6 +307,11 @@ _aahp() {
 }
 # status command
 
+@test "aahp status is a recognized command (not Unknown command)" {
+    _aahp status "$TEST_TMPDIR"
+    [[ "$output" != *"Unknown command"* ]]
+}
+
 @test "aahp status exits non-zero when MANIFEST.json missing" {
     _aahp status "$TEST_TMPDIR"
     [ "$status" -ne 0 ]
@@ -323,6 +338,14 @@ _aahp() {
     cd "$orig_dir"
     [ "$status" -eq 0 ]
     [[ "$output" == *"Path: $TEST_TMPDIR/project-sub"* ]]
+}
+
+# ─── archive command (behavior covered in archive.bats) ──────
+
+@test "aahp archive is a recognized command (not Unknown command)" {
+    # No LOG.md present, so the script errors, but dispatch must still route it.
+    _aahp archive "$TEST_TMPDIR"
+    [[ "$output" != *"Unknown command"* ]]
 }
 
 # ─── next command (not built in - ensure helpful error) ──────

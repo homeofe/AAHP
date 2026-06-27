@@ -32,3 +32,5 @@ Thumbs.db
 *.crt
 *.p12
 .ai/logs/
+aahp-swarm-link
+noop.patch

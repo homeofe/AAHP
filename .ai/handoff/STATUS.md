@@ -117,3 +117,9 @@ verification only and is ignored at `--level ci`. AAHP v3.1.0 adds a reviewed, e
 > 2026-06-21 ci(aahp): fix unquoted next_task_id (invalid JSON) + lint-handoff noreply@ PII exclusion.
 
 > 2026-06-27 ci: migrate npm publish to OIDC trusted publishing (supply-chain-guard pattern); add publish + release jobs to ci.yml (semver-tag triggered, --provenance, id-token write, no NPM_TOKEN) and remove old auto-publish.yml + publish.yml.
+
+<!-- SECTION: merge-main-oidc -->
+Merged main (OIDC publish migration + BOM strip) into the status/archive cli.bats coverage branch; manifest regenerated against the merged tree.
+
+<!-- SECTION: cleanup-stray-files -->
+Removed stray aahp-swarm-link gitlink and noop.patch that git add -A swept into the merge commit; ignored both to prevent re-sweeping.

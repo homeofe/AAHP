@@ -1,7 +1,7 @@
 # AAHP: Current State of the Nation
 
-> Last updated: 2026-06-26 by Codex
-> Commit: (pending #34/#35)
+> Last updated: 2026-06-27 by claude-opus-4-8
+> Commit: (pending: strip UTF-8 BOM from handoff files)
 >
 > **Rule:** This file is rewritten (not appended) at the end of every session.
 > It reflects the *current* reality, not history. History lives in LOG.md.
@@ -41,6 +41,7 @@ verification only and is ignored at `--level ci`. AAHP v3.1.0 adds a reviewed, e
 | `cli.bats` | OK | verify help test added; 2 pre-existing Windows-only failures (version-capture flake, read-only-dir) pass on Linux CI |
 | `npx aahp` CLI | OK | init, manifest, lint, migrate, verify, and archive commands registered; source syntax and help verified locally |
 | `shellcheck` | PENDING | Not installable offline on this machine; runs in CI (ci.yml extended to cover the new scripts) |
+| `BOM scan` | OK | UTF-8 BOM stripped from `.ai/handoff/WORKFLOW.md`, regenerated `MANIFEST.json` summary, and the `templates/WORKFLOW.md` init source (Gemini review). No BOM remains in `.ai/handoff/`. |
 <!-- /SECTION: build_health -->
 
 ---

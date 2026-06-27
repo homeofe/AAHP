@@ -3,17 +3,17 @@
   "project": "AAHP",
   "last_session": {
     "agent": "claude-opus-4-8",
-    "session_id": "cli-1782530525",
-    "timestamp": "2026-06-27T03:22:06Z",
-    "commit": "52478c2",
+    "session_id": "cli-1782532734",
+    "timestamp": "2026-06-27T03:58:55Z",
+    "commit": "bc822f7",
     "phase": "implementation",
     "duration_minutes": 0
   },
   "files": {
     "STATUS.md": {
-      "checksum": "sha256:c32268d7d6442c8adf009dcc03746b01f274db823b41b98ec851756f927a2542",
-      "updated": "2026-06-27T03:21:54Z",
-      "lines": 118,
+      "checksum": "sha256:06b4d3349684c8b8d9a0cd894a03e26e70bed706aba509f287e3e2e5b6bc6f4c",
+      "updated": "2026-06-27T03:58:27Z",
+      "lines": 119,
       "summary": "(no summary available)"
     },
     "NEXT_ACTIONS.md": {
@@ -59,10 +59,10 @@
       "summary": "(no summary available)"
     },
     "WORKFLOW.md": {
-      "checksum": "sha256:c8ed848290c0657f8b53218823ed2b5bf7967baeb04c2c113667368b5f83da4c",
-      "updated": "2026-04-05T17:29:32Z",
+      "checksum": "sha256:62ac58c749c907cf2eb9236172cd11d3a81128a855e8946e93e436ee016745be",
+      "updated": "2026-06-27T03:53:31Z",
       "lines": 131,
-      "summary": "﻿# AAHP: Autonomous Multi-Agent Workflow"
+      "summary": "(no summary available)"
     },
     "pii-allowlist.json": {
       "checksum": "sha256:7c1051f6e2bc3943b7c1dbe4da229694455681b8875a346c99279e555edb733f",
@@ -74,7 +74,7 @@
   "quick_context": "(no summary available) (no summary available) ",
   "token_budget": {
     "manifest_only": 85,
-    "manifest_plus_core": 4213,
-    "full_read": 9678
+    "manifest_plus_core": 4255,
+    "full_read": 9720
   }
 }

@@ -256,6 +256,20 @@ JSON
     [[ "$output" == *"must contain exactly value, kind, reason, owner, and expires"* ]]
 }
 
+@test "allowlist covers only the exact email listed; a different email is still blocked" {
+    create_full_handoff
+    cat > "$TEST_TMPDIR/.ai/handoff/pii-allowlist.json" <<'JSON'
+{"version":1,"entries":[{"value":"owner@company.test","kind":"email","reason":"Required operational owner reference","owner":"Platform Operations","expires":"2099-01-01"}]}
+JSON
+    bash "$SCRIPTS_DIR/aahp-manifest.sh" "$TEST_TMPDIR" --quiet
+    bash "$SCRIPTS_DIR/aahp-manifest.sh" "$TEST_TMPDIR" --quiet
+    echo "Contact owner@company.test and intruder@external.test for escalation." >> "$TEST_TMPDIR/.ai/handoff/STATUS.md"
+    run bash "$SCRIPTS_DIR/lint-handoff.sh" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Allowed PII email 'owner@company.test'"* ]]
+    [[ "$output" == *"intruder@external.test"* ]]
+}
+
 @test "PII allowlist never suppresses secret detection" {
     create_full_handoff
     cat > "$TEST_TMPDIR/.ai/handoff/pii-allowlist.json" <<'JSON'

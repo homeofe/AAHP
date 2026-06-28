@@ -71,7 +71,7 @@
 
 ---
 
-### T-015: Add `aahp status` quick-look command [medium] (issue #15)
+### T-015: Add `aahp status` quick-look command [medium] (issue #22)
 **Priority:** medium
 
 **Goal:** Add a `status` subcommand that reads MANIFEST.json and prints a concise project summary, so agents and humans can orient instantly without opening files manually.
@@ -99,7 +99,7 @@
 
 ---
 
-### T-016: Add `aahp archive` command for LOG.md rotation [medium] (issue #16)
+### T-016: Add `aahp archive` command for LOG.md rotation [medium] (issue #23)
 **Priority:** medium
 
 **Goal:** Automate the LOG.md to LOG-ARCHIVE.md split described in README Section 1.3, keeping LOG.md lean for token efficiency.
@@ -131,7 +131,7 @@
 
 ---
 
-### T-017: Add project-level CLAUDE.md [low] (issue #17)
+### T-017: Add project-level CLAUDE.md [low] (issue #24)
 **Priority:** low
 
 **Goal:** Create an AAHP-specific CLAUDE.md so AI agents working on this project get correct conventions without relying solely on the workspace-level file.

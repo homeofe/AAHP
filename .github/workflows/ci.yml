@@ -38,6 +38,7 @@ jobs:
           shellcheck scripts/_aahp-lib.sh
           shellcheck -x -P scripts/ scripts/aahp-manifest.sh
           shellcheck -x -P scripts/ scripts/aahp-migrate-v2.sh
+          shellcheck -x -P scripts/ scripts/aahp-migrate-grounding.sh
           shellcheck scripts/lint-handoff.sh
           shellcheck -x -P scripts/ scripts/verify-handoff.sh
           shellcheck -x -P scripts/ scripts/aahp-archive.sh

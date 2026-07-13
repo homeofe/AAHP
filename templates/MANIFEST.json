@@ -51,6 +51,12 @@
       "updated": "[ISO-8601]",
       "lines": 0,
       "summary": "[Pipeline summary]"
+    },
+    "GROUNDING.md": {
+      "checksum": "sha256:[hash]",
+      "updated": "[ISO-8601]",
+      "lines": 0,
+      "summary": "[Grounding register: task-type anchor matrix]"
     }
   },
   "quick_context": "[2-3 sentences: What just happened, what's next, any blockers]",

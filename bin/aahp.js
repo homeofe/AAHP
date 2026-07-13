@@ -8,6 +8,7 @@
 //   manifest [path]   (Re)generate MANIFEST.json from existing handoff files
 //   lint [path]       Validate handoff files for safety violations
 //   migrate [path]    Migrate an AAHP v1 project to v2/v3
+//   migrate-grounding [path]  Add the Grounded Reflection Layer to an existing project
 //   verify [path]     Run the canonical handoff gate (checksum + drift + TTL)
 //   archive [path]    Rotate or verify LOG.md -> LOG-ARCHIVE.md
 
@@ -50,6 +51,7 @@ Commands:
   manifest [path]   (Re)generate MANIFEST.json from existing handoff files
   lint [path]       Validate handoff files for safety violations
   migrate [path]    Migrate an AAHP v1 project to v2/v3
+  migrate-grounding [path]  Add the Grounded Reflection Layer to an existing project
   verify [path]     Run the canonical handoff gate (checksum + drift + TTL)
   archive [path]    Rotate or verify LOG.md -> LOG-ARCHIVE.md
   status [path]     Show a quick state summary from MANIFEST.json
@@ -80,6 +82,7 @@ Examples:
   npx aahp manifest --phase implementation --agent claude-sonnet
   npx aahp lint ./my-project
   npx aahp migrate
+  npx aahp migrate-grounding       # Add the Grounded Reflection Layer to an existing project
   npx aahp verify --level ci      # CI gate (no escape hatch)
   npx aahp archive --verify       # Verify LOG archive integrity
 `)
@@ -424,6 +427,10 @@ switch (command) {
 
   case 'migrate':
     runScript('aahp-migrate-v2.sh', rest)
+    break
+
+  case 'migrate-grounding':
+    runScript('aahp-migrate-grounding.sh', rest)
     break
 
   case 'verify':

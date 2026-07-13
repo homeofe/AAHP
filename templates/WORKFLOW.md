@@ -99,7 +99,8 @@ Scope:   Grounding and trust-of-claims only - are STATUS.md / TRUST.md assertion
          actually grounded? provenance gaps? circular review? expired trust?
          NOT code review (that is Phase 4).
 Emits:   An advisory verdict SHIP / NEEDS_CHANGES / BLOCK, before the terminal
-         Phase 5 handoff. Never a "Phase 6": Phase 5 is the final atomic step.
+         Phase 5 handoff. Never a "Phase 6": Phase 5 is the final atomic step (the
+         branch is pushed there), so an audit after it could not gate the commit.
 ```
 
 > Draft v0.1. See GROUNDING.md and README section 2.10. The audit reasons on top of

@@ -2,17 +2,17 @@
   "aahp_version": "3.0",
   "project": "AAHP",
   "last_session": {
-    "agent": "grounding-migration",
-    "session_id": "ground-1783957484",
-    "timestamp": "2026-07-13T15:44:45Z",
-    "commit": "ad51da4",
+    "agent": "claude-opus-4-8",
+    "session_id": "cli-1783959676",
+    "timestamp": "2026-07-13T16:21:16Z",
+    "commit": "2c21282",
     "phase": "fix",
     "duration_minutes": 0
   },
   "files": {
     "STATUS.md": {
-      "checksum": "sha256:b1144b6ccf45e6b81bd2e02883ff426ef0b7fee523220f4d631c0de1ee3a22dd",
-      "updated": "2026-07-13T11:44:34Z",
+      "checksum": "sha256:fb85f3201dab827436c34441dc82352ec1d7068152f5ce77117b19178f6b263e",
+      "updated": "2026-07-13T16:21:06Z",
       "lines": 127,
       "summary": "(no summary available)"
     },
@@ -47,9 +47,9 @@
       "summary": "(no summary available)"
     },
     "TRUST.md": {
-      "checksum": "sha256:ac974da0bb483c095d0e6c9dd89fdbc507db56ad0842305e4418d15fa474ff26",
-      "updated": "2026-07-13T15:44:44Z",
-      "lines": 90,
+      "checksum": "sha256:525c39c153a6f2f34f3ad1d64bbe2915b3548b93f3228579bb6a804437b375a7",
+      "updated": "2026-07-13T16:17:55Z",
+      "lines": 91,
       "summary": "(no summary available)"
     },
     "CONVENTIONS.md": {
@@ -65,9 +65,9 @@
       "summary": "(no summary available)"
     },
     "GROUNDING.md": {
-      "checksum": "sha256:99dafb08880f078c55b82720bae14d775f1f94db13135b2f164a9f164148aac1",
-      "updated": "2026-07-13T15:44:44Z",
-      "lines": 207,
+      "checksum": "sha256:7ef8cece585dc5defb4285175b9ba560d5469675df553d4ce28ec9e7aec24343",
+      "updated": "2026-07-13T16:17:31Z",
+      "lines": 209,
       "summary": "(no summary available)"
     },
     "pii-allowlist.json": {
@@ -77,11 +77,11 @@
       "summary": "{"
     }
   },
-  "quick_context": "(no summary available) (no summary available) ",
+  "quick_context": "PR #25 review fixes: migration guard, hard-fail on missing template, provenance-column note, band/phase clarifications.",
   "token_budget": {
     "manifest_only": 85,
-    "manifest_plus_core": 4441,
-    "full_read": 11963
+    "manifest_plus_core": 4545,
+    "full_read": 12118
   }
   ,"next_task_id": 6
   ,"tasks": {"T-001":{"title":"[T-006] Publish npm package","status":"blocked","priority":"medium","depends_on":[],"created":"2026-06-28T10:10:21.975Z","notes":"**AAHP Task:** `T-006`  \n**Status:** blocked  \n**Priority:** medium  \n\n\n\n\n---\n*Auto-created from AAHP manifest · project: AAHP*","github_issue":18,"github_repo":"homeofe/AAHP"},"T-002":{"title":"[T-014] Add CLI integration tests for bin/aahp.js [high]","status":"ready","priority":"high","depends_on":[],"created":"2026-06-28T10:10:21.975Z","notes":"**AAHP Task:** `T-014`  \n**Status:** ready  \n**Priority:** high  \n\n\n\n\n---\n*Auto-created from AAHP manifest · project: AAHP*","github_issue":14,"github_repo":"homeofe/AAHP"},"T-015":{"title":"Add `aahp status` quick-look command [medium]","status":"ready","priority":"medium","depends_on":[],"created":"2026-06-28T10:10:21.978Z","github_issue":22,"github_repo":"homeofe/AAHP"},"T-016":{"title":"Add `aahp archive` command for LOG.md rotation [medium]","status":"ready","priority":"medium","depends_on":[],"created":"2026-06-28T10:10:21.979Z","github_issue":23,"github_repo":"homeofe/AAHP"},"T-017":{"title":"Add project-level CLAUDE.md [low]","status":"ready","priority":"low","depends_on":[],"created":"2026-06-28T10:10:21.979Z","github_issue":24,"github_repo":"homeofe/AAHP"}}

@@ -53,7 +53,7 @@ CHANGES=()
 echo -e "${GREEN}[1/3]${NC} Checking TRUST.md for a Provenance section..."
 
 if [ -f "$HANDOFF_DIR/TRUST.md" ]; then
-    if ! grep -q "Provenance" "$HANDOFF_DIR/TRUST.md"; then
+    if ! grep -q "## Provenance" "$HANDOFF_DIR/TRUST.md"; then
         cat >> "$HANDOFF_DIR/TRUST.md" <<'PROVENANCE'
 
 ---
@@ -66,8 +66,9 @@ strongest: `model_claim`, `self_reviewed`, `cross_model_reviewed`, `source_verif
 `tool_verified`, `test_verified`, `runtime_observed`, `human_confirmed`.
 `cross_model_reviewed` maps to status `assumed`, never `verified`; only
 `source_verified` / `tool_verified` / `test_verified` / `runtime_observed` /
-`human_confirmed` can support `verified` (grounded). TTL and expiry stay governed by
-the Trust Decay rule (README section 2.5). See GROUNDING.md for the task-type anchor
+`human_confirmed` can support `verified` (grounded). To record it in this register, add
+a `Provenance` column to the tables above and use `-` when it is unknown. TTL and expiry
+stay governed by the Trust Decay rule (README section 2.5). See GROUNDING.md for the anchor
 matrix and README section 2.10 for the doctrine.
 PROVENANCE
         CHANGES+=("Added a Provenance section to TRUST.md")
@@ -89,7 +90,9 @@ if [ ! -f "$HANDOFF_DIR/GROUNDING.md" ]; then
         CHANGES+=("Copied GROUNDING.md template")
         echo "  -> Copied GROUNDING.md."
     else
-        echo -e "${YELLOW}  -> Template not found at $REPO_ROOT/templates/GROUNDING.md${NC}"
+        echo -e "${RED}Error: template not found at $REPO_ROOT/templates/GROUNDING.md${NC}"
+        echo "The aahp package looks incomplete. Aborting to avoid a partial migration."
+        exit 1
     fi
 else
     echo "  -> GROUNDING.md already present (left untouched)."

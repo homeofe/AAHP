@@ -24,9 +24,10 @@ to strongest: `model_claim`, `self_reviewed`, `cross_model_reviewed`,
 `source_verified`, `tool_verified`, `test_verified`, `runtime_observed`,
 `human_confirmed`. `cross_model_reviewed` maps to status `assumed`, never `verified`;
 only `source_verified` / `tool_verified` / `test_verified` / `runtime_observed` /
-`human_confirmed` can support `verified` (grounded). TTL and expiry stay governed by
-the Trust Decay rule (README section 2.5). See GROUNDING.md for the task-type anchor
-matrix and README section 2.10 for the doctrine.
+`human_confirmed` can support `verified` (grounded). Record it in the Provenance column
+of the tables below, using `-` when unknown. TTL and expiry stay governed by the Trust
+Decay rule (README section 2.5). See GROUNDING.md for the task-type anchor matrix and
+README section 2.10 for the doctrine.
 
 ---
 

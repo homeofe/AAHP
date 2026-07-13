@@ -134,7 +134,9 @@ it must carry a `confidence_source`.
 A confidence above 0.75 that lacks a matching anchor is a provenance gap: lower the
 number or add the anchor. A passing test suite does not qualify for the `0.99+`
 band: it shows the absence of caught failures, not proof of correctness. Reserve
-`0.99+` for formal proofs or deterministic calculations only.
+`0.99+` for formal proofs or deterministic calculations only. Runtime observation (the
+0.90-0.98 band) does not compound toward `0.99+`; that top band is for mathematical or
+logical proof.
 
 ---
 

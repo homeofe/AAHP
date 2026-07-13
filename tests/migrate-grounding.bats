@@ -69,11 +69,28 @@ EOF
 @test "adds a Provenance section to TRUST.md" {
     create_full_handoff
     _create_trust_md
-    ! grep -q "Provenance" "$TEST_TMPDIR/.ai/handoff/TRUST.md"
+    ! grep -q "## Provenance" "$TEST_TMPDIR/.ai/handoff/TRUST.md"
 
     run bash "$SCRIPTS_DIR/aahp-migrate-grounding.sh" "$TEST_TMPDIR"
     [ "$status" -eq 0 ]
-    grep -q "Provenance" "$TEST_TMPDIR/.ai/handoff/TRUST.md"
+    grep -q "## Provenance" "$TEST_TMPDIR/.ai/handoff/TRUST.md"
+}
+
+@test "adds the section even when TRUST.md mentions Provenance without the heading" {
+    create_full_handoff
+    # A Provenance column but no "## Provenance" section heading
+    cat > "$TEST_TMPDIR/.ai/handoff/TRUST.md" <<'EOF'
+# TestProject: Trust Register
+
+| Property | Status | Provenance | Notes |
+|----------|--------|------------|-------|
+| build passes | untested | - | |
+EOF
+    ! grep -q "## Provenance" "$TEST_TMPDIR/.ai/handoff/TRUST.md"
+
+    run bash "$SCRIPTS_DIR/aahp-migrate-grounding.sh" "$TEST_TMPDIR"
+    [ "$status" -eq 0 ]
+    grep -q "## Provenance" "$TEST_TMPDIR/.ai/handoff/TRUST.md"
 }
 
 @test "is idempotent: re-run does not duplicate the Provenance section" {

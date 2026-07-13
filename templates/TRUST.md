@@ -16,44 +16,59 @@
 
 ---
 
+## Provenance (Draft v0.1, proposed)
+
+The Grounded Reflection Layer adds an orthogonal *provenance* field recording HOW a
+claim was checked, separate from the Status columns below. Provenance tokens, weakest
+to strongest: `model_claim`, `self_reviewed`, `cross_model_reviewed`,
+`source_verified`, `tool_verified`, `test_verified`, `runtime_observed`,
+`human_confirmed`. `cross_model_reviewed` maps to status `assumed`, never `verified`;
+only `source_verified` / `tool_verified` / `test_verified` / `runtime_observed` /
+`human_confirmed` can support `verified` (grounded). Record it in the Provenance column
+of the tables below, using `-` when unknown. TTL and expiry stay governed by the Trust
+Decay rule (README section 2.5). See GROUNDING.md for the task-type anchor matrix and
+README section 2.10 for the doctrine.
+
+---
+
 ## Build System
 
-| Property | Status | Last Verified | Agent | Notes |
-|----------|--------|---------------|-------|-------|
-| `build` passes | untested | - | - | |
-| `test` passes | untested | - | - | |
-| `lint` passes | untested | - | - | |
-| `type-check` passes | untested | - | - | |
+| Property | Status | Provenance | Last Verified | Agent | TTL | Expires | Notes |
+|----------|--------|------------|---------------|-------|-----|---------|-------|
+| `build` passes | untested | - | - | - | - | - | |
+| `test` passes | untested | - | - | - | - | - | |
+| `lint` passes | untested | - | - | - | - | - | |
+| `type-check` passes | untested | - | - | - | - | - | |
 
 ---
 
 ## Infrastructure
 
-| Property | Status | Last Verified | Agent | Notes |
-|----------|--------|---------------|-------|-------|
-| Local dev stack boots | untested | - | - | |
-| All health endpoints respond | untested | - | - | |
-| Database connection works | untested | - | - | |
-| Auth flow completes | untested | - | - | |
+| Property | Status | Provenance | Last Verified | Agent | TTL | Expires | Notes |
+|----------|--------|------------|---------------|-------|-----|---------|-------|
+| Local dev stack boots | untested | - | - | - | - | - | |
+| All health endpoints respond | untested | - | - | - | - | - | |
+| Database connection works | untested | - | - | - | - | - | |
+| Auth flow completes | untested | - | - | - | - | - | |
 
 ---
 
 ## Integrations
 
-| Property | Status | Last Verified | Agent | Notes |
-|----------|--------|---------------|-------|-------|
-| External API A reachable | untested | - | - | |
-| Webhook delivery confirmed | untested | - | - | |
+| Property | Status | Provenance | Last Verified | Agent | TTL | Expires | Notes |
+|----------|--------|------------|---------------|-------|-----|---------|-------|
+| External API A reachable | untested | - | - | - | - | - | |
+| Webhook delivery confirmed | untested | - | - | - | - | - | |
 
 ---
 
 ## Security
 
-| Property | Status | Last Verified | Agent | Notes |
-|----------|--------|---------------|-------|-------|
-| No secrets in source | assumed | - | - | Pre-commit hooks configured |
-| Auth tokens expire correctly | untested | - | - | |
-| PII not logged | untested | - | - | |
+| Property | Status | Provenance | Last Verified | Agent | TTL | Expires | Notes |
+|----------|--------|------------|---------------|-------|-----|---------|-------|
+| No secrets in source | assumed | - | - | - | - | - | Pre-commit hooks configured |
+| Auth tokens expire correctly | untested | - | - | - | - | - | |
+| PII not logged | untested | - | - | - | - | - | |
 
 ---
 

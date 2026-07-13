@@ -351,6 +351,61 @@ aahp archive --verify     # fails if LOG.md has more than 10 active entries
 
 A canonical log entry starts with `## [YYYY-MM-DD]`. The default flow keeps the 10 newest entries in `LOG.md`. Entry 11 and older are moved automatically into `LOG-ARCHIVE.md`, and the postcondition verifies by entry hash that no rotated entry was dropped. `LOG-ARCHIVE.index.json` stores the hashes of archived entries so `--verify` also detects later truncation or tampering. `LOG-ARCHIVE.md` and the index are included in `MANIFEST.json` whenever present, so archive changes stay inside the checksum boundary.
 
+### 2.10 Grounded Reflection Layer
+
+Trust Decay (2.5) tracks whether a claim is stale; provenance (2.4) tracks who made
+it; the Verify Gate (2.8) tracks whether handoff state drifted. None of them ask the
+harder question: is the claim actually grounded in evidence outside the model? Loops
+of generate-review-verify can converge on plausibility rather than truth when the
+generator and verifier share the same model-family blind spots, and agreement between
+models is not the same as an external anchor.
+
+The Grounded Reflection Layer (Draft v0.1) adds that missing axis. It is additive and
+backward compatible: it changes no `MANIFEST.json` field and no schema. A claim is
+described on two orthogonal axes:
+
+- Axis A - Status (grounding confidence). Reused from TRUST.md: `verified`, `assumed`,
+  `untested` (rendered `(Verified)` / `(Assumed)` / `(Unknown)` in STATUS.md). The
+  shorthand `grounded` / `partially_grounded` / `ungrounded` names points on this same
+  axis; it adds no new levels.
+- Axis B - Provenance (how a claim was produced or checked). A new orthogonal field,
+  weakest to strongest: `model_claim` < `self_reviewed` < `cross_model_reviewed` <
+  `source_verified` < `tool_verified` < `test_verified` < `runtime_observed` <
+  `human_confirmed`. Recorded as a Provenance column in TRUST.md, never mixed into the
+  status.
+
+| Grounding term | Status | Typical provenance |
+|---|---|---|
+| grounded | verified | test_verified / tool_verified / source_verified / runtime_observed / human_confirmed |
+| partially_grounded | assumed | cross_model_reviewed / self_reviewed |
+| ungrounded | untested | model_claim |
+
+Two rules carry the doctrine:
+
+1. `cross_model_reviewed` maps to status `assumed`, never `verified`. Consensus between
+   models raises robustness but is not an external anchor.
+2. A claim reaches status `verified` (grounded) only with at least one external anchor:
+   passing tests, build, type-check, lint, schema validation, a verified external
+   source, runtime observation, a deterministic calculation, or human confirmation.
+
+`templates/GROUNDING.md` (scaffolded by `aahp init` into `.ai/handoff/GROUNDING.md`)
+carries the task-type anchor matrix, confidence bands, and required TRUST fields.
+Existing projects adopt the layer in place with `aahp migrate-grounding`, which adds
+the Provenance section to TRUST.md, drops in GROUNDING.md, and regenerates the
+manifest.
+
+An optional grounding audit may run on demand or as a pre-handoff "Phase 4.5"
+(WORKFLOW.md) for high-impact tasks. It is advisory, scoped to grounding and
+trust-of-claims (not code review), and emits `SHIP` / `NEEDS_CHANGES` / `BLOCK`. It is
+never a "Phase 6": Phase 5 Handoff is the terminal atomic step, so an audit placed
+after it could not gate the commit.
+
+Scope note: AAHP ships the doctrine (this section), the templates (the TRUST.md
+provenance column and GROUNDING.md), and the migration tooling. The executable
+enforcement artifacts (an auditor agent, a `/challenge` command, an enforcement rule)
+live in the consuming harness (for example a Claude Code `.claude/` layer), because
+AAHP has no agent/command layer of its own.
+
 ## 3. Robustness: Surviving Failures
 
 ### 3.1 Atomic Handoff with `HANDOFF.lock`

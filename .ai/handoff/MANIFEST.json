@@ -3,17 +3,17 @@
   "project": "AAHP-spec",
   "last_session": {
     "agent": "claude-opus-4-8",
-    "session_id": "cli-1784018889",
-    "timestamp": "2026-07-14T08:48:09Z",
-    "commit": "a51e899",
+    "session_id": "cli-1784020760",
+    "timestamp": "2026-07-14T09:19:20Z",
+    "commit": "b98d269",
     "phase": "implementation",
     "duration_minutes": 0
   },
   "files": {
     "STATUS.md": {
-      "checksum": "sha256:8cae7a40a590ee73ce51e07ac0d6343ce3430a13fb6daf60d272eef9268a96c0",
-      "updated": "2026-07-14T08:48:09Z",
-      "lines": 140,
+      "checksum": "sha256:7c4deffa0319af0586efbeb7b835c2cb9b45797c924ed301ca0b22595aab84ab",
+      "updated": "2026-07-14T09:19:19Z",
+      "lines": 142,
       "summary": "(no summary available)"
     },
     "NEXT_ACTIONS.md": {
@@ -80,8 +80,8 @@
   "quick_context": "(no summary available) (no summary available) ",
   "token_budget": {
     "manifest_only": 85,
-    "manifest_plus_core": 4903,
-    "full_read": 12476
+    "manifest_plus_core": 4975,
+    "full_read": 12548
   }
   ,"next_task_id": 6
   ,"tasks": {"T-001":{"title":"[T-006] Publish npm package","status":"blocked","priority":"medium","depends_on":[],"created":"2026-06-28T10:10:21.975Z","notes":"**AAHP Task:** `T-006`  \n**Status:** blocked  \n**Priority:** medium  \n\n\n\n\n---\n*Auto-created from AAHP manifest · project: AAHP*","github_issue":18,"github_repo":"homeofe/AAHP"},"T-002":{"title":"[T-014] Add CLI integration tests for bin/aahp.js [high]","status":"ready","priority":"high","depends_on":[],"created":"2026-06-28T10:10:21.975Z","notes":"**AAHP Task:** `T-014`  \n**Status:** ready  \n**Priority:** high  \n\n\n\n\n---\n*Auto-created from AAHP manifest · project: AAHP*","github_issue":14,"github_repo":"homeofe/AAHP"},"T-015":{"title":"Add `aahp status` quick-look command [medium]","status":"ready","priority":"medium","depends_on":[],"created":"2026-06-28T10:10:21.978Z","github_issue":22,"github_repo":"homeofe/AAHP"},"T-016":{"title":"Add `aahp archive` command for LOG.md rotation [medium]","status":"ready","priority":"medium","depends_on":[],"created":"2026-06-28T10:10:21.979Z","github_issue":23,"github_repo":"homeofe/AAHP"},"T-017":{"title":"Add project-level CLAUDE.md [low]","status":"ready","priority":"low","depends_on":[],"created":"2026-06-28T10:10:21.979Z","github_issue":24,"github_repo":"homeofe/AAHP"}}

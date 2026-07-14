@@ -394,6 +394,29 @@ Existing projects adopt the layer in place with `aahp migrate-grounding`, which 
 the Provenance section to TRUST.md, drops in GROUNDING.md, and regenerates the
 manifest.
 
+**Grounding reference (condensed).** The load-bearing contents of `GROUNDING.md`, inline for readers of this spec.
+
+Task-type anchor matrix (the weakest provenance that can carry a task to status `verified`):
+
+| Task type | Minimum external anchor | Min provenance for verified |
+|---|---|---|
+| Code implementation | passing tests + build + type-check/lint on the change | `test_verified` |
+| Documentation | doc checked against the source or config it describes | `source_verified` |
+| Architecture decisions | ADR of alternatives considered, plus human sign-off | `human_confirmed` |
+| Security-sensitive changes | scanner or static-analysis output + cross-provider review + human sign-off | `human_confirmed` |
+| External factual research | two or more independent verified external sources | `source_verified` |
+| Agent-governance changes | the verify gate passes + cross-model review + human sign-off | `human_confirmed` |
+
+Confidence bands (advisory; a number never substitutes for an anchor):
+
+- `grounded` = status `verified`: at least one external anchor (tests, build, type-check, lint, schema validation, a verified source, runtime observation, a deterministic calculation, or human confirmation).
+- `partially_grounded` = status `assumed`: cross-model reviewed or weak evidence, no external anchor yet. Model consensus is not grounding.
+- `ungrounded` = status `untested`: model-only; nothing external has checked it.
+
+Minimum TRUST.md fields when the layer is active: `id`, `claim`, `status`, `provenance`, `generated_by`, `verified_by` (or null), `evidence`, `ttl`, `expires`, `owner`.
+
+Full template: `templates/GROUNDING.md` -scaffolded by `aahp init` into `.ai/handoff/GROUNDING.md`.
+
 An optional grounding audit may run on demand or as a pre-handoff "Phase 4.5"
 (WORKFLOW.md) for high-impact tasks. It is advisory, scoped to grounding and
 trust-of-claims (not code review), and emits `SHIP` / `NEEDS_CHANGES` / `BLOCK`. It is

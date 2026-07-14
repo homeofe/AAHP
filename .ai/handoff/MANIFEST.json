@@ -3,76 +3,76 @@
   "project": "AAHP",
   "last_session": {
     "agent": "claude-opus-4-8",
-    "session_id": "cli-1784008044",
-    "timestamp": "2026-07-14T05:47:25Z",
-    "commit": "f040bfb",
+    "session_id": "cli-1784009907",
+    "timestamp": "2026-07-14T06:18:27Z",
+    "commit": "4784168",
     "phase": "implementation",
     "duration_minutes": 0
   },
   "files": {
     "STATUS.md": {
-      "checksum": "sha256:d598f2c2310f5ab7ccf7b3eaade03ffc89e29e5ee75731ccec9fdf4b354d622d",
-      "updated": "2026-07-14T05:47:17Z",
-      "lines": 132,
+      "checksum": "sha256:dc47b9ab315f06c3263f65e59ba3e614dc78c502f1d5767064f2b38fea911f20",
+      "updated": "2026-07-14T06:18:27Z",
+      "lines": 134,
       "summary": "(no summary available)"
     },
     "NEXT_ACTIONS.md": {
       "checksum": "sha256:50de9129b820e50f0a23859fa482b88390196c0c8653bdd235e8c45839a42715",
-      "updated": "2026-07-14T05:45:01Z",
+      "updated": "2026-07-14T06:18:26Z",
       "lines": 234,
       "summary": "(no summary available)"
     },
     "LOG.md": {
       "checksum": "sha256:08d903cd6ec745a75fbfeb2a611b6c7e0e810848a1e56f22e714d097e9be7279",
-      "updated": "2026-07-14T05:45:01Z",
+      "updated": "2026-07-14T06:18:26Z",
       "lines": 266,
       "summary": "(no summary available)"
     },
     "LOG-ARCHIVE.md": {
       "checksum": "sha256:dd4df677e9dfcd7f72620ae5c25a35e0b0c764ca5807dc79f71163bf29d5542b",
-      "updated": "2026-07-14T05:45:01Z",
+      "updated": "2026-07-14T06:18:26Z",
       "lines": 26,
       "summary": "(no summary available)"
     },
     "LOG-ARCHIVE.index.json": {
       "checksum": "sha256:48bf942ed937ca19b019d2c11eef04ff0633c4c51e3229b61f0a9d158c084d93",
-      "updated": "2026-07-14T05:45:01Z",
+      "updated": "2026-07-14T06:18:26Z",
       "lines": 9,
       "summary": "{"
     },
     "DASHBOARD.md": {
       "checksum": "sha256:e96e392db8dab2e9719e542dfa2a10c240d0be16ac6721298c460a22985cbdea",
-      "updated": "2026-07-14T05:45:01Z",
+      "updated": "2026-07-14T06:18:26Z",
       "lines": 96,
       "summary": "(no summary available)"
     },
     "TRUST.md": {
       "checksum": "sha256:525c39c153a6f2f34f3ad1d64bbe2915b3548b93f3228579bb6a804437b375a7",
-      "updated": "2026-07-14T05:45:01Z",
+      "updated": "2026-07-14T06:18:26Z",
       "lines": 91,
       "summary": "(no summary available)"
     },
     "CONVENTIONS.md": {
       "checksum": "sha256:aa576e7c37de31ea6e2b5e4cc3e15ba4494571798a0e42f276f505ba9cac24af",
-      "updated": "2026-07-14T05:45:01Z",
+      "updated": "2026-07-14T06:18:26Z",
       "lines": 114,
       "summary": "(no summary available)"
     },
     "WORKFLOW.md": {
       "checksum": "sha256:62ac58c749c907cf2eb9236172cd11d3a81128a855e8946e93e436ee016745be",
-      "updated": "2026-07-14T05:45:01Z",
+      "updated": "2026-07-14T06:18:26Z",
       "lines": 131,
       "summary": "(no summary available)"
     },
     "GROUNDING.md": {
       "checksum": "sha256:7ef8cece585dc5defb4285175b9ba560d5469675df553d4ce28ec9e7aec24343",
-      "updated": "2026-07-14T05:45:01Z",
+      "updated": "2026-07-14T06:18:26Z",
       "lines": 209,
       "summary": "(no summary available)"
     },
     "pii-allowlist.json": {
       "checksum": "sha256:7c1051f6e2bc3943b7c1dbe4da229694455681b8875a346c99279e555edb733f",
-      "updated": "2026-07-14T05:45:01Z",
+      "updated": "2026-07-14T06:18:26Z",
       "lines": 4,
       "summary": "{"
     }
@@ -80,8 +80,8 @@
   "quick_context": "(no summary available) (no summary available) ",
   "token_budget": {
     "manifest_only": 85,
-    "manifest_plus_core": 4612,
-    "full_read": 12185
+    "manifest_plus_core": 4668,
+    "full_read": 12241
   }
   ,"next_task_id": 6
   ,"tasks": {"T-001":{"title":"[T-006] Publish npm package","status":"blocked","priority":"medium","depends_on":[],"created":"2026-06-28T10:10:21.975Z","notes":"**AAHP Task:** `T-006`  \n**Status:** blocked  \n**Priority:** medium  \n\n\n\n\n---\n*Auto-created from AAHP manifest · project: AAHP*","github_issue":18,"github_repo":"homeofe/AAHP"},"T-002":{"title":"[T-014] Add CLI integration tests for bin/aahp.js [high]","status":"ready","priority":"high","depends_on":[],"created":"2026-06-28T10:10:21.975Z","notes":"**AAHP Task:** `T-014`  \n**Status:** ready  \n**Priority:** high  \n\n\n\n\n---\n*Auto-created from AAHP manifest · project: AAHP*","github_issue":14,"github_repo":"homeofe/AAHP"},"T-015":{"title":"Add `aahp status` quick-look command [medium]","status":"ready","priority":"medium","depends_on":[],"created":"2026-06-28T10:10:21.978Z","github_issue":22,"github_repo":"homeofe/AAHP"},"T-016":{"title":"Add `aahp archive` command for LOG.md rotation [medium]","status":"ready","priority":"medium","depends_on":[],"created":"2026-06-28T10:10:21.979Z","github_issue":23,"github_repo":"homeofe/AAHP"},"T-017":{"title":"Add project-level CLAUDE.md [low]","status":"ready","priority":"low","depends_on":[],"created":"2026-06-28T10:10:21.979Z","github_issue":24,"github_repo":"homeofe/AAHP"}}

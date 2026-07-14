@@ -583,6 +583,49 @@ A standalone bash script (`scripts/aahp-manifest.sh`) can also regenerate it fro
 
 Agents should always regenerate the manifest as the final step before committing handoff files. The migration script (`aahp-migrate-v2.sh`) delegates to `aahp-manifest.sh` internally.
 
+**CLI command reference.** The `aahp` CLI exposes one command per protocol operation. `init` and `status` are pure Node; the rest shell out to the matching `scripts/*.sh` (so they need `bash`, and on Windows Git Bash or WSL).
+
+| Command | Purpose |
+|---|---|
+| `aahp init [path]` | Copy the AAHP templates into `.ai/handoff/` |
+| `aahp manifest [path]` | (Re)generate `MANIFEST.json` from the handoff files |
+| `aahp lint [path]` | Validate handoff files for safety violations |
+| `aahp verify [path]` | Run the canonical handoff gate (checksum + drift + pointer + TTL) |
+| `aahp archive [path]` | Rotate or verify `LOG.md` into `LOG-ARCHIVE.md` |
+| `aahp migrate [path]` | Migrate an AAHP v1 project to v2/v3 |
+| `aahp migrate-grounding [path]` | Add the Grounded Reflection Layer to an existing project |
+| `aahp status [path]` | Print a read-only state summary from `MANIFEST.json` |
+
+**Quick state summary: `aahp status`.** `aahp status [path]` prints a read-only snapshot of the current handoff state, read entirely from `.ai/handoff/MANIFEST.json`. It regenerates nothing and has no side effects, so it is the cheapest way for an incoming agent (or a human) to orient before deciding what to read in full. It takes only an optional `[path]` and no flags.
+
+```bash
+aahp status                # summarize .ai/handoff/ in the current directory
+aahp status ./my-project   # summarize a specific project
+```
+
+Sample output:
+
+```
+Project: AAHP
+Path: /home/you/projects/aahp
+Phase: implementation
+Agent: claude-opus-4-8
+Session: 2026-07-14T06:18:27Z
+Session ID: cli-1784009907
+Commit: 4784168
+Manifest lines: ?
+Next actions lines: 234
+Task counts: ready: 4, blocked: 1
+Quick context: Auth service complete. Next: fix CORS header.
+Open ready/in_progress tasks:
+  T-015: Add `aahp status` quick-look command (ready)
+  T-016: Add `aahp archive` command for LOG.md rotation (ready)
+```
+
+The report covers `project`, the resolved `path`, and the `last_session` block (phase, agent, timestamp, session id, commit); the recorded line counts for `MANIFEST.json` and `NEXT_ACTIONS.md` (a `?` means the manifest does not record that file's line count, which is the normal case for `MANIFEST.json` itself); a `Task counts` roll-up printed in priority order (`ready`, `in_progress`, `blocked`, `done`, `cancelled`, `stale`, or `none` when there are no tasks); the `quick_context` string; and up to five open `ready`/`in_progress` tasks. It reads only `MANIFEST.json`, so it reflects the last regeneration, not uncommitted edits to other handoff files.
+
+Exit codes: `0` on success; `1` when `MANIFEST.json` is missing (it prints a hint to run `aahp init` or `aahp manifest` first) or cannot be parsed as JSON.
+
 ### 7.2 Checksums cover entire files
 
 Whole-file SHA-256 is the AAHP v2 standard. The schema (`aahp-manifest.schema.json`), lint tool, and migration script all enforce `sha256:<64-hex-chars>` format. Section-level checksums were considered but add complexity without proportional benefit -if a section changes, the whole-file checksum changes too, which is sufficient for detecting drift.

@@ -173,6 +173,40 @@
         }
       },
       "additionalProperties": false
+    },
+    "cross_repo_ref": {
+      "type": "object",
+      "description": "v3.4 (optional, additive): links this handoff to a related repo's handoff. Backward compatible; projects without it validate unchanged.",
+      "required": [
+        "repo",
+        "commit",
+        "relation"
+      ],
+      "properties": {
+        "repo": {
+          "type": "string",
+          "minLength": 1,
+          "description": "owner/name of the referenced repository (e.g., homeofe/improvements)"
+        },
+        "commit": {
+          "type": "string",
+          "description": "Commit hash in the referenced repository this handoff relates to"
+        },
+        "handoff_file": {
+          "type": "string",
+          "description": "Path to the referenced handoff file (default .ai/handoff/MANIFEST.json)"
+        },
+        "relation": {
+          "type": "string",
+          "enum": [
+            "implements",
+            "extends",
+            "consumes"
+          ],
+          "description": "How this repo relates to the referenced repo"
+        }
+      },
+      "additionalProperties": false
     }
   },
   "additionalProperties": false,

@@ -875,6 +875,68 @@ Because Phase 5 Handoff is the terminal atomic step, the audit is never a "Phase
 
 ---
 
+## 10. Multi-Repo and Cross-Repo Handoff
+
+Section 7.3 covers parallel agents inside one repository. Real estates are bigger than one repo: an upstream repo defines a protocol, tool, or library, and many downstream repos consume it. AAHP's `propagate.sh` already ships the framework outward, but the handoff act across a repo boundary had no protocol-level doctrine. This section supplies it. It is additive; single-repo projects are unaffected.
+
+### 10.1 The propagation model
+
+AAHP distinguishes three terms:
+
+- **Upstream repo**: the source of truth for the shared artifact (for example this AAHP repo, or a shared gate-scripts repo). It owns the canonical scripts, schema, and templates.
+- **Consumer repo** (downstream): a repo that installs the upstream artifact and runs it locally. It owns its own `.ai/handoff/` state; the upstream artifact is a dependency, not its state.
+- **Propagation commit**: the commit in a consumer that adopts or updates the upstream artifact (new scripts, new schema version). It is a normal AAHP handoff commit in the consumer, subject to that consumer's own verify gate.
+
+`propagate.sh` (conceptually) copies the upstream artifacts into a consumer while preserving that consumer's own per-repo configuration (its `AAHP_HANDOFF_FILES` set, its `CONVENTIONS.md`). The direction is one-way: upstream never reads consumer state, and a consumer never edits the upstream copy in place; it re-propagates to update.
+
+### 10.2 Cross-repo handoff pattern
+
+When an agent finishes work in repo A and the next agent must continue in repo B (for example, A implements a change that B consumes), the handoff crosses a repo boundary. AAHP does not move handoff state between repos: each repo keeps its own `.ai/handoff/`. Instead, the receiving repo records a typed *reference* to the source.
+
+What travels vs. what stays local:
+
+- **Travels (recorded in B):** a pointer to A's repo, the exact commit in A, the handoff file in A, and the relation. Nothing else: no secrets, no file contents, no chat history.
+- **Stays local:** each repo's `STATUS.md`, `LOG.md`, `TRUST.md`, `CONVENTIONS.md`, checksums, and task graph. Trust and provenance are never inherited across repos; B verifies its own claims.
+
+The reference is an optional, additive top-level field in B's `MANIFEST.json`:
+
+```json
+"cross_repo_ref": {
+  "repo": "homeofe/improvements",
+  "commit": "abc1234",
+  "handoff_file": ".ai/handoff/MANIFEST.json",
+  "relation": "implements"
+}
+```
+
+- `repo` (required): `owner/name` of the referenced repository.
+- `commit` (required): the commit in that repo this handoff relates to. Pin a commit, not a branch, so the reference is stable.
+- `handoff_file` (optional): path to the referenced handoff file; defaults to `.ai/handoff/MANIFEST.json`.
+- `relation` (required): one of `implements`, `extends`, `consumes` -how B relates to A.
+
+This field is **optional and backward compatible**. The manifest schema (`schema/aahp-manifest.schema.json`, npm v3.4) permits it but does not require it, so v2 and v3 projects without it validate and run unchanged. It is agent-set, like the task graph: an agent adds it when a cross-repo relation exists and (as with `tasks`) re-adds it after a manifest regeneration until the generator preserves it natively.
+
+### 10.3 Monorepo considerations
+
+A monorepo hosts multiple packages in one git repo. AAHP scopes handoff state per package root, not per repo:
+
+- **Per-package handoff dirs.** Each package that maintains its own handoff carries its own `.ai/handoff/` at its package root (`packages/api/.ai/handoff/`, `packages/web/.ai/handoff/`). `aahp verify [path]` and `aahp manifest [path]` both take a path, so they run against a specific package root.
+- **Shared vs. package-local CONVENTIONS.md.** Repo-wide rules (commit style, the em-dash ban, the license header) belong in a single root `CONVENTIONS.md`; a package may add a package-local `CONVENTIONS.md` for rules that apply only to it. The package-local file extends, it does not replace, the root one.
+- **How verify handles paths.** The gate operates on exactly one handoff directory: the `.ai/handoff/` under the path it is given. Its content-drift check (Section 2.8) compares against that package's tree. Run the gate once per package that has handoff state; a repo-root run does not transitively cover nested package handoffs.
+
+### 10.4 Version skew policy
+
+Consumers and upstream drift. The policy:
+
+- **Scripts are versioned by semver** in the upstream `package.json` (`@elvatis_com/aahp`). The protocol schema version (`aahp_version`, currently `3.0`) tracks the file-format contract; the npm version tracks the tooling. They move independently.
+- **Consumers pin or float.** A consumer either pins an exact version (reproducible, manual updates) or floats a caret range within one major (`^3.0.0`: picks up additive minors and fixes automatically, never a breaking major). Pin when the gate is a required check on a protected branch; float for low-risk internal repos.
+- **Deprecation policy.** A major version is supported for **12 months** after the next major is released. Within that window a consumer on the old major keeps working; after it, upstream may drop compatibility shims.
+- **Breaking changes require a migration guide.** Any breaking change (a removed or renamed field, a stricter required set) ships with a migration entry in `CHANGELOG.md` and, where mechanical, a `migrate` path (as the v1 to v2/v3 migration does, Section 5). Additive changes such as `cross_repo_ref` are minor bumps and need no migration.
+
+When a consumer runs older scripts than the upstream ships, the mismatch is safe as long as both stay within the same major: additive fields the consumer's older schema does not know about are ignored by older tooling, and the verify gate on each side checks only its own repo. Cross-major skew is exactly the case the deprecation window and the migration guide exist for.
+
+---
+
 *This specification is a living document. Feedback welcome at [github.com/homeofe/AAHP](https://github.com/homeofe/AAHP).*
 
 ---

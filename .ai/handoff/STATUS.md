@@ -1,7 +1,12 @@
 # AAHP: Current State of the Nation
 
-> Last updated: 2026-07-13 by claude-opus-4-8 (branch feat/grounded-reflection-layer)
+> Last updated: 2026-07-14 by claude-opus-4-8 (branch chore/refresh-handoff-pointer-layer3)
 > Commit: (pending)
+>
+> Note (2026-07-14): Manifest commit-pointer refreshed against the main base
+> commit to clear a CI Layer 3 stale-pointer failure. PR #25 was squash-merged,
+> which orphaned the recorded branch commit (2c21282) so it was no longer an
+> ancestor of HEAD. No source code changed; this is a handoff-only refresh.
 >
 > **Rule:** This file is rewritten (not appended) at the end of every session.
 > It reflects the *current* reality, not history. History lives in LOG.md.

@@ -2,7 +2,7 @@
 # cli.bats - Integration tests for bin/aahp.js
 #
 # These tests invoke the CLI binary directly and verify real output.
-# Covers: --help, --version, init, manifest, lint, and unknown-command handling.
+# Covers: --help, --version, init, manifest, lint, status, and unknown-command handling.
 
 setup() {
     load test_helper
@@ -405,6 +405,49 @@ _aahp() {
     _aahp manifest "$TEST_TMPDIR" --phase "review" --quiet
     [ "$status" -eq 0 ]
     grep -q '"phase": "review"' "$TEST_TMPDIR/.ai/handoff/MANIFEST.json"
+}
+
+# ─── status ─────────────────────────────────────────────────
+
+@test "aahp status fails when MANIFEST.json is missing" {
+    _aahp status "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"MANIFEST.json"* ]]
+}
+
+@test "aahp status hint mentions init or manifest when MANIFEST is missing" {
+    _aahp status "$TEST_TMPDIR"
+    [[ "$output" == *"aahp init"* || "$output" == *"aahp manifest"* ]]
+}
+
+@test "aahp status exits 0 on a generated manifest" {
+    create_status_md
+    create_next_actions_md
+    create_log_md
+    _aahp manifest "$TEST_TMPDIR" --phase idle --quiet
+    _aahp status "$TEST_TMPDIR"
+    [ "$status" -eq 0 ]
+}
+
+@test "aahp status prints project, phase, and task counts" {
+    create_status_md
+    create_next_actions_md
+    create_log_md
+    _aahp manifest "$TEST_TMPDIR" --phase implementation --quiet
+    _aahp status "$TEST_TMPDIR"
+    [[ "$output" == *"Project:"* ]]
+    [[ "$output" == *"Phase: implementation"* ]]
+    [[ "$output" == *"Task counts:"* ]]
+}
+
+@test "aahp status reflects the documentation phase" {
+    create_status_md
+    create_next_actions_md
+    create_log_md
+    _aahp manifest "$TEST_TMPDIR" --phase documentation --quiet
+    _aahp status "$TEST_TMPDIR"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Phase: documentation"* ]]
 }
 
 

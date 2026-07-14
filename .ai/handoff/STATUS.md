@@ -1,3 +1,5 @@
+> Note (2026-07-14, v3.5.0, claude-opus-4-8): Release prep. Added the `documentation` pipeline phase (aahp-manifest.sh validation + schema last_session.phase enum + bin/aahp.js help). Fixed aahp-manifest.sh to preserve the optional `cross_repo_ref` field across regeneration (README 10.2 caveat dropped). Added CHANGELOG.md documenting the real version history (npm publishing had lapsed after 3.2.1, so 3.3.0/3.4.0 were never published). Bumped npm 3.4.0 -> 3.5.0. Pointed the CI release notes at CHANGELOG.md. Re-enabled AAHP CI + CodeQL on GitHub-hosted (NOT self-hosted: AAHP is public, so self-hosting risks fork-PR RCE). This manifest was regenerated with the new --phase documentation.
+
 # AAHP: Current State of the Nation
 
 > Last updated: 2026-07-14 by claude-opus-4-8 (branch docs/t010-handoff-sync)

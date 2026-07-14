@@ -55,7 +55,8 @@
             "implementation",
             "review",
             "fix",
-            "idle"
+            "idle",
+            "documentation"
           ],
           "description": "Pipeline phase at session end"
         },

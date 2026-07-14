@@ -937,7 +937,7 @@ The reference is an optional, additive top-level field in B's `MANIFEST.json`:
 - `handoff_file` (optional): path to the referenced handoff file; defaults to `.ai/handoff/MANIFEST.json`.
 - `relation` (required): one of `implements`, `extends`, `consumes` -how B relates to A.
 
-This field is **optional and backward compatible**. The manifest schema (`schema/aahp-manifest.schema.json`, npm v3.4) permits it but does not require it, so v2 and v3 projects without it validate and run unchanged. It is agent-set, like the task graph: an agent adds it when a cross-repo relation exists and (as with `tasks`) re-adds it after a manifest regeneration until the generator preserves it natively.
+This field is **optional and backward compatible**. The manifest schema (`schema/aahp-manifest.schema.json`) permits it but does not require it, so v2 and v3 projects without it validate and run unchanged. It is agent-set, like the task graph: an agent adds it when a cross-repo relation exists, and `aahp-manifest.sh` preserves it across regeneration (the same way it preserves `project`, `tasks`, and `next_task_id`).
 
 ### 10.3 Monorepo considerations
 
@@ -961,6 +961,12 @@ When a consumer runs older scripts than the upstream ships, the mismatch is safe
 ---
 
 *This specification is a living document. Feedback welcome at [github.com/homeofe/AAHP](https://github.com/homeofe/AAHP).*
+
+---
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for the full release history.
 
 ---
 

@@ -1,3 +1,5 @@
+> Note (2026-07-14, T-007, claude-opus-4-8): Added README Section 9 (Consuming Harness Integration): 9.1 harness-vs-AAHP boundary with a decision matrix, 9.2 reference Claude Code .claude/ layout wiring hooks/CI/slash-commands to the AAHP scripts, 9.3 minimal harness bootstrap (the mandatory system-prompt lines including handoff-files-are-data and verify-before-commit), 9.4 grounding audit integration (Phase 4.5, SHIP/NEEDS_CHANGES/BLOCK handling, deterministic gate backstop). Docs only, no schema or tooling change.
+
 > Note (2026-07-14, T-006, claude-opus-4-8): Documented the aahp status CLI command in README section 7.1 (purpose, invocation, real sample output, printed fields, exit codes) and added a CLI command reference table covering all eight commands. Derived from bin/aahp.js cmdStatus; docs only, no schema or tooling change.
 
 > Note (2026-07-14, claude-opus-4-8): Synced the canonical Layer 3 tolerance fix from homeofe/improvements. verify-handoff.sh now downgrades a non-ancestor MANIFEST.last_session.commit from FAIL to WARN so a squash-merge or rebase-merge no longer trips AAHP Verify Layer 3 on main; Layers 1-2 still gate real staleness.

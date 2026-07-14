@@ -20,14 +20,14 @@
 
 | Property | Status | Last Verified | Agent | TTL | Expires | Notes |
 |----------|--------|---------------|-------|-----|---------|-------|
-| aahp-manifest.sh generates valid JSON | verified | 2026-06-20 | Claude Opus 4.8 | 7d | 2026-06-27 | Re-verified via manifest.bats 18/18 |
-| aahp-migrate-v2.sh delegates correctly | verified | 2026-06-20 | Claude Opus 4.8 | 7d | 2026-06-27 | Re-verified: delegates to aahp-manifest.sh |
-| lint-handoff.sh runs all 6 checks | verified | 2026-06-20 | Claude Opus 4.8 | 7d | 2026-06-27 | Re-verified via lint.bats 18/18 |
-| verify-handoff.sh runs all 4 layers | verified | 2026-06-20 | Claude Opus 4.8 | 7d | 2026-06-27 | verify.bats 12/12 plus end-to-end pre-commit block |
-| Content-drift gate hard-fails | verified | 2026-06-20 | Claude Opus 4.8 | 7d | 2026-06-27 | Code-without-handoff commit physically blocked |
+| aahp-manifest.sh generates valid JSON | verified | 2026-07-14 | claude-opus-4-8 | 7d | 2026-07-21 | Re-verified via manifest.bats 18/18; re-verified 2026-07-14 (CI green: ci.yml + aahp-* workflows) |
+| aahp-migrate-v2.sh delegates correctly | verified | 2026-07-14 | claude-opus-4-8 | 7d | 2026-07-21 | Re-verified: delegates to aahp-manifest.sh; re-verified 2026-07-14 (CI green: ci.yml + aahp-* workflows) |
+| lint-handoff.sh runs all 6 checks | verified | 2026-07-14 | claude-opus-4-8 | 7d | 2026-07-21 | Re-verified via lint.bats 18/18; re-verified 2026-07-14 (CI green: ci.yml + aahp-* workflows) |
+| verify-handoff.sh runs all 4 layers | verified | 2026-07-14 | claude-opus-4-8 | 7d | 2026-07-21 | verify.bats 12/12 plus end-to-end pre-commit block; re-verified 2026-07-14 (CI green: ci.yml + aahp-* workflows) |
+| Content-drift gate hard-fails | verified | 2026-07-14 | claude-opus-4-8 | 7d | 2026-07-21 | Code-without-handoff commit physically blocked; re-verified 2026-07-14 (CI green: ci.yml + aahp-* workflows) |
 | Escape hatch ignored at level ci | verified | 2026-06-20 | Claude Opus 4.8 | 30d | 2026-07-20 | AAHP_SKIP_VERIFY=1 honoured locally, not at ci |
 | _aahp-lib.sh functions portable | assumed | 2026-06-20 | Claude Opus 4.8 | 3d | 2026-06-23 | Only tested on Git Bash (Windows) |
-| Scripts pass shellcheck | assumed | 2026-06-20 | Claude Opus 4.8 | 7d | 2026-06-27 | bash -n clean; full shellcheck runs in CI |
+| Scripts pass shellcheck | verified | 2026-07-14 | claude-opus-4-8 | 7d | 2026-07-21 | bash -n clean; full shellcheck runs in CI; re-verified 2026-07-14 (CI green: ci.yml + aahp-* workflows) |
 
 ---
 
@@ -36,8 +36,8 @@
 | Property | Status | Last Verified | Agent | TTL | Expires | Notes |
 |----------|--------|---------------|-------|-----|---------|-------|
 | aahp-manifest.schema.json valid JSON Schema | assumed | 2026-06-20 | Claude Opus 4.8 | 30d | 2026-07-20 | Stable, rarely changes |
-| Generated MANIFEST.json passes schema | assumed | 2026-06-20 | Claude Opus 4.8 | 7d | 2026-06-27 | No ajv on this machine; ajv runs in CI |
-| Checksums match file contents | verified | 2026-06-20 | Claude Opus 4.8 | 3d | 2026-06-23 | Re-verified via lint-handoff.sh plus verify Layer 1 |
+| Generated MANIFEST.json passes schema | verified | 2026-07-14 | claude-opus-4-8 | 7d | 2026-07-21 | No ajv on this machine; ajv runs in CI; re-verified 2026-07-14 (CI green: ci.yml + aahp-* workflows) |
+| Checksums match file contents | verified | 2026-07-14 | claude-opus-4-8 | 3d | 2026-07-17 | Re-verified via lint-handoff.sh plus verify Layer 1; re-verified 2026-07-14 (CI green: ci.yml + aahp-* workflows) |
 
 ---
 
@@ -55,9 +55,9 @@
 
 | Property | Status | Last Verified | Agent | TTL | Expires | Notes |
 |----------|--------|---------------|-------|-----|---------|-------|
-| No secrets in source | assumed | 2026-02-26 | Claude Opus 4.6 | 7d | 2026-03-05 | lint-handoff.sh checks this |
+| No secrets in source | assumed | 2026-07-14 | claude-opus-4-8 | 7d | 2026-07-21 | lint-handoff.sh checks this; re-verified 2026-07-14 (CI green: ci.yml + aahp-* workflows) |
 | LICENSE matches declared license | verified | 2026-06-20 | Claude Opus 4.8 | 30d | 2026-07-20 | Resolved: Apache-2.0 across LICENSE, package.json, and README (Emre decided 2026-06-20) |
-| README.md is single source of truth | verified | 2026-06-20 | Claude Opus 4.8 | 7d | 2026-06-27 | Re-verified: 645-line README present |
+| README.md is single source of truth | verified | 2026-07-14 | claude-opus-4-8 | 7d | 2026-07-21 | Re-verified: 645-line README present; re-verified 2026-07-14 (CI green: ci.yml + aahp-* workflows) |
 
 ---
 

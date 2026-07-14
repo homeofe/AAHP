@@ -63,7 +63,7 @@ Init options:
 Manifest options:
   --agent NAME      Agent identifier (default: "cli-tool")
   --session-id ID   Session identifier (default: auto-generated)
-  --phase PHASE     Pipeline phase: research|architecture|implementation|review|fix|idle
+  --phase PHASE     Pipeline phase: research|architecture|implementation|review|fix|idle|documentation
   --context "TEXT"  Quick context string
   --duration MIN    Session duration in minutes
   --quiet           Suppress output except errors

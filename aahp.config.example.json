@@ -42,5 +42,13 @@
   ],
   "docLinks": {
     "include": ["README.md", "docs/*.md"]
+  },
+  "check": {
+    "skip": ["claims"]
+  },
+  "pinnedDep": {
+    "name": "@elvatis_com/aahp",
+    "location": "devDependencies",
+    "allowRange": false
   }
 }

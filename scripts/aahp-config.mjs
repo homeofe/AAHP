@@ -9,6 +9,7 @@
 
 import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
+import { execFileSync } from "node:child_process";
 
 // Resolve the target project root: the first non-flag positional argument,
 // else the current working directory. Mirrors the [path] convention in the
@@ -59,4 +60,40 @@ export function handoffFiles(packageRoot) {
   const m = lib.match(/AAHP_HANDOFF_FILES=\(([^)]*)\)/);
   if (!m) throw new Error("could not parse AAHP_HANDOFF_FILES from scripts/_aahp-lib.sh");
   return m[1].split(/\s+/).map((s) => s.trim()).filter(Boolean);
+}
+
+// Return true iff root is inside a git work tree. Uses `git rev-parse
+// --is-inside-work-tree`, which correctly reports true for linked worktrees and
+// submodules (not only the primary checkout). Returns false on any throw (git
+// missing, or not a repo) so callers can fail loud with an actionable message
+// instead of silently scanning zero files.
+export function isInsideWorkTree(root) {
+  try {
+    const out = execFileSync("git", ["-C", root, "rev-parse", "--is-inside-work-tree"], {
+      encoding: "utf8",
+    });
+    return out.trim() === "true";
+  } catch {
+    return false;
+  }
+}
+
+// Enumerate tracked files under root matching the given git pathspecs, using
+// `git ls-files` via execFileSync (NO shell) so only tracked files are scanned
+// and a pathspec cannot inject shell metacharacters. Throws AAHP_NO_GIT when
+// root is not inside a git work tree, so an enumerating gate fails loud instead
+// of vacuously passing on an empty file list outside a checkout.
+export function listTrackedFiles(root, specs) {
+  if (!isInsideWorkTree(root)) {
+    const e = new Error(
+      `not inside a git work tree at ${root}; cannot enumerate files - run this gate inside a git checkout (in CI use actions/checkout)`,
+    );
+    e.code = "AAHP_NO_GIT";
+    throw e;
+  }
+  const out = execFileSync("git", ["-C", root, "ls-files", "-z", "--", ...specs], {
+    encoding: "utf8",
+    maxBuffer: 64 * 1024 * 1024,
+  });
+  return out.split("\0").filter(Boolean);
 }

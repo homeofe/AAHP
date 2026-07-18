@@ -11,9 +11,12 @@
 #   - Makes them executable.
 #   - Does NOT overwrite a non-AAHP hook without backing it up first.
 #
-# The hooks call <target>/scripts/verify-handoff.sh, so the target repo must
-# also have scripts/verify-handoff.sh + scripts/_aahp-lib.sh + lint-handoff.sh
-# (copied as part of AAHP propagation).
+# The hooks resolve the "aahp verify" gate two ways: they prefer the vendored
+# <target>/scripts/verify-handoff.sh when it is present (a full AAHP checkout
+# that also ships scripts/_aahp-lib.sh + lint-handoff.sh via AAHP propagation),
+# and otherwise fall back to the installed aahp CLI (npx --no-install aahp). So
+# a consumer that only "npm install"ed @elvatis_com/aahp no longer needs a full
+# AAHP checkout for the hooks to work.
 #
 # Exit codes:
 #   0 = hooks installed

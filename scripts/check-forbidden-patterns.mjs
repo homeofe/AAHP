@@ -19,9 +19,8 @@
 // bans as an escape (e.g. "\\u2014") so the config file itself does not match.
 
 import { readFileSync } from "node:fs";
-import { execFileSync } from "node:child_process";
 import { join } from "node:path";
-import { resolveRoot, loadConfig } from "./aahp-config.mjs";
+import { resolveRoot, loadConfig, isInsideWorkTree, listTrackedFiles } from "./aahp-config.mjs";
 
 const root = resolveRoot();
 
@@ -39,18 +38,19 @@ if (rules.length === 0) {
   process.exit(0);
 }
 
+// Fail loud outside a git work tree: `git ls-files` would enumerate zero files
+// and the gate would vacuously pass, so a real violation could ship undetected.
+if (!isInsideWorkTree(root)) {
+  console.error(
+    `  forbidden-patterns: not inside a git work tree at ${root}; cannot enumerate files - run this gate inside a git checkout (in CI use actions/checkout)`,
+  );
+  process.exit(1);
+}
+
 const DEFAULT_INCLUDE = ["*.md", "*.mjs", "*.js", "*.json", "*.sh", "*.bash", "*.bats", "*.yml", "*.yaml", "*.txt"];
 
 function gitLsFiles(specs) {
-  try {
-    const out = execFileSync("git", ["-C", root, "ls-files", "-z", "--", ...specs], {
-      encoding: "utf8",
-      maxBuffer: 64 * 1024 * 1024,
-    });
-    return out.split("\0").filter(Boolean);
-  } catch {
-    return [];
-  }
+  return listTrackedFiles(root, specs);
 }
 
 const failures = [];

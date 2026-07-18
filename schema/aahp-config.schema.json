@@ -228,6 +228,51 @@
         }
       },
       "additionalProperties": false
+    },
+    "check": {
+      "type": "object",
+      "description": "Selects which gates `aahp check` runs. Both lists are optional; omit to run every applicable gate. Gate ids: changelog, changelog-format, version-sync, claims, forbidden-patterns, schema-doc-sync, doc-links, handoff.",
+      "properties": {
+        "only": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Run only these gate ids (whitelist)."
+        },
+        "skip": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Skip these gate ids (blacklist), applied after only."
+        }
+      },
+      "additionalProperties": false
+    },
+    "pinnedDep": {
+      "type": "object",
+      "description": "Opt-in distribution-pin assertion for the aahp doctor pinned-dep gate. Absent: the gate reports skip. A repo whose own package name equals name reports self.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Package that must be pinned (default @elvatis_com/aahp)."
+        },
+        "location": {
+          "type": "string",
+          "enum": [
+            "devDependencies",
+            "dependencies",
+            "any"
+          ],
+          "description": "Which dependency block must carry the pin (default devDependencies)."
+        },
+        "allowRange": {
+          "type": "boolean",
+          "description": "If true, accept a semver range; default false requires an exact pin."
+        }
+      },
+      "additionalProperties": false
     }
   },
   "additionalProperties": false

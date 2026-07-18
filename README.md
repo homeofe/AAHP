@@ -443,8 +443,9 @@ follows the protocol and emits a machine-readable JSON record a fleet dashboard
 can ingest:
 
 ```bash
-aahp doctor            # human-readable summary plus the JSON record
-aahp doctor --json     # only the JSON record, on stdout
+aahp doctor              # human-readable summary plus the JSON record
+aahp doctor --json       # only the JSON record, on stdout
+aahp doctor --governance # governance-only record; skip the 3 handoff gates (alias --no-handoff)
 ```
 
 It checks six gates: the handoff file set matches `AAHP_HANDOFF_FILES` (indexed
@@ -461,6 +462,24 @@ across configured sites. The record:
   "checkedAt": "2026-07-18T00:00:00Z" }
 ```
 
+**`aahp check`** is the pass/fail counterpart to that record. Where `doctor` emits a
+conformance snapshot, `check` runs the config-driven governance gates as one aggregate
+and its exit code drives CI (0 only when no gate fails; a skipped gate never fails):
+
+```bash
+aahp check             # run every applicable gate; per-gate PASS/FAIL/SKIP plus a footer
+aahp check --json      # a { schemaVersion: 1, gates: { id: status } } record on stdout
+aahp check --quiet     # only failing gate lines plus the footer
+```
+
+Each gate is applicable only when its inputs exist (for example the `handoff` gate runs
+only when `.ai/handoff/MANIFEST.json` is present); otherwise it is reported `skip`, not
+run. `config.check.only` (a whitelist) and `config.check.skip` (a blacklist) narrow the
+set explicitly. The same governance-only stance is available from the record side:
+`aahp doctor --governance` (alias `--no-handoff`) forces the three handoff gates to
+`skip` without evaluating them, so a repo with no `.ai/handoff/` still emits a green
+conformance record; the default mode is unchanged.
+
 **Config-driven gates.** These gates read an optional `aahp.config.json` at the
 project root and are a clean no-op when it (or the relevant section) is absent, so
 a repo that never opts in keeps working:
@@ -476,9 +495,14 @@ a repo that never opts in keeps working:
 The changelog validator and the LOG generator import the release-heading grammar
 from a single module (`scripts/changelog-grammar.mjs`), so the two cannot diverge.
 The config shape is described by `schema/aahp-config.schema.json`; see
-`aahp.config.example.json` for a worked example. `npm run check` runs the gates and
-`npm run doctor` runs the conformance check; both run in CI. See Section 11 for the
-release ceremony these gate.
+`aahp.config.example.json` for a worked example. Two more optional keys tune the
+commands rather than an individual gate: `check` (`only` / `skip`) selects which gates
+`aahp check` runs, and `pinnedDep` (`name` / `location` / `allowRange`) opts a repo into
+the doctor pinned-dep gate (absent, it reports `skip`). The gates that enumerate tracked
+files (`forbidden-patterns`, `doc-links`) fail loud outside a git work tree rather than
+silently scanning zero files, so a misconfigured CI job cannot pass vacuously. `npm run
+check` runs the gates and `npm run doctor` runs the conformance check; both run in CI.
+See Section 11 for the release ceremony these gate.
 
 ---
 
@@ -686,6 +710,42 @@ unquoted JSON integer and must stay greater than the highest assigned `T-NNN`.
 repo on self-hosted runners executes untrusted fork-PR code (RCE); AAHP stays
 GitHub-hosted.
 
+### ADR-011: aahp check is the consumer-facing governance aggregator
+**Why it recurs:** three commands now read repo state, so an agent may fold one into
+another. **Decision:** `aahp check` is the one aggregator over the config-driven
+governance gates, emitting a single pass/fail run. It stays distinct from `aahp verify`
+(handoff drift) and `aahp doctor` (a conformance record). One entry point per concern.
+
+### ADR-012: doctor records conformance, check runs the gates
+**Why it recurs:** doctor and check both touch changelog-format and version-sync, so the
+overlap looks like duplication to trim. **Decision:** `aahp doctor` is a stable
+`schemaVersion: 1` conformance record for a fleet dashboard; `aahp check` is the pass/fail
+gate runner whose exit code drives CI. The shared gates are intentional, not redundant.
+
+### ADR-013: git hooks resolve the vendored script first, then the CLI
+**Why it recurs:** wiring a hook to one hard-coded path is the quick way. **Decision:**
+the hooks run `scripts/verify-handoff.sh` when it is vendored, else the installed `aahp`
+CLI via `npx --no-install`, and skip when neither resolves. The local hook is a
+convenience; the required CI check is the non-bypassable authority.
+
+### ADR-014: enumerating gates scan git-tracked files and fail loud off-tree
+**Why it recurs:** a plain filesystem walk looks simpler than shelling out to git.
+**Decision:** the enumerating gates list files with `git ls-files` and fail loud outside a
+git work tree instead of vacuously passing on zero files. A broad filesystem walk was
+rejected: it would reimplement `.gitignore` and scan `node_modules` and build output.
+
+### ADR-015: the pinned-dep gate is opt-in and config-driven
+**Why it recurs:** hard-coding the dependency name and location is the quick path.
+**Decision:** the doctor pinned-dep gate reads `pinnedDep` (`name` / `location` /
+`allowRange`) and reports skip when it is absent; the defaults reproduce the prior
+exact-pin behavior, and a repo whose own package name matches still reports `self`.
+
+### ADR-016: aahp-govern.yml is portable, opt-in, and verify-only
+**Why it recurs:** copying vendored script paths into the workflow is the obvious wiring.
+**Decision:** `assets/governance/aahp-govern.yml` calls the `aahp` CLI via `npx` (no
+vendored paths), is opt-in, and never mutates the repo. `aahp-verify.yml` gates handoff
+state; `aahp-govern.yml` gates governance. Two workflows, two concerns.
+
 ---
 
 *The v2-proposal questions below were resolved earlier and are retained for detail.*
@@ -726,7 +786,7 @@ A standalone bash script (`scripts/aahp-manifest.sh`) can also regenerate it fro
 
 Agents should always regenerate the manifest as the final step before committing handoff files. The migration script (`aahp-migrate-v2.sh`) delegates to `aahp-manifest.sh` internally.
 
-**CLI command reference.** The `aahp` CLI exposes one command per protocol operation. `init` and `status` are pure Node; the rest shell out to the matching `scripts/*.sh` (so they need `bash`, and on Windows Git Bash or WSL).
+**CLI command reference.** The `aahp` CLI exposes one command per protocol operation. `init`, `status`, `check`, and `doctor` run in Node (`check` and `doctor` orchestrate the Node gate scripts); the rest shell out to the matching `scripts/*.sh` (so they need `bash`, and on Windows Git Bash or WSL).
 
 | Command | Purpose |
 |---|---|
@@ -734,6 +794,7 @@ Agents should always regenerate the manifest as the final step before committing
 | `aahp manifest [path]` | (Re)generate `MANIFEST.json` from the handoff files |
 | `aahp lint [path]` | Validate handoff files for safety violations |
 | `aahp verify [path]` | Run the canonical handoff gate (checksum + drift + pointer + TTL) |
+| `aahp check [path]` | Run the config-driven governance gates as one aggregate |
 | `aahp archive [path]` | Rotate or verify `LOG.md` into `LOG-ARCHIVE.md` |
 | `aahp migrate [path]` | Migrate an AAHP v1 project to v2/v3 |
 | `aahp migrate-grounding [path]` | Add the Grounded Reflection Layer to an existing project |
@@ -953,7 +1014,8 @@ your-project/
     pre-commit            # -> scripts/verify-handoff.sh . --level precommit
     pre-push              # -> scripts/verify-handoff.sh . --level prepush
   .github/workflows/
-    aahp-verify.yml       # runs `aahp verify --level ci` as a required check
+    aahp-verify.yml       # runs `aahp verify --level ci` as a required check (handoff)
+    aahp-govern.yml       # portable governance gate: `aahp check` via npx (governance)
   .claude/
     CLAUDE.md             # harness system prompt (see 9.3)
     commands/
@@ -964,8 +1026,8 @@ your-project/
       grounding-auditor.md  # the Phase 4.5 auditor persona
 ```
 
-- **Hooks.** `scripts/install-hooks.sh` (shipped by AAHP) installs the pre-commit and pre-push hooks; the harness runs it once at setup. See Section 2.8.
-- **CI.** Copy `.github/workflows/aahp-verify.yml`; it runs `aahp verify --level ci` (no escape hatch) and should be a required status check.
+- **Hooks.** `scripts/install-hooks.sh` (shipped by AAHP) installs the pre-commit and pre-push hooks; the harness runs it once at setup. The hooks resolve the vendored `scripts/verify-handoff.sh` first, fall back to the installed `aahp` CLI via `npx --no-install` when it is absent, and skip when neither resolves (the required CI check is the non-bypassable backstop). See Section 2.8.
+- **CI.** Copy `.github/workflows/aahp-verify.yml`; it runs `aahp verify --level ci` (no escape hatch) and should be a required status check. For governance (changelog, version sync, forbidden patterns, doc links) copy the portable `.github/workflows/aahp-govern.yml` beside it, or let `aahp init --gates` scaffold it; it runs `aahp check` through the pinned devDependency via `npx` and is verify-only.
 - **Referencing scripts.** Harness commands invoke AAHP by the vendored script path (`bash scripts/verify-handoff.sh . --level prepush`) or the CLI (`npx aahp verify`). They never reimplement the checks.
 
 ### 9.3 Minimal harness bootstrap
@@ -1107,11 +1169,26 @@ and a version tag.
 A consumer that pins `@elvatis_com/aahp` (Section 10) also gets the config-driven gates by
 adding an `aahp.config.json` (see `schema/aahp-config.schema.json` and
 `aahp.config.example.json`). `versionSites` pins the package version across files, `claims`
-pins capability numbers across surfaces, and `generate` drives an optional LOG
-release-journal plus a `NEXT_ACTIONS.md` current-version freshness gate. Every section is
-optional, and `aahp doctor` reports the consumer's conformance (including that the
-dependency is pinned) as a JSON record a fleet dashboard can aggregate. Call the gates via
-`npx --no-install aahp doctor --json` from CI so the pinned dependency is used.
+pins capability numbers across surfaces, `forbiddenPatterns` denylists text (for example the
+em-dash ban), `docSync` keeps duplicated value-sets in step, `docLinks` checks internal
+Markdown links, and `generate` drives an optional LOG release-journal plus a
+`NEXT_ACTIONS.md` current-version freshness gate. Two selection keys tune the surface:
+`check` (`only`/`skip`) chooses which gates `aahp check` runs, and `pinnedDep`
+(`name`/`location`/`allowRange`) opts the `doctor` pinned-dep gate in (absent, it is a clean
+skip). Every section is optional.
+
+Run the gates two ways. `npx --no-install aahp check .` is the pass/fail RUN whose exit code
+gates CI: it aggregates every applicable gate and continues past failures so one run surfaces
+them all. `npx --no-install aahp doctor --json` emits the conformance RECORD a fleet
+dashboard can aggregate. On a repo that does not use the handoff protocol, add `--governance`
+(alias `--no-handoff`) so the three handoff gates skip and the record can still be green. The
+tracked-file gates (`forbidden-patterns`, `doc-links`) scan git-tracked files and fail loud
+outside a git work tree, so run them in a checkout (in CI, `actions/checkout`).
+
+The fastest way to adopt all of this is `aahp init --gates`, which scaffolds a trimmed
+`aahp.config.json`, a `govern` npm script (`aahp check .`), and a portable
+`.github/workflows/aahp-govern.yml` (verify-only, `npx`-based, no vendored paths) without
+touching `.ai/handoff/`.
 
 ---
 

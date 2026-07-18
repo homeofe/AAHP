@@ -1,0 +1,33 @@
+# aahp-govern.yml - Portable AAHP governance gate for consumer repositories.
+#
+# Drop this into .github/workflows/ (or let `aahp init --gates` scaffold it) to
+# run the AAHP governance gates on every push and pull request. It invokes the
+# gates through the pinned @elvatis_com/aahp devDependency via `npx --no-install`,
+# so there are no vendored script paths to maintain. Verify-only: it never
+# mutates the repository, and it honors no skip or bypass environment variable.
+#
+# Prerequisites in the consumer repo:
+#   - @elvatis_com/aahp pinned as an exact devDependency (npm i -D -E @elvatis_com/aahp)
+#   - a committed package-lock.json (npm ci needs it)
+#   - an aahp.config.json (see `aahp init --gates`)
+name: AAHP Govern
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  govern:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install pinned aahp devDependency
+        run: npm ci --ignore-scripts
+      - name: Run governance gates
+        run: npx --no-install aahp check .
+      - name: Governance conformance record
+        run: npx --no-install aahp doctor --governance --json .

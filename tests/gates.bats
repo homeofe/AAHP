@@ -228,14 +228,41 @@ EOF
 @test "claims: floorCmd overstate fails the honesty check" {
     mkpkg "1.0.0"
     echo "We ship 350+ rules." > "$TEST_TMPDIR/README.md"
+    echo 'console.log(12)' > "$TEST_TMPDIR/floor.mjs"
     mkconfig <<'EOF'
 { "claims": [ { "id": "rules", "canonical": "350+", "advertised": 350,
-  "phrase": "(\\d+)\\+\\s*rules\\b", "floorCmd": "echo 12",
+  "phrase": "(\\d+)\\+\\s*rules\\b", "floorCmd": "floor.mjs",
   "surfaces": [ { "file": "README.md" } ] } ] }
 EOF
     run node "$CLAIMS" "$TEST_TMPDIR"
     [ "$status" -eq 1 ]
     [[ "$output" == *"exceeds ground truth"* ]]
+}
+
+@test "claims: floorCmd rejects a path escaping the project root (no shell exec)" {
+    mkpkg "1.0.0"
+    echo "We ship 350+ rules." > "$TEST_TMPDIR/README.md"
+    mkconfig <<'EOF'
+{ "claims": [ { "id": "rules", "canonical": "350+", "advertised": 350,
+  "phrase": "(\\d+)\\+\\s*rules\\b", "floorCmd": "../evil.mjs",
+  "surfaces": [ { "file": "README.md" } ] } ] }
+EOF
+    run node "$CLAIMS" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"repo-relative script path"* ]]
+}
+
+@test "claims: floorCmd rejects an absolute path" {
+    mkpkg "1.0.0"
+    echo "We ship 350+ rules." > "$TEST_TMPDIR/README.md"
+    mkconfig <<'EOF'
+{ "claims": [ { "id": "rules", "canonical": "350+", "advertised": 350,
+  "phrase": "(\\d+)\\+\\s*rules\\b", "floorCmd": "/tmp/evil.mjs",
+  "surfaces": [ { "file": "README.md" } ] } ] }
+EOF
+    run node "$CLAIMS" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"repo-relative script path"* ]]
 }
 
 # --- generator / freshness ---------------------------------------------------

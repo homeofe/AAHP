@@ -138,6 +138,96 @@
         }
       },
       "additionalProperties": false
+    },
+    "forbiddenPatterns": {
+      "type": "array",
+      "description": "Regexes that must NOT appear in tracked files (checked by check-forbidden-patterns.mjs).",
+      "items": {
+        "type": "object",
+        "required": [
+          "pattern"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "pattern": {
+            "type": "string",
+            "description": "Regex source. Store a literal-unicode ban as an escape (e.g. \\u2014) so the config file itself does not match."
+          },
+          "flags": {
+            "type": "string",
+            "description": "Regex flags (default \"gm\")."
+          },
+          "message": {
+            "type": "string"
+          },
+          "include": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "git pathspecs to scan (default: common text files)."
+          },
+          "exclude": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "docSync": {
+      "type": "array",
+      "description": "Groups of sources whose extracted value-set must agree (checked by check-schema-doc-sync.mjs).",
+      "items": {
+        "type": "object",
+        "required": [
+          "sources"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "file",
+                "pattern"
+              ],
+              "properties": {
+                "file": {
+                  "type": "string"
+                },
+                "pattern": {
+                  "type": "string",
+                  "description": "Regex; capture group 1 is one value. The set of group-1 values must match across all sources in the group."
+                }
+              },
+              "additionalProperties": false
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "docLinks": {
+      "type": "object",
+      "description": "Internal Markdown link checker (check-doc-links.mjs). Presence enables it.",
+      "properties": {
+        "include": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "git pathspecs of docs to check (default: README.md, CLAUDE.md, CONTRIBUTING.md, .ai/handoff/*.md)."
+        }
+      },
+      "additionalProperties": false
     }
   },
   "additionalProperties": false

@@ -26,6 +26,8 @@
 
 We are human beings and will remain human beings. We delegate tasks to computers only when we choose to - and the most important rule above all is: **do no damage**. AI agents working in this project exist to serve, assist, and protect human intent. They do not act autonomously beyond their assigned scope, and they never take actions that could cause harm - to data, to systems, or to people.
 
+> The project's non-negotiable invariants live in [CONSTITUTION.md](CONSTITUTION.md) (a short, stable index of the rules the gates enforce). The decisions behind them are in the [Architectural Decision Log](#7-architectural-decision-log).
+
 ---
 
 ## Why AAHP? The Agentic Token Crisis
@@ -620,9 +622,73 @@ Over a typical day with 10 agent sessions, v2 saves **~20,000–25,000 tokens** 
 
 ---
 
-## 7. Resolved Decisions
+## 7. Architectural Decision Log
 
-These questions were open in the initial v2 proposal and have been resolved:
+The canonical record of load-bearing decisions: the ones agents keep re-deriving, or
+could reverse by accident while "improving" the code. Each has a stable `ADR-NNN`
+anchor. The non-negotiable subset is indexed in [CONSTITUTION.md](CONSTITUTION.md).
+
+**Promotion rule:** when a decision recorded in `.ai/handoff/LOG.md` is load-bearing
+AND reversible-by-accident, lift its rationale here before `aahp archive` rotates the
+LOG entry out of the working set. That is what stops settled decisions from being
+re-litigated once they fall out of the default read set.
+
+### ADR-001: verify is verify-only; regeneration is a separate /handoff step
+**Why it recurs:** the reflexive "improvement" is to make the gate auto-fix or
+regenerate on failure. **Decision:** `aahp verify` never mutates state; a regenerating
+gate would hide the very drift it exists to detect, so CI failure stays a true signal.
+
+### ADR-002: zero runtime dependencies
+**Why it recurs:** every feature invites a dep (a validator, a YAML parser, a color
+lib) and `npm i x` is a one-liner. **Decision:** the core works on Node built-ins +
+bash + standard tools; `package.json` has no `dependencies`. Keeps the CLI installable
+and auditable anywhere and immune to supply-chain risk.
+
+### ADR-003: checksums strip CR (CRLF-agnostic whole-file SHA-256)
+**Why it recurs:** the CR-strip looks like a pointless line to delete. **Decision:**
+strip CR before hashing so a Windows working tree (CRLF) and a Linux CI checkout (LF)
+produce identical checksums. The generator and verifier must stay in lockstep.
+
+### ADR-004: LOG.md is an append-only agent journal, not a release journal
+**Why it recurs:** v3.6.0 shipped a LOG-from-CHANGELOG generator; an agent could point
+it at AAHP's own `LOG.md`. **Decision:** `LOG.md` is the immutable session history; the
+release-journal generator is an opt-in consumer capability that must not target it.
+
+### ADR-005: the PII allowlist is PII-only and never a verify bypass
+**Why it recurs:** an agent extending the allowlist could broaden it into a general
+bypass. **Decision:** the allowlist is exact-match, expiring, reviewed, and suppresses
+only the matching PII finding; secret detection and every other verify layer stay
+non-bypassable. (Backed by regression tests.)
+
+### ADR-006: TRUST-TTL lives in TRUST.md, not MANIFEST.json
+**Why it recurs:** `MANIFEST.json` looks like the "obvious" home for structured TTL
+data. **Decision:** keeping TTL in `TRUST.md` avoids a schema change and keeps the
+human-auditable trust record in one human-readable file.
+
+### ADR-007: gate severities are fixed (drift blocks, TTL warns, escape hatch is local-only)
+**Why it recurs:** each severity is a knob an agent could flip while "tuning" the gate.
+**Decision:** the content-drift gate hard-fails; TRUST-TTL is advisory (warn); and
+`AAHP_SKIP_VERIFY` is honored locally but ignored at `--level ci`, so the required check
+can never be bypassed.
+
+### ADR-008: aahp_version is independent of the npm version
+**Why it recurs:** at release time an agent may reflexively bump `aahp_version` to match
+the npm semver. **Decision:** `aahp_version` (currently `3.0`) tracks the on-disk
+file-format contract; the npm version tracks the tooling. They move independently.
+
+### ADR-009: next_task_id is an unquoted integer and monotonic
+**Why it recurs:** it has been re-broken twice (a quoted default made MANIFEST invalid
+JSON; a lagging counter reassigned a live task ID). **Decision:** `next_task_id` is an
+unquoted JSON integer and must stay greater than the highest assigned `T-NNN`.
+
+### ADR-010: CI runs on GitHub-hosted runners only (public repo)
+**Why it recurs:** cost pressure invites self-hosted runners. **Decision:** a public
+repo on self-hosted runners executes untrusted fork-PR code (RCE); AAHP stays
+GitHub-hosted.
+
+---
+
+*The v2-proposal questions below were resolved earlier and are retained for detail.*
 
 ### 7.1 MANIFEST.json is auto-generated
 

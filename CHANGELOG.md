@@ -11,6 +11,29 @@ independently of the npm version).
 
 ## [Unreleased]
 
+## [3.7.0] - 2026-07-18
+**Anti-entropy: enforcement gates, a constitution, and an ADR log**
+
+### Added
+- Three config-driven enforcement gates (a clean no-op without config), folded into
+  `npm run check`: `check-forbidden-patterns.mjs` (bans configured regexes such as em
+  dashes or model names in tracked files), `check-schema-doc-sync.mjs` (asserts an
+  extracted value-set is identical across sources, e.g. an enum in the schema vs its
+  doc copies), and `check-doc-links.mjs` (resolves internal Markdown file links). Their
+  config keys (`forbiddenPatterns`, `docSync`, `docLinks`) are documented in
+  `schema/aahp-config.schema.json` and `aahp.config.example.json`.
+- `CONSTITUTION.md`: a short, stable index of the project's non-negotiable invariants
+  (each already enforced by a gate, test, or CI), linked from the README and CLAUDE.md.
+- README Section 7 reframed as an Architectural Decision Log: 10 ADRs with stable
+  `ADR-NNN` anchors and a LOG-to-ADR promotion rule.
+
+### Changed
+- The ci.yml ShellCheck step uses a `git ls-files` glob instead of a hand-maintained
+  list, so new scripts are covered automatically (`scripts/propagate.sh` had been
+  missed).
+- Removed the stale German release runbook from the CONVENTIONS template and the
+  dogfood, and collapsed the duplicated Three Laws motto to a single home (README).
+
 ## [3.6.1] - 2026-07-18
 **Security: harden the claims floorCmd; fix shipped documentation drift**
 
@@ -123,7 +146,8 @@ independently of the npm version).
 ### Changed
 - Relicensed to Apache-2.0 (earlier commits carried MIT, then CC BY 4.0, headers).
 
-[Unreleased]: https://github.com/homeofe/AAHP/compare/v3.6.1...HEAD
+[Unreleased]: https://github.com/homeofe/AAHP/compare/v3.7.0...HEAD
+[3.7.0]: https://github.com/homeofe/AAHP/compare/v3.6.1...v3.7.0
 [3.6.1]: https://github.com/homeofe/AAHP/compare/v3.6.0...v3.6.1
 [3.6.0]: https://github.com/homeofe/AAHP/compare/v3.5.0...v3.6.0
 [3.5.0]: https://github.com/homeofe/AAHP/releases/tag/v3.5.0

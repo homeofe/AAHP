@@ -2,6 +2,10 @@
   "version": 1,
   "entries": [
     {
+      "sha256": "25bda6a6fe3800ab598258de387c86407073a43149cd1998445208396e255d5f",
+      "title": "## [2026-02-26] Claude Opus 4.6: AAHP v3 -Task IDs & Dependency Graphs"
+    },
+    {
       "sha256": "e9d267e1c40b87ad372744a8dd556e9ea8c6481c8cfa8c642a81a79a48003b07",
       "title": "## [2026-02-26] Claude Opus 4.6: Resolve Open Questions & Dogfood Protocol"
     },

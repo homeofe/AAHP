@@ -11,5 +11,31 @@
     "freshness": {
       "file": ".ai/handoff/NEXT_ACTIONS.md"
     }
+  },
+  "forbiddenPatterns": [
+    {
+      "id": "em-dash",
+      "pattern": "\\u2014",
+      "message": "em dash (U+2014) is banned; use a hyphen (see CONSTITUTION.md)"
+    }
+  ],
+  "docSync": [
+    {
+      "id": "task-status-enum",
+      "sources": [
+        { "file": "schema/aahp-manifest.schema.json", "pattern": "\"(ready|in_progress|blocked|done|cancelled)\"" },
+        { "file": "README.md", "pattern": "`(ready|in_progress|blocked|done|cancelled)`" }
+      ]
+    },
+    {
+      "id": "phase-enum",
+      "sources": [
+        { "file": "schema/aahp-manifest.schema.json", "pattern": "\"(research|architecture|implementation|review|fix|idle|documentation)\"" },
+        { "file": "scripts/aahp-manifest.sh", "pattern": "(research|architecture|implementation|review|fix|idle|documentation)" }
+      ]
+    }
+  ],
+  "docLinks": {
+    "include": ["README.md", "CLAUDE.md", "CONTRIBUTING.md", "CONSTITUTION.md", ".ai/handoff/*.md"]
   }
 }

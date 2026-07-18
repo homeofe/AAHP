@@ -6,6 +6,27 @@
 
 ---
 
+## [2026-07-18] claude-opus-4-8: Anti-entropy initiative (gates + constitution + ADR log, v3.7.0)
+
+**Agent:** claude-opus-4-8
+**Phase:** implementation
+**Branch:** feat/anti-entropy
+**Tasks:** anti-entropy strategy (steps 3-6)
+
+### What was done
+
+- Added 3 config-driven enforcement gates (no-op without config), wired into `npm run check`: check-forbidden-patterns.mjs (regex denylist over `git ls-files`; AAHP bans em dashes), check-schema-doc-sync.mjs (extract-and-compare value-sets across sources; AAHP pins the task-status + phase enums), check-doc-links.mjs (internal markdown file-link resolver). Config keys forbiddenPatterns/docSync/docLinks in the schema + example. 9 bats tests.
+- Added CONSTITUTION.md (12 non-negotiable invariants, each already enforced), linked from README + CLAUDE.md and tied into the doc-links + forbidden-patterns gates.
+- Reframed README Section 7 as an Architectural Decision Log (10 ADRs with stable anchors + the LOG-to-ADR promotion rule).
+- Free win: ci.yml shellcheck globs `git ls-files` (auto-covers new scripts). De-dup: removed the rotted German runbook from the CONVENTIONS template + dogfood; collapsed the duplicate Three Laws.
+
+### Decisions
+
+- Per the strategy, deliberately did NOT build a separate governance system/command, a docs/adr/ directory (README Section 7 IS the log), any per-PR LLM gate, or the swarm self-governance runtime. Gates extend the existing deterministic machinery.
+- Deferred AAHP's own `claims` config (prose capability numbers are false-positive-prone) and aggressive README/CLAUDE de-dup (kept operational how-to; the constitution is the invariant index).
+
+---
+
 ## [2026-07-18] claude-opus-4-8: Security hardening + doc-drift fixes (v3.6.1)
 
 **Agent:** claude-opus-4-8
@@ -230,32 +251,3 @@ An allowlist suppresses only the matching PII finding. Secret detection and ever
 - bats-core via npm (`npx bats`) rather than system install
 - Tests create isolated temp fixtures -no dependency on project's own `.ai/handoff/`
 - New follow-up tasks created: T-006 (npm publish), T-007 (shellcheck fixes), T-008 (bats in CI)
-
----
-
-## [2026-02-26] Claude Opus 4.6: AAHP v3 -Task IDs & Dependency Graphs
-
-**Agent:** Claude Opus 4.6
-**Phase:** 3 (Implementer)
-**Branch:** main
-**Tasks:** T-001, T-002
-
-### What was done
-
-- Extended `schema/aahp-manifest.schema.json` with optional `tasks` and `next_task_id` fields
-- Defined task ID format: `T-001`, `T-002`, etc. (stable, never reused, zero-padded)
-- Added dependency graph structure to MANIFEST.json (`depends_on` array per task)
-- Updated `templates/MANIFEST.json` with example task entries
-- Updated `templates/NEXT_ACTIONS.md` with `T-xxx:` heading format
-- Updated `templates/DASHBOARD.md` with `ID` column in tasks table
-- Updated `scripts/aahp-manifest.sh` to preserve `tasks` and `next_task_id` on regeneration (uses Node.js for JSON parsing)
-- Added README.md Section 8: full v3 specification (task IDs, schema, agent algorithm, backward compat)
-- Dogfooded v3 on AAHP's own `.ai/handoff/` files with 5 tasks (T-001 through T-005)
-
-### Decisions made
-
-- Task IDs use `T-xxx` format (short, readable, sortable) over `AAHP-xxx` (too project-specific)
-- Dependency graph lives in MANIFEST.json (structured data) not in Markdown (human text)
-- `tasks` and `next_task_id` are optional -v2 projects continue to work without them
-- `aahp-manifest.sh` preserves task data using Node.js JSON parsing (available on most systems)
-- `aahp_version` bumped to `"3.0"` in generated manifests

@@ -1,6 +1,6 @@
 {
   "name": "@elvatis_com/aahp",
-  "version": "3.6.1",
+  "version": "3.7.0",
   "description": "AI-to-AI Handoff Protocol - CLI tools for managing agent handoff files",
   "author": "Elvatis <emre.kohler@elvatis.com>",
   "bin": {
@@ -32,6 +32,7 @@
     "schema/",
     "aahp.config.example.json",
     "CHANGELOG.md",
+    "CONSTITUTION.md",
     "LICENSE",
     "README.md"
   ],
@@ -44,9 +45,12 @@
     "check:changelog-format": "node scripts/check-changelog-format.mjs",
     "check:version-sync": "node scripts/check-version-sync.mjs",
     "check:claims": "node scripts/check-claims.mjs",
+    "check:forbidden-patterns": "node scripts/check-forbidden-patterns.mjs",
+    "check:schema-doc-sync": "node scripts/check-schema-doc-sync.mjs",
+    "check:doc-links": "node scripts/check-doc-links.mjs",
     "check:handoff": "node scripts/aahp-dashboard.mjs --check",
     "handoff:refresh": "node scripts/aahp-dashboard.mjs",
-    "check": "npm run check:changelog && npm run check:changelog-format && npm run check:version-sync && npm run check:claims && npm run check:handoff",
+    "check": "npm run check:changelog && npm run check:changelog-format && npm run check:version-sync && npm run check:claims && npm run check:forbidden-patterns && npm run check:schema-doc-sync && npm run check:doc-links && npm run check:handoff",
     "doctor": "node bin/aahp.js doctor .",
     "test": "npx bats tests/",
     "prepublishOnly": "npm run check && npm run doctor && npm test"

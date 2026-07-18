@@ -98,6 +98,8 @@ AAHP commands come in two flavors: **Node-native** (like `init`) and **bash-dele
 
 ## Working Rules
 
+> These operationalize [CONSTITUTION.md](CONSTITUTION.md), the non-negotiable invariants. When in doubt, the constitution wins.
+
 - Read [`.ai/handoff/MANIFEST.json`](.ai/handoff/MANIFEST.json) and relevant handoff files before making larger changes.
 - Keep bash portable across Linux, macOS, and Git Bash on Windows.
 - Use ASCII only. Do not introduce Unicode em dashes.

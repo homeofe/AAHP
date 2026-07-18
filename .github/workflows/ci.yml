@@ -35,18 +35,12 @@ jobs:
 
       - name: ShellCheck scripts
         run: |
-          shellcheck scripts/_aahp-lib.sh
-          shellcheck -x -P scripts/ scripts/aahp-manifest.sh
-          shellcheck -x -P scripts/ scripts/aahp-migrate-v2.sh
-          shellcheck -x -P scripts/ scripts/aahp-migrate-grounding.sh
-          shellcheck -x -P scripts/ scripts/lint-handoff.sh
-          shellcheck -x -P scripts/ scripts/verify-handoff.sh
-          shellcheck -x -P scripts/ scripts/aahp-archive.sh
-          shellcheck scripts/install-hooks.sh
-          shellcheck scripts/hooks/pre-commit
-          shellcheck scripts/hooks/pre-push
-          shellcheck tests/run.sh
-          shellcheck tests/test_helper.bash
+          # Shellcheck every tracked shell script + git hook. A glob (not a
+          # hand-maintained list) means new scripts are covered automatically -
+          # the old list had already missed scripts/propagate.sh.
+          mapfile -t sh_files < <(git ls-files '*.sh' '*.bash' 'scripts/hooks/*')
+          printf '  shellcheck: %s\n' "${sh_files[@]}"
+          shellcheck -x -P scripts/ "${sh_files[@]}"
 
       - name: Compile Python validators
         run: python -m py_compile scripts/validate-pii-allowlist.py

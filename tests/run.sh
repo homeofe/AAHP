@@ -26,13 +26,13 @@ if [ $# -gt 0 ]; then
     # Run a specific test suite
     suite="$1"
     case "$suite" in
-        manifest|lint|migrate|migrate-grounding|archive|verify|cli|gates|doctor)
+        manifest|lint|migrate|migrate-grounding|archive|verify|cli|gates|doctor|anti-entropy)
             echo "Running $suite tests..."
             $BATS "$SCRIPT_DIR/${suite}.bats"
             ;;
         *)
             echo "Unknown suite: $suite" >&2
-            echo "Available: manifest, lint, migrate, migrate-grounding, archive, verify, cli, gates, doctor" >&2
+            echo "Available: manifest, lint, migrate, migrate-grounding, archive, verify, cli, gates, doctor, anti-entropy" >&2
             exit 1
             ;;
     esac

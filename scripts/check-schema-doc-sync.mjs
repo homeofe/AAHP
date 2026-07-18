@@ -17,6 +17,14 @@
 //   ]
 // Each source's pattern captures ONE token per match in group 1; the SET of
 // distinct group-1 values must be identical across all sources in the group.
+//
+// Scope (be honest about what this catches): when a source pattern hard-codes the
+// token alternation (the common case), the gate reliably catches a source that
+// DROPS a token entirely - the disagreement drift that bit us in v3.6.1. It does
+// NOT catch a brand-new token added to one source only (no pattern captures it),
+// nor a token that lingers in unrelated prose while its authoritative use is
+// removed. Keep one source authoritative and point patterns at that source's
+// canonical location for the strongest guarantee.
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";

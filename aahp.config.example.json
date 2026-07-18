@@ -27,5 +27,20 @@
     "freshness": {
       "file": ".ai/handoff/NEXT_ACTIONS.md"
     }
+  },
+  "forbiddenPatterns": [
+    { "id": "em-dash", "pattern": "\\u2014", "message": "em dash (U+2014) is banned; use a hyphen" }
+  ],
+  "docSync": [
+    {
+      "id": "task-status-enum",
+      "sources": [
+        { "file": "schema/my-manifest.schema.json", "pattern": "\"(ready|in_progress|blocked|done|cancelled)\"" },
+        { "file": "README.md", "pattern": "`(ready|in_progress|blocked|done|cancelled)`" }
+      ]
+    }
+  ],
+  "docLinks": {
+    "include": ["README.md", "docs/*.md"]
   }
 }

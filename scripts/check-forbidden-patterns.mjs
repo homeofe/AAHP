@@ -39,7 +39,7 @@ if (rules.length === 0) {
   process.exit(0);
 }
 
-const DEFAULT_INCLUDE = ["*.md", "*.mjs", "*.js", "*.json", "*.sh", "*.bash", "*.yml", "*.yaml", "*.txt"];
+const DEFAULT_INCLUDE = ["*.md", "*.mjs", "*.js", "*.json", "*.sh", "*.bash", "*.bats", "*.yml", "*.yaml", "*.txt"];
 
 function gitLsFiles(specs) {
   try {

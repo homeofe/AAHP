@@ -24,7 +24,7 @@ gadd() { git -C "$TEST_TMPDIR" add -A; }
 
 @test "forbidden-patterns: fails on a match, reporting file and message" {
     mkpkg
-    printf 'has an em dash — here\n' > "$TEST_TMPDIR/doc.md"
+    printf 'has an em dash \342\200\224 here\n' > "$TEST_TMPDIR/doc.md"  # octal U+2014, so this .bats file itself stays em-dash-free
     mkconfig <<'EOF'
 { "forbiddenPatterns": [ { "id": "em-dash", "pattern": "\\u2014", "message": "no em dash" } ] }
 EOF

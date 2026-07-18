@@ -51,6 +51,7 @@ export function parseReleases(changelogText) {
     headline = headline
       .replace(/\s+/g, " ")
       .replace(/[^\x20-\x7E]/g, "")
+      .replace(/\\/g, "\\\\") // escape backslashes FIRST so the pipe-escape below is not incomplete
       .replace(/\|/g, "\\|")
       .trim();
     if (headline.length > 120) headline = headline.slice(0, 117).trimEnd() + "...";

@@ -30,8 +30,11 @@ if (!existsSync(changelogPath)) {
 
 const changelog = readFileSync(changelogPath, "utf8");
 const version = pkg.version;
-// Keep a Changelog heading, no 'v' inside the brackets.
-const heading = new RegExp(`^## \\[${version.replace(/\./g, "\\.")}\\] - `, "m");
+// Keep a Changelog heading, no 'v' inside the brackets. Escape every regex
+// metacharacter (not just dots) so a version string can never be mis-parsed as
+// a pattern - complete escaping, not just the common case.
+const escapedVersion = version.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const heading = new RegExp(`^## \\[${escapedVersion}\\] - `, "m");
 
 if (!heading.test(changelog)) {
   console.error(

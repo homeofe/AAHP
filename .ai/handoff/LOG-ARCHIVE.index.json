@@ -2,6 +2,10 @@
   "version": 1,
   "entries": [
     {
+      "sha256": "e9d267e1c40b87ad372744a8dd556e9ea8c6481c8cfa8c642a81a79a48003b07",
+      "title": "## [2026-02-26] Claude Opus 4.6: Resolve Open Questions & Dogfood Protocol"
+    },
+    {
       "sha256": "175da26816ba01cd90415b026d37daf3687502ff8e93dd82e5737e24c0ccaac8",
       "title": "## [2026-02-26] Claude Opus 4.6: Merge v2 Proposal into README"
     },

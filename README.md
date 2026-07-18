@@ -563,17 +563,20 @@ This takes ~100 tokens but prevents cascading failures.
 
 ```bash
 .ai/handoff/
-├── MANIFEST.json        # NEW: index, checksums, summaries, quick context
-├── STATUS.md            # Sectioned with markers
-├── NEXT_ACTIONS.md      # Max 5 active items
-├── LOG.md               # Last 10 entries
-├── LOG-ARCHIVE.md       # Overflow (auto-managed)
-├── DASHBOARD.md         # Extended: build health + task queue
-├── CONVENTIONS.md       # Extended: project rules
-├── TRUST.md             # Extended: verification register with TTL
-├── WORKFLOW.md          # Extended: pipeline definition
-├── .aiignore            # NEW: patterns to exclude from handoff files
-└── HANDOFF.lock         # NEW: transient, exists only during active updates
+├── MANIFEST.json           # NEW: index, checksums, summaries, quick context
+├── STATUS.md               # Sectioned with markers
+├── NEXT_ACTIONS.md         # Max 5 active items
+├── LOG.md                  # Last 10 entries
+├── LOG-ARCHIVE.md          # Overflow (auto-managed)
+├── LOG-ARCHIVE.index.json  # Archived-entry hashes (tamper/truncation check)
+├── DASHBOARD.md            # Extended: build health + task queue
+├── TRUST.md                # Extended: verification register with TTL
+├── CONVENTIONS.md          # Extended: project rules
+├── WORKFLOW.md             # Extended: pipeline definition
+├── GROUNDING.md            # Grounded Reflection Layer: task-type anchor matrix
+├── pii-allowlist.json      # Optional: reviewed, expiring PII email allowlist
+├── .aiignore               # NEW: patterns to exclude from handoff files
+└── HANDOFF.lock            # NEW: transient, exists only during active updates
 ```
 
 ---
@@ -669,6 +672,7 @@ Agents should always regenerate the manifest as the final step before committing
 | `aahp migrate [path]` | Migrate an AAHP v1 project to v2/v3 |
 | `aahp migrate-grounding [path]` | Add the Grounded Reflection Layer to an existing project |
 | `aahp status [path]` | Print a read-only state summary from `MANIFEST.json` |
+| `aahp doctor [path]` | Conformance self-check; emit a JSON conformance record |
 
 **Quick state summary: `aahp status`.** `aahp status [path]` prints a read-only snapshot of the current handoff state, read entirely from `.ai/handoff/MANIFEST.json`. It regenerates nothing and has no side effects, so it is the cheapest way for an incoming agent (or a human) to orient before deciding what to read in full. It takes only an optional `[path]` and no flags.
 
@@ -797,7 +801,7 @@ Each task in the `tasks` object has the following fields:
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `title` | string | yes | Short task description (max 200 chars) |
-| `status` | enum | yes | `ready`, `in_progress`, `blocked`, `done` |
+| `status` | enum | yes | `ready`, `in_progress`, `blocked`, `done`, `cancelled` |
 | `priority` | enum | no | `critical`, `high`, `medium`, `low` |
 | `depends_on` | array | no | Task IDs that must be `done` before this task can start |
 | `blocked_by` | string | no | External blocker (not a task dependency) |

@@ -74,7 +74,7 @@
           },
           "floorCmd": {
             "type": "string",
-            "description": "Optional command run in the project root whose stdout yields an integer ground-truth floor; advertised must not exceed it. Omit for an editorial claim."
+            "description": "Optional repo-relative path to a Node script whose stdout yields an integer ground-truth floor; advertised must not exceed it. Run with the Node interpreter, no shell (a path escaping the project root is rejected). Omit for an editorial claim."
           },
           "joinTsConcat": {
             "type": "boolean",

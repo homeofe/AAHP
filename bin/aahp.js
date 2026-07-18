@@ -259,14 +259,15 @@ function cmdStatus(targetPath) {
   const files = manifest.files ?? {}
   const tasks = manifest.tasks ?? {}
 
-  const statusPriority = ['ready', 'in_progress', 'blocked', 'done', 'cancelled', 'stale']
+  // Status vocabulary is the schema's task-status enum (schema/aahp-manifest.schema.json).
+  // Any value outside it falls into the `other` bucket.
+  const statusPriority = ['ready', 'in_progress', 'blocked', 'done', 'cancelled']
   const taskStatusCounts = {
     ready: 0,
     in_progress: 0,
     blocked: 0,
     done: 0,
     cancelled: 0,
-    stale: 0,
     other: 0,
   }
 

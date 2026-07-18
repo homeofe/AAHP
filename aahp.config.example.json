@@ -11,7 +11,7 @@
       "advertised": 350,
       "phrase": "(\\d+)\\+\\s*(?:detection rules|rules)\\b",
       "flags": "gi",
-      "floorCmd": "node scripts/count-rules.mjs",
+      "floorCmd": "scripts/count-rules.mjs",
       "surfaces": [
         { "file": "README.md", "note": "intro" },
         { "file": "package.json", "note": "npm description" }

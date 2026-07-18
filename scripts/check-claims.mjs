@@ -16,18 +16,21 @@
 //       "advertised": 350,             // the number every surface must carry
 //       "phrase": "(\\d+)\\+\\s*rules\\b",  // regex source; capture group 1 = number
 //       "flags": "gi",                 // optional (default "gi")
-//       "floorCmd": "node scripts/count-rules.mjs",  // optional: stdout -> integer floor
+//       "floorCmd": "scripts/count-rules.mjs",  // optional: repo-relative Node script; stdout -> integer floor
 //       "joinTsConcat": true,          // optional: join "a" + "b" JS literal splits
 //       "surfaces": [ { "file": "README.md", "note": "intro" } ]
 //     }
 //   ]
 //
-// floorCmd runs in the project root (same trust boundary as an npm script). If
-// omitted, the claim is editorial and the honesty check is skipped.
+// SECURITY: floorCmd is a repo-relative path to a Node script, run with the Node
+// interpreter via execFileSync (NO shell), so a config string cannot inject shell
+// metacharacters or execute an arbitrary binary, and a path that escapes the
+// project root is rejected. If omitted, the claim is editorial and the honesty
+// check is skipped.
 
 import { readFileSync } from "node:fs";
-import { execSync } from "node:child_process";
-import { join } from "node:path";
+import { execFileSync } from "node:child_process";
+import { join, resolve, relative, isAbsolute } from "node:path";
 import { resolveRoot, loadConfig } from "./aahp-config.mjs";
 
 const root = resolveRoot();
@@ -55,12 +58,20 @@ for (const claim of claims) {
   // Honesty check: the advertised floor must not exceed ground truth.
   if (floorCmd) {
     let floor = null;
-    try {
-      const out = execSync(floorCmd, { cwd: root, encoding: "utf8" });
-      const m = out.match(/-?\d+/);
-      floor = m ? Number(m[0]) : null;
-    } catch (err) {
-      failures.push({ id, msg: `floorCmd failed (${floorCmd}): ${err.message.split("\n")[0]}` });
+    // floorCmd is a repo-relative path to a Node script whose stdout yields an
+    // integer. Run it with the Node interpreter via execFileSync (NO shell) so a
+    // config string can never inject shell metacharacters or execute an arbitrary
+    // binary; reject any path that escapes the project root.
+    if (isAbsolute(floorCmd) || relative(root, resolve(root, floorCmd)).startsWith("..")) {
+      failures.push({ id, msg: `floorCmd must be a repo-relative script path inside the project (got ${JSON.stringify(floorCmd)})` });
+    } else {
+      try {
+        const out = execFileSync(process.execPath, [resolve(root, floorCmd)], { cwd: root, encoding: "utf8" });
+        const m = out.match(/-?\d+/);
+        floor = m ? Number(m[0]) : null;
+      } catch (err) {
+        failures.push({ id, msg: `floorCmd failed (${floorCmd}): ${err.message.split("\n")[0]}` });
+      }
     }
     if (floor !== null && advertised > floor) {
       failures.push({

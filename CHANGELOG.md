@@ -11,6 +11,24 @@ independently of the npm version).
 
 ## [Unreleased]
 
+## [3.6.1] - 2026-07-18
+**Security: harden the claims floorCmd; fix shipped documentation drift**
+
+### Security
+- `check-claims.mjs` now runs `floorCmd` as a repo-relative Node script via
+  `execFileSync` (no shell), instead of `execSync` on an arbitrary config string.
+  This closes a command-injection path from a PR-editable `aahp.config.json`
+  (a contributor could otherwise gain code execution in a consumer's CI). The
+  schema and example are updated to match; a path escaping the project is rejected.
+
+### Fixed
+- Documentation drift: README Section 4 now lists the full canonical handoff set
+  (adds `GROUNDING.md`, `pii-allowlist.json`, `LOG-ARCHIVE.index.json`); the
+  Section 7.1 command table adds `aahp doctor`; the Section 8.3 task-status enum
+  adds `cancelled`; and the phantom `stale` bucket (never in the schema) is
+  removed from `aahp status`.
+- Removed em dashes (U+2014) from the CONVENTIONS templates and CLAUDE.md.
+
 ## [3.6.0] - 2026-07-18
 
 ### Added
@@ -102,7 +120,8 @@ independently of the npm version).
 ### Changed
 - Relicensed to Apache-2.0 (earlier commits carried MIT, then CC BY 4.0, headers).
 
-[Unreleased]: https://github.com/homeofe/AAHP/compare/v3.6.0...HEAD
+[Unreleased]: https://github.com/homeofe/AAHP/compare/v3.6.1...HEAD
+[3.6.1]: https://github.com/homeofe/AAHP/compare/v3.6.0...v3.6.1
 [3.6.0]: https://github.com/homeofe/AAHP/compare/v3.5.0...v3.6.0
 [3.5.0]: https://github.com/homeofe/AAHP/releases/tag/v3.5.0
 [3.4.0]: https://github.com/homeofe/AAHP/compare/v3.2.1...v3.4.0

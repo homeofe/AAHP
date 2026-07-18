@@ -3,16 +3,16 @@
   "project": "AAHP",
   "last_session": {
     "agent": "claude-opus-4-8",
-    "session_id": "cli-1784376196",
-    "timestamp": "2026-07-18T12:03:16Z",
-    "commit": "dfd5ca9",
+    "session_id": "cli-1784377190",
+    "timestamp": "2026-07-18T12:19:50Z",
+    "commit": "35ce0e1",
     "phase": "fix",
     "duration_minutes": 0
   },
   "files": {
     "STATUS.md": {
-      "checksum": "sha256:0665fe3f5dee0a9a0ccb6716c4e91816a86a58855a8b202a9508f75858749a07",
-      "updated": "2026-07-18T12:03:01Z",
+      "checksum": "sha256:fb4e85efce27a1ceebe4515adf88cd26016097ee5eefa82a09f5622b9bbbd442",
+      "updated": "2026-07-18T12:19:44Z",
       "lines": 148,
       "summary": "(no summary available)"
     },
@@ -80,8 +80,8 @@
   "quick_context": "(no summary available) (no summary available) ",
   "token_budget": {
     "manifest_only": 85,
-    "manifest_plus_core": 5863,
-    "full_read": 14111
+    "manifest_plus_core": 5924,
+    "full_read": 14172
   }
   ,"next_task_id": 18
   ,"tasks": {"T-001":{"title":"[T-006] Publish npm package","status":"done","priority":"medium","depends_on":[],"created":"2026-06-28T10:10:21.975Z","notes":"**AAHP Task:** `T-006`  \n**Status:** blocked  \n**Priority:** medium  \n\n\n\n\n---\n*Auto-created from AAHP manifest · project: AAHP*","github_issue":18,"github_repo":"homeofe/AAHP","completed":"2026-07-14T00:00:00Z"},"T-002":{"title":"[T-014] Add CLI integration tests for bin/aahp.js [high]","status":"done","priority":"high","depends_on":[],"created":"2026-06-28T10:10:21.975Z","notes":"**AAHP Task:** `T-014`  \n**Status:** ready  \n**Priority:** high  \n\n\n\n\n---\n*Auto-created from AAHP manifest · project: AAHP*","github_issue":14,"github_repo":"homeofe/AAHP","completed":"2026-07-14T00:00:00Z"},"T-015":{"title":"Add `aahp status` quick-look command [medium]","status":"done","priority":"medium","depends_on":[],"created":"2026-06-28T10:10:21.978Z","github_issue":22,"github_repo":"homeofe/AAHP","completed":"2026-07-14T00:00:00Z"},"T-016":{"title":"Add `aahp archive` command for LOG.md rotation [medium]","status":"done","priority":"medium","depends_on":[],"created":"2026-06-28T10:10:21.979Z","github_issue":23,"github_repo":"homeofe/AAHP","completed":"2026-07-14T00:00:00Z"},"T-017":{"title":"Add project-level CLAUDE.md [low]","status":"done","priority":"low","depends_on":[],"created":"2026-06-28T10:10:21.979Z","github_issue":24,"github_repo":"homeofe/AAHP","completed":"2026-07-14T00:00:00Z"}}

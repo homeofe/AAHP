@@ -700,7 +700,7 @@ Open ready/in_progress tasks:
   T-016: Add `aahp archive` command for LOG.md rotation (ready)
 ```
 
-The report covers `project`, the resolved `path`, and the `last_session` block (phase, agent, timestamp, session id, commit); the recorded line counts for `MANIFEST.json` and `NEXT_ACTIONS.md` (a `?` means the manifest does not record that file's line count, which is the normal case for `MANIFEST.json` itself); a `Task counts` roll-up printed in priority order (`ready`, `in_progress`, `blocked`, `done`, `cancelled`, `stale`, or `none` when there are no tasks); the `quick_context` string; and up to five open `ready`/`in_progress` tasks. It reads only `MANIFEST.json`, so it reflects the last regeneration, not uncommitted edits to other handoff files.
+The report covers `project`, the resolved `path`, and the `last_session` block (phase, agent, timestamp, session id, commit); the recorded line counts for `MANIFEST.json` and `NEXT_ACTIONS.md` (a `?` means the manifest does not record that file's line count, which is the normal case for `MANIFEST.json` itself); a `Task counts` roll-up printed in priority order (`ready`, `in_progress`, `blocked`, `done`, `cancelled`, `other`, or `none` when there are no tasks); the `quick_context` string; and up to five open `ready`/`in_progress` tasks. It reads only `MANIFEST.json`, so it reflects the last regeneration, not uncommitted edits to other handoff files.
 
 Exit codes: `0` on success; `1` when `MANIFEST.json` is missing (it prints a hint to run `aahp init` or `aahp manifest` first) or cannot be parsed as JSON.
 

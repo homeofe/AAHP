@@ -65,17 +65,21 @@ for (const claim of claims) {
     // different-drive path ("D:evil.mjs") is drive-relative (isAbsolute false) and
     // relativizes to an ABSOLUTE path, so reject when floorCmd OR its relative form
     // is absolute, when it escapes via "..", or when it resolves to the root itself.
-    const resolved = resolve(root, floorCmd);
-    const rel = relative(root, resolved);
-    if (isAbsolute(floorCmd) || isAbsolute(rel) || rel.startsWith("..") || rel === "") {
-      failures.push({ id, msg: `floorCmd must be a repo-relative script path inside the project (got ${JSON.stringify(floorCmd)})` });
+    if (typeof floorCmd !== "string") {
+      failures.push({ id, msg: `floorCmd must be a repo-relative script path (string), got ${JSON.stringify(floorCmd)}` });
     } else {
-      try {
-        const out = execFileSync(process.execPath, [resolved], { cwd: root, encoding: "utf8" });
-        const m = out.match(/-?\d+/);
-        floor = m ? Number(m[0]) : null;
-      } catch (err) {
-        failures.push({ id, msg: `floorCmd failed (${floorCmd}): ${err.message.split("\n")[0]}` });
+      const resolved = resolve(root, floorCmd);
+      const rel = relative(root, resolved);
+      if (isAbsolute(floorCmd) || isAbsolute(rel) || rel.startsWith("..") || rel === "") {
+        failures.push({ id, msg: `floorCmd must be a repo-relative script path inside the project (got ${JSON.stringify(floorCmd)})` });
+      } else {
+        try {
+          const out = execFileSync(process.execPath, [resolved], { cwd: root, encoding: "utf8" });
+          const m = out.match(/-?\d+/);
+          floor = m ? Number(m[0]) : null;
+        } catch (err) {
+          failures.push({ id, msg: `floorCmd failed (${floorCmd}): ${err.message.split("\n")[0]}` });
+        }
       }
     }
     if (floor !== null && advertised > floor) {

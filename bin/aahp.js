@@ -262,14 +262,16 @@ function cmdStatus(targetPath) {
   // Status vocabulary is the schema's task-status enum (schema/aahp-manifest.schema.json).
   // Any value outside it falls into the `other` bucket.
   const statusPriority = ['ready', 'in_progress', 'blocked', 'done', 'cancelled']
-  const taskStatusCounts = {
+  // Null-prototype so a task status like "toString"/"valueOf" cannot match the
+  // `in` check below via the prototype chain.
+  const taskStatusCounts = Object.assign(Object.create(null), {
     ready: 0,
     in_progress: 0,
     blocked: 0,
     done: 0,
     cancelled: 0,
     other: 0,
-  }
+  })
 
   for (const task of Object.values(tasks)) {
     const currentStatus = typeof task === 'object' && task !== null && 'status' in task ? String(task.status) : 'other'

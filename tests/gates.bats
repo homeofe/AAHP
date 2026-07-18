@@ -252,6 +252,19 @@ EOF
     [[ "$output" == *"repo-relative script path"* ]]
 }
 
+@test "claims: floorCmd rejects an absolute path" {
+    mkpkg "1.0.0"
+    echo "We ship 350+ rules." > "$TEST_TMPDIR/README.md"
+    mkconfig <<'EOF'
+{ "claims": [ { "id": "rules", "canonical": "350+", "advertised": 350,
+  "phrase": "(\\d+)\\+\\s*rules\\b", "floorCmd": "/tmp/evil.mjs",
+  "surfaces": [ { "file": "README.md" } ] } ] }
+EOF
+    run node "$CLAIMS" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"repo-relative script path"* ]]
+}
+
 # --- generator / freshness ---------------------------------------------------
 
 @test "generator: freshness passes when NEXT_ACTIONS matches package.json" {

@@ -19,7 +19,10 @@ independently of the npm version).
   `execFileSync` (no shell), instead of `execSync` on an arbitrary config string.
   This closes a command-injection path from a PR-editable `aahp.config.json`
   (a contributor could otherwise gain code execution in a consumer's CI). The
-  schema and example are updated to match; a path escaping the project is rejected.
+  schema and example are updated to match; a path escaping the project is rejected,
+  including Windows cross-drive and absolute paths.
+- Hardened `aahp status`: the task-status counter uses a null-prototype object so a
+  crafted status like `toString` cannot match via the prototype chain.
 
 ### Fixed
 - Documentation drift: README Section 4 now lists the full canonical handoff set

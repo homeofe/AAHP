@@ -61,12 +61,17 @@ for (const claim of claims) {
     // floorCmd is a repo-relative path to a Node script whose stdout yields an
     // integer. Run it with the Node interpreter via execFileSync (NO shell) so a
     // config string can never inject shell metacharacters or execute an arbitrary
-    // binary; reject any path that escapes the project root.
-    if (isAbsolute(floorCmd) || relative(root, resolve(root, floorCmd)).startsWith("..")) {
+    // binary; reject any path that escapes the project root. On Windows a
+    // different-drive path ("D:evil.mjs") is drive-relative (isAbsolute false) and
+    // relativizes to an ABSOLUTE path, so reject when floorCmd OR its relative form
+    // is absolute, when it escapes via "..", or when it resolves to the root itself.
+    const resolved = resolve(root, floorCmd);
+    const rel = relative(root, resolved);
+    if (isAbsolute(floorCmd) || isAbsolute(rel) || rel.startsWith("..") || rel === "") {
       failures.push({ id, msg: `floorCmd must be a repo-relative script path inside the project (got ${JSON.stringify(floorCmd)})` });
     } else {
       try {
-        const out = execFileSync(process.execPath, [resolve(root, floorCmd)], { cwd: root, encoding: "utf8" });
+        const out = execFileSync(process.execPath, [resolved], { cwd: root, encoding: "utf8" });
         const m = out.match(/-?\d+/);
         floor = m ? Number(m[0]) : null;
       } catch (err) {

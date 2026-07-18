@@ -120,3 +120,15 @@ EOF
     [ "$status" -eq 1 ]
     [[ "$output" == *"MISSING.md"* ]]
 }
+
+@test "doc-links: root-relative resolves against repo root; non-http schemes skipped" {
+    mkpkg
+    echo "c" > "$TEST_TMPDIR/DOC.md"
+    printf 'root [c](/DOC.md), scheme [f](ftp://x/y), proto [p](//x/y)\n' > "$TEST_TMPDIR/README.md"
+    mkconfig <<'EOF'
+{ "docLinks": { "include": ["README.md"] } }
+EOF
+    gadd
+    run node "$DL" "$TEST_TMPDIR"
+    [ "$status" -eq 0 ]
+}

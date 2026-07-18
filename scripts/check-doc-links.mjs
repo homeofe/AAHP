@@ -1,10 +1,12 @@
 #!/usr/bin/env node
 // check-doc-links.mjs - Config-driven broken-link gate. Resolves internal
 // Markdown links in the configured files against the filesystem and fails if a
-// relative file target does not exist. Skips external (http/https/mailto) links
-// and same-file "#anchor" links (anchor validation is intentionally out of
-// scope - low value, brittle across renderers). A clean no-op when docLinks is
-// absent.
+// file target does not exist. Skips links with any URI scheme (http/https/ftp/
+// mailto/...), protocol-relative "//host" links, and same-file "#anchor" links
+// (anchor validation is intentionally out of scope - low value, brittle across
+// renderers). Root-relative ("/x") targets resolve against the repo root; others
+// against the linking file's directory. Percent-encoded targets are decoded. A
+// clean no-op when docLinks is absent.
 //
 //   "docLinks": {
 //     "include": ["README.md", "CLAUDE.md", ".ai/handoff/*.md"]
@@ -60,12 +62,23 @@ for (const rel of gitLsFiles(include)) {
   const dir = dirname(join(root, rel));
   for (const m of text.matchAll(LINK_RE)) {
     let target = m[1];
-    if (/^(https?:|mailto:|#)/i.test(target)) continue; // external or same-file anchor
+    // Skip external links (any URI scheme like http:/ftp:/git:), protocol-relative
+    // ("//host/x"), and same-file anchors ("#x").
+    if (/^(?:[a-z0-9+.-]+:|\/\/|#)/i.test(target)) continue;
     // Strip a trailing #anchor and any ?query from the file portion.
     target = target.split("#")[0].split("?")[0];
     if (!target) continue;
     checked++;
-    const resolved = resolve(dir, target);
+    // Percent-decode ("my%20file.md" -> "my file.md"); tolerate a stray "%".
+    let decoded;
+    try {
+      decoded = decodeURIComponent(target);
+    } catch {
+      decoded = target;
+    }
+    // A root-relative link ("/x") resolves against the REPO root; others against
+    // the linking file's directory.
+    const resolved = decoded.startsWith("/") ? join(root, decoded) : resolve(dir, decoded);
     if (!existsSync(resolved)) {
       failures.push({ file: rel, target: m[1] });
     }

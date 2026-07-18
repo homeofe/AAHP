@@ -276,53 +276,65 @@ function cmdInitGates(targetPath, flags) {
   let wrote = 0
   let skipped = 0
 
-  // 1. aahp.config.json (inlined; ASCII; em-dash stored as an escape)
-  const configPath = join(targetPath, 'aahp.config.json')
-  if (existsSync(configPath) && !force) {
-    console.log('  skip: aahp.config.json (already exists, use --force to overwrite)')
-    skipped++
-  } else {
-    writeFileSync(configPath, JSON.stringify(GATES_CONFIG, null, 2) + '\n')
-    console.log('  write: aahp.config.json')
-    wrote++
-  }
-
-  // 2. govern npm script - only when a package.json already exists (never create one)
-  const pkgPath = join(targetPath, 'package.json')
-  if (existsSync(pkgPath)) {
-    const pkg = readJsonSafe(pkgPath)
-    if (!pkg) {
-      console.log('  skip: package.json present but not valid JSON; not adding a govern script')
-      skipped++
-    } else if (pkg.scripts && pkg.scripts.govern && !force) {
-      console.log('  skip: package.json govern script (already present, use --force to overwrite)')
+  // All filesystem writes run under one guard so a permission (EACCES/EPERM) or
+  // other I/O error exits cleanly with a message instead of a raw stack trace,
+  // matching cmdInit's handling.
+  try {
+    // 1. aahp.config.json (inlined; ASCII; em-dash stored as an escape)
+    const configPath = join(targetPath, 'aahp.config.json')
+    if (existsSync(configPath) && !force) {
+      console.log('  skip: aahp.config.json (already exists, use --force to overwrite)')
       skipped++
     } else {
-      pkg.scripts = pkg.scripts || {}
-      pkg.scripts.govern = 'aahp check .'
-      writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n')
-      console.log('  update: package.json (added govern script)')
+      writeFileSync(configPath, JSON.stringify(GATES_CONFIG, null, 2) + '\n')
+      console.log('  write: aahp.config.json')
       wrote++
     }
-  } else {
-    console.log('  note: no package.json; skipped the govern script (add one, then set "govern": "aahp check .")')
-  }
 
-  // 3. .github/workflows/aahp-govern.yml (copied from the packaged asset)
-  const asset = join(PACKAGE_ROOT, 'assets', 'governance', 'aahp-govern.yml')
-  const wfDir = join(targetPath, '.github', 'workflows')
-  const wfDest = join(wfDir, 'aahp-govern.yml')
-  if (!existsSync(asset)) {
-    console.log('  skip: aahp-govern.yml (packaged asset not found)')
-    skipped++
-  } else if (existsSync(wfDest) && !force) {
-    console.log('  skip: .github/workflows/aahp-govern.yml (already exists, use --force to overwrite)')
-    skipped++
-  } else {
-    mkdirSync(wfDir, { recursive: true })
-    copyFileSync(asset, wfDest)
-    console.log('  write: .github/workflows/aahp-govern.yml')
-    wrote++
+    // 2. govern npm script - only when a package.json already exists (never create one)
+    const pkgPath = join(targetPath, 'package.json')
+    if (existsSync(pkgPath)) {
+      const pkg = readJsonSafe(pkgPath)
+      if (!pkg) {
+        console.log('  skip: package.json present but not valid JSON; not adding a govern script')
+        skipped++
+      } else if (pkg.scripts && pkg.scripts.govern && !force) {
+        console.log('  skip: package.json govern script (already present, use --force to overwrite)')
+        skipped++
+      } else {
+        pkg.scripts = pkg.scripts || {}
+        pkg.scripts.govern = 'aahp check .'
+        writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n')
+        console.log('  update: package.json (added govern script)')
+        wrote++
+      }
+    } else {
+      console.log('  note: no package.json; skipped the govern script (add one, then set "govern": "aahp check .")')
+    }
+
+    // 3. .github/workflows/aahp-govern.yml (copied from the packaged asset)
+    const asset = join(PACKAGE_ROOT, 'assets', 'governance', 'aahp-govern.yml')
+    const wfDir = join(targetPath, '.github', 'workflows')
+    const wfDest = join(wfDir, 'aahp-govern.yml')
+    if (!existsSync(asset)) {
+      console.log('  skip: aahp-govern.yml (packaged asset not found)')
+      skipped++
+    } else if (existsSync(wfDest) && !force) {
+      console.log('  skip: .github/workflows/aahp-govern.yml (already exists, use --force to overwrite)')
+      skipped++
+    } else {
+      mkdirSync(wfDir, { recursive: true })
+      copyFileSync(asset, wfDest)
+      console.log('  write: .github/workflows/aahp-govern.yml')
+      wrote++
+    }
+  } catch (err) {
+    if (err.code === 'EACCES' || err.code === 'EPERM') {
+      console.error(`Error: permission denied during init --gates: ${err.message}`)
+    } else {
+      console.error(`Error: init --gates failed: ${err.message}`)
+    }
+    process.exit(1)
   }
 
   console.log()
@@ -724,12 +736,17 @@ function cmdCheck(targetPath, flags) {
       reason = 'not applicable here'
     } else {
       const r = spawnSync(process.execPath, [join(PACKAGE_ROOT, 'scripts', gate.script), ...gate.args, targetPath], { encoding: 'utf8' })
-      if (r.status === 0) {
+      if (r.error) {
+        // The gate process could not be spawned at all (e.g. missing interpreter).
+        status = 'fail'
+        reason = `failed to run gate: ${r.error.message}`
+      } else if (r.status === 0) {
         status = 'pass'
         reason = firstLine(r.stdout)
       } else {
+        // Non-zero exit, or r.status === null when the gate was killed by a signal.
         status = 'fail'
-        reason = firstLine(r.stderr || r.stdout)
+        reason = r.signal ? `gate killed by signal ${r.signal}` : firstLine(r.stderr || r.stdout)
       }
     }
     results[gate.id] = { status, reason }

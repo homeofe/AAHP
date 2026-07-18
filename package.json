@@ -1,6 +1,6 @@
 {
   "name": "@elvatis_com/aahp",
-  "version": "3.7.0",
+  "version": "3.8.0",
   "description": "AI-to-AI Handoff Protocol - CLI tools for managing agent handoff files",
   "author": "Elvatis <emre.kohler@elvatis.com>",
   "bin": {
@@ -28,6 +28,7 @@
   "files": [
     "bin/",
     "scripts/",
+    "assets/",
     "templates/",
     "schema/",
     "aahp.config.example.json",

@@ -16,9 +16,8 @@
 // via execFileSync (no shell).
 
 import { existsSync, readFileSync } from "node:fs";
-import { execFileSync } from "node:child_process";
 import { join, dirname, resolve } from "node:path";
-import { resolveRoot, loadConfig } from "./aahp-config.mjs";
+import { resolveRoot, loadConfig, isInsideWorkTree, listTrackedFiles } from "./aahp-config.mjs";
 
 const root = resolveRoot();
 
@@ -35,24 +34,24 @@ if (!config.docLinks) {
   process.exit(0);
 }
 
+// Fail loud outside a git work tree: `git ls-files` would enumerate zero files
+// and the gate would vacuously pass, so a broken link could ship undetected.
+if (!isInsideWorkTree(root)) {
+  console.error(
+    `  doc-links: not inside a git work tree at ${root}; cannot enumerate files - run this gate inside a git checkout (in CI use actions/checkout)`,
+  );
+  process.exit(1);
+}
+
 const DEFAULT_INCLUDE = ["README.md", "CLAUDE.md", "CONTRIBUTING.md", ".ai/handoff/*.md"];
 const include = Array.isArray(config.docLinks.include) && config.docLinks.include.length ? config.docLinks.include : DEFAULT_INCLUDE;
-
-function gitLsFiles(specs) {
-  try {
-    const out = execFileSync("git", ["-C", root, "ls-files", "-z", "--", ...specs], { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
-    return out.split("\0").filter(Boolean);
-  } catch {
-    return [];
-  }
-}
 
 // Markdown inline link: [text](target). Capture the target (group 1).
 const LINK_RE = /\[[^\]]*\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g;
 const failures = [];
 let checked = 0;
 
-for (const rel of gitLsFiles(include)) {
+for (const rel of listTrackedFiles(root, include)) {
   let text;
   try {
     text = readFileSync(join(root, rel), "utf8");

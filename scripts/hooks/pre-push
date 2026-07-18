@@ -18,12 +18,17 @@ set -euo pipefail
 REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || echo ".")"
 VERIFY="$REPO_ROOT/scripts/verify-handoff.sh"
 
-if [ ! -f "$VERIFY" ]; then
-    echo "AAHP pre-push: scripts/verify-handoff.sh not found, skipping gate." >&2
-    exit 0
+# Resolve the gate: prefer the vendored script (full AAHP checkout); otherwise
+# fall back to the installed aahp CLI (npm-install consumer). If neither is
+# available, skip. AAHP_SKIP_VERIFY=1 disables the CLI fallback locally (the
+# vendored script honours the same escape hatch internally).
+if [ -f "$VERIFY" ]; then
+    bash "$VERIFY" "$REPO_ROOT" --level prepush
+elif [ "${AAHP_SKIP_VERIFY:-0}" != "1" ] && command -v npx >/dev/null 2>&1 && npx --no-install aahp --version >/dev/null 2>&1; then
+    npx --no-install aahp verify "$REPO_ROOT" --level prepush
+else
+    echo "AAHP pre-push: no verify-handoff.sh and no aahp CLI, skipping gate." >&2
 fi
-
-bash "$VERIFY" "$REPO_ROOT" --level prepush
 
 # Conformance self-check (aahp doctor). Dogfooded on AAHP; opt-in for consumers.
 # Runs only when the aahp tooling is resolvable, and honours the same escape

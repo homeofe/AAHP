@@ -5,11 +5,13 @@
 //
 // Commands:
 //   init [path]       Initialize .ai/handoff/ directory with AAHP templates
+//                     (init --gates scaffolds governance-only config, no handoff)
 //   manifest [path]   (Re)generate MANIFEST.json from existing handoff files
 //   lint [path]       Validate handoff files for safety violations
 //   migrate [path]    Migrate an AAHP v1 project to v2/v3
 //   migrate-grounding [path]  Add the Grounded Reflection Layer to an existing project
 //   verify [path]     Run the canonical handoff gate (checksum + drift + TTL)
+//   check [path]      Run the config-driven governance gates as one aggregate
 //   archive [path]    Rotate or verify LOG.md -> LOG-ARCHIVE.md
 
 //   status [path]     Show a quick state summary from MANIFEST.json
@@ -22,7 +24,7 @@
 
 import { fileURLToPath } from 'node:url'
 import { dirname, join, resolve, relative, isAbsolute } from 'node:path'
-import { existsSync, mkdirSync, copyFileSync, readdirSync, readFileSync } from 'node:fs'
+import { existsSync, mkdirSync, copyFileSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { spawn, spawnSync } from 'node:child_process'
 
 const __filename = fileURLToPath(import.meta.url)
@@ -54,13 +56,21 @@ Commands:
   migrate [path]    Migrate an AAHP v1 project to v2/v3
   migrate-grounding [path]  Add the Grounded Reflection Layer to an existing project
   verify [path]     Run the canonical handoff gate (checksum + drift + TTL)
+  check [path]      Run the config-driven governance gates as one aggregate
   archive [path]    Rotate or verify LOG.md -> LOG-ARCHIVE.md
   status [path]     Show a quick state summary from MANIFEST.json
   doctor [path]     Conformance self-check; emits a JSON conformance record
 
 Init options:
+  --gates           Scaffold governance-only config (aahp.config.json + a
+                    govern npm script + .github/workflows/aahp-govern.yml);
+                    does NOT create .ai/handoff/
   --force           Overwrite existing files (default: skip existing)
   --with-pii-allowlist  Copy pii-allowlist.json template when needed
+
+Check options:
+  --json            Print only the JSON governance record to stdout
+  --quiet           Print only failing gates (plus the summary)
 
 Manifest options:
   --agent NAME      Agent identifier (default: "cli-tool")
@@ -75,6 +85,9 @@ Verify options:
   --quiet           Suppress per-check OK output, keep failures
 
 Doctor options:
+  --governance      Governance-only record; skips the 3 handoff gates without
+                    evaluating them (alias: --no-handoff). Lets a repo with no
+                    .ai/handoff emit a green conformance record.
   --json            Print only the JSON conformance record to stdout
   --quiet           Print only failing gates (plus the record)
 
@@ -227,6 +240,98 @@ function cmdInit(targetPath, flags) {
     console.log('  3. Run: aahp manifest --phase idle')
     console.log('  4. Commit: git add .ai/handoff/ && git commit -m "chore: init AAHP handoff files"')
   }
+}
+
+// ---------------------------------------------------------------------------
+// init --gates - scaffold governance-only adoption (no handoff protocol).
+//
+// Writes three things at the project root, each skip-if-exists (--force to
+// overwrite): a trimmed aahp.config.json, a `govern` npm script (only when a
+// package.json exists), and the portable .github/workflows/aahp-govern.yml
+// copied from the packaged asset. It never touches .ai/handoff/. The scaffolded
+// config enables the two gates that are green on any git repo out of the box
+// (the em-dash ban + internal doc-link check); versionSites/claims/docSync are
+// left for the adopter to add once they have the matching files.
+// ---------------------------------------------------------------------------
+
+const GATES_CONFIG = {
+  $schema: './node_modules/@elvatis_com/aahp/schema/aahp-config.schema.json',
+  forbiddenPatterns: [
+    // Store the ban as an escape so this config file never matches its own rule.
+    { id: 'em-dash', pattern: '\\u2014', message: 'em dash (U+2014) is banned; use a hyphen' },
+  ],
+  docLinks: {
+    include: ['README.md', 'CONTRIBUTING.md', 'docs/*.md'],
+  },
+}
+
+function cmdInitGates(targetPath, flags) {
+  const force = flags.includes('--force')
+
+  if (!existsSync(targetPath)) {
+    console.error(`Error: target directory does not exist: ${targetPath}`)
+    process.exit(1)
+  }
+
+  let wrote = 0
+  let skipped = 0
+
+  // 1. aahp.config.json (inlined; ASCII; em-dash stored as an escape)
+  const configPath = join(targetPath, 'aahp.config.json')
+  if (existsSync(configPath) && !force) {
+    console.log('  skip: aahp.config.json (already exists, use --force to overwrite)')
+    skipped++
+  } else {
+    writeFileSync(configPath, JSON.stringify(GATES_CONFIG, null, 2) + '\n')
+    console.log('  write: aahp.config.json')
+    wrote++
+  }
+
+  // 2. govern npm script - only when a package.json already exists (never create one)
+  const pkgPath = join(targetPath, 'package.json')
+  if (existsSync(pkgPath)) {
+    const pkg = readJsonSafe(pkgPath)
+    if (!pkg) {
+      console.log('  skip: package.json present but not valid JSON; not adding a govern script')
+      skipped++
+    } else if (pkg.scripts && pkg.scripts.govern && !force) {
+      console.log('  skip: package.json govern script (already present, use --force to overwrite)')
+      skipped++
+    } else {
+      pkg.scripts = pkg.scripts || {}
+      pkg.scripts.govern = 'aahp check .'
+      writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n')
+      console.log('  update: package.json (added govern script)')
+      wrote++
+    }
+  } else {
+    console.log('  note: no package.json; skipped the govern script (add one, then set "govern": "aahp check .")')
+  }
+
+  // 3. .github/workflows/aahp-govern.yml (copied from the packaged asset)
+  const asset = join(PACKAGE_ROOT, 'assets', 'governance', 'aahp-govern.yml')
+  const wfDir = join(targetPath, '.github', 'workflows')
+  const wfDest = join(wfDir, 'aahp-govern.yml')
+  if (!existsSync(asset)) {
+    console.log('  skip: aahp-govern.yml (packaged asset not found)')
+    skipped++
+  } else if (existsSync(wfDest) && !force) {
+    console.log('  skip: .github/workflows/aahp-govern.yml (already exists, use --force to overwrite)')
+    skipped++
+  } else {
+    mkdirSync(wfDir, { recursive: true })
+    copyFileSync(asset, wfDest)
+    console.log('  write: .github/workflows/aahp-govern.yml')
+    wrote++
+  }
+
+  console.log()
+  console.log(`Done. ${wrote} written/updated, ${skipped} skipped.`)
+  console.log()
+  console.log('Next steps:')
+  console.log('  1. Pin aahp exactly: npm install --save-dev --save-exact @elvatis_com/aahp')
+  console.log('  2. Tune aahp.config.json (docLinks.include; add versionSites once you keep a CHANGELOG).')
+  console.log('  3. Run: npm run govern   (or: npx aahp check .)')
 }
 
 // ---------------------------------------------------------------------------
@@ -444,14 +549,27 @@ function gateGrounding(handoffDir) {
   return { status: 'pass', reason: 'GROUNDING.md present; TRUST.md has a Provenance column' }
 }
 
-function gatePinnedDep(pkg) {
-  if (pkg && pkg.name === '@elvatis_com/aahp') return { status: 'self', reason: 'this repo is the aahp package itself' }
+// Distribution-pin gate. Config-driven and opt-in (C-7): the package name, the
+// dependency block, and whether a range is acceptable all come from the optional
+// pinnedDep config. A repo whose own name equals the target name is `self`
+// (checked before config so AAHP stays self with no config). When pinnedDep is
+// absent the gate is `skip` - it never forces an unrelated consumer red.
+function gatePinnedDep(pkg, config) {
+  const cfg = (config && typeof config.pinnedDep === 'object' && config.pinnedDep) || null
+  const name = (cfg && typeof cfg.name === 'string' && cfg.name) || '@elvatis_com/aahp'
+  if (pkg && pkg.name === name) return { status: 'self', reason: `this repo is ${name} itself` }
+  if (!cfg) return { status: 'skip', reason: 'distribution pin not asserted (set pinnedDep to enable)' }
+  const location = cfg.location === 'dependencies' || cfg.location === 'any' ? cfg.location : 'devDependencies'
   const dev = (pkg && pkg.devDependencies) || {}
   const reg = (pkg && pkg.dependencies) || {}
-  const spec = dev['@elvatis_com/aahp'] !== undefined ? dev['@elvatis_com/aahp'] : reg['@elvatis_com/aahp']
-  if (spec === undefined) return { status: 'missing', reason: '@elvatis_com/aahp not pinned in devDependencies' }
+  let spec
+  if (location === 'dependencies') spec = reg[name]
+  else if (location === 'any') spec = dev[name] !== undefined ? dev[name] : reg[name]
+  else spec = dev[name]
+  if (spec === undefined) return { status: 'missing', reason: `${name} not pinned in ${location}` }
   if (/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(spec)) return { status: 'pass', reason: `pinned exact: ${spec}` }
-  return { status: 'fail', reason: `not an exact pin: "${spec}" (use an exact version, no range operator)` }
+  if (cfg.allowRange === true) return { status: 'pass', reason: `pinned (range allowed): ${spec}` }
+  return { status: 'fail', reason: `not an exact pin: "${spec}" (use an exact version, or set pinnedDep.allowRange:true)` }
 }
 
 function gateChangelogFormat(targetPath) {
@@ -473,14 +591,19 @@ function gateVersionSync(targetPath) {
 function cmdDoctor(targetPath, flags) {
   const jsonOnly = flags.includes('--json')
   const quiet = flags.includes('--quiet')
+  // Governance mode (A-2): skip the 3 handoff gates WITHOUT evaluating them, so
+  // a repo with no .ai/handoff can still emit a green conformance record.
+  const governance = flags.includes('--governance') || flags.includes('--no-handoff')
   const handoffDir = join(targetPath, '.ai', 'handoff')
   const pkg = readJsonSafe(join(targetPath, 'package.json')) || {}
+  const config = readJsonSafe(join(targetPath, 'aahp.config.json')) || {}
 
+  const handoffSkip = { status: 'skip', reason: 'governance mode: handoff gate not evaluated' }
   const results = {
-    'handoff-set': gateHandoffSet(handoffDir),
-    'manifest-schema': gateManifestSchema(handoffDir),
-    grounding: gateGrounding(handoffDir),
-    'pinned-dep': gatePinnedDep(pkg),
+    'handoff-set': governance ? handoffSkip : gateHandoffSet(handoffDir),
+    'manifest-schema': governance ? handoffSkip : gateManifestSchema(handoffDir),
+    grounding: governance ? handoffSkip : gateGrounding(handoffDir),
+    'pinned-dep': gatePinnedDep(pkg, config),
     'changelog-format': gateChangelogFormat(targetPath),
     'version-sync': gateVersionSync(targetPath),
   }
@@ -488,8 +611,11 @@ function cmdDoctor(targetPath, flags) {
   const gates = {}
   for (const [k, v] of Object.entries(results)) gates[k] = v.status
 
+  // `mode` is additive and present ONLY in governance mode, so the default
+  // record stays byte-for-byte identical to prior versions (backward compat).
   const record = {
     schemaVersion: 1,
+    ...(governance ? { mode: 'governance' } : {}),
     repo: deriveRepo(targetPath, pkg),
     aahpVersion: getVersion(),
     gates,
@@ -522,6 +648,128 @@ function cmdDoctor(targetPath, flags) {
   if (!quiet) {
     console.log('\nJSON record:')
     console.log(JSON.stringify(record))
+  }
+
+  process.exit(failing.length === 0 ? 0 : 1)
+}
+
+// ---------------------------------------------------------------------------
+// check command - run the config-driven governance gates as one aggregate.
+//
+// Unlike `doctor` (a conformance RECORD over handoff + release gates), `check`
+// is the pass/fail RUN a consumer wires into CI. It executes every APPLICABLE
+// governance gate against [path], continues past a failure so one run surfaces
+// them all, and exits non-zero iff any gate fails. Each gate is a clean no-op
+// when its precondition is absent, so an unconfigured repo exits 0 with skips.
+// This is the SINGLE definition of the gate set; keep it in step with the
+// package.json "check" script chain (a test asserts dogfood parity).
+// ---------------------------------------------------------------------------
+
+const CHECK_GATES = [
+  { id: 'changelog', script: 'check-changelog.mjs', args: [] },
+  { id: 'changelog-format', script: 'check-changelog-format.mjs', args: [] },
+  { id: 'version-sync', script: 'check-version-sync.mjs', args: [] },
+  { id: 'claims', script: 'check-claims.mjs', args: [] },
+  { id: 'forbidden-patterns', script: 'check-forbidden-patterns.mjs', args: [] },
+  { id: 'schema-doc-sync', script: 'check-schema-doc-sync.mjs', args: [] },
+  { id: 'doc-links', script: 'check-doc-links.mjs', args: [] },
+  { id: 'handoff', script: 'aahp-dashboard.mjs', args: ['--check'] },
+]
+
+// A gate is applicable only when its trigger is present, mirroring how each
+// underlying gate self-skips: the package-dependent gates need package.json (so
+// a bare repo never trips AAHP_NO_PKG), the config gates need their section, and
+// the handoff gate needs an adopted .ai/handoff/MANIFEST.json.
+function gateApplies(id, targetPath, pkg, config) {
+  const has = (...p) => existsSync(join(targetPath, ...p))
+  switch (id) {
+    case 'changelog':
+    case 'changelog-format':
+      return !!pkg && has('CHANGELOG.md')
+    case 'version-sync':
+      return !!pkg && Array.isArray(config.versionSites) && config.versionSites.length > 0
+    case 'claims':
+      return Array.isArray(config.claims) && config.claims.length > 0
+    case 'forbidden-patterns':
+      return Array.isArray(config.forbiddenPatterns) && config.forbiddenPatterns.length > 0
+    case 'schema-doc-sync':
+      return Array.isArray(config.docSync) && config.docSync.length > 0
+    case 'doc-links':
+      return !!config.docLinks
+    case 'handoff':
+      return has('.ai', 'handoff', 'MANIFEST.json')
+    default:
+      return false
+  }
+}
+
+function cmdCheck(targetPath, flags) {
+  const jsonOnly = flags.includes('--json')
+  const quiet = flags.includes('--quiet')
+  const pkg = readJsonSafe(join(targetPath, 'package.json'))
+  const config = readJsonSafe(join(targetPath, 'aahp.config.json')) || {}
+
+  const sel = (config && typeof config.check === 'object' && config.check) || {}
+  const only = Array.isArray(sel.only) ? sel.only : null
+  const skip = Array.isArray(sel.skip) ? sel.skip : []
+
+  const results = {}
+  for (const gate of CHECK_GATES) {
+    let status, reason
+    if ((only && !only.includes(gate.id)) || skip.includes(gate.id)) {
+      status = 'skip'
+      reason = 'deselected by config.check'
+    } else if (!gateApplies(gate.id, targetPath, pkg, config)) {
+      status = 'skip'
+      reason = 'not applicable here'
+    } else {
+      const r = spawnSync(process.execPath, [join(PACKAGE_ROOT, 'scripts', gate.script), ...gate.args, targetPath], { encoding: 'utf8' })
+      if (r.status === 0) {
+        status = 'pass'
+        reason = firstLine(r.stdout)
+      } else {
+        status = 'fail'
+        reason = firstLine(r.stderr || r.stdout)
+      }
+    }
+    results[gate.id] = { status, reason }
+  }
+
+  const gates = {}
+  for (const [k, v] of Object.entries(results)) gates[k] = v.status
+  const failing = Object.entries(gates).filter(([, s]) => s === 'fail')
+
+  const record = {
+    schemaVersion: 1,
+    command: 'check',
+    repo: deriveRepo(targetPath, pkg || {}),
+    aahpVersion: getVersion(),
+    gates,
+    checkedAt: new Date().toISOString(),
+  }
+
+  if (jsonOnly) {
+    process.stdout.write(JSON.stringify(record, null, 2) + '\n')
+    process.exit(failing.length === 0 ? 0 : 1)
+  }
+
+  const labels = { pass: 'PASS', fail: 'FAIL', skip: 'SKIP' }
+  if (!quiet) {
+    console.log(`\naahp check - governance gates for ${record.repo} (aahp v${record.aahpVersion})`)
+    console.log('=========================================')
+  }
+  for (const [k, v] of Object.entries(results)) {
+    const ok = v.status !== 'fail'
+    if (!ok || !quiet) console.log(`  ${(labels[v.status] || v.status).padEnd(6)} ${k}: ${v.reason}`)
+  }
+  if (!quiet) console.log('=========================================')
+  if (failing.length === 0) {
+    if (!quiet) {
+      const ran = Object.values(gates).filter((s) => s !== 'skip').length
+      console.log(`Governance OK: ${ran} gate(s) ran, no failures.`)
+    }
+  } else {
+    console.log(`Governance FAILED: ${failing.map(([k]) => k).join(', ')}.`)
   }
 
   process.exit(failing.length === 0 ? 0 : 1)
@@ -627,7 +875,8 @@ const rest = rawArgs.slice(1)
 switch (command) {
   case 'init': {
     const { targetPath, flags } = extractPathAndFlags(rest)
-    cmdInit(targetPath, flags)
+    if (flags.includes('--gates')) cmdInitGates(targetPath, flags)
+    else cmdInit(targetPath, flags)
     break
   }
 
@@ -651,6 +900,12 @@ switch (command) {
   case 'verify':
     runScript('verify-handoff.sh', rest)
     break
+
+  case 'check': {
+    const { targetPath, flags } = extractPathAndFlags(rest)
+    cmdCheck(targetPath, flags)
+    break
+  }
 
   case 'archive':
     runScript('aahp-archive.sh', rest)

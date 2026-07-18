@@ -6,8 +6,9 @@ load test_helper
 AAHP="$AAHP_ROOT/bin/aahp.js"
 
 # Build a fully conformant consumer fixture: package.json with an exact-version
-# pin, a valid MANIFEST.json, GROUNDING.md, and a TRUST.md with a Provenance
-# column. No CHANGELOG.md / config, so changelog-format and version-sync SKIP.
+# pin, an aahp.config.json that opts the pinned-dep gate in (C-7), a valid
+# MANIFEST.json, GROUNDING.md, and a TRUST.md with a Provenance column. No
+# CHANGELOG.md and no versionSites, so changelog-format and version-sync SKIP.
 scaffold_conformant() {
     local root="$TEST_TMPDIR"
     local h="$root/.ai/handoff"
@@ -16,6 +17,14 @@ scaffold_conformant() {
   "name": "consumer-app",
   "version": "1.2.3",
   "devDependencies": { "@elvatis_com/aahp": "3.4.0" }
+}
+EOF
+    # C-7: pinned-dep is opt-in. An empty pinnedDep object asserts the default
+    # pin (@elvatis_com/aahp in devDependencies) so the gate is evaluated, not
+    # skipped, and the exact/range/missing tests still exercise it.
+    cat > "$root/aahp.config.json" <<'EOF'
+{
+  "pinnedDep": {}
 }
 EOF
     create_manifest_json "$h"
@@ -144,4 +153,84 @@ EOF
     [ "$status" -eq 1 ]
     [[ "$output" == *"grounding"* ]]
     [[ "$output" != *"handoff-set"* ]]
+}
+
+# --- Governance mode (A-2): --governance / --no-handoff -----------------------
+
+@test "doctor --governance on a repo without .ai/handoff exits 0 with the 3 handoff gates skip" {
+    scaffold_conformant
+    # A governance-only consumer never adopts the handoff protocol.
+    rm -rf "$TEST_TMPDIR/.ai"
+    run node "$AAHP" doctor "$TEST_TMPDIR" --governance --json
+    [ "$status" -eq 0 ]
+    echo "$output" | node -e '
+      let s = "";
+      process.stdin.on("data", (d) => (s += d)).on("end", () => {
+        const r = JSON.parse(s);
+        for (const k of ["handoff-set", "manifest-schema", "grounding"]) {
+          if (r.gates[k] !== "skip") process.exit(2);
+        }
+      });
+    '
+}
+
+@test "doctor: --no-handoff is an exact alias for --governance" {
+    scaffold_conformant
+    rm -rf "$TEST_TMPDIR/.ai"
+    run node "$AAHP" doctor "$TEST_TMPDIR" --governance --json
+    [ "$status" -eq 0 ]
+    local gov="$output"
+    run node "$AAHP" doctor "$TEST_TMPDIR" --no-handoff --json
+    [ "$status" -eq 0 ]
+    local nh="$output"
+    # Identical gate maps and mode; only the checkedAt timestamp may differ.
+    node -e '
+      const a = JSON.parse(process.argv[1]);
+      const b = JSON.parse(process.argv[2]);
+      if (a.mode !== b.mode) process.exit(2);
+      const ka = Object.keys(a.gates).sort();
+      const kb = Object.keys(b.gates).sort();
+      if (JSON.stringify(ka) !== JSON.stringify(kb)) process.exit(3);
+      for (const k of ka) if (a.gates[k] !== b.gates[k]) process.exit(4);
+    ' "$gov" "$nh"
+}
+
+@test "doctor --governance --json emits mode:governance with all six gate keys and the 3 handoff gates skip" {
+    scaffold_conformant
+    rm -rf "$TEST_TMPDIR/.ai"
+    run node "$AAHP" doctor "$TEST_TMPDIR" --governance --json
+    [ "$status" -eq 0 ]
+    echo "$output" | node -e '
+      let s = "";
+      process.stdin.on("data", (d) => (s += d)).on("end", () => {
+        const r = JSON.parse(s);
+        if (r.mode !== "governance") process.exit(2);
+        const keys = ["handoff-set","manifest-schema","grounding","pinned-dep","changelog-format","version-sync"];
+        for (const k of keys) if (!(k in r.gates)) process.exit(3);
+        for (const k of ["handoff-set", "manifest-schema", "grounding"]) {
+          if (r.gates[k] !== "skip") process.exit(4);
+        }
+      });
+    '
+}
+
+@test "doctor: default (no flag) still hard-fails on a repo without .ai/handoff" {
+    scaffold_conformant
+    rm -rf "$TEST_TMPDIR/.ai"
+    run node "$AAHP" doctor "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Conformance FAILED"* ]]
+}
+
+@test "doctor --json: default record has NO mode key (backward compat)" {
+    scaffold_conformant
+    run node "$AAHP" doctor "$TEST_TMPDIR" --json
+    [ "$status" -eq 0 ]
+    echo "$output" | node -e '
+      let s = "";
+      process.stdin.on("data", (d) => (s += d)).on("end", () => {
+        const r = JSON.parse(s);
+        if ("mode" in r) process.exit(2);
+      });
+    '
 }

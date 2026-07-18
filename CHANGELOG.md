@@ -11,6 +11,44 @@ independently of the npm version).
 
 ## [Unreleased]
 
+## [3.8.0] - 2026-07-18
+**Portable Governance: one aggregate governance gate, a governance-only conformance record, and a drop-in CI workflow**
+
+### Added
+- `aahp check [path]`: a consumer-facing governance aggregator that runs the
+  config-driven gates (changelog, changelog-format, version-sync, claims,
+  forbidden-patterns, schema-doc-sync, doc-links, handoff) as one run. Each gate reports
+  pass, fail, or skip, and the exit code is 0 only when no gate fails (a skipped gate
+  never fails). `--json` emits a `schemaVersion: 1` record; `--quiet` prints only
+  failures; `config.check.only` / `config.check.skip` select which gates run.
+- `aahp doctor --governance` (alias `--no-handoff`): a governance-only conformance record
+  that forces the three handoff gates to `skip` without evaluating them, so a repo with no
+  `.ai/handoff/` can still emit a green record. The default mode is unchanged and
+  byte-identical to prior versions.
+- `aahp init --gates`: scaffolds governance-only config without creating `.ai/handoff/`
+  (writes `aahp.config.json`, adds a `govern` script to an existing `package.json`, and
+  writes `.github/workflows/aahp-govern.yml`).
+- An opt-in, config-driven pinned-dep gate for `aahp doctor`: `pinnedDep`
+  (`name` / `location` / `allowRange`) asserts the distribution pin. Absent config reports
+  `skip`; the defaults reproduce the prior exact-pin behavior; a repo whose own package
+  name matches reports `self`.
+- `assets/governance/aahp-govern.yml`: a portable, opt-in, verify-only governance workflow
+  that invokes `aahp check` and `aahp doctor --governance` through the pinned
+  devDependency via `npx --no-install` (no vendored script paths).
+- New `check` (`only` / `skip`) and `pinnedDep` (`name` / `location` / `allowRange`) keys
+  in `schema/aahp-config.schema.json` and `aahp.config.example.json`.
+- README: ADR-011 through ADR-016 in Section 7, plus `aahp check` and
+  `aahp doctor --governance` coverage in Sections 2.11 and 9.2.
+
+### Changed
+- Git hooks are de-vendored: they resolve `scripts/verify-handoff.sh` when it is vendored,
+  else the installed `aahp` CLI via `npx --no-install`, and skip when neither resolves. The
+  required CI check remains the non-bypassable authority.
+- The enumerating governance gates (`check-forbidden-patterns.mjs`, `check-doc-links.mjs`)
+  fail loud outside a git work tree instead of silently scanning zero files: file
+  enumeration goes through a shared `git ls-files` helper that throws when the project root
+  is not a git checkout.
+
 ## [3.7.0] - 2026-07-18
 **Anti-entropy: enforcement gates, a constitution, and an ADR log**
 
@@ -146,7 +184,8 @@ independently of the npm version).
 ### Changed
 - Relicensed to Apache-2.0 (earlier commits carried MIT, then CC BY 4.0, headers).
 
-[Unreleased]: https://github.com/homeofe/AAHP/compare/v3.7.0...HEAD
+[Unreleased]: https://github.com/homeofe/AAHP/compare/v3.8.0...HEAD
+[3.8.0]: https://github.com/homeofe/AAHP/compare/v3.7.0...v3.8.0
 [3.7.0]: https://github.com/homeofe/AAHP/compare/v3.6.1...v3.7.0
 [3.6.1]: https://github.com/homeofe/AAHP/compare/v3.6.0...v3.6.1
 [3.6.0]: https://github.com/homeofe/AAHP/compare/v3.5.0...v3.6.0

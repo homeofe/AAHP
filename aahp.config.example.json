@@ -1,0 +1,31 @@
+{
+  "$schema": "./node_modules/@elvatis_com/aahp/schema/aahp-config.schema.json",
+  "versionSites": [
+    { "file": "src/cli.ts", "minOccurrences": 1, "note": "CLI --version banner" },
+    { "file": "README.md", "minOccurrences": 1, "boundary": true, "note": "install snippet" }
+  ],
+  "claims": [
+    {
+      "id": "rule count",
+      "canonical": "350+",
+      "advertised": 350,
+      "phrase": "(\\d+)\\+\\s*(?:detection rules|rules)\\b",
+      "flags": "gi",
+      "floorCmd": "node scripts/count-rules.mjs",
+      "surfaces": [
+        { "file": "README.md", "note": "intro" },
+        { "file": "package.json", "note": "npm description" }
+      ]
+    }
+  ],
+  "generate": {
+    "log": {
+      "source": "CHANGELOG.md",
+      "target": ".ai/handoff/LOG.md",
+      "title": "My Project: Release Journal"
+    },
+    "freshness": {
+      "file": ".ai/handoff/NEXT_ACTIONS.md"
+    }
+  }
+}

@@ -9,6 +9,33 @@ independently of the npm version).
 > disabled, so `3.3.0` and `3.4.0` were developed in the repository but never published.
 > `3.5.0` is the first npm release since `3.2.1` and ships everything below it.
 
+## [Unreleased]
+
+## [3.6.0] - 2026-07-18
+
+### Added
+- `aahp doctor`: a conformance self-check that emits a machine-readable JSON record
+  (`schemaVersion: 1`) covering the handoff file set, MANIFEST schema conformance,
+  GROUNDING/TRUST provenance, an exact-version dependency pin, changelog format, and
+  version sync. `--json` prints the record to stdout.
+- Config-driven release gates that ship in the package and run against any consumer
+  project via `aahp.config.json`: `check-version-sync.mjs`, `check-changelog.mjs`,
+  `check-changelog-format.mjs`, and `check-claims.mjs`. Each is a no-op until a repo opts
+  in, so projects without config keep working.
+- A single shared changelog grammar (`changelog-grammar.mjs`) imported by both the format
+  validator and the optional LOG release-journal generator (`aahp-dashboard.mjs`), so the
+  two cannot diverge.
+- `schema/aahp-config.schema.json` and `aahp.config.example.json` documenting the config
+  shape (`versionSites`, `claims`, `generate`), plus a `NEXT_ACTIONS.md` current-version
+  freshness gate.
+- README Section 2.11 (conformance and the config-driven gates) and a documented release
+  ceremony. A `Provenance` column was adopted in the dogfooded `.ai/handoff/TRUST.md`.
+
+### Changed
+- `check-changelog-format.mjs` enforces the Keep a Changelog grammar (R1-R8, with
+  `## [Unreleased]` optional); this CHANGELOG was normalized to conform (gave `3.1.0` a
+  full ISO date and collapsed the `3.0.1-3.0.5` range into a single dated entry).
+
 ## [3.5.0] - 2026-07-14
 
 ### Added
@@ -57,25 +84,30 @@ independently of the npm version).
   `aahp archive --verify` detects truncation or tampering. Reusable per-check badge
   workflows were split out for downstream repos.
 
-## [3.1.0] - 2026-06
+## [3.1.0] - 2026-06-26
 
 ### Added
 - Reviewed, exact-value, expiring PII email allowlist (`pii-allowlist.json`),
   MANIFEST-indexed so it cannot suppress secrets. Shipped to npm as part of the 3.2.0
   release.
 
-## [3.0.1] to [3.0.5] - 2026-04-12 to 2026-06-20
+## [3.0.5] - 2026-06-20
 
 ### Added
-- AAHP v3: stable task IDs (`T-001` and up), a machine-readable dependency graph in
-  `MANIFEST.json`, the `aahp` CLI, the verify gate (`aahp verify`), checksum integrity,
-  the prompt-injection and secrets/PII firewalls, and OIDC trusted publishing to npm.
+- AAHP v3 (v3.0.1 through v3.0.5): stable task IDs (`T-001` and up), a machine-readable
+  dependency graph in `MANIFEST.json`, the `aahp` CLI, the verify gate (`aahp verify`),
+  checksum integrity, the prompt-injection and secrets/PII firewalls, and OIDC trusted
+  publishing to npm.
 
 ### Changed
 - Relicensed to Apache-2.0 (earlier commits carried MIT, then CC BY 4.0, headers).
 
+[Unreleased]: https://github.com/homeofe/AAHP/compare/v3.6.0...HEAD
+[3.6.0]: https://github.com/homeofe/AAHP/compare/v3.5.0...v3.6.0
 [3.5.0]: https://github.com/homeofe/AAHP/releases/tag/v3.5.0
 [3.4.0]: https://github.com/homeofe/AAHP/compare/v3.2.1...v3.4.0
 [3.3.0]: https://github.com/homeofe/AAHP/compare/v3.2.1...v3.3.0
 [3.2.1]: https://github.com/homeofe/AAHP/releases/tag/v3.2.1
 [3.2.0]: https://github.com/homeofe/AAHP/releases/tag/v3.2.0
+[3.1.0]: https://github.com/homeofe/AAHP/compare/v3.0.5...v3.1.0
+[3.0.5]: https://github.com/homeofe/AAHP/releases/tag/v3.0.5

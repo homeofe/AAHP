@@ -59,6 +59,16 @@ jobs:
           npm install --no-save ajv-cli ajv-formats
           npx ajv-cli validate --spec=draft2020 -c ajv-formats -s schema/aahp-manifest.schema.json -d .ai/handoff/MANIFEST.json
 
+      - name: Syntax-check Node gates
+        run: |
+          for f in scripts/*.mjs; do node --check "$f"; done
+
+      - name: Run release gates (changelog, version-sync, claims, handoff)
+        run: npm run check
+
+      - name: Run aahp doctor (conformance)
+        run: npm run doctor
+
       - name: Run bats tests
         run: npm test
 

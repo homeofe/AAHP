@@ -429,6 +429,57 @@ enforcement artifacts (an auditor agent, a `/challenge` command, an enforcement 
 live in the consuming harness (for example a Claude Code `.claude/` layer), because
 AAHP has no agent/command layer of its own.
 
+### 2.11 Conformance: `aahp doctor` and the config-driven release gates
+
+The layers above gate *handoff* state. Release hygiene (a well-formed changelog, a
+version bumped everywhere, honest capability numbers) is a separate concern, so it
+lives in a separate command and a set of config-driven gates that ship in the
+package and run against any consumer project.
+
+**`aahp doctor`** is a conformance self-check. It asserts that a repo actually
+follows the protocol and emits a machine-readable JSON record a fleet dashboard
+can ingest:
+
+```bash
+aahp doctor            # human-readable summary plus the JSON record
+aahp doctor --json     # only the JSON record, on stdout
+```
+
+It checks six gates: the handoff file set matches `AAHP_HANDOFF_FILES` (indexed
+files present, no strays); `MANIFEST.json` conforms to the schema; `GROUNDING.md`
+is present and `TRUST.md` carries a Provenance column; `@elvatis_com/aahp` is
+pinned to an exact version in `devDependencies` (`self` for this repo); the
+`CHANGELOG.md` matches the Keep a Changelog grammar; and the version is in sync
+across configured sites. The record:
+
+```json
+{ "schemaVersion": 1, "repo": "homeofe/AAHP", "aahpVersion": "3.6.0",
+  "gates": { "handoff-set": "pass", "manifest-schema": "pass", "grounding": "pass",
+             "pinned-dep": "self", "changelog-format": "pass", "version-sync": "pass" },
+  "checkedAt": "2026-07-18T00:00:00Z" }
+```
+
+**Config-driven gates.** These gates read an optional `aahp.config.json` at the
+project root and are a clean no-op when it (or the relevant section) is absent, so
+a repo that never opts in keeps working:
+
+| Gate | Script | Config key | Checks |
+|------|--------|-----------|--------|
+| version-sync | `check-version-sync.mjs` | `versionSites` | the package version appears in each listed file |
+| changelog presence | `check-changelog.mjs` | uses `CHANGELOG.md` | the current version has a changelog entry |
+| changelog format | `check-changelog-format.mjs` | uses `CHANGELOG.md` | Keep a Changelog 1.1.0 + SemVer grammar |
+| claims | `check-claims.mjs` | `claims` | capability numbers agree across surfaces and do not exceed a ground-truth floor |
+| generator + freshness | `aahp-dashboard.mjs` | `generate` | an optional LOG release journal stays in sync; a `Current version` header matches the package |
+
+The changelog validator and the LOG generator import the release-heading grammar
+from a single module (`scripts/changelog-grammar.mjs`), so the two cannot diverge.
+The config shape is described by `schema/aahp-config.schema.json`; see
+`aahp.config.example.json` for a worked example. `npm run check` runs the gates and
+`npm run doctor` runs the conformance check; both run in CI. See Section 11 for the
+release ceremony these gate.
+
+---
+
 ## 3. Robustness: Surviving Failures
 
 ### 3.1 Atomic Handoff with `HANDOFF.lock`
@@ -957,6 +1008,40 @@ Consumers and upstream drift. The policy:
 - **Breaking changes require a migration guide.** Any breaking change (a removed or renamed field, a stricter required set) ships with a migration entry in `CHANGELOG.md` and, where mechanical, a `migrate` path (as the v1 to v2/v3 migration does, Section 5). Additive changes such as `cross_repo_ref` are minor bumps and need no migration.
 
 When a consumer runs older scripts than the upstream ships, the mismatch is safe as long as both stay within the same major: additive fields the consumer's older schema does not know about are ignored by older tooling, and the verify gate on each side checks only its own repo. Cross-major skew is exactly the case the deprecation window and the migration guide exist for.
+
+---
+
+## 11. Releasing AAHP
+
+Releases follow [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and SemVer,
+and the grammar is machine-checked by `aahp doctor` / `check:changelog-format`.
+
+**Release ceremony:**
+
+1. Move the accumulated `## [Unreleased]` notes into a new `## [X.Y.Z] - YYYY-MM-DD`
+   section (leaving `## [Unreleased]` empty above it) and add its reference link at the
+   file foot.
+2. Bump `version` in `package.json` to `X.Y.Z`; the top changelog release must equal it.
+3. Run the gates and conformance check: `npm run check && npm run doctor`.
+4. Regenerate handoff state: update `STATUS.md`, the `NEXT_ACTIONS.md` `Current version`
+   line, and `MANIFEST.json` (`aahp manifest`).
+5. `npm test` (bats green), commit, and push the `vX.Y.Z` tag. CI publishes to npm (OIDC
+   trusted publishing) and creates the GitHub Release, which links to `CHANGELOG.md`.
+
+This is distinct from the `/handoff` MANIFEST-regeneration ceremony: `/handoff` refreshes
+handoff state at the end of every session; a release additionally cuts a changelog entry
+and a version tag.
+
+### 11.1 Config-driven consumer gates
+
+A consumer that pins `@elvatis_com/aahp` (Section 10) also gets the config-driven gates by
+adding an `aahp.config.json` (see `schema/aahp-config.schema.json` and
+`aahp.config.example.json`). `versionSites` pins the package version across files, `claims`
+pins capability numbers across surfaces, and `generate` drives an optional LOG
+release-journal plus a `NEXT_ACTIONS.md` current-version freshness gate. Every section is
+optional, and `aahp doctor` reports the consumer's conformance (including that the
+dependency is pinned) as a JSON record a fleet dashboard can aggregate. Call the gates via
+`npx --no-install aahp doctor --json` from CI so the pinned dependency is used.
 
 ---
 

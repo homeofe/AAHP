@@ -1,0 +1,144 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/homeofe/AAHP/schema/aahp-config.schema.json",
+  "title": "AAHP Config",
+  "description": "Optional aahp.config.json consumed by the config-driven AAHP release gates (version-sync, changelog, claims, generator) and by aahp doctor. Every section is optional; an absent file or section makes the corresponding gate a no-op.",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "Optional JSON Schema reference for editor tooling."
+    },
+    "versionSites": {
+      "type": "array",
+      "description": "Files that must contain the current package.json version at least minOccurrences times (checked by check-version-sync.mjs).",
+      "items": {
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "properties": {
+          "file": {
+            "type": "string",
+            "description": "Path relative to the project root."
+          },
+          "minOccurrences": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Minimum number of occurrences required (default 1)."
+          },
+          "boundary": {
+            "type": "boolean",
+            "description": "If true, match on word boundaries so 3.3.0 does not match inside 3.3.09 (default false: literal substring)."
+          },
+          "note": {
+            "type": "string",
+            "description": "Human-readable reason this file pins the version."
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "claims": {
+      "type": "array",
+      "description": "Capability numbers pinned to one canonical value across surfaces (checked by check-claims.mjs).",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "canonical",
+          "advertised",
+          "phrase",
+          "surfaces"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Short identifier for the claim (used in messages)."
+          },
+          "canonical": {
+            "type": "string",
+            "description": "Token shown to humans, e.g. \"350+\"."
+          },
+          "advertised": {
+            "type": "integer",
+            "description": "The number every surface must carry."
+          },
+          "phrase": {
+            "type": "string",
+            "description": "Regex source; capture group 1 is the number to compare."
+          },
+          "flags": {
+            "type": "string",
+            "description": "Regex flags (default \"gi\")."
+          },
+          "floorCmd": {
+            "type": "string",
+            "description": "Optional command run in the project root whose stdout yields an integer ground-truth floor; advertised must not exceed it. Omit for an editorial claim."
+          },
+          "joinTsConcat": {
+            "type": "boolean",
+            "description": "If true, join adjacent JS string-literal concatenations before matching."
+          },
+          "surfaces": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "file"
+              ],
+              "properties": {
+                "file": {
+                  "type": "string"
+                },
+                "note": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "generate": {
+      "type": "object",
+      "description": "Handoff generator + freshness gate (aahp-dashboard.mjs).",
+      "properties": {
+        "log": {
+          "type": "object",
+          "description": "Generate a LOG release journal from a CHANGELOG. Opt-in: omit to leave an append-only agent-journal LOG.md untouched.",
+          "properties": {
+            "source": {
+              "type": "string",
+              "description": "CHANGELOG path relative to the project root (default CHANGELOG.md)."
+            },
+            "target": {
+              "type": "string",
+              "description": "Output path relative to the project root (default .ai/handoff/LOG.md)."
+            },
+            "title": {
+              "type": "string",
+              "description": "H1 title for the generated journal."
+            }
+          },
+          "additionalProperties": false
+        },
+        "freshness": {
+          "type": "object",
+          "description": "Check that a hand-curated doc's 'Current version: **vX.Y.Z**' line matches package.json.",
+          "properties": {
+            "file": {
+              "type": "string",
+              "description": "Path relative to the project root (default .ai/handoff/NEXT_ACTIONS.md)."
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

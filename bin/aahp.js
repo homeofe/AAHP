@@ -13,6 +13,7 @@
 //   archive [path]    Rotate or verify LOG.md -> LOG-ARCHIVE.md
 
 //   status [path]     Show a quick state summary from MANIFEST.json
+//   doctor [path]     Conformance self-check; emits a JSON conformance record
 
 //
 // Options:
@@ -22,7 +23,7 @@
 import { fileURLToPath } from 'node:url'
 import { dirname, join, resolve, relative, isAbsolute } from 'node:path'
 import { existsSync, mkdirSync, copyFileSync, readdirSync, readFileSync } from 'node:fs'
-import { spawn } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -55,6 +56,7 @@ Commands:
   verify [path]     Run the canonical handoff gate (checksum + drift + TTL)
   archive [path]    Rotate or verify LOG.md -> LOG-ARCHIVE.md
   status [path]     Show a quick state summary from MANIFEST.json
+  doctor [path]     Conformance self-check; emits a JSON conformance record
 
 Init options:
   --force           Overwrite existing files (default: skip existing)
@@ -71,6 +73,10 @@ Manifest options:
 Verify options:
   --level LEVEL     Layers to run: precommit|prepush|full|ci (default: full)
   --quiet           Suppress per-check OK output, keep failures
+
+Doctor options:
+  --json            Print only the JSON conformance record to stdout
+  --quiet           Print only failing gates (plus the record)
 
 Global options:
   --help, -h        Show this help message
@@ -312,6 +318,212 @@ function cmdStatus(targetPath) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// doctor command -conformance self-check emitting a machine-readable JSON record
+//
+// Asserts CONFORMANCE (not just drift) against the AAHP contract and emits a
+// record aahp-hub can ingest to render a fleet matrix. Implemented Node-native
+// (like status) because it must assemble JSON and stay cross-platform (the bash
+// path has documented MSYS/Windows fragility). Gate statuses:
+//   pass    -conforms
+//   fail    -present but wrong
+//   missing -a required thing is absent (e.g. an unpinned/absent dep)
+//   skip    -not applicable here (e.g. no CHANGELOG.md, no versionSites)
+//   self    -this repo IS @elvatis_com/aahp, so it does not pin itself
+// ---------------------------------------------------------------------------
+
+function readJsonSafe(path) {
+  try {
+    return JSON.parse(readFileSync(path, 'utf8'))
+  } catch {
+    return null
+  }
+}
+
+function firstLine(text) {
+  return String(text || '')
+    .split('\n')
+    .map((l) => l.trim())
+    .find((l) => l.length > 0) || 'gate failed'
+}
+
+// Parse the canonical handoff file list from the bash source of truth so the
+// Node tooling never drifts from _aahp-lib.sh.
+function handoffFileSet() {
+  try {
+    const lib = readFileSync(join(PACKAGE_ROOT, 'scripts', '_aahp-lib.sh'), 'utf8')
+    const m = lib.match(/AAHP_HANDOFF_FILES=\(([^)]*)\)/)
+    return m ? m[1].split(/\s+/).map((s) => s.trim()).filter(Boolean) : []
+  } catch {
+    return []
+  }
+}
+
+function deriveRepo(targetPath, pkg) {
+  const repoField = pkg && pkg.repository
+  const url = typeof repoField === 'string' ? repoField : repoField && repoField.url
+  const fromPkg = url && String(url).match(/github\.com[/:]([^/]+\/[^/.]+?)(?:\.git)?$/)
+  if (fromPkg) return fromPkg[1]
+  const git = spawnSync('git', ['-C', targetPath, 'remote', 'get-url', 'origin'], { encoding: 'utf8' })
+  const m = git.status === 0 && git.stdout.match(/github\.com[/:]([^/]+\/[^/.]+?)(?:\.git)?\s*$/)
+  return m ? m[1] : 'unknown'
+}
+
+function runGate(scriptName, targetPath) {
+  return spawnSync(process.execPath, [join(PACKAGE_ROOT, 'scripts', scriptName), targetPath], { encoding: 'utf8' })
+}
+
+function gateHandoffSet(handoffDir) {
+  const manifestPath = join(handoffDir, 'MANIFEST.json')
+  if (!existsSync(manifestPath)) return { status: 'fail', reason: 'MANIFEST.json not found' }
+  const manifest = readJsonSafe(manifestPath)
+  if (!manifest) return { status: 'fail', reason: 'MANIFEST.json is not valid JSON' }
+  const canonical = new Set(handoffFileSet())
+  const files = manifest.files || {}
+  const missing = Object.keys(files).filter((f) => !existsSync(join(handoffDir, f)))
+  if (missing.length) return { status: 'fail', reason: `indexed file(s) missing on disk: ${missing.join(', ')}` }
+  let entries = []
+  try {
+    entries = readdirSync(handoffDir)
+  } catch {
+    // handoff dir unreadable is already covered by the MANIFEST check above
+  }
+  const strays = entries.filter((f) => /\.(md|json)$/.test(f) && f !== 'MANIFEST.json' && !canonical.has(f))
+  if (strays.length) return { status: 'fail', reason: `untracked stray handoff file(s): ${strays.join(', ')}` }
+  return { status: 'pass', reason: `${Object.keys(files).length} indexed files present, no strays` }
+}
+
+function gateManifestSchema(handoffDir) {
+  const manifest = readJsonSafe(join(handoffDir, 'MANIFEST.json'))
+  if (!manifest) return { status: 'fail', reason: 'MANIFEST.json missing or invalid JSON' }
+  const isStr = (v) => typeof v === 'string'
+  const errs = []
+  if (!isStr(manifest.aahp_version) || !/^\d+\.\d+$/.test(manifest.aahp_version)) errs.push('aahp_version must match \\d+.\\d+')
+  if (!isStr(manifest.project) || !manifest.project) errs.push('project must be a non-empty string')
+  const ls = manifest.last_session
+  if (!ls || typeof ls !== 'object') {
+    errs.push('last_session missing')
+  } else {
+    if (!isStr(ls.agent)) errs.push('last_session.agent missing')
+    if (!isStr(ls.timestamp)) errs.push('last_session.timestamp missing')
+    if (!['research', 'architecture', 'implementation', 'review', 'fix', 'idle', 'documentation'].includes(ls.phase)) errs.push('last_session.phase invalid')
+  }
+  if (!isStr(manifest.quick_context)) errs.push('quick_context must be a string')
+  const files = manifest.files
+  if (!files || typeof files !== 'object') {
+    errs.push('files object missing')
+  } else {
+    for (const [name, e] of Object.entries(files)) {
+      if (!e || typeof e !== 'object') { errs.push(`files.${name} malformed`); continue }
+      if (!isStr(e.checksum) || !/^sha256:[a-f0-9]{64}$/.test(e.checksum)) errs.push(`files.${name}.checksum invalid`)
+      if (!isStr(e.updated)) errs.push(`files.${name}.updated missing`)
+      if (!Number.isInteger(e.lines) || e.lines < 0) errs.push(`files.${name}.lines invalid`)
+      if (!isStr(e.summary)) errs.push(`files.${name}.summary missing`)
+    }
+  }
+  if ('next_task_id' in manifest && (!Number.isInteger(manifest.next_task_id) || manifest.next_task_id < 1)) errs.push('next_task_id must be an integer >= 1')
+  if (manifest.tasks && typeof manifest.tasks === 'object') {
+    for (const [id, t] of Object.entries(manifest.tasks)) {
+      if (!/^T-\d{3,}$/.test(id)) errs.push(`task id "${id}" invalid`)
+      else if (!t || !isStr(t.title) || !isStr(t.status)) errs.push(`task ${id} missing title/status`)
+    }
+  }
+  if (errs.length) return { status: 'fail', reason: errs.slice(0, 5).join('; ') + (errs.length > 5 ? ` (+${errs.length - 5} more)` : '') }
+  return { status: 'pass', reason: 'structural checks against aahp-manifest.schema.json pass' }
+}
+
+function gateGrounding(handoffDir) {
+  if (!existsSync(join(handoffDir, 'GROUNDING.md'))) return { status: 'fail', reason: 'GROUNDING.md not found' }
+  const trustPath = join(handoffDir, 'TRUST.md')
+  if (!existsSync(trustPath)) return { status: 'fail', reason: 'TRUST.md not found' }
+  const trust = readFileSync(trustPath, 'utf8')
+  if (!/^\|[^\n]*\bProvenance\b[^\n]*\|/im.test(trust)) return { status: 'fail', reason: 'TRUST.md has no Provenance column' }
+  return { status: 'pass', reason: 'GROUNDING.md present; TRUST.md has a Provenance column' }
+}
+
+function gatePinnedDep(pkg) {
+  if (pkg && pkg.name === '@elvatis_com/aahp') return { status: 'self', reason: 'this repo is the aahp package itself' }
+  const dev = (pkg && pkg.devDependencies) || {}
+  const reg = (pkg && pkg.dependencies) || {}
+  const spec = dev['@elvatis_com/aahp'] !== undefined ? dev['@elvatis_com/aahp'] : reg['@elvatis_com/aahp']
+  if (spec === undefined) return { status: 'missing', reason: '@elvatis_com/aahp not pinned in devDependencies' }
+  if (/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(spec)) return { status: 'pass', reason: `pinned exact: ${spec}` }
+  return { status: 'fail', reason: `not an exact pin: "${spec}" (use an exact version, no range operator)` }
+}
+
+function gateChangelogFormat(targetPath) {
+  if (!existsSync(join(targetPath, 'CHANGELOG.md'))) return { status: 'skip', reason: 'no CHANGELOG.md' }
+  const r = runGate('check-changelog-format.mjs', targetPath)
+  if (r.status === 0) return { status: 'pass', reason: 'Keep a Changelog format valid' }
+  return { status: 'fail', reason: firstLine(r.stderr || r.stdout) }
+}
+
+function gateVersionSync(targetPath) {
+  const cfg = readJsonSafe(join(targetPath, 'aahp.config.json'))
+  const sites = cfg && Array.isArray(cfg.versionSites) ? cfg.versionSites : []
+  if (sites.length === 0) return { status: 'skip', reason: 'no versionSites configured' }
+  const r = runGate('check-version-sync.mjs', targetPath)
+  if (r.status === 0) return { status: 'pass', reason: `version matches ${sites.length} site(s)` }
+  return { status: 'fail', reason: firstLine(r.stderr || r.stdout) }
+}
+
+function cmdDoctor(targetPath, flags) {
+  const jsonOnly = flags.includes('--json')
+  const quiet = flags.includes('--quiet')
+  const handoffDir = join(targetPath, '.ai', 'handoff')
+  const pkg = readJsonSafe(join(targetPath, 'package.json')) || {}
+
+  const results = {
+    'handoff-set': gateHandoffSet(handoffDir),
+    'manifest-schema': gateManifestSchema(handoffDir),
+    grounding: gateGrounding(handoffDir),
+    'pinned-dep': gatePinnedDep(pkg),
+    'changelog-format': gateChangelogFormat(targetPath),
+    'version-sync': gateVersionSync(targetPath),
+  }
+
+  const gates = {}
+  for (const [k, v] of Object.entries(results)) gates[k] = v.status
+
+  const record = {
+    schemaVersion: 1,
+    repo: deriveRepo(targetPath, pkg),
+    aahpVersion: getVersion(),
+    gates,
+    checkedAt: new Date().toISOString(),
+  }
+
+  const failing = Object.entries(gates).filter(([, s]) => s === 'fail' || s === 'missing')
+
+  if (jsonOnly) {
+    process.stdout.write(JSON.stringify(record, null, 2) + '\n')
+    process.exit(failing.length === 0 ? 0 : 1)
+  }
+
+  const labels = { pass: 'PASS', fail: 'FAIL', missing: 'MISSING', skip: 'SKIP', self: 'SELF' }
+  if (!quiet) {
+    console.log(`\naahp doctor -conformance for ${record.repo} (aahp v${record.aahpVersion})`)
+    console.log('=========================================')
+  }
+  for (const [k, v] of Object.entries(results)) {
+    const tag = labels[v.status] || v.status.toUpperCase()
+    const ok = v.status === 'pass' || v.status === 'skip' || v.status === 'self'
+    if (!ok || !quiet) console.log(`  ${tag.padEnd(8)} ${k}: ${v.reason}`)
+  }
+  if (!quiet) console.log('=========================================')
+  if (failing.length === 0) {
+    if (!quiet) console.log(`Conformance OK: ${Object.keys(gates).length} gate(s), no failures.`)
+  } else {
+    console.log(`Conformance FAILED: ${failing.map(([k]) => k).join(', ')}.`)
+  }
+  if (!quiet) {
+    console.log('\nJSON record:')
+    console.log(JSON.stringify(record))
+  }
+
+  process.exit(failing.length === 0 ? 0 : 1)
+}
+
 // Shell script commands -spawn bash scripts
 //
 // The bash scripts already handle their own argument parsing, including
@@ -444,6 +656,12 @@ switch (command) {
   case 'status': {
     const { targetPath } = extractPathAndFlags(rest)
     cmdStatus(targetPath)
+    break
+  }
+
+  case 'doctor': {
+    const { targetPath, flags } = extractPathAndFlags(rest)
+    cmdDoctor(targetPath, flags)
     break
   }
 

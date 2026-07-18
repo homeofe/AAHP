@@ -2,6 +2,10 @@
   "version": 1,
   "entries": [
     {
+      "sha256": "175da26816ba01cd90415b026d37daf3687502ff8e93dd82e5737e24c0ccaac8",
+      "title": "## [2026-02-26] Claude Opus 4.6: Merge v2 Proposal into README"
+    },
+    {
       "sha256": "c9ae834d0da14652c521f35978e38080edd3a0c70930c2782dac66ec4de0a50d",
       "title": "## [2026-02-26] Previous: AAHP v2 Tooling Implementation"
     }

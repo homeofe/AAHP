@@ -62,3 +62,7 @@ jobs:
       - name: Run aahp verify (CI level, no escape hatch)
         if: ${{ github.actor != 'dependabot[bot]' && github.event.head_commit.author.username != 'dependabot[bot]' }}
         run: bash scripts/verify-handoff.sh . --level ci
+
+      - name: Run aahp doctor (conformance record)
+        if: ${{ github.actor != 'dependabot[bot]' && github.event.head_commit.author.username != 'dependabot[bot]' }}
+        run: node bin/aahp.js doctor . --json

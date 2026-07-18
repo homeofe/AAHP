@@ -4,6 +4,24 @@
 
 ---
 
+## [2026-02-26] Claude Opus 4.6: Merge v2 Proposal into README
+
+**Agent:** Claude Opus 4.6
+**Phase:** 3 (Implementer)
+**Branch:** main
+
+### What was done
+
+- Deleted `AAHP-v2-PROPOSAL.md` (content was identical to README.md)
+- Updated `scripts/aahp-migrate-v2.sh` references from `AAHP-v2-PROPOSAL.md` to `README.md`
+- Committed and pushed to GitHub (commit 672be62)
+
+### Decisions made
+
+- Single source of truth: README.md is the v2 specification document
+
+---
+
 ## [2026-02-26] Previous: AAHP v2 Tooling Implementation
 
 **Agent:** (prior session)

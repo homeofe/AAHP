@@ -1,6 +1,6 @@
 {
   "name": "@elvatis_com/aahp",
-  "version": "3.5.0",
+  "version": "3.6.0",
   "description": "AI-to-AI Handoff Protocol - CLI tools for managing agent handoff files",
   "author": "Elvatis <emre.kohler@elvatis.com>",
   "bin": {
@@ -30,6 +30,8 @@
     "scripts/",
     "templates/",
     "schema/",
+    "aahp.config.example.json",
+    "CHANGELOG.md",
     "LICENSE",
     "README.md"
   ],
@@ -38,8 +40,16 @@
   },
   "type": "module",
   "scripts": {
+    "check:changelog": "node scripts/check-changelog.mjs",
+    "check:changelog-format": "node scripts/check-changelog-format.mjs",
+    "check:version-sync": "node scripts/check-version-sync.mjs",
+    "check:claims": "node scripts/check-claims.mjs",
+    "check:handoff": "node scripts/aahp-dashboard.mjs --check",
+    "handoff:refresh": "node scripts/aahp-dashboard.mjs",
+    "check": "npm run check:changelog && npm run check:changelog-format && npm run check:version-sync && npm run check:claims && npm run check:handoff",
+    "doctor": "node bin/aahp.js doctor .",
     "test": "npx bats tests/",
-    "prepublishOnly": "npm test"
+    "prepublishOnly": "npm run check && npm run doctor && npm test"
   },
   "devDependencies": {
     "bats": "^1.13.0"

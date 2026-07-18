@@ -138,6 +138,25 @@ EOF
     [[ "$output" == *"Stale claim"* ]]
 }
 
+# ─── Layer 3: commit-pointer freshness (warn, never blocks) ──
+
+@test "Layer 3 WARNS (never fails) when the manifest commit is not an ancestor of HEAD" {
+    # Simulate a squash-merge / rebase-merge: the manifest records a commit that
+    # is not in HEAD's history (an orphaned root commit). Layers 1-2 still pass,
+    # so the gate must WARN and still succeed rather than hard-fail.
+    local orphan orphan_short mfile
+    mfile="$TEST_TMPDIR/.ai/handoff/MANIFEST.json"
+    orphan=$(git -C "$TEST_TMPDIR" commit-tree "$(git -C "$TEST_TMPDIR" rev-parse 'HEAD^{tree}')" -m orphan)
+    orphan_short=$(git -C "$TEST_TMPDIR" rev-parse --short "$orphan")
+    node -e 'const fs=require("fs");const p=process.argv[1];const c=process.argv[2];const m=JSON.parse(fs.readFileSync(p,"utf8"));m.last_session.commit=c;fs.writeFileSync(p,JSON.stringify(m,null,2)+"\n");' "$mfile" "$orphan_short"
+
+    run bash "$SCRIPTS_DIR/verify-handoff.sh" "$TEST_TMPDIR" --level full
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"is not an ancestor of HEAD"* ]]
+    [[ "$output" == *"squash-merge or rebase-merge"* ]]
+    [[ "$output" == *"aahp verify passed"* ]]
+}
+
 # ─── Argument handling ───────────────────────────────────────
 
 @test "rejects an invalid --level" {

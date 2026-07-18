@@ -4,6 +4,8 @@
 > Each item should be self-contained, the agent must be able to start without asking questions.
 > Blocked tasks go to the bottom. Completed tasks move to "Recently Completed".
 
+Current version: **v[VERSION]**
+
 ---
 
 ## T-001: [Task Title]

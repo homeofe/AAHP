@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
-# AAHP pre-push hook - full handoff gate.
+# AAHP pre-push hook - full handoff gate + conformance self-check.
 #
 # Runs: aahp verify --level prepush
 #   Layer 1: MANIFEST checksum integrity
 #   Layer 2: content-drift gate
 #   Layer 3: commit-pointer freshness (MANIFEST.last_session.commit vs HEAD)
 #   Layer 4: TRUST-TTL expiry (advisory)
+# then: aahp doctor (conformance self-check), when the aahp tooling is resolvable.
 #
 # Escape hatch: AAHP_SKIP_VERIFY=1 git push ...   (caught by the required CI
 # check; do NOT use it to bypass CI). Never use `git push --no-verify`.
@@ -23,3 +24,14 @@ if [ ! -f "$VERIFY" ]; then
 fi
 
 bash "$VERIFY" "$REPO_ROOT" --level prepush
+
+# Conformance self-check (aahp doctor). Dogfooded on AAHP; opt-in for consumers.
+# Runs only when the aahp tooling is resolvable, and honours the same escape
+# hatch as the verify gate. A non-zero doctor result blocks the push.
+if [ "${AAHP_SKIP_VERIFY:-0}" != "1" ] && command -v node >/dev/null 2>&1; then
+    if [ -f "$REPO_ROOT/bin/aahp.js" ]; then
+        node "$REPO_ROOT/bin/aahp.js" doctor "$REPO_ROOT" --quiet
+    elif command -v npx >/dev/null 2>&1 && npx --no-install aahp --version >/dev/null 2>&1; then
+        npx --no-install aahp doctor "$REPO_ROOT" --quiet
+    fi
+fi

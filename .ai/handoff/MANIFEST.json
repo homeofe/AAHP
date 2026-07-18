@@ -1,78 +1,78 @@
 {
   "aahp_version": "3.0",
-  "project": "AAHP-spec",
+  "project": "AAHP",
   "last_session": {
     "agent": "claude-opus-4-8",
-    "session_id": "cli-1784025685",
-    "timestamp": "2026-07-14T10:41:25Z",
-    "commit": "83a4192",
-    "phase": "documentation",
+    "session_id": "cli-1784372119",
+    "timestamp": "2026-07-18T10:55:20Z",
+    "commit": "6118bea",
+    "phase": "fix",
     "duration_minutes": 0
   },
   "files": {
     "STATUS.md": {
-      "checksum": "sha256:66c90333d460a41bd1fc6e0c8126f80d044f87f9533d0673ccdcf017cb629564",
-      "updated": "2026-07-14T10:41:24Z",
-      "lines": 143,
+      "checksum": "sha256:c2efa2c1c8b85934ab13d5c620b0848a4d3a368977ec7bb88c0064c9ce8cec72",
+      "updated": "2026-07-18T10:55:12Z",
+      "lines": 146,
       "summary": "(no summary available)"
     },
     "NEXT_ACTIONS.md": {
-      "checksum": "sha256:50de9129b820e50f0a23859fa482b88390196c0c8653bdd235e8c45839a42715",
-      "updated": "2026-07-14T08:23:45Z",
-      "lines": 234,
+      "checksum": "sha256:7fb39a30e71266cb62a96cd8ca74c3c50e962ddd5ca02ff78d5d62657df613f8",
+      "updated": "2026-07-18T10:31:20Z",
+      "lines": 236,
       "summary": "(no summary available)"
     },
     "LOG.md": {
-      "checksum": "sha256:08d903cd6ec745a75fbfeb2a611b6c7e0e810848a1e56f22e714d097e9be7279",
-      "updated": "2026-07-14T08:23:45Z",
-      "lines": 266,
+      "checksum": "sha256:75328da38d350b41a2c934cc18d6ada419bf3a3c4396bc82fa22de494ae8fabf",
+      "updated": "2026-07-18T10:38:04Z",
+      "lines": 270,
       "summary": "(no summary available)"
     },
     "LOG-ARCHIVE.md": {
-      "checksum": "sha256:dd4df677e9dfcd7f72620ae5c25a35e0b0c764ca5807dc79f71163bf29d5542b",
-      "updated": "2026-07-14T08:23:45Z",
-      "lines": 26,
+      "checksum": "sha256:144c5aeb48c3709d29569f0d6195279ad6848a011b103a5bb0f9da7663a18899",
+      "updated": "2026-07-18T10:38:04Z",
+      "lines": 44,
       "summary": "(no summary available)"
     },
     "LOG-ARCHIVE.index.json": {
-      "checksum": "sha256:48bf942ed937ca19b019d2c11eef04ff0633c4c51e3229b61f0a9d158c084d93",
-      "updated": "2026-07-14T08:23:45Z",
-      "lines": 9,
+      "checksum": "sha256:f4d24099772e935c33c624dc90a211d77c5e897bc8c33e081a0a6569b876af51",
+      "updated": "2026-07-18T10:38:04Z",
+      "lines": 13,
       "summary": "{"
     },
     "DASHBOARD.md": {
       "checksum": "sha256:e96e392db8dab2e9719e542dfa2a10c240d0be16ac6721298c460a22985cbdea",
-      "updated": "2026-07-14T08:23:45Z",
+      "updated": "2026-04-05T17:29:32Z",
       "lines": 96,
       "summary": "(no summary available)"
     },
     "TRUST.md": {
-      "checksum": "sha256:5032e6a9acb480080ddaa2f6e2c77fde328e1d7ea53a2563fbca31e493bd1c3e",
-      "updated": "2026-07-14T10:16:22Z",
-      "lines": 91,
+      "checksum": "sha256:ed25a904864a49e5ad8062d2c12b090f0fbcc4a37b1558322a0c028ecd6878c5",
+      "updated": "2026-07-18T10:32:12Z",
+      "lines": 93,
       "summary": "(no summary available)"
     },
     "CONVENTIONS.md": {
       "checksum": "sha256:aa576e7c37de31ea6e2b5e4cc3e15ba4494571798a0e42f276f505ba9cac24af",
-      "updated": "2026-07-14T08:23:45Z",
+      "updated": "2026-04-05T17:29:32Z",
       "lines": 114,
       "summary": "(no summary available)"
     },
     "WORKFLOW.md": {
       "checksum": "sha256:62ac58c749c907cf2eb9236172cd11d3a81128a855e8946e93e436ee016745be",
-      "updated": "2026-07-14T08:23:45Z",
+      "updated": "2026-06-28T06:56:53Z",
       "lines": 131,
       "summary": "(no summary available)"
     },
     "GROUNDING.md": {
       "checksum": "sha256:7ef8cece585dc5defb4285175b9ba560d5469675df553d4ce28ec9e7aec24343",
-      "updated": "2026-07-14T08:23:45Z",
+      "updated": "2026-07-13T16:30:26Z",
       "lines": 209,
       "summary": "(no summary available)"
     },
     "pii-allowlist.json": {
       "checksum": "sha256:7c1051f6e2bc3943b7c1dbe4da229694455681b8875a346c99279e555edb733f",
-      "updated": "2026-07-14T08:23:45Z",
+      "updated": "2026-06-26T10:38:49Z",
       "lines": 4,
       "summary": "{"
     }
@@ -80,8 +80,8 @@
   "quick_context": "(no summary available) (no summary available) ",
   "token_budget": {
     "manifest_only": 85,
-    "manifest_plus_core": 5141,
-    "full_read": 12792
+    "manifest_plus_core": 5633,
+    "full_read": 13645
   }
   ,"next_task_id": 18
   ,"tasks": {"T-001":{"title":"[T-006] Publish npm package","status":"done","priority":"medium","depends_on":[],"created":"2026-06-28T10:10:21.975Z","notes":"**AAHP Task:** `T-006`  \n**Status:** blocked  \n**Priority:** medium  \n\n\n\n\n---\n*Auto-created from AAHP manifest · project: AAHP*","github_issue":18,"github_repo":"homeofe/AAHP","completed":"2026-07-14T00:00:00Z"},"T-002":{"title":"[T-014] Add CLI integration tests for bin/aahp.js [high]","status":"done","priority":"high","depends_on":[],"created":"2026-06-28T10:10:21.975Z","notes":"**AAHP Task:** `T-014`  \n**Status:** ready  \n**Priority:** high  \n\n\n\n\n---\n*Auto-created from AAHP manifest · project: AAHP*","github_issue":14,"github_repo":"homeofe/AAHP","completed":"2026-07-14T00:00:00Z"},"T-015":{"title":"Add `aahp status` quick-look command [medium]","status":"done","priority":"medium","depends_on":[],"created":"2026-06-28T10:10:21.978Z","github_issue":22,"github_repo":"homeofe/AAHP","completed":"2026-07-14T00:00:00Z"},"T-016":{"title":"Add `aahp archive` command for LOG.md rotation [medium]","status":"done","priority":"medium","depends_on":[],"created":"2026-06-28T10:10:21.979Z","github_issue":23,"github_repo":"homeofe/AAHP","completed":"2026-07-14T00:00:00Z"},"T-017":{"title":"Add project-level CLAUDE.md [low]","status":"done","priority":"low","depends_on":[],"created":"2026-06-28T10:10:21.979Z","github_issue":24,"github_repo":"homeofe/AAHP","completed":"2026-07-14T00:00:00Z"}}

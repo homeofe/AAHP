@@ -1,0 +1,15 @@
+{
+  "$schema": "./schema/aahp-config.schema.json",
+  "versionSites": [
+    {
+      "file": "CHANGELOG.md",
+      "minOccurrences": 1,
+      "note": "top release heading must carry the current package version"
+    }
+  ],
+  "generate": {
+    "freshness": {
+      "file": ".ai/handoff/NEXT_ACTIONS.md"
+    }
+  }
+}

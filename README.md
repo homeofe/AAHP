@@ -1169,11 +1169,26 @@ and a version tag.
 A consumer that pins `@elvatis_com/aahp` (Section 10) also gets the config-driven gates by
 adding an `aahp.config.json` (see `schema/aahp-config.schema.json` and
 `aahp.config.example.json`). `versionSites` pins the package version across files, `claims`
-pins capability numbers across surfaces, and `generate` drives an optional LOG
-release-journal plus a `NEXT_ACTIONS.md` current-version freshness gate. Every section is
-optional, and `aahp doctor` reports the consumer's conformance (including that the
-dependency is pinned) as a JSON record a fleet dashboard can aggregate. Call the gates via
-`npx --no-install aahp doctor --json` from CI so the pinned dependency is used.
+pins capability numbers across surfaces, `forbiddenPatterns` denylists text (for example the
+em-dash ban), `docSync` keeps duplicated value-sets in step, `docLinks` checks internal
+Markdown links, and `generate` drives an optional LOG release-journal plus a
+`NEXT_ACTIONS.md` current-version freshness gate. Two selection keys tune the surface:
+`check` (`only`/`skip`) chooses which gates `aahp check` runs, and `pinnedDep`
+(`name`/`location`/`allowRange`) opts the `doctor` pinned-dep gate in (absent, it is a clean
+skip). Every section is optional.
+
+Run the gates two ways. `npx --no-install aahp check .` is the pass/fail RUN whose exit code
+gates CI: it aggregates every applicable gate and continues past failures so one run surfaces
+them all. `npx --no-install aahp doctor --json` emits the conformance RECORD a fleet
+dashboard can aggregate. On a repo that does not use the handoff protocol, add `--governance`
+(alias `--no-handoff`) so the three handoff gates skip and the record can still be green. The
+tracked-file gates (`forbidden-patterns`, `doc-links`) scan git-tracked files and fail loud
+outside a git work tree, so run them in a checkout (in CI, `actions/checkout`).
+
+The fastest way to adopt all of this is `aahp init --gates`, which scaffolds a trimmed
+`aahp.config.json`, a `govern` npm script (`aahp check .`), and a portable
+`.github/workflows/aahp-govern.yml` (verify-only, `npx`-based, no vendored paths) without
+touching `.ai/handoff/`.
 
 ---
 

@@ -11,6 +11,15 @@ independently of the npm version).
 
 ## [Unreleased]
 
+## [3.8.1] - 2026-07-19
+
+### Fixed
+- `scripts/aahp-manifest.sh` now passes the manifest path to its Node helpers as an
+  argument (`process.argv[1]`) instead of interpolating `$HANDOFF_DIR` into the inline
+  script. On Windows and MSYS checkouts the interpolated path was not readable by native
+  Node, so the preservation helpers failed silently and `tasks`, `next_task_id`, and
+  `cross_repo_ref` were dropped from MANIFEST.json on regeneration. Linux and CI were
+  unaffected. Regeneration now preserves those optional fields on every platform.
 ## [3.8.0] - 2026-07-18
 **Portable Governance: one aggregate governance gate, a governance-only conformance record, and a drop-in CI workflow**
 
@@ -184,7 +193,8 @@ independently of the npm version).
 ### Changed
 - Relicensed to Apache-2.0 (earlier commits carried MIT, then CC BY 4.0, headers).
 
-[Unreleased]: https://github.com/homeofe/AAHP/compare/v3.8.0...HEAD
+[Unreleased]: https://github.com/homeofe/AAHP/compare/v3.8.1...HEAD
+[3.8.1]: https://github.com/homeofe/AAHP/compare/v3.8.0...v3.8.1
 [3.8.0]: https://github.com/homeofe/AAHP/compare/v3.7.0...v3.8.0
 [3.7.0]: https://github.com/homeofe/AAHP/compare/v3.6.1...v3.7.0
 [3.6.1]: https://github.com/homeofe/AAHP/compare/v3.6.0...v3.6.1

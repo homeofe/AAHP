@@ -146,25 +146,25 @@ if [ -f "$HANDOFF_DIR/MANIFEST.json" ]; then
     # Extract tasks block and next_task_id if they exist
     if command -v node &>/dev/null; then
         EXISTING=$(node -e "
-            const m = JSON.parse(require('fs').readFileSync('$HANDOFF_DIR/MANIFEST.json', 'utf8'));
+            const m = JSON.parse(require('fs').readFileSync(process.argv[1], 'utf8'));
             if (m.tasks) process.stdout.write(JSON.stringify(m.tasks));
-        " 2>/dev/null || true)
+        " "$HANDOFF_DIR/MANIFEST.json" 2>/dev/null || true)
         if [ -n "$EXISTING" ]; then
             TASKS_JSON="$EXISTING"
         fi
         EXISTING_ID=$(node -e "
-            const m = JSON.parse(require('fs').readFileSync('$HANDOFF_DIR/MANIFEST.json', 'utf8'));
+            const m = JSON.parse(require('fs').readFileSync(process.argv[1], 'utf8'));
             if (m.next_task_id) process.stdout.write(String(m.next_task_id));
-        " 2>/dev/null || true)
+        " "$HANDOFF_DIR/MANIFEST.json" 2>/dev/null || true)
         if [ -n "$EXISTING_ID" ] && [[ "$EXISTING_ID" =~ ^[0-9]+$ ]]; then
             NEXT_TASK_ID="$EXISTING_ID"
         fi
         # Preserve the optional cross_repo_ref field (v3.4+), like tasks it is
         # agent-managed and must survive regeneration.
         EXISTING_CRR=$(node -e "
-            const m = JSON.parse(require('fs').readFileSync('$HANDOFF_DIR/MANIFEST.json', 'utf8'));
+            const m = JSON.parse(require('fs').readFileSync(process.argv[1], 'utf8'));
             if (m.cross_repo_ref) process.stdout.write(JSON.stringify(m.cross_repo_ref));
-        " 2>/dev/null || true)
+        " "$HANDOFF_DIR/MANIFEST.json" 2>/dev/null || true)
         if [ -n "$EXISTING_CRR" ]; then
             CROSS_REPO_REF="$EXISTING_CRR"
         fi

@@ -145,29 +145,46 @@ CROSS_REPO_REF=""
 if [ -f "$HANDOFF_DIR/MANIFEST.json" ]; then
     # Extract tasks block and next_task_id if they exist
     if command -v node &>/dev/null; then
-        EXISTING=$(node -e "
-            const m = JSON.parse(require('fs').readFileSync('$HANDOFF_DIR/MANIFEST.json', 'utf8'));
-            if (m.tasks) process.stdout.write(JSON.stringify(m.tasks));
-        " 2>/dev/null || true)
-        if [ -n "$EXISTING" ]; then
-            TASKS_JSON="$EXISTING"
+        # Read tasks, next_task_id, and cross_repo_ref in a SINGLE node process
+        # (not three) and emit them tab-separated. Fewer spawns matter on Windows,
+        # where process creation is slow. Capture stderr separately so an
+        # interpreter warning cannot corrupt the TSV, and surface a read/parse
+        # error on stderr instead of silently dropping the fields. The path is
+        # passed as argv (process.argv[1]) so native Node can read it on Windows
+        # and MSYS, not only on Linux. JSON.stringify emits a single line with no
+        # literal tab, so the TSV split is safe. The command substitution sits in
+        # an if-condition, which is exempt from 'set -e', so a missing or corrupt
+        # MANIFEST is non-fatal: regeneration continues without the preserved
+        # fields rather than aborting.
+        ERR_FILE=$(mktemp)
+        if MANIFEST_FIELDS=$(node -e "
+            try {
+                const m = JSON.parse(require('fs').readFileSync(process.argv[1], 'utf8'));
+                process.stdout.write([
+                    m.tasks ? JSON.stringify(m.tasks) : '',
+                    m.next_task_id !== undefined ? String(m.next_task_id) : '',
+                    m.cross_repo_ref ? JSON.stringify(m.cross_repo_ref) : ''
+                ].join('\t'));
+            } catch (e) {
+                console.error(e.message);
+                process.exit(1);
+            }
+        " "$HANDOFF_DIR/MANIFEST.json" 2>"$ERR_FILE"); then
+            IFS=$'\t' read -r EXISTING EXISTING_ID EXISTING_CRR <<< "$MANIFEST_FIELDS" || true
+            if [ -n "$EXISTING" ]; then
+                TASKS_JSON="$EXISTING"
+            fi
+            if [ -n "$EXISTING_ID" ] && [[ "$EXISTING_ID" =~ ^[0-9]+$ ]]; then
+                NEXT_TASK_ID="$EXISTING_ID"
+            fi
+            if [ -n "$EXISTING_CRR" ]; then
+                CROSS_REPO_REF="$EXISTING_CRR"
+            fi
+        else
+            echo "aahp-manifest: could not read the existing MANIFEST.json to preserve tasks/next_task_id/cross_repo_ref; regenerating without them." >&2
+            cat "$ERR_FILE" >&2
         fi
-        EXISTING_ID=$(node -e "
-            const m = JSON.parse(require('fs').readFileSync('$HANDOFF_DIR/MANIFEST.json', 'utf8'));
-            if (m.next_task_id) process.stdout.write(String(m.next_task_id));
-        " 2>/dev/null || true)
-        if [ -n "$EXISTING_ID" ] && [[ "$EXISTING_ID" =~ ^[0-9]+$ ]]; then
-            NEXT_TASK_ID="$EXISTING_ID"
-        fi
-        # Preserve the optional cross_repo_ref field (v3.4+), like tasks it is
-        # agent-managed and must survive regeneration.
-        EXISTING_CRR=$(node -e "
-            const m = JSON.parse(require('fs').readFileSync('$HANDOFF_DIR/MANIFEST.json', 'utf8'));
-            if (m.cross_repo_ref) process.stdout.write(JSON.stringify(m.cross_repo_ref));
-        " 2>/dev/null || true)
-        if [ -n "$EXISTING_CRR" ]; then
-            CROSS_REPO_REF="$EXISTING_CRR"
-        fi
+        rm -f "$ERR_FILE"
     fi
 fi
 

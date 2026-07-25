@@ -70,7 +70,8 @@ Init options:
 
 Check options:
   --json            Print only the JSON governance record to stdout
-  --quiet           Print only failing gates (plus the summary)
+  --quiet           Print only failing and warning gates (plus the summary)
+                    A gate may report warn: advisory, never changes the exit code
 
 Manifest options:
   --agent NAME      Agent identifier (default: "cli-tool")
@@ -688,6 +689,20 @@ const CHECK_GATES = [
   { id: 'handoff', script: 'aahp-dashboard.mjs', args: ['--check'] },
 ]
 
+// Opt-in gates. Unlike the gates above, these are appended to the run ONLY when
+// the project asks for them in aahp.config.json, so a repo that never opts in
+// keeps the exact gate SET (and therefore the exact --json record shape) it had
+// before this gate existed. Same backward-compatibility stance as the
+// governance-mode `mode` field on the doctor record.
+const OPTIONAL_CHECK_GATES = [
+  {
+    id: 'acceptance-criteria',
+    script: 'check-acceptance-criteria.mjs',
+    args: [],
+    enabled: (config) => !!config.acceptanceCriteria,
+  },
+]
+
 // A gate is applicable only when its trigger is present, mirroring how each
 // underlying gate self-skips: the package-dependent gates need package.json (so
 // a bare repo never trips AAHP_NO_PKG), the config gates need their section, and
@@ -710,6 +725,8 @@ function gateApplies(id, targetPath, pkg, config) {
       return !!config.docLinks
     case 'handoff':
       return has('.ai', 'handoff', 'MANIFEST.json')
+    case 'acceptance-criteria':
+      return !!config.acceptanceCriteria
     default:
       return false
   }
@@ -726,7 +743,8 @@ function cmdCheck(targetPath, flags) {
   const skip = Array.isArray(sel.skip) ? sel.skip : []
 
   const results = {}
-  for (const gate of CHECK_GATES) {
+  const gatesToRun = [...CHECK_GATES, ...OPTIONAL_CHECK_GATES.filter((g) => g.enabled(config))]
+  for (const gate of gatesToRun) {
     let status, reason
     if ((only && !only.includes(gate.id)) || skip.includes(gate.id)) {
       status = 'skip'
@@ -741,8 +759,15 @@ function cmdCheck(targetPath, flags) {
         status = 'fail'
         reason = `failed to run gate: ${r.error.message}`
       } else if (r.status === 0) {
-        status = 'pass'
-        reason = firstLine(r.stdout)
+        // Exit 0 whose first stdout line starts with "WARN " is an ADVISORY
+        // result: the gate found something worth reporting but deliberately did
+        // not fail. `warn` is reported and never affects the exit code. The
+        // "WARN" token and a self-identifying "<gate-id>: " label are stripped,
+        // because this line is already printed under the gate's own id.
+        const head = firstLine(r.stdout)
+        const isWarn = /^WARN\b/.test(head)
+        status = isWarn ? 'warn' : 'pass'
+        reason = isWarn ? head.replace(/^WARN\s+/, '').replace(`${gate.id}: `, '') : head
       } else {
         // Non-zero exit, or r.status === null when the gate was killed by a signal.
         status = 'fail'
@@ -755,6 +780,7 @@ function cmdCheck(targetPath, flags) {
   const gates = {}
   for (const [k, v] of Object.entries(results)) gates[k] = v.status
   const failing = Object.entries(gates).filter(([, s]) => s === 'fail')
+  const warning = Object.entries(gates).filter(([, s]) => s === 'warn')
 
   const record = {
     schemaVersion: 1,
@@ -770,20 +796,23 @@ function cmdCheck(targetPath, flags) {
     process.exit(failing.length === 0 ? 0 : 1)
   }
 
-  const labels = { pass: 'PASS', fail: 'FAIL', skip: 'SKIP' }
+  const labels = { pass: 'PASS', fail: 'FAIL', skip: 'SKIP', warn: 'WARN' }
   if (!quiet) {
     console.log(`\naahp check - governance gates for ${record.repo} (aahp v${record.aahpVersion})`)
     console.log('=========================================')
   }
   for (const [k, v] of Object.entries(results)) {
-    const ok = v.status !== 'fail'
+    // --quiet keeps failures AND advisory warnings; a warning nobody prints is
+    // a warning nobody acts on.
+    const ok = v.status !== 'fail' && v.status !== 'warn'
     if (!ok || !quiet) console.log(`  ${(labels[v.status] || v.status).padEnd(6)} ${k}: ${v.reason}`)
   }
   if (!quiet) console.log('=========================================')
   if (failing.length === 0) {
     if (!quiet) {
       const ran = Object.values(gates).filter((s) => s !== 'skip').length
-      console.log(`Governance OK: ${ran} gate(s) ran, no failures.`)
+      const warnNote = warning.length > 0 ? `, ${warning.length} warning(s)` : ''
+      console.log(`Governance OK: ${ran} gate(s) ran, no failures${warnNote}.`)
     }
   } else {
     console.log(`Governance FAILED: ${failing.map(([k]) => k).join(', ')}.`)

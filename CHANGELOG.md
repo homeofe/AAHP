@@ -11,6 +11,40 @@ independently of the npm version).
 
 ## [Unreleased]
 
+## [3.9.0] - 2026-07-25
+**Acceptance-criteria lifecycle: one canonical section, task boxes, and a warn-first gate**
+
+### Added
+- Specification Section 8.7 defines the acceptance-criteria lifecycle: one canonical
+  `Acceptance criteria` section per task, `- [ ]` while a criterion is unresolved, `- [x]`
+  only on evidence, and, before a task becomes `done` or a linked issue closes, every
+  remaining criterion completed, explicitly waived (`(waived: rationale)`), or moved to a
+  linked open follow-up (`(follow-up: T-042)`). `Completion criteria` and
+  `Definition of done` stay recognized as legacy aliases with a documented rename path.
+- `scripts/check-acceptance-criteria.mjs`, an opt-in gate that reports three lifecycle
+  defects: a legacy heading alias, plain bullets where task boxes belong, and criteria left
+  unresolved on a task the manifest marks `done`. It reads tracked files plus the
+  `MANIFEST.json` task registry and makes no network calls, so a run is complete and
+  deterministic offline.
+- `acceptanceCriteria` (`include` / `manifest` / `strict`) in
+  `schema/aahp-config.schema.json` and `aahp.config.example.json`. Absent, the gate does not
+  run and does not appear in the `aahp check` record, so the gate set an existing consumer
+  sees is unchanged. Present, findings are warnings and the exit code stays 0;
+  `"strict": true` makes them fail.
+- A `warn` status in `aahp check`: an advisory result that is printed (including under
+  `--quiet`) and never changes the exit code.
+- Acceptance-criteria task boxes in both `.github/ISSUE_TEMPLATE` files, the lifecycle rule
+  in `templates/CONVENTIONS.md`, and `tests/acceptance-criteria.bats` covering canonical,
+  legacy-heading, plain-bullet, waived, follow-up, invalid-closure, strict, offline, and
+  gate-set-unchanged cases.
+- ADR-017: new detection ships warn-first, and a new gate joins the gate set only on opt-in.
+
+### Changed
+- `templates/NEXT_ACTIONS.md` uses the canonical `Acceptance criteria` heading instead of
+  `Definition of done`, and states the lifecycle rule in its header.
+- `package-lock.json` is regenerated so its root name and version match `package.json`
+  (it had drifted to the pre-scope name at `3.5.0`).
+
 ## [3.8.1] - 2026-07-19
 
 ### Fixed
@@ -193,7 +227,8 @@ independently of the npm version).
 ### Changed
 - Relicensed to Apache-2.0 (earlier commits carried MIT, then CC BY 4.0, headers).
 
-[Unreleased]: https://github.com/homeofe/AAHP/compare/v3.8.1...HEAD
+[Unreleased]: https://github.com/homeofe/AAHP/compare/v3.9.0...HEAD
+[3.9.0]: https://github.com/homeofe/AAHP/compare/v3.8.1...v3.9.0
 [3.8.1]: https://github.com/homeofe/AAHP/compare/v3.8.0...v3.8.1
 [3.8.0]: https://github.com/homeofe/AAHP/compare/v3.7.0...v3.8.0
 [3.7.0]: https://github.com/homeofe/AAHP/compare/v3.6.1...v3.7.0

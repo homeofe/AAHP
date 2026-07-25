@@ -58,6 +58,20 @@ Commit format:
 - Validate generated JSON with `python3 -c "import json; json.load(open(...))"` or `jq .`
 - Run `lint-handoff.sh` against the project's own `.ai/handoff/` directory
 
+## Acceptance Criteria Lifecycle
+
+Specified in README Section 8.7. Every task carries one canonical **Acceptance criteria**
+section written as task boxes.
+
+- `Acceptance criteria` is the canonical heading. `Completion criteria` and
+  `Definition of done` are legacy aliases: still recognized, never written in new content.
+- `- [ ]` while a criterion is unresolved; `- [x]` only with evidence (commit, PR, test
+  run, live verification). Bulk-checking to close something out is invalid.
+- Before a task becomes `done`, every remaining criterion is checked, waived
+  (`(waived: rationale)`), or moved to a linked open follow-up (`(follow-up: T-042)`).
+- `aahp check` runs the `acceptance-criteria` gate on this file's sibling
+  `NEXT_ACTIONS.md`. Findings are warnings; they are still defects to fix.
+
 ## Formatting
 
 - **No em dashes (U+2014)**: Never use Unicode em dashes in any file (code, docs, comments, templates). They break shell scripts, cause encoding errors on Windows (cp1252), and corrupt JSON. Use a regular hyphen (`-`) instead.

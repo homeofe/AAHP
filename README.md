@@ -475,7 +475,9 @@ aahp check --quiet     # only failing gate lines plus the footer
 Each gate is applicable only when its inputs exist (for example the `handoff` gate runs
 only when `.ai/handoff/MANIFEST.json` is present); otherwise it is reported `skip`, not
 run. `config.check.only` (a whitelist) and `config.check.skip` (a blacklist) narrow the
-set explicitly. The same governance-only stance is available from the record side:
+set explicitly. A gate may also report `warn`: a finding worth printing that deliberately
+does not fail the run. `warn` never changes the exit code, and `--quiet` still prints it.
+The same governance-only stance is available from the record side:
 `aahp doctor --governance` (alias `--no-handoff`) forces the three handoff gates to
 `skip` without evaluating them, so a repo with no `.ai/handoff/` still emits a green
 conformance record; the default mode is unchanged.
@@ -491,6 +493,7 @@ a repo that never opts in keeps working:
 | changelog format | `check-changelog-format.mjs` | uses `CHANGELOG.md` | Keep a Changelog 1.1.0 + SemVer grammar |
 | claims | `check-claims.mjs` | `claims` | capability numbers agree across surfaces and do not exceed a ground-truth floor |
 | generator + freshness | `aahp-dashboard.mjs` | `generate` | an optional LOG release journal stays in sync; a `Current version` header matches the package |
+| acceptance criteria | `check-acceptance-criteria.mjs` | `acceptanceCriteria` | the acceptance-criteria lifecycle (Section 8.7): canonical heading, task boxes not bullets, nothing unresolved on a `done` task. Warn by default, `"strict": true` to enforce |
 
 The changelog validator and the LOG generator import the release-heading grammar
 from a single module (`scripts/changelog-grammar.mjs`), so the two cannot diverge.
@@ -746,6 +749,18 @@ exact-pin behavior, and a repo whose own package name matches still reports `sel
 vendored paths), is opt-in, and never mutates the repo. `aahp-verify.yml` gates handoff
 state; `aahp-govern.yml` gates governance. Two workflows, two concerns.
 
+### ADR-017: new detection ships warn-first, and a new gate joins the set only on opt-in
+**Why it recurs:** a new rule looks obviously correct, so wiring it in as a failing gate
+by default feels like the honest thing to do. Every AAHP consumer runs these gates, so a
+new default failure is a fleet-wide outage rather than a bug in one repo.
+**Decision:** detection lands at warn severity (reported, exit code unchanged) and
+enforcement is opt-in through `aahp.config.json`. The `acceptance-criteria` gate is the
+worked example: absent `acceptanceCriteria`, the gate does not run and does not even
+appear in the `aahp check` record, so the gate SET a consumer sees is unchanged; present,
+findings are warnings; with `"strict": true`, they fail. `aahp check` reports the extra
+`warn` status, which never changes the exit code. Promotion of a warn rule to a default
+failure is a separate, deliberate major decision, never a side effect of an upgrade.
+
 ---
 
 *The v2-proposal questions below were resolved earlier and are retained for detail.*
@@ -973,6 +988,74 @@ When `aahp-manifest.sh` regenerates `MANIFEST.json`, it:
 
 Task data is managed by agents directly -the CLI tool never creates or modifies tasks.
 
+### 8.7 Acceptance-criteria lifecycle
+
+A task status says *whether* work is finished. Acceptance criteria say *what finished
+means*. Without a lifecycle for them, agents write criteria as prose bullets, use three
+competing headings, and flip a task to `done` while criteria sit unresolved: after the
+session ends nobody can tell an unmet criterion from an accepted exception. The lifecycle
+below is protocol-level, and task boxes are its Markdown representation.
+
+**The rule:**
+
+1. Every implementation task has one canonical **Acceptance criteria** section, written
+   as a Markdown heading (`## Acceptance criteria`) or a bold label
+   (`**Acceptance criteria:**`). Both forms are canonical; adapters emit whichever the
+   host document uses.
+2. Every criterion is a task box, `- [ ]`, while it is unresolved. Plain bullets are not
+   criteria: nothing distinguishes resolved from unresolved.
+3. A criterion becomes `- [x]` only when there is evidence it is satisfied: a commit, a
+   PR, a test run, or a live verification. Bulk-checking a list to close something out is
+   invalid, and the protocol treats it as a defect even though no tool can see intent.
+4. Before a task becomes `done` (or a linked issue closes), every remaining criterion is
+   one of:
+   - completed and checked;
+   - explicitly waived, with the rationale inline: `- [ ] Criterion (waived: rationale)`;
+   - moved to a linked open follow-up: `- [ ] Criterion (follow-up: T-042)` or
+     `(follow-up: #123)`.
+5. Closure records the evidence: the commit, PR, tests, live verification, waiver
+   rationale, or follow-up reference. `NEXT_ACTIONS.md` keeps it in the "Recently
+   Completed" resolution column.
+
+**Canonical heading and legacy aliases.** New content uses `Acceptance criteria`. Two
+aliases exist in the wild and every reader, including the gate, still recognizes them:
+
+| Heading | Status |
+|---------|--------|
+| `Acceptance criteria` | canonical |
+| `Completion criteria` | legacy alias, recognized, reported at warn level |
+| `Definition of done` | legacy alias, recognized, reported at warn level |
+
+Migration is a rename: the criteria themselves do not change, so a project can migrate one
+document at a time. Nothing forces the rename, because a reader that stops accepting the
+aliases would lose information that already exists.
+
+**Verification.** The opt-in `acceptance-criteria` gate (Section 2.11) reads the configured
+documents plus the `MANIFEST.json` task registry and reports three findings: a legacy
+heading, plain bullets where task boxes belong, and criteria left unresolved on a task the
+manifest marks `done` (a criterion that carries a waiver or follow-up marker is resolved,
+not unresolved). Findings are warnings by default. The gate makes no network calls, so a
+run is complete and deterministic offline.
+
+**Optional GitHub synchronization.** The lifecycle belongs to AAHP task semantics; issue
+task boxes are one rendering of it. Where a project links tasks to issues (by convention,
+`github_issue` / `github_repo` on the task object), the adapter is responsible for the
+round trip:
+
+1. When a task is created, mirror its `Acceptance criteria` section onto the issue body
+   as the same task boxes.
+2. While work proceeds, check a box on the issue only when the same criterion is checked
+   on the task, and only with evidence, so the two never disagree.
+3. **Before the issue closes**, reconcile: every box on the issue must be checked, carry a
+   waiver rationale, or point at an open follow-up issue or task. Closing an issue that
+   still shows unresolved boxes destroys the distinction between "done", "waived", and
+   "forgotten".
+4. Record the closing evidence (commit, PR, or test run) in the closing comment.
+
+Verification of live issue state needs the network and is therefore an optional online
+extra a harness or adapter provides. The offline gate never depends on it: a repository
+with no network access gets the full offline result and exits 0.
+
 ---
 
 ## 9. Consuming Harness Integration
@@ -1175,7 +1258,10 @@ Markdown links, and `generate` drives an optional LOG release-journal plus a
 `NEXT_ACTIONS.md` current-version freshness gate. Two selection keys tune the surface:
 `check` (`only`/`skip`) chooses which gates `aahp check` runs, and `pinnedDep`
 (`name`/`location`/`allowRange`) opts the `doctor` pinned-dep gate in (absent, it is a clean
-skip). Every section is optional.
+skip). `acceptanceCriteria` (`include`/`manifest`/`strict`) opts into the acceptance-criteria
+lifecycle gate of Section 8.7: absent, the gate does not run and does not appear in the
+`aahp check` record at all; present, its findings are warnings until the project sets
+`"strict": true`. Every section is optional.
 
 Run the gates two ways. `npx --no-install aahp check .` is the pass/fail RUN whose exit code
 gates CI: it aggregates every applicable gate and continues past failures so one run surfaces

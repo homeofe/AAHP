@@ -3,8 +3,11 @@
 > Priority order. Work top-down.
 > Each item should be self-contained, the agent must be able to start without asking questions.
 > Blocked tasks go to the bottom. Completed tasks move to "Recently Completed".
+> Acceptance criteria use the canonical heading and task boxes (README Section 8.7):
+> `- [ ]` while unresolved, `- [x]` only on evidence; before a task is `done` every
+> criterion is checked, waived `(waived: rationale)`, or moved `(follow-up: ref)`.
 
-Current version: **v3.8.1**
+Current version: **v3.9.0**
 
 ---
 
@@ -66,7 +69,7 @@ Current version: **v3.8.1**
 
 **Files:** `bin/aahp.js`, `tests/cli.bats`, `tests/test_helper.bash`
 
-**Definition of done:**
+**Acceptance criteria:**
 - [ ] `tests/cli.bats` exists with 10+ tests covering all subcommands
 - [ ] All tests pass locally and in CI
 - [ ] Init command tested: creates correct files, handles --force, custom paths
@@ -93,7 +96,7 @@ Current version: **v3.8.1**
 
 **Files:** `bin/aahp.js`, `tests/cli.bats`
 
-**Definition of done:**
+**Acceptance criteria:**
 - [ ] `aahp status` reads MANIFEST.json and prints a human-readable summary
 - [ ] Shows task breakdown (ready/blocked/done counts)
 - [ ] Graceful error when no MANIFEST.json exists
@@ -125,7 +128,7 @@ Current version: **v3.8.1**
 
 **Files:** `scripts/aahp-archive.sh`, `bin/aahp.js`, `tests/archive.bats`, `templates/LOG-ARCHIVE.md`
 
-**Definition of done:**
+**Acceptance criteria:**
 - [ ] `aahp archive` splits LOG.md entries into LOG.md (recent) + LOG-ARCHIVE.md (older)
 - [ ] `--keep N` flag controls retention count (default 5)
 - [ ] Idempotent - running twice produces the same result
@@ -154,7 +157,7 @@ Current version: **v3.8.1**
 
 **Files:** `CLAUDE.md` (new file in project root)
 
-**Definition of done:**
+**Acceptance criteria:**
 - [ ] `CLAUDE.md` exists in project root with build/test/lint commands
 - [ ] Covers project-specific conventions not in workspace CLAUDE.md
 - [ ] Under 80 lines
@@ -191,7 +194,7 @@ Option B - Local publish:
 
 **Files:** `package.json`, `bin/aahp.js`, `.github/workflows/publish.yml`
 
-**Definition of done:**
+**Acceptance criteria:**
 - [ ] Package published to npm registry
 - [ ] `npx aahp init` works from any directory
 

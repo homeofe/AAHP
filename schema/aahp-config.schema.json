@@ -229,9 +229,31 @@
       },
       "additionalProperties": false
     },
+    "acceptanceCriteria": {
+      "type": "object",
+      "description": "Opt-in acceptance-criteria lifecycle gate (check-acceptance-criteria.mjs). Absent, the gate never runs and `aahp check` does not list it. Present, it reports legacy heading aliases, plain bullets where task boxes belong, and criteria left unresolved on tasks the manifest marks done. Findings are warnings (exit 0) unless strict is true.",
+      "properties": {
+        "include": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "git pathspecs of documents to scan (default: .ai/handoff/NEXT_ACTIONS.md). List live task documents, not templates: a template task id can collide with a real task id in the manifest."
+        },
+        "manifest": {
+          "type": "string",
+          "description": "Path to the task registry that supplies task status (default .ai/handoff/MANIFEST.json). Absent, the done-state rule is skipped rather than guessed."
+        },
+        "strict": {
+          "type": "boolean",
+          "description": "If true, findings fail the gate (exit 1). Default false: findings are advisory warnings and the exit code stays 0."
+        }
+      },
+      "additionalProperties": false
+    },
     "check": {
       "type": "object",
-      "description": "Selects which gates `aahp check` runs. Both lists are optional; omit to run every applicable gate. Gate ids: changelog, changelog-format, version-sync, claims, forbidden-patterns, schema-doc-sync, doc-links, handoff.",
+      "description": "Selects which gates `aahp check` runs. Both lists are optional; omit to run every applicable gate. Gate ids: changelog, changelog-format, version-sync, claims, forbidden-patterns, schema-doc-sync, doc-links, handoff, acceptance-criteria.",
       "properties": {
         "only": {
           "type": "array",

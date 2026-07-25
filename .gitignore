@@ -34,3 +34,7 @@ Thumbs.db
 .ai/logs/
 aahp-swarm-link
 noop.patch
+
+# supply-chain-guard scanner state (risk history, triage decisions).
+# Scanner state, not project content.
+.scg-history/

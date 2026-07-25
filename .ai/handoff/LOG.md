@@ -172,8 +172,8 @@ An allowlist suppresses only the matching PII finding. Secret detection and ever
   the intended REQUIRED check. Committed despite Actions being OFF org-wide
   (cost sweep); a comment documents that it activates when Actions returns.
 - Extended `ci.yml` shellcheck to cover the new scripts.
-- Wrote `scripts/ROLLOUT.md` (10 active Elvatis repos, ordered) and a README 2.7
-  section documenting the gate.
+- Wrote `scripts/ROLLOUT.md` (role-based consumer waves, ordered) and a README
+  2.7 section documenting the gate.
 - Tests: `tests/verify.bats` (12, all pass) plus a verify help test in cli.bats.
 
 ### Decisions made
@@ -189,8 +189,8 @@ An allowlist suppresses only the matching PII finding. Secret detection and ever
 
 ### Open items
 
-- Propagate the gate to the ~9 remaining active repos in ROLLOUT.md (improvements
-  done as the first target).
+- Propagate the gate to the remaining consumer waves in ROLLOUT.md (the wave-1
+  seeding framework is done as the first target).
 - Mark `aahp-verify` as a REQUIRED status check once Actions is re-enabled.
 
 ---

@@ -28,6 +28,7 @@
   "files": [
     "bin/",
     "scripts/",
+    "!scripts/ROLLOUT.md",
     "assets/",
     "templates/",
     "schema/",
@@ -60,4 +61,3 @@
     "bats": "^1.13.0"
   }
 }
-

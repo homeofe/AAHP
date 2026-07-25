@@ -31,7 +31,7 @@ Current version: **v3.8.1**
 - Added archive tests and MANIFEST coverage for `LOG-ARCHIVE.md`.
 
 
-### T-031: Reviewed, expiring PII allowlist [high] (ideabase issue #21)
+### T-031: Reviewed, expiring PII allowlist [high] (external backlog item)
 
 - Added a strict exact-email allowlist with owner, reason, and expiry fields.
 - Integrated it into `aahp lint` and MANIFEST integrity; it cannot suppress secrets.
@@ -141,7 +141,7 @@ Current version: **v3.8.1**
 **Context:**
 - The workspace-level `CLAUDE.md` (parent directory) provides general conventions
 - AAHP has project-specific patterns: zero-dependency Node.js, bash scripts sourcing `_aahp-lib.sh`, bats testing, shellcheck compliance, the AAHP v3 format itself
-- Other projects in the workspace (AEGIS) already have project-level CLAUDE.md files
+- Other projects in the same workspace already have project-level CLAUDE.md files
 - This helps new agents contribute correctly on the first attempt
 
 **What to do:**

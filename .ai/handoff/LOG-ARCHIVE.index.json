@@ -2,6 +2,10 @@
   "version": 1,
   "entries": [
     {
+      "sha256": "fd444e090086e176dc71c68ae24457df68e1f0f75debe2412ecea58e1f69272c",
+      "title": "## [2026-02-26] Claude Opus 4.6: Complete T-003, T-004, T-005 -CI, CLI, Tests"
+    },
+    {
       "sha256": "25bda6a6fe3800ab598258de387c86407073a43149cd1998445208396e255d5f",
       "title": "## [2026-02-26] Claude Opus 4.6: AAHP v3 -Task IDs & Dependency Graphs"
     },

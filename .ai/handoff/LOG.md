@@ -6,6 +6,31 @@
 
 ---
 
+## [2026-07-25] claude-opus-5: Trust register re-verification (10 rows re-established, 0 downgraded)
+
+**Agent:** claude-opus-5
+**Phase:** review
+**Branch:** chore/trust-reverification
+**Tasks:** TRUST.md re-verification sweep
+
+### What was done
+
+- Layer 4 was reporting 3 expired `verified` rows: escape hatch ignored at level ci (expired 2026-07-20), checksums match file contents (expired 2026-07-21), LICENSE matches declared license (expired 2026-07-20). A further 7 `verified` rows carried Expires 2026-07-25 and would have raised the same warning the next morning, so all 10 were handled in one sweep. Each was re-established by running something, not re-stamped, and every Notes cell now records the anchor that backs it.
+- Suites backing the rows, every count taken from a run in this session: manifest.bats 19/19, migrate.bats 12/12, lint.bats 31 ok / 0 fail (1 pre-existing skip covering a grep leading-dash limitation), verify.bats 13/13, gates.bats 22/22, doctor.bats 15/15. `npm run check` passed all 8 gates; `aahp doctor .` passed its 6 gates with pinned-dep reported as `self`.
+- Honest note on the full-suite run: `npm test` over all 222 tests was started and reached test 169 with only 3 failures, all of them the known cli.bats cases that fail on a Windows-style shell and pass on Linux CI (version capture, read-only-directory permissions, and a path-separator assumption in `aahp status`). The run was cut short by a runner time limit, not by a test failure, so the suites it had not yet reached were run separately to completion. None of the 3 known failures touches any row in this register. Whole-suite green remains CI's call, which is the correct division of labour.
+- The content-drift and escape-hatch rows were re-established behaviourally rather than by reading the source. A throwaway repository was driven into the drift state (a source file committed with no handoff update). Verify hard-failed Layer 2 and exited 1. With AAHP_SKIP_VERIFY=1 the same repository exited 0 at `--level prepush` (hatch honoured, verification skipped entirely) and exited 1 at `--level ci` (hatch ignored, Layer 2 still failing). Those two different outcomes are exactly what the row asserts.
+- Checksums were recomputed independently of the lint script across all 11 indexed handoff files (0 mismatches), then confirmed again through lint-handoff.sh and verify Layer 1. A negative control (one appended line in a copied STATUS.md) made Layer 1 fail with the expected mismatch, which shows the detector is live rather than passing vacuously. Worth knowing for future readers: lint-handoff.sh prints a checksum mismatch but does not raise its own exit code for it, so verify Layer 1 (which greps the lint output) is the layer that actually blocks.
+- LICENSE was re-read against package.json and README: Apache-2.0 in the LICENSE body and its copyright line, in the package.json license field, and in both the README badge and the License section, with no competing license string in tracked sources.
+- Two stale test counts that had been carried forward were corrected in the register and in STATUS.md Build Health: gates.bats is 22 tests (recorded as 20) and doctor.bats is 15 (recorded as 10). The suites grew and the notes did not follow, which is the same drift the register exists to catch.
+
+### Decisions
+
+- No row was downgraded, so no downgrade explanation is owed here. Every one of the 10 rows reached a real external anchor in this session.
+- TTL values were deliberately left unchanged. Recomputing Expires from an unchanged TTL is re-verification; lengthening a TTL because the warning is tiresome would be gaming the gate. The structural problem is real and is being raised for the maintainer instead of patched silently: six script rows on a 7-day TTL guarantee a Layer 4 warning every week, which is exactly the cadence that teaches readers to skim past it. Note also that this register's own policy puts script and checksum rows at a 1 to 3 day TTL, so the current 7-day values are already looser than the stated rule. Both halves of that tension belong to the maintainer, not to a passing agent.
+- Package version deliberately not bumped. This change touches only the handoff register, its log, and the status file.
+
+---
+
 ## [2026-07-18] claude-opus-4-8: Anti-entropy initiative (gates + constitution + ADR log, v3.7.0)
 
 **Agent:** claude-opus-4-8
@@ -221,33 +246,3 @@ An allowlist suppresses only the matching PII finding. Secret detection and ever
 ### Blockers
 
 - npm authentication requires interactive browser login - cannot be completed by agent
-
----
-
-## [2026-02-26] Claude Opus 4.6: Complete T-003, T-004, T-005 -CI, CLI, Tests
-
-**Agent:** Claude Opus 4.6
-**Phase:** 3 (Implementer)
-**Branch:** main
-**Tasks:** T-003, T-004, T-005
-
-### What was done
-
-- **T-003**: Created `.github/workflows/ci.yml` -GitHub Actions CI pipeline with shellcheck, lint-handoff.sh, and ajv schema validation
-- **T-004**: Created `bin/aahp.js` + `package.json` -npx-distributable CLI with subcommands: init, manifest, lint, migrate. Pure Node.js, no dependencies. ESM module.
-- **T-005**: Created 48 bats tests across 3 suites: `tests/manifest.bats` (18), `tests/lint.bats` (18), `tests/migrate.bats` (12). All passing. Cross-platform temp dir handling for Windows Git Bash.
-- Fixed `lint-handoff.sh` Python detection: Windows `python3` Store alias passes `command -v` but doesn't work; now tries actual invocation before trusting
-- Fixed Unicode encoding in Python checksum output (cp1252 on Windows)
-- Updated README.md: title "AAHP v2 Proposal" → "AAHP: AI-to-AI Handoff Protocol (v2/v3)", version refs, agent names
-- Added `bats` as devDependency for local test running
-- Created `tests/run.sh` convenience runner
-- Created `tests/test_helper.bash` shared test fixtures
-- All 48 tests pass, CLI verified, lint passes
-
-### Decisions made
-
-- CLI uses ESM (`"type": "module"`) with zero external dependencies -only Node.js built-ins
-- `aahp init` implemented in pure Node.js (file copy), other commands spawn bash scripts
-- bats-core via npm (`npx bats`) rather than system install
-- Tests create isolated temp fixtures -no dependency on project's own `.ai/handoff/`
-- New follow-up tasks created: T-006 (npm publish), T-007 (shellcheck fixes), T-008 (bats in CI)

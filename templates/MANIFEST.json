@@ -69,11 +69,10 @@
   "tasks": {
     "T-001": {
       "title": "Example: Implement feature X",
-      "status": "done",
+      "status": "in_progress",
       "priority": "high",
       "depends_on": [],
-      "created": "[ISO-8601]",
-      "completed": "[ISO-8601]"
+      "created": "[ISO-8601]"
     },
     "T-002": {
       "title": "Example: Add tests for feature X",

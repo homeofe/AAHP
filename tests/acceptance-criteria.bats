@@ -158,7 +158,7 @@ EOF
     run node "$AC" "$TEST_TMPDIR"
     [ "$status" -eq 0 ]
     [[ "$output" == *"plain-bullets"* ]]
-    [[ "$output" == *"2 plain bullet(s)"* ]]
+    [[ "$output" == *"2 plain list item(s)"* ]]
 }
 
 @test "acceptance-criteria: nested detail lines under a task box are not criteria" {
@@ -466,4 +466,249 @@ EOF
     run node "$AAHP" check "$TEST_TMPDIR"
     [ "$status" -eq 0 ]
     [[ "$output" == *"deselected by config.check"* ]]
+}
+
+# --- ordered-list criteria ---------------------------------------------------
+#
+# "1." is the form a human reaches for when the criteria are a sequence. A
+# parser that only sees "-" makes those criteria invisible to EVERY rule, so a
+# done task with unresolved numbered criteria passes completely clean. A gate
+# that silently under-reports is worse than no gate.
+
+@test "acceptance-criteria: ordered-list task boxes are criteria (unresolved-on-done fires)" {
+    enable_gate
+    manifest_with_tasks
+    next_actions <<'EOF'
+## T-007: Closed task
+
+**Acceptance criteria:**
+1. [x] Tests pass
+2. [ ] Docs updated
+EOF
+    gadd
+    run node "$AC" "$TEST_TMPDIR"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"unresolved-on-done"* ]]
+    [[ "$output" == *"T-007"* ]]
+    [[ "$output" == *"1 criterion/criteria are unresolved"* ]]
+}
+
+@test "acceptance-criteria: ordered-list plain items are criteria (plain-bullets fires)" {
+    enable_gate
+    manifest_with_tasks
+    next_actions <<'EOF'
+## T-008: Open task
+
+**Acceptance criteria:**
+1. Tests pass
+2. Docs updated
+EOF
+    gadd
+    run node "$AC" "$TEST_TMPDIR"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"plain-bullets"* ]]
+    [[ "$output" == *"2 plain list item(s)"* ]]
+}
+
+@test "acceptance-criteria: ordered-list criteria resolve the same way bullets do" {
+    enable_gate
+    manifest_with_tasks
+    next_actions <<'EOF'
+## T-007: Closed task
+
+**Acceptance criteria:**
+1. [x] Tests pass
+2. [ ] Docs updated (waived: docs live downstream)
+3. [ ] Benchmark rerun (follow-up: T-008)
+EOF
+    gadd
+    run node "$AC" "$TEST_TMPDIR"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Acceptance criteria OK"* ]]
+}
+
+# --- fenced code blocks are not content --------------------------------------
+
+@test "acceptance-criteria: criteria shown inside a fenced block are not live criteria" {
+    enable_gate
+    manifest_with_tasks
+    next_actions <<'EOF'
+## T-007: Closed task
+
+**Acceptance criteria:**
+- [x] Tests pass
+
+## How to write criteria
+
+**Acceptance criteria:**
+
+```markdown
+- [ ] Something not yet done
+1. [ ] Another thing not yet done
+- A plain bullet nobody can track
+```
+EOF
+    gadd
+    run node "$AC" "$TEST_TMPDIR"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Acceptance criteria OK"* ]]
+}
+
+@test "acceptance-criteria: a tilde fence is skipped too" {
+    enable_gate
+    manifest_with_tasks
+    next_actions <<'EOF'
+## T-007: Closed task
+
+**Acceptance criteria:**
+- [x] Tests pass
+
+~~~
+- [ ] Example criterion inside a tilde fence
+~~~
+EOF
+    gadd
+    run node "$AC" "$TEST_TMPDIR"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Acceptance criteria OK"* ]]
+}
+
+# --- corrupt task registry ---------------------------------------------------
+#
+# An unparseable MANIFEST.json used to be reported as an ABSENT one, which
+# silently disabled the unresolved-on-done rule even under strict, while the
+# message asserted the registry was missing when it was actually corrupt.
+
+@test "acceptance-criteria: an unparseable manifest is a finding, not a silent skip" {
+    enable_gate
+    printf '{ "tasks": { "T-007": ' > "$TEST_TMPDIR/.ai/handoff/MANIFEST.json"
+    next_actions <<'EOF'
+## T-007: Closed task
+
+**Acceptance criteria:**
+- [ ] Docs updated
+EOF
+    gadd
+    run node "$AC" "$TEST_TMPDIR"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"manifest-unreadable"* ]]
+    [[ "$output" == *"present but not valid JSON"* ]]
+    [[ "$output" != *"no task registry at"* ]]
+}
+
+@test "acceptance-criteria: strict fails on an unparseable manifest" {
+    enable_gate_strict
+    printf 'not json at all' > "$TEST_TMPDIR/.ai/handoff/MANIFEST.json"
+    next_actions <<'EOF'
+## T-007: Closed task
+
+**Acceptance criteria:**
+- [x] Docs updated
+EOF
+    gadd
+    run node "$AC" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"manifest-unreadable"* ]]
+}
+
+@test "acceptance-criteria: a genuinely absent manifest still reports as absent" {
+    enable_gate
+    rm -f "$TEST_TMPDIR/.ai/handoff/MANIFEST.json"
+    next_actions <<'EOF'
+## T-007: Closed task
+
+**Acceptance criteria:**
+- [ ] Docs updated
+EOF
+    gadd
+    run node "$AC" "$TEST_TMPDIR"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"no task registry at"* ]]
+    [[ "$output" != *"manifest-unreadable"* ]]
+}
+
+# --- task scope across intervening headings ----------------------------------
+#
+# Real documents put prose headings between a task heading and its criteria.
+# Resetting task scope on ANY other heading meant unresolved-on-done could never
+# fire for those tasks. Scope now closes on a SIBLING or ANCESTOR heading only.
+
+@test "acceptance-criteria: an intervening deeper heading does not drop task scope" {
+    enable_gate
+    manifest_with_tasks
+    next_actions <<'EOF'
+## T-007: Closed task
+
+### Context
+
+Some prose about what was decided.
+
+### Files
+
+- `src/thing.ts`: the thing
+
+### Acceptance criteria
+
+- [ ] Docs updated
+EOF
+    gadd
+    run node "$AC" "$TEST_TMPDIR"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"unresolved-on-done"* ]]
+    [[ "$output" == *"T-007"* ]]
+}
+
+@test "acceptance-criteria: a sibling heading does close task scope" {
+    enable_gate
+    manifest_with_tasks
+    next_actions <<'EOF'
+## T-007: Closed task
+
+Prose only.
+
+## Appendix
+
+**Acceptance criteria:**
+- [ ] Not attached to any task
+EOF
+    gadd
+    run node "$AC" "$TEST_TMPDIR"
+    [ "$status" -eq 0 ]
+    [[ "$output" != *"unresolved-on-done"* ]]
+}
+
+# --- the shipped scaffolding passes its own gate -----------------------------
+
+@test "acceptance-criteria: the shipped templates are clean under the gate" {
+    enable_gate_strict
+    cp "$AAHP_ROOT/templates/NEXT_ACTIONS.md" "$TEST_TMPDIR/.ai/handoff/NEXT_ACTIONS.md"
+    cp "$AAHP_ROOT/templates/MANIFEST.json" "$TEST_TMPDIR/.ai/handoff/MANIFEST.json"
+    gadd
+    run node "$AC" "$TEST_TMPDIR"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Acceptance criteria OK"* ]]
+}
+
+# --- importable without side effects -----------------------------------------
+
+@test "acceptance-criteria: importing the module runs no gate and exits nothing" {
+    # The path travels in the environment, not in argv, so this process is not
+    # the gate's entry point and the guard in the module must keep it inert.
+    run env AC_PATH="$AC" node -e "const { pathToFileURL } = require('node:url'); import(pathToFileURL(process.env.AC_PATH).href).then((m) => { const s = m.parseCriteriaSections('x.md', '## T-007: t\n\n**Acceptance criteria:**\n1. [ ] a\n'); if (s.length !== 1) throw new Error('sections ' + s.length); if (s[0].items.length !== 1) throw new Error('items ' + s[0].items.length); console.log('IMPORT_OK'); });"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"IMPORT_OK"* ]]
+    [[ "$output" != *"section(s)"* ]]
+    [[ "$output" != *"not configured"* ]]
+}
+
+# --- offline by construction, proved statically ------------------------------
+#
+# Stronger than asserting the word "Offline" appears in the output: this walks
+# the gate's transitive relative-import graph and asserts no module in it can
+# reach the network at all.
+
+@test "acceptance-criteria: the gate's module graph contains no network capability" {
+    run node -e "const { readFileSync } = require('node:fs'); const { dirname, resolve } = require('node:path'); const seen = new Set(); const stack = [process.argv[1]]; const banned = /(?:node:)?(?:net|tls|http|https|http2|dgram|dns)['\"]|fetch\s*\(|XMLHttpRequest|WebSocket/; while (stack.length) { const f = resolve(stack.pop()); if (seen.has(f)) continue; seen.add(f); const src = readFileSync(f, 'utf8'); if (banned.test(src)) throw new Error('network capability in ' + f); for (const m of src.matchAll(/from\s+['\"](\.[^'\"]+)['\"]/g)) stack.push(resolve(dirname(f), m[1])); } console.log('OFFLINE_OK modules=' + seen.size);" "$AC"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"OFFLINE_OK"* ]]
 }

@@ -42,6 +42,32 @@ independently of the npm version).
 ### Changed
 - `templates/NEXT_ACTIONS.md` uses the canonical `Acceptance criteria` heading instead of
   `Definition of done`, and states the lifecycle rule in its header.
+- The shipped scaffolding passes its own gate. `templates/MANIFEST.json` marked the example
+  `T-001` as `done` while `templates/NEXT_ACTIONS.md` carried unchecked criteria for it, so
+  every project initialised from the templates started life with an `unresolved-on-done`
+  warning. `T-001` is now `in_progress`, which is what the template document actually
+  shows.
+
+### Fixed
+- Criteria written as an ordered list (`1.`, `2)`) are recognized. They were invisible to
+  every rule, so a task marked `done` with unresolved numbered criteria passed completely
+  clean. Both list forms now count, and README Section 8.7 states which forms are criteria
+  and which are not.
+- Fenced code blocks are skipped. The parser carried no fence state, so documentation that
+  SHOWS an example of the criteria format was read as criteria that exist, which fired
+  hardest on the projects most likely to document the convention.
+- A `MANIFEST.json` that is present but unparseable is reported as `manifest-unreadable`
+  instead of being treated as an absent one. Treating it as absent silently disabled the
+  `unresolved-on-done` rule even under `"strict": true`, and the message asserted the
+  registry was missing when it was corrupt.
+- Task scope survives an intervening heading. Any non-task heading between a task heading
+  and its criteria heading used to reset scope to null, so `unresolved-on-done` could never
+  fire for a task whose document puts a `### Context` or `### Files` subsection in between.
+  Scope now closes only on a sibling or ancestor heading.
+- `scripts/check-acceptance-criteria.mjs` no longer runs the gate at import time. The gate
+  runs only when the module is the process entry point, so `parseCriteriaSections` and
+  `findSectionDefects` can be imported without the gate reading the filesystem, printing,
+  or calling `process.exit`.
 - `package-lock.json` is regenerated so its root name and version match `package.json`
   (it had drifted to the pre-scope name at `3.5.0`).
 

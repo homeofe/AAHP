@@ -1,4 +1,4 @@
-﻿# AAHP: AI-to-AI Handoff Protocol (v2/v3)
+# AAHP: AI-to-AI Handoff Protocol (v2/v3)
 
 [![CI](https://github.com/homeofe/AAHP/actions/workflows/ci.yml/badge.svg)](https://github.com/homeofe/AAHP/actions/workflows/ci.yml)
 [![AAHP Verify](https://github.com/homeofe/AAHP/actions/workflows/aahp-verify.yml/badge.svg)](https://github.com/homeofe/AAHP/actions/workflows/aahp-verify.yml)
@@ -493,7 +493,7 @@ a repo that never opts in keeps working:
 | changelog format | `check-changelog-format.mjs` | uses `CHANGELOG.md` | Keep a Changelog 1.1.0 + SemVer grammar |
 | claims | `check-claims.mjs` | `claims` | capability numbers agree across surfaces and do not exceed a ground-truth floor |
 | generator + freshness | `aahp-dashboard.mjs` | `generate` | an optional LOG release journal stays in sync; a `Current version` header matches the package |
-| acceptance criteria | `check-acceptance-criteria.mjs` | `acceptanceCriteria` | the acceptance-criteria lifecycle (Section 8.7): canonical heading, task boxes not bullets, nothing unresolved on a `done` task. Warn by default, `"strict": true` to enforce |
+| acceptance criteria | `check-acceptance-criteria.mjs` | `acceptanceCriteria` | the acceptance-criteria lifecycle (Section 8.7): canonical heading, task boxes not plain list items, nothing unresolved on a `done` task, a parseable task registry. Warn by default, `"strict": true` to enforce |
 
 The changelog validator and the LOG generator import the release-heading grammar
 from a single module (`scripts/changelog-grammar.mjs`), so the two cannot diverge.
@@ -1031,11 +1031,33 @@ document at a time. Nothing forces the rename, because a reader that stops accep
 aliases would lose information that already exists.
 
 **Verification.** The opt-in `acceptance-criteria` gate (Section 2.11) reads the configured
-documents plus the `MANIFEST.json` task registry and reports three findings: a legacy
-heading, plain bullets where task boxes belong, and criteria left unresolved on a task the
+documents plus the `MANIFEST.json` task registry and reports four findings: a legacy
+heading, plain bullets where task boxes belong, criteria left unresolved on a task the
 manifest marks `done` (a criterion that carries a waiver or follow-up marker is resolved,
-not unresolved). Findings are warnings by default. The gate makes no network calls, so a
-run is complete and deterministic offline.
+not unresolved), and a task registry that is present but not valid JSON. Findings are
+warnings by default. The gate makes no network calls, so a run is complete and
+deterministic offline.
+
+**What counts as a criterion.** Both Markdown list forms do, because the choice between
+them is a matter of taste and a rule that only sees one of them under-reports silently:
+
+| Form | Counted | Resolution readable |
+|------|---------|---------------------|
+| `- [ ]` / `- [x]` (bullet task box) | yes | yes |
+| `1. [ ]` / `1. [x]` (ordered task box) | yes | yes |
+| `- plain` (bullet) | yes, reported as `plain-bullets` | no |
+| `1. plain` (ordered) | yes, reported as `plain-bullets` | no |
+
+Nested items (indent two or more) are detail lines belonging to the criterion above them.
+Lines inside a fenced code block are never criteria, so documentation that shows the
+format is not mistaken for criteria that exist. Prose, tables, and definition lists are
+not criteria: a section written that way reports zero items, which is visible in the
+section count rather than silently clean.
+
+**A corrupt task registry is loud.** An absent `MANIFEST.json` means the done-state rule
+genuinely does not apply and the gate says so. A `MANIFEST.json` that exists but does not
+parse is a finding of its own (`manifest-unreadable`), because every done-state verdict
+below it is unreliable while it stands; under `"strict": true` it fails the gate.
 
 **Optional GitHub synchronization.** The lifecycle belongs to AAHP task semantics; issue
 task boxes are one rendering of it. Where a project links tasks to issues (by convention,

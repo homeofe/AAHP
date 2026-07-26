@@ -11,6 +11,33 @@ independently of the npm version).
 
 ## [Unreleased]
 
+## [3.8.3] - 2026-07-26
+
+### Fixed
+- `aahp verify` Layer 1 now fails when `MANIFEST.json` indexes a file that is not present
+  in the working tree. Deleting an indexed handoff file used to pass both `aahp lint` and
+  `aahp verify --level ci` silently: the checksum comparison answers "does this file still
+  match what the manifest recorded", and a deleted file has no content to mismatch, so the
+  comparison never fired for it. The manifest could therefore keep advertising an artefact
+  that no longer existed while the blocking gate stayed green. A missing indexed file is
+  now reported by name and with its own message, separately from a checksum mismatch,
+  because the two need different fixes: restore the file, or regenerate the manifest.
+- `aahp doctor`'s `handoff-set` gate already caught this case, so the two gates disagreed
+  about the same repository state. They now agree.
+- `scripts/lint-handoff.sh` raises its own exit code for a failed integrity check. It
+  previously printed `! Checksum mismatch` and still exited 0, and still printed
+  "All checks passed", because the comparison runs in an embedded interpreter that cannot
+  write to the calling shell's violation counter. Two CI workflows and the documented exit
+  contract already trusted that exit code, so a hook or a job wired to it got a pass on a
+  corrupted handoff set. Both integrity failures now count as violations.
+
+### Changed
+- `aahp verify` Layer 1 checks the existence of every indexed file itself, against
+  `MANIFEST.json`, instead of inferring it from another script's output. Blocking no longer
+  rests solely on string-matching between two scripts, and it survives `lint-handoff.sh`
+  being unavailable or changing its wording. The checksum comparison still reuses
+  `lint-handoff.sh`, and lint's non-zero exit is still honoured.
+
 ## [3.8.2] - 2026-07-25
 
 ### Fixed
@@ -220,7 +247,8 @@ independently of the npm version).
 ### Changed
 - Relicensed to Apache-2.0 (earlier commits carried MIT, then CC BY 4.0, headers).
 
-[Unreleased]: https://github.com/homeofe/AAHP/compare/v3.8.2...HEAD
+[Unreleased]: https://github.com/homeofe/AAHP/compare/v3.8.3...HEAD
+[3.8.3]: https://github.com/homeofe/AAHP/compare/v3.8.2...v3.8.3
 [3.8.2]: https://github.com/homeofe/AAHP/compare/v3.8.1...v3.8.2
 [3.8.1]: https://github.com/homeofe/AAHP/compare/v3.8.0...v3.8.1
 [3.8.0]: https://github.com/homeofe/AAHP/compare/v3.7.0...v3.8.0

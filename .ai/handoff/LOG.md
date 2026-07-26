@@ -6,6 +6,37 @@
 
 ---
 
+## [2026-07-26] claude-opus-5: Layer 1 catches deleted indexed files; lint raises its own exit code
+
+**Agent:** claude-opus-5
+**Phase:** fix
+**Branch:** fix/layer1-deletion-and-lint-exit
+**Tasks:** #51, #52
+
+### What was done
+
+- Reproduced #51 before changing anything: a throwaway repository with a valid handoff set passed
+  `aahp verify --level ci` (exit 0), then one file indexed by `MANIFEST.json` was deleted and committed,
+  and the same command still passed (exit 0). `lint-handoff.sh` printed `! LOG.md: file not found` and
+  still ended with "All checks passed" and exit 0.
+- Confirmed the gates disagreed: `aahp doctor` on the identical state reported
+  `FAIL handoff-set: indexed file(s) missing on disk: LOG.md`. The blind spot was in verify Layer 1,
+  not in doctor.
+- Layer 1 now enumerates the indexed files and asserts existence itself, through a shared library
+  helper, instead of inferring the result from another script's stdout. A missing indexed file is
+  named and carries its own message, kept distinct from a checksum mismatch because the fixes differ.
+- #52 decided in favour of lint raising its own exit code. The script header already documented
+  `1 = violations found`, and two workflows already run it as a blocking step, so the exit 0 on a
+  mismatch was an accident of the comparison running in an embedded interpreter that cannot write to
+  the calling shell's counter. Both integrity failures now count as violations, and Layer 1 keeps its
+  own independent check so blocking never rests on that exit code or on matching lint's wording.
+- Regression tests: two in `tests/lint.bats` (mismatch exits 1; deletion exits 1 and names the file
+  without claiming a mismatch) and three in `tests/verify.bats` (deletion fails at `--level ci`; and
+  two that run verify against a stubbed `lint-handoff.sh` which always exits 0, so only Layer 1's own
+  checks can produce the failure).
+
+---
+
 ## [2026-07-25] claude-opus-5: Trust register re-verification (10 rows re-established, 0 downgraded)
 
 **Agent:** claude-opus-5

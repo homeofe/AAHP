@@ -12,9 +12,16 @@
 #   5. HANDOFF.lock stale check
 #   6. Parallel agent detection (advisory)
 #
-# Exit codes:
+# Exit codes (this script DECIDES, it does not merely report):
 #   0 = all checks passed
 #   1 = violations found
+#
+# Check 4 covers BOTH kinds of MANIFEST.json integrity failure, and both
+# count as violations, so a hook or a CI job can trust this exit code:
+#   - a checksum mismatch (an indexed file changed outside the protocol)
+#   - a missing indexed file (the manifest indexes a path that is gone)
+# aahp verify Layer 1 keeps its OWN independent check of both, so blocking
+# never depends solely on this script's exit code or on its output text.
 
 set -euo pipefail
 
@@ -216,26 +223,46 @@ if [ -f "$HANDOFF_DIR/MANIFEST.json" ]; then
             fi
         done
 
-        # Verify checksums
-        echo "  Verifying checksums..."
+        # Verify the existence AND the checksum of every indexed file.
+        #
+        # Existence is asserted FIRST and reported separately. A deleted file
+        # has no content to compare, so the checksum comparison alone can never
+        # see it; and the two failures need different fixes (restore the file
+        # vs. regenerate the manifest), so they must not share a message.
+        #
+        # Exit contract of the embedded script: 0 = clean, 3 = findings,
+        # anything else = the interpreter itself failed.
+        echo "  Verifying indexed files..."
+        CHECKSUM_RC=0
         "$PYTHON_CMD" -c "
 import json, hashlib, os, sys
 sys.stdout.reconfigure(errors='replace')
 manifest = json.load(open('$HANDOFF_DIR/MANIFEST.json'))
+findings = 0
 for fname, meta in manifest.get('files', {}).items():
     fpath = os.path.join('$HANDOFF_DIR', fname)
-    if os.path.exists(fpath):
-        actual = 'sha256:' + hashlib.sha256(open(fpath, 'rb').read().replace(b'\r', b'')).hexdigest()
-        expected = meta.get('checksum', '')
-        if actual != expected:
-            print(f'  ! Checksum mismatch: {fname}')
-            print(f'    Expected: {expected}')
-            print(f'    Actual:   {actual}')
-        else:
-            print(f'  OK: {fname}')
+    if not os.path.exists(fpath):
+        print(f'  ! Missing indexed file: {fname}')
+        print('    Indexed by MANIFEST.json but not present in the working tree.')
+        print('    Fix: restore the file, or regenerate the manifest (aahp manifest).')
+        findings += 1
+        continue
+    actual = 'sha256:' + hashlib.sha256(open(fpath, 'rb').read().replace(b'\r', b'')).hexdigest()
+    expected = meta.get('checksum', '')
+    if actual != expected:
+        print(f'  ! Checksum mismatch: {fname}')
+        print(f'    Expected: {expected}')
+        print(f'    Actual:   {actual}')
+        findings += 1
     else:
-        print(f'  ! {fname}: file not found')
-" 2>/dev/null || echo -e "  ${YELLOW}⚠ Could not verify checksums (Python error)${NC}"
+        print(f'  OK: {fname}')
+sys.exit(3 if findings else 0)
+" 2>/dev/null || CHECKSUM_RC=$?
+        if [ "$CHECKSUM_RC" -eq 3 ]; then
+            VIOLATIONS=$((VIOLATIONS + 1))
+        elif [ "$CHECKSUM_RC" -ne 0 ]; then
+            echo -e "  ${YELLOW}⚠ Could not verify checksums (Python error)${NC}"
+        fi
 
     else
         echo -e "  ${RED}✗ Invalid JSON.${NC}"

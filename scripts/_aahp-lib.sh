@@ -116,6 +116,46 @@ if cur is not None:
     fi
 }
 
+# List the files MANIFEST.json indexes that are absent from the handoff dir.
+# Echoes one file name per line, or nothing when every indexed file is present.
+#
+# This exists so aahp verify Layer 1 can detect a deleted indexed file on its
+# own, without relying on another script's exit code or output text. A deleted
+# file has no content, so a checksum comparison can never see it.
+aahp_manifest_missing_files() {
+    local manifest="$1"
+    local handoff_dir="$2"
+    [ -f "$manifest" ] || return 0
+
+    if command -v node &>/dev/null; then
+        node -e "
+            const fs = require('fs'), path = require('path');
+            let m;
+            try { m = JSON.parse(fs.readFileSync(process.argv[1], 'utf8')) } catch { process.exit(0) }
+            const files = (m && m.files) || {};
+            for (const name of Object.keys(files)) {
+                if (!fs.existsSync(path.join(process.argv[2], name))) console.log(name);
+            }
+        " "$manifest" "$handoff_dir" 2>/dev/null || true
+        return 0
+    fi
+
+    local py
+    py=$(aahp_python_cmd)
+    if [ -n "$py" ]; then
+        "$py" -c "
+import json, os, sys
+try:
+    m = json.load(open(sys.argv[1]))
+except Exception:
+    sys.exit(0)
+for name in (m.get('files') or {}):
+    if not os.path.exists(os.path.join(sys.argv[2], name)):
+        print(name)
+" "$manifest" "$handoff_dir" 2>/dev/null || true
+    fi
+}
+
 # Report expired "verified" trust rows from a TRUST.md file.
 # Trust tables are Markdown with a header row that includes "Status" and
 # "Expires" columns. We locate those columns from the header, then for each

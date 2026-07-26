@@ -118,6 +118,59 @@ teardown() {
     [[ "$output" == *"checksums do not match"* || "$output" == *"Checksum mismatch"* ]]
 }
 
+@test "FAILS when a file indexed by MANIFEST.json is deleted (level ci)" {
+    rm "$TEST_TMPDIR/.ai/handoff/LOG.md"
+    git -C "$TEST_TMPDIR" add -A
+    git -C "$TEST_TMPDIR" commit -q -m "delete an indexed handoff file"
+
+    run bash "$SCRIPTS_DIR/verify-handoff.sh" "$TEST_TMPDIR" --level ci
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Missing indexed file: LOG.md"* ]]
+    [[ "$output" == *"indexes file(s) that are not present"* ]]
+    # A deletion must not be reported as if it were a tampered file.
+    [[ "$output" != *"checksums do not match"* ]]
+}
+
+# Layer 1 must not depend on lint-handoff.sh's exit code. Both tests below run
+# verify against a copy of scripts/ whose lint-handoff.sh is a stub that always
+# exits 0, so only Layer 1's own checks can produce the failure.
+
+_stub_scripts_dir_with_passing_lint() {
+    local stub="$TEST_TMPDIR/stub-scripts"
+    cp -r "$SCRIPTS_DIR" "$stub"
+    cat > "$stub/lint-handoff.sh" <<'STUB'
+#!/usr/bin/env bash
+# Stub: reports a checksum mismatch but exits 0, exactly the pre-fix contract.
+echo "  ! Checksum mismatch: STATUS.md"
+exit 0
+STUB
+    echo "$stub"
+}
+
+@test "Layer 1 blocks a checksum mismatch even when lint exits 0" {
+    local stub
+    stub="$(_stub_scripts_dir_with_passing_lint)"
+
+    run bash "$stub/verify-handoff.sh" "$TEST_TMPDIR" --level ci
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"checksums do not match"* ]]
+}
+
+@test "Layer 1 blocks a deleted indexed file even when lint exits 0" {
+    local stub
+    stub="$(_stub_scripts_dir_with_passing_lint)"
+    # Make the stub silent so nothing in its output can trigger the failure.
+    cat > "$stub/lint-handoff.sh" <<'STUB'
+#!/usr/bin/env bash
+exit 0
+STUB
+    rm "$TEST_TMPDIR/.ai/handoff/NEXT_ACTIONS.md"
+
+    run bash "$stub/verify-handoff.sh" "$TEST_TMPDIR" --level ci
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Missing indexed file: NEXT_ACTIONS.md"* ]]
+}
+
 # ─── Layer 4: TRUST-TTL (advisory) ───────────────────────────
 
 @test "reports expired verified trust rows as a warning (non-blocking)" {

@@ -183,6 +183,12 @@ A JSON Schema (`schema/aahp-manifest.schema.json`) is included for reference and
 ./scripts/lint-handoff.sh [path-to-project]
 ```
 
+`lint-handoff.sh` decides as well as reports: it exits `1` when it finds any
+violation, including a checksum mismatch or a missing indexed file, so its exit
+code is safe to wire into a hook or a CI job. `aahp verify` Layer 1 keeps its own
+independent check of both conditions, so blocking never depends solely on that
+exit code.
+
 To use AJV for strict schema validation in CI, install it separately:
 
 ```bash
@@ -311,7 +317,12 @@ but they do not stop an agent from committing code while leaving `STATUS.md` and
 `aahp verify` (`scripts/verify-handoff.sh`) is the single canonical gate. It runs
 up to 4 layers:
 
-1. **MANIFEST checksum integrity** - reuses `lint-handoff.sh`.
+1. **MANIFEST integrity** - every file `MANIFEST.json` indexes must still be
+   present AND still match its recorded checksum. A missing indexed file and a
+   checksum mismatch are reported as different failures, because the fix
+   differs: restore the file, or regenerate the manifest. The checksum
+   comparison reuses `lint-handoff.sh`; existence is checked by the gate
+   itself, so it does not depend on another script staying available.
 2. **Content-drift gate (the key check)** - if the change set touches any source
    file OUTSIDE `.ai/handoff/`, it MUST also include `STATUS.md` AND a regenerated
    `MANIFEST.json`. Otherwise it HARD-FAILS with:

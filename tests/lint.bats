@@ -336,6 +336,35 @@ JSON
     [[ "$output" == *"No stale lock"* ]]
 }
 
+# ─── Indexed-file integrity (exit code, not just output) ────
+
+@test "exits non-zero when an indexed file's checksum no longer matches" {
+    create_full_handoff
+    bash "$SCRIPTS_DIR/aahp-manifest.sh" "$TEST_TMPDIR" --quiet --phase implementation
+    # Change an indexed file without regenerating the manifest.
+    printf '
+unmanaged edit
+' >> "$TEST_TMPDIR/.ai/handoff/STATUS.md"
+
+    run bash "$SCRIPTS_DIR/lint-handoff.sh" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Checksum mismatch: STATUS.md"* ]]
+    [[ "$output" == *"violation(s) found"* ]]
+    [[ "$output" != *"All checks passed"* ]]
+}
+
+@test "exits non-zero and names the file when an indexed file is deleted" {
+    create_full_handoff
+    bash "$SCRIPTS_DIR/aahp-manifest.sh" "$TEST_TMPDIR" --quiet --phase implementation
+    rm "$TEST_TMPDIR/.ai/handoff/LOG.md"
+
+    run bash "$SCRIPTS_DIR/lint-handoff.sh" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Missing indexed file: LOG.md"* ]]
+    # A deletion must be distinguishable from a tampered file.
+    [[ "$output" != *"Checksum mismatch"* ]]
+}
+
 # ─── Missing handoff directory ───────────────────────────────
 
 @test "errors when handoff directory does not exist" {

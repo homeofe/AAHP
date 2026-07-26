@@ -3,7 +3,9 @@
 #
 # Runs up to 4 layers that together stop staled handoff state from being
 # committed or pushed:
-#   1. MANIFEST checksum integrity (reuses lint-handoff.sh)
+#   1. MANIFEST integrity: every file MANIFEST.json indexes must exist and
+#      must still match its recorded checksum. Existence is checked here
+#      directly; the checksum comparison reuses lint-handoff.sh.
 #   2. Content-drift gate (THE key check): if a commit/push changes any source
 #      file OUTSIDE .ai/handoff/, it MUST also include STATUS.md AND a
 #      regenerated MANIFEST.json. Otherwise FAIL.
@@ -119,12 +121,16 @@ echo "========================================="
 echo "  AAHP Verify (level: $LEVEL)"
 echo "========================================="
 
-# --- Layer 1: MANIFEST checksum integrity ----------------------
-# Reuses lint-handoff.sh, which already validates JSON, required fields,
-# and per-file SHA-256 checksums against MANIFEST.json.
+# --- Layer 1: MANIFEST integrity -------------------------------
+# Two distinct failures, reported separately because the fixes differ:
+#   - an indexed file is MISSING  -> restore it, or regenerate the manifest
+#   - an indexed file MISMATCHES  -> it changed outside the protocol
+# The checksum comparison reuses lint-handoff.sh, which also validates JSON
+# and required fields. Existence is checked here directly, so a deleted file
+# is caught even if lint is unavailable or its output format changes.
 
 echo ""
-echo -e "${GREEN}[Layer 1]${NC} MANIFEST checksum integrity (via lint-handoff.sh)"
+echo -e "${GREEN}[Layer 1]${NC} MANIFEST integrity: indexed files present and unchanged"
 
 if [ ! -f "$HANDOFF_DIR/MANIFEST.json" ]; then
     log_fail "MANIFEST.json not found. Run /handoff (aahp manifest)."
@@ -133,14 +139,36 @@ else
     LINT_OUT=""
     LINT_RC=0
     LINT_OUT=$(bash "$SCRIPT_DIR/lint-handoff.sh" "$PROJECT_ROOT" 2>&1) || LINT_RC=$?
+    LAYER1_FAILED=0
+
+    # Existence of every indexed file is checked HERE, directly against
+    # MANIFEST.json, not by reading lint's output. A deleted file has no
+    # content to compare, so the checksum path can never catch it, and the
+    # blocking decision must not rest on another script's exit code or on
+    # string-matching its stdout.
+    MISSING_INDEXED=$(aahp_manifest_missing_files "$HANDOFF_DIR/MANIFEST.json" "$HANDOFF_DIR")
+    if [ -n "$MISSING_INDEXED" ]; then
+        log_fail "MANIFEST.json indexes file(s) that are not present in the working tree."
+        echo "$MISSING_INDEXED" | sed 's/^/    Missing indexed file: /'
+        echo "    Fix: restore the file(s), or regenerate the manifest with /handoff."
+        FAILURES=$((FAILURES + 1))
+        LAYER1_FAILED=1
+    fi
+
     if echo "$LINT_OUT" | grep -q "Checksum mismatch"; then
         log_fail "MANIFEST.json checksums do not match file contents. Run /handoff."
         echo "$LINT_OUT" | grep -E "Checksum mismatch|Expected:|Actual:" | sed 's/^/    /'
         FAILURES=$((FAILURES + 1))
-    elif [ "$LINT_RC" -ne 0 ]; then
+        LAYER1_FAILED=1
+    fi
+
+    if [ "$LINT_RC" -ne 0 ] && [ "$LAYER1_FAILED" -eq 0 ]; then
         log_fail "lint-handoff.sh reported violations (exit $LINT_RC). Run: aahp lint"
         FAILURES=$((FAILURES + 1))
-    else
+        LAYER1_FAILED=1
+    fi
+
+    if [ "$LAYER1_FAILED" -eq 0 ]; then
         log_ok "Checksums and handoff lint pass."
     fi
 fi

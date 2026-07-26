@@ -32,6 +32,11 @@ independently of the npm version).
   corrupted handoff set. Both integrity failures now count as violations.
 
 ### Changed
+- Consequence of the exit-code fix, worth knowing before upgrading: `aahp lint` now exits 1
+  on a repository that has run `aahp init` but not yet `aahp manifest`, because the
+  scaffolded manifest still carries the template placeholder `sha256:[hash]` for every
+  file. `aahp verify` has always refused that state, so no blocking verdict changes; only
+  lint stops disagreeing with what it prints. Run `aahp manifest` after `aahp init`.
 - `aahp verify` Layer 1 checks the existence of every indexed file itself, against
   `MANIFEST.json`, instead of inferring it from another script's output. Blocking no longer
   rests solely on string-matching between two scripts, and it survives `lint-handoff.sh`

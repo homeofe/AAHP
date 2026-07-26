@@ -222,9 +222,12 @@ teardown() {
     cat > "$TEST_TMPDIR/.ai/handoff/pii-allowlist.json" <<'JSON'
 {"version":1,"entries":[{"value":"owner@company.test","kind":"email","reason":"Required operational owner reference","owner":"Platform Operations","expires":"2099-01-01"}]}
 JSON
-    bash "$SCRIPTS_DIR/aahp-manifest.sh" "$TEST_TMPDIR" --quiet
-    bash "$SCRIPTS_DIR/aahp-manifest.sh" "$TEST_TMPDIR" --quiet
     echo "Contact owner@company.test for escalation." >> "$TEST_TMPDIR/.ai/handoff/STATUS.md"
+    # Generate the manifest AFTER the edit. Appending to an indexed file and
+    # then leaving the manifest stale is a genuine integrity violation, which
+    # this test is not about.
+    bash "$SCRIPTS_DIR/aahp-manifest.sh" "$TEST_TMPDIR" --quiet
+    bash "$SCRIPTS_DIR/aahp-manifest.sh" "$TEST_TMPDIR" --quiet
     run bash "$SCRIPTS_DIR/lint-handoff.sh" "$TEST_TMPDIR"
     [ "$status" -eq 0 ]
     [[ "$output" == *"Allowed PII email 'owner@company.test'"* ]]

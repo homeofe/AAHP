@@ -365,10 +365,23 @@ _aahp() {
 # ─── lint: basic smoke test via CLI ──────────────────────────
 
 @test "aahp lint exits 0 on a clean handoff directory" {
-    # Init first so the handoff dir has valid files
+    # Init scaffolds the files, then manifest records their checksums. Without
+    # the second step the manifest still carries the template placeholder
+    # "sha256:[hash]" for every file, which is a real integrity violation and
+    # which aahp verify has always failed on.
     _aahp init "$TEST_TMPDIR"
+    _aahp manifest "$TEST_TMPDIR" --quiet
     _aahp lint "$TEST_TMPDIR"
     [ "$status" -eq 0 ]
+}
+
+@test "aahp lint exits non-zero right after init, before the manifest is generated" {
+    # The scaffolded manifest indexes every handoff file with a placeholder
+    # checksum. Lint must not call that clean: aahp verify already refuses it.
+    _aahp init "$TEST_TMPDIR"
+    _aahp lint "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Checksum mismatch"* ]]
 }
 
 @test "aahp lint exits non-zero on injection pattern" {

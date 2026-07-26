@@ -116,44 +116,53 @@ if cur is not None:
     fi
 }
 
-# List the files MANIFEST.json indexes that are absent from the handoff dir.
-# Echoes one file name per line, or nothing when every indexed file is present.
+# Read the file index out of a MANIFEST.json.
+# Echoes one TAB-separated "<name>\t<recorded-checksum>" line per indexed file.
 #
-# This exists so aahp verify Layer 1 can detect a deleted indexed file on its
-# own, without relying on another script's exit code or output text. A deleted
-# file has no content, so a checksum comparison can never see it.
-aahp_manifest_missing_files() {
+# This exists so aahp verify Layer 1 can reach its OWN verdict on both
+# MANIFEST integrity failures (a missing indexed file and a checksum mismatch)
+# without reading another script's exit code or string-matching its stdout.
+# The caller does the existence test and the checksum comparison itself, so a
+# helper that cannot answer must SAY SO rather than echo an empty, innocent
+# looking index. Hence the exit codes below: every failure mode is
+# distinguishable from "the manifest indexes nothing", and none of them is
+# silently converted into a pass.
+#
+# Exit codes:
+#   0 = index read successfully (zero output lines = the manifest indexes
+#       nothing, which is a finding for the caller, not a clean result)
+#   1 = MANIFEST.json is absent, unreadable, or not valid JSON
+#   2 = no JSON interpreter available (neither node nor python)
+aahp_manifest_index() {
     local manifest="$1"
-    local handoff_dir="$2"
-    [ -f "$manifest" ] || return 0
+    [ -f "$manifest" ] && [ -r "$manifest" ] || return 1
 
     if command -v node &>/dev/null; then
-        node -e "
-            const fs = require('fs'), path = require('path');
-            let m;
-            try { m = JSON.parse(fs.readFileSync(process.argv[1], 'utf8')) } catch { process.exit(0) }
-            const files = (m && m.files) || {};
+        node -e '
+            const fs = require("fs");
+            const m = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+            const files = (m && typeof m === "object" && m.files) || {};
             for (const name of Object.keys(files)) {
-                if (!fs.existsSync(path.join(process.argv[2], name))) console.log(name);
+                const meta = files[name];
+                const sum = (meta && typeof meta === "object" && meta.checksum) || "";
+                process.stdout.write(name + "\t" + String(sum) + "\n");
             }
-        " "$manifest" "$handoff_dir" 2>/dev/null || true
+        ' "$manifest" || return 1
         return 0
     fi
 
     local py
     py=$(aahp_python_cmd)
-    if [ -n "$py" ]; then
-        "$py" -c "
-import json, os, sys
-try:
-    m = json.load(open(sys.argv[1]))
-except Exception:
-    sys.exit(0)
-for name in (m.get('files') or {}):
-    if not os.path.exists(os.path.join(sys.argv[2], name)):
-        print(name)
-" "$manifest" "$handoff_dir" 2>/dev/null || true
-    fi
+    [ -n "$py" ] || return 2
+
+    "$py" -c '
+import json, sys
+m = json.load(open(sys.argv[1], encoding="utf-8"))
+files = (m.get("files") or {}) if isinstance(m, dict) else {}
+for name, meta in files.items():
+    checksum = meta.get("checksum", "") if isinstance(meta, dict) else ""
+    sys.stdout.write("%s\t%s\n" % (name, checksum))
+' "$manifest" || return 1
 }
 
 # Report expired "verified" trust rows from a TRUST.md file.

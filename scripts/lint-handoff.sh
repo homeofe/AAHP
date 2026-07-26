@@ -20,8 +20,12 @@
 # count as violations, so a hook or a CI job can trust this exit code:
 #   - a checksum mismatch (an indexed file changed outside the protocol)
 #   - a missing indexed file (the manifest indexes a path that is gone)
-# aahp verify Layer 1 keeps its OWN independent check of both, so blocking
-# never depends solely on this script's exit code or on its output text.
+#   - an empty index, or a verifier that could not run at all: integrity is
+#     then UNPROVEN, and unproven counts as a violation here
+# aahp verify Layer 1 computes both verdicts itself, from MANIFEST.json and
+# the bytes on disk, so blocking never depends on this script's exit code or
+# on its output text. The two implementations are deliberately different
+# (embedded Python here, shell plus sha256sum there) so they cross-check.
 
 set -euo pipefail
 
@@ -210,7 +214,9 @@ echo -e "${GREEN}[4/6]${NC} Validating MANIFEST.json..."
 
 if [ -f "$HANDOFF_DIR/MANIFEST.json" ]; then
     if [ -z "$PYTHON_CMD" ]; then
-        echo -e "  ${YELLOW}⚠ Python not found. Skipping MANIFEST.json validation.${NC}"
+        echo -e "  ${YELLOW}⚠ Python not found. MANIFEST.json integrity NOT verified here.${NC}"
+        echo "    The blocking check is 'aahp verify' Layer 1, which uses node or"
+        echo "    python and FAILS outright when neither is available."
     elif "$PYTHON_CMD" -c "import json; json.load(open('$HANDOFF_DIR/MANIFEST.json'))" 2>/dev/null; then
         echo -e "  ${GREEN}✓ Valid JSON.${NC}"
 
@@ -230,8 +236,15 @@ if [ -f "$HANDOFF_DIR/MANIFEST.json" ]; then
         # see it; and the two failures need different fixes (restore the file
         # vs. regenerate the manifest), so they must not share a message.
         #
+        # An empty index is a finding too: zero iterations means nothing was
+        # compared, which is not the same as everything matching.
+        #
         # Exit contract of the embedded script: 0 = clean, 3 = findings,
-        # anything else = the interpreter itself failed.
+        # anything else = the interpreter itself failed, and that ALSO counts
+        # as a violation. If the tool cannot tell whether the files match,
+        # integrity is unproven, and unproven must not print "All checks
+        # passed". stderr is deliberately not discarded so the real cause of
+        # an interpreter failure is visible in the gate log.
         echo "  Verifying indexed files..."
         CHECKSUM_RC=0
         "$PYTHON_CMD" -c "
@@ -239,7 +252,13 @@ import json, hashlib, os, sys
 sys.stdout.reconfigure(errors='replace')
 manifest = json.load(open('$HANDOFF_DIR/MANIFEST.json'))
 findings = 0
-for fname, meta in manifest.get('files', {}).items():
+indexed = manifest.get('files') or {}
+if not indexed:
+    print('  ! MANIFEST.json indexes no files.')
+    print('    Nothing could be verified, so nothing is verified.')
+    print('    Fix: regenerate the manifest (aahp manifest).')
+    sys.exit(3)
+for fname, meta in indexed.items():
     fpath = os.path.join('$HANDOFF_DIR', fname)
     if not os.path.exists(fpath):
         print(f'  ! Missing indexed file: {fname}')
@@ -257,11 +276,13 @@ for fname, meta in manifest.get('files', {}).items():
     else:
         print(f'  OK: {fname}')
 sys.exit(3 if findings else 0)
-" 2>/dev/null || CHECKSUM_RC=$?
+" || CHECKSUM_RC=$?
         if [ "$CHECKSUM_RC" -eq 3 ]; then
             VIOLATIONS=$((VIOLATIONS + 1))
         elif [ "$CHECKSUM_RC" -ne 0 ]; then
-            echo -e "  ${YELLOW}⚠ Could not verify checksums (Python error)${NC}"
+            echo -e "  ${RED}✗ Could not verify indexed files (verifier exited $CHECKSUM_RC).${NC}"
+            echo "    Integrity is UNPROVEN. That counts as a violation, not a note."
+            VIOLATIONS=$((VIOLATIONS + 1))
         fi
 
     else

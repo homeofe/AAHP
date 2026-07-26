@@ -4,8 +4,9 @@
 # Runs up to 4 layers that together stop staled handoff state from being
 # committed or pushed:
 #   1. MANIFEST integrity: every file MANIFEST.json indexes must exist and
-#      must still match its recorded checksum. Existence is checked here
-#      directly; the checksum comparison reuses lint-handoff.sh.
+#      must still match its recorded checksum. Both are checked here, against
+#      MANIFEST.json and the bytes on disk. lint-handoff.sh also runs and its
+#      exit code still blocks, but no Layer 1 verdict is read out of it.
 #   2. Content-drift gate (THE key check): if a commit/push changes any source
 #      file OUTSIDE .ai/handoff/, it MUST also include STATUS.md AND a
 #      regenerated MANIFEST.json. Otherwise FAIL.
@@ -125,9 +126,12 @@ echo "========================================="
 # Two distinct failures, reported separately because the fixes differ:
 #   - an indexed file is MISSING  -> restore it, or regenerate the manifest
 #   - an indexed file MISMATCHES  -> it changed outside the protocol
-# The checksum comparison reuses lint-handoff.sh, which also validates JSON
-# and required fields. Existence is checked here directly, so a deleted file
-# is caught even if lint is unavailable or its output format changes.
+# Both are decided by this script, from MANIFEST.json and the bytes on disk.
+# Anything that leaves integrity unproven (no JSON interpreter, an unparseable
+# manifest, an empty index, no checksum tool) is a FAILURE here, not a note:
+# "could not check" is never allowed to read as "checked and clean".
+# lint-handoff.sh still runs for the checks Layer 1 does not cover, and its
+# exit code still blocks, but no Layer 1 verdict depends on its output.
 
 echo ""
 echo -e "${GREEN}[Layer 1]${NC} MANIFEST integrity: indexed files present and unchanged"
@@ -141,32 +145,97 @@ else
     LINT_OUT=$(bash "$SCRIPT_DIR/lint-handoff.sh" "$PROJECT_ROOT" 2>&1) || LINT_RC=$?
     LAYER1_FAILED=0
 
-    # Existence of every indexed file is checked HERE, directly against
-    # MANIFEST.json, not by reading lint's output. A deleted file has no
-    # content to compare, so the checksum path can never catch it, and the
-    # blocking decision must not rest on another script's exit code or on
-    # string-matching its stdout.
-    MISSING_INDEXED=$(aahp_manifest_missing_files "$HANDOFF_DIR/MANIFEST.json" "$HANDOFF_DIR")
-    if [ -n "$MISSING_INDEXED" ]; then
-        log_fail "MANIFEST.json indexes file(s) that are not present in the working tree."
-        while IFS= read -r missing_file; do
-            [ -n "$missing_file" ] || continue
-            echo "    Missing indexed file: $missing_file"
-        done <<< "$MISSING_INDEXED"
-        echo "    Fix: restore the file(s), or regenerate the manifest with /handoff."
+    # BOTH integrity verdicts are reached HERE, directly against MANIFEST.json
+    # and the bytes on disk. Nothing in this layer is inferred from another
+    # script's exit code or from string-matching its stdout, so a lint that
+    # dies early, prints nothing, or exits 0 cannot make Layer 1 report clean.
+    # lint-handoff.sh still runs, and its exit code still blocks, because it
+    # covers checks Layer 1 does not (injection, secrets, PII, stale lock) and
+    # because a second, independently written verifier is a useful cross-check.
+    if ! declare -F aahp_manifest_index >/dev/null 2>&1; then
+        log_fail "scripts/_aahp-lib.sh is out of date: helper 'aahp_manifest_index' is missing."
+        echo "    Layer 1 cannot verify MANIFEST integrity without it, so nothing is proven."
+        echo "    Fix: re-sync scripts/_aahp-lib.sh from the AAHP release that ships this gate."
         FAILURES=$((FAILURES + 1))
         LAYER1_FAILED=1
-    fi
+    else
+        INDEX_RC=0
+        MANIFEST_INDEX=$(aahp_manifest_index "$HANDOFF_DIR/MANIFEST.json") || INDEX_RC=$?
 
-    if echo "$LINT_OUT" | grep -q "Checksum mismatch"; then
-        log_fail "MANIFEST.json checksums do not match file contents. Run /handoff."
-        echo "$LINT_OUT" | grep -E "Checksum mismatch|Expected:|Actual:" | sed 's/^/    /'
-        FAILURES=$((FAILURES + 1))
-        LAYER1_FAILED=1
+        if [ "$INDEX_RC" -eq 2 ]; then
+            log_fail "No JSON interpreter available (need node or python)."
+            echo "    MANIFEST integrity could not be checked, so it is NOT verified."
+            FAILURES=$((FAILURES + 1))
+            LAYER1_FAILED=1
+        elif [ "$INDEX_RC" -ne 0 ]; then
+            log_fail "MANIFEST.json could not be read or parsed (helper exit $INDEX_RC)."
+            echo "    Fix: repair the file, or regenerate the manifest with /handoff."
+            FAILURES=$((FAILURES + 1))
+            LAYER1_FAILED=1
+        elif [ -z "${MANIFEST_INDEX//[[:space:]]/}" ]; then
+            log_fail "MANIFEST.json indexes no files, so nothing was verified."
+            echo "    An empty 'files' index proves nothing about the handoff set."
+            echo "    Fix: regenerate the manifest with /handoff (aahp manifest)."
+            FAILURES=$((FAILURES + 1))
+            LAYER1_FAILED=1
+        else
+            MISSING_INDEXED=""
+            MISMATCHED_INDEXED=""
+            UNVERIFIABLE_INDEXED=""
+            while IFS=$'\t' read -r idx_name idx_sum; do
+                [ -n "$idx_name" ] || continue
+                if [ ! -f "$HANDOFF_DIR/$idx_name" ]; then
+                    MISSING_INDEXED="${MISSING_INDEXED}${idx_name}"$'\n'
+                    continue
+                fi
+                SUM_RC=0
+                ACTUAL_SUM=$(aahp_checksum "$HANDOFF_DIR/$idx_name" 2>/dev/null) || SUM_RC=$?
+                if [ "$SUM_RC" -ne 0 ] || [ -z "$ACTUAL_SUM" ]; then
+                    UNVERIFIABLE_INDEXED="${UNVERIFIABLE_INDEXED}${idx_name}"$'\n'
+                elif [ "$ACTUAL_SUM" != "$idx_sum" ]; then
+                    MISMATCHED_INDEXED="${MISMATCHED_INDEXED}${idx_name}"$'\t'"${idx_sum}"$'\t'"${ACTUAL_SUM}"$'\n'
+                fi
+            done <<< "$MANIFEST_INDEX"
+
+            if [ -n "$MISSING_INDEXED" ]; then
+                log_fail "MANIFEST.json indexes file(s) that are not present in the working tree."
+                while IFS= read -r missing_file; do
+                    [ -n "$missing_file" ] || continue
+                    echo "    Missing indexed file: $missing_file"
+                done <<< "$MISSING_INDEXED"
+                echo "    Fix: restore the file(s), or regenerate the manifest with /handoff."
+                FAILURES=$((FAILURES + 1))
+                LAYER1_FAILED=1
+            fi
+
+            if [ -n "$MISMATCHED_INDEXED" ]; then
+                log_fail "MANIFEST.json checksums do not match file contents. Run /handoff."
+                while IFS=$'\t' read -r bad_name bad_expected bad_actual; do
+                    [ -n "$bad_name" ] || continue
+                    echo "    Checksum mismatch: $bad_name"
+                    echo "      Expected: $bad_expected"
+                    echo "      Actual:   $bad_actual"
+                done <<< "$MISMATCHED_INDEXED"
+                FAILURES=$((FAILURES + 1))
+                LAYER1_FAILED=1
+            fi
+
+            if [ -n "$UNVERIFIABLE_INDEXED" ]; then
+                log_fail "Could not compute a checksum for indexed file(s); integrity is UNPROVEN."
+                while IFS= read -r bad_file; do
+                    [ -n "$bad_file" ] || continue
+                    echo "    Unverifiable indexed file: $bad_file"
+                done <<< "$UNVERIFIABLE_INDEXED"
+                echo "    Fix: install sha256sum or shasum, and make the file readable."
+                FAILURES=$((FAILURES + 1))
+                LAYER1_FAILED=1
+            fi
+        fi
     fi
 
     if [ "$LINT_RC" -ne 0 ] && [ "$LAYER1_FAILED" -eq 0 ]; then
         log_fail "lint-handoff.sh reported violations (exit $LINT_RC). Run: aahp lint"
+        echo "$LINT_OUT" | tail -4 | sed 's/^/    /'
         FAILURES=$((FAILURES + 1))
         LAYER1_FAILED=1
     fi

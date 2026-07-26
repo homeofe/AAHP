@@ -164,3 +164,5 @@ Merged main (OIDC publish migration + BOM strip) into the status/archive cli.bat
 Removed stray aahp-swarm-link gitlink and noop.patch that git add -A swept into the merge commit; ignored both to prevent re-sweeping.
 
 > 2026-06-30 ci: exempt Dependabot from the aahp-verify handoff gate (keep supply-chain-guard/codeql/build).
+
+<!-- Layer 1 hardening: both MANIFEST integrity verdicts are now computed by the gate itself; unproven integrity fails. -->

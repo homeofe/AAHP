@@ -368,6 +368,57 @@ unmanaged edit
     [[ "$output" != *"Checksum mismatch"* ]]
 }
 
+@test "an unverifiable checksum run is a violation, not a yellow note" {
+    create_full_handoff
+    bash "$SCRIPTS_DIR/aahp-manifest.sh" "$TEST_TMPDIR" --quiet --phase implementation
+
+    local py real_py
+    py="$(bash -c "source '$SCRIPTS_DIR/_aahp-lib.sh'; aahp_python_cmd")"
+    [ -n "$py" ] || skip "no working python interpreter"
+    real_py="$(command -v "$py")"
+
+    # A wrapper that behaves exactly like the real interpreter except for the
+    # checksum verifier, which it kills with an unexpected exit code. Both
+    # names are wrapped because the detection helper may select either.
+    local fake="$TEST_TMPDIR/fakebin" name
+    mkdir -p "$fake"
+    for name in python python3; do
+        cat > "$fake/$name" <<WRAP
+#!/usr/bin/env bash
+for a in "\$@"; do case "\$a" in *hashlib*) exit 9 ;; esac; done
+exec "$real_py" "\$@"
+WRAP
+        chmod +x "$fake/$name"
+    done
+
+    PATH="$fake:$PATH" run bash "$SCRIPTS_DIR/lint-handoff.sh" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Could not verify indexed files"* ]]
+    [[ "$output" == *"violation(s) found"* ]]
+    [[ "$output" != *"All checks passed"* ]]
+}
+
+@test "a MANIFEST that indexes nothing is a violation" {
+    create_full_handoff
+    bash "$SCRIPTS_DIR/aahp-manifest.sh" "$TEST_TMPDIR" --quiet --phase implementation
+
+    local py
+    py="$(bash -c "source '$SCRIPTS_DIR/_aahp-lib.sh'; aahp_python_cmd")"
+    [ -n "$py" ] || skip "no working python interpreter"
+    "$py" - "$TEST_TMPDIR/.ai/handoff/MANIFEST.json" <<'PY'
+import json, sys
+path = sys.argv[1]
+manifest = json.load(open(path, encoding="utf-8"))
+manifest["files"] = {}
+json.dump(manifest, open(path, "w", encoding="utf-8"), indent=2)
+PY
+
+    run bash "$SCRIPTS_DIR/lint-handoff.sh" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"indexes no files"* ]]
+    [[ "$output" != *"All checks passed"* ]]
+}
+
 # ─── Missing handoff directory ───────────────────────────────
 
 @test "errors when handoff directory does not exist" {

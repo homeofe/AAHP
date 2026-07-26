@@ -131,44 +131,95 @@ teardown() {
     [[ "$output" != *"checksums do not match"* ]]
 }
 
-# Layer 1 must not depend on lint-handoff.sh's exit code. Both tests below run
-# verify against a copy of scripts/ whose lint-handoff.sh is a stub that always
-# exits 0, so only Layer 1's own checks can produce the failure.
+# Layer 1 must reach BOTH integrity verdicts on its own. The stub below is a
+# lint-handoff.sh that prints NOTHING and exits 0, which is what a lint that
+# dies early looks like from the outside. Nothing in the stub's output can be
+# grepped, and its exit code says "clean", so any failure the gate reports has
+# to have been computed by Layer 1 itself. A stub that prints the literal
+# string Layer 1 used to grep for would only prove the grep works.
 
-_stub_scripts_dir_with_passing_lint() {
+_stub_scripts_dir_with_silent_passing_lint() {
     local stub="$TEST_TMPDIR/stub-scripts"
+    rm -rf "$stub"
     cp -r "$SCRIPTS_DIR" "$stub"
     cat > "$stub/lint-handoff.sh" <<'STUB'
 #!/usr/bin/env bash
-# Stub: reports a checksum mismatch but exits 0, exactly the pre-fix contract.
-echo "  ! Checksum mismatch: STATUS.md"
+# Stub: prints nothing at all and exits 0.
 exit 0
 STUB
     echo "$stub"
 }
 
-@test "Layer 1 blocks a checksum mismatch even when lint exits 0" {
+@test "Layer 1 blocks a checksum mismatch when lint is silent and exits 0" {
     local stub
-    stub="$(_stub_scripts_dir_with_passing_lint)"
+    stub="$(_stub_scripts_dir_with_silent_passing_lint)"
+    # Real tampering, not a stubbed message.
+    printf '\nunmanaged edit\n' >> "$TEST_TMPDIR/.ai/handoff/STATUS.md"
 
     run bash "$stub/verify-handoff.sh" "$TEST_TMPDIR" --level ci
     [ "$status" -eq 1 ]
     [[ "$output" == *"checksums do not match"* ]]
+    [[ "$output" == *"Checksum mismatch: STATUS.md"* ]]
 }
 
-@test "Layer 1 blocks a deleted indexed file even when lint exits 0" {
+@test "Layer 1 blocks a deleted indexed file when lint is silent and exits 0" {
     local stub
-    stub="$(_stub_scripts_dir_with_passing_lint)"
-    # Make the stub silent so nothing in its output can trigger the failure.
-    cat > "$stub/lint-handoff.sh" <<'STUB'
-#!/usr/bin/env bash
-exit 0
-STUB
+    stub="$(_stub_scripts_dir_with_silent_passing_lint)"
     rm "$TEST_TMPDIR/.ai/handoff/NEXT_ACTIONS.md"
 
     run bash "$stub/verify-handoff.sh" "$TEST_TMPDIR" --level ci
     [ "$status" -eq 1 ]
     [[ "$output" == *"Missing indexed file: NEXT_ACTIONS.md"* ]]
+}
+
+# ─── Layer 1 must not fail open when it cannot check ─────────
+
+@test "Layer 1 FAILS with a named helper when _aahp-lib.sh is out of date" {
+    # A partially synced repository: the gate scripts are new, the shared
+    # library is old and does not carry the helper Layer 1 needs. Without a
+    # guard this aborts at exit 127 with no diagnostic.
+    local stub="$TEST_TMPDIR/stub-oldlib"
+    rm -rf "$stub"
+    cp -r "$SCRIPTS_DIR" "$stub"
+    printf '\nunset -f aahp_manifest_index\n' >> "$stub/_aahp-lib.sh"
+
+    run bash "$stub/verify-handoff.sh" "$TEST_TMPDIR" --level ci
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"aahp_manifest_index"* ]]
+    [[ "$output" == *"out of date"* ]]
+    [[ "$output" != *"aahp verify passed"* ]]
+}
+
+@test "Layer 1 FAILS when no JSON interpreter is available" {
+    # The helper signals "I could not answer" with exit 2. That must block,
+    # not read as an empty (and therefore innocent) index.
+    local stub="$TEST_TMPDIR/stub-nointerp"
+    rm -rf "$stub"
+    cp -r "$SCRIPTS_DIR" "$stub"
+    printf '\naahp_manifest_index() { return 2; }\n' >> "$stub/_aahp-lib.sh"
+
+    run bash "$stub/verify-handoff.sh" "$TEST_TMPDIR" --level ci
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"No JSON interpreter available"* ]]
+    [[ "$output" != *"aahp verify passed"* ]]
+}
+
+@test "Layer 1 FAILS when MANIFEST.json indexes nothing" {
+    local py
+    py="$(bash -c "source '$SCRIPTS_DIR/_aahp-lib.sh'; aahp_python_cmd")"
+    [ -n "$py" ] || skip "no working python interpreter"
+    "$py" - "$TEST_TMPDIR/.ai/handoff/MANIFEST.json" <<'PY'
+import json, sys
+path = sys.argv[1]
+manifest = json.load(open(path, encoding="utf-8"))
+manifest["files"] = {}
+json.dump(manifest, open(path, "w", encoding="utf-8"), indent=2)
+PY
+
+    run bash "$SCRIPTS_DIR/verify-handoff.sh" "$TEST_TMPDIR" --level ci
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"indexes no files"* ]]
+    [[ "$output" != *"aahp verify passed"* ]]
 }
 
 # ─── Layer 4: TRUST-TTL (advisory) ───────────────────────────

@@ -37,11 +37,29 @@ independently of the npm version).
   scaffolded manifest still carries the template placeholder `sha256:[hash]` for every
   file. `aahp verify` has always refused that state, so no blocking verdict changes; only
   lint stops disagreeing with what it prints. Run `aahp manifest` after `aahp init`.
-- `aahp verify` Layer 1 checks the existence of every indexed file itself, against
-  `MANIFEST.json`, instead of inferring it from another script's output. Blocking no longer
-  rests solely on string-matching between two scripts, and it survives `lint-handoff.sh`
-  being unavailable or changing its wording. The checksum comparison still reuses
-  `lint-handoff.sh`, and lint's non-zero exit is still honoured.
+- `aahp verify` Layer 1 reaches BOTH integrity verdicts itself: it reads the file index out
+  of `MANIFEST.json` and hashes each indexed file, instead of inferring existence or a
+  mismatch from another script's output. Blocking no longer rests on string-matching
+  between two scripts, and it survives `lint-handoff.sh` being unavailable, changing its
+  wording, or dying before it prints anything. `lint-handoff.sh` still runs for the checks
+  Layer 1 does not cover, and its non-zero exit is still honoured.
+
+### Fixed (second round, after adversarial review of this change)
+- `scripts/lint-handoff.sh` no longer converts an unexpected exit code from the checksum
+  verifier into a yellow note. Any exit code other than "clean" or "findings" means the
+  tool could not establish integrity, and unproven integrity is now a violation. Before
+  this, an interpreter that died inside the loop produced "All checks passed" and exit 0
+  over a tampered handoff set, which is the same fail-open the rest of this release cures.
+- `scripts/verify-handoff.sh` guards the shared library helper it depends on. Under
+  `set -euo pipefail` an absent helper aborted the gate at exit 127 with no diagnostic;
+  a partially synced repository now gets a message that names the missing helper and says
+  the library is out of date.
+- A `MANIFEST.json` whose `files` index is empty is now a finding in both scripts. Zero
+  indexed files means zero comparisons ran, which is not the same as everything matching.
+- The manifest-reading helper no longer turns its own failures into "nothing is missing".
+  A manifest that is absent, unreadable, or unparseable, and the case where neither node
+  nor python is available, are each reported with a distinct exit code, and Layer 1 fails
+  on all of them rather than printing an affirmative pass.
 
 ## [3.8.2] - 2026-07-25
 

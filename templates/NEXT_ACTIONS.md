@@ -3,6 +3,10 @@
 > Priority order. Work top-down.
 > Each item should be self-contained, the agent must be able to start without asking questions.
 > Blocked tasks go to the bottom. Completed tasks move to "Recently Completed".
+> Every task carries one **Acceptance criteria** section written as task boxes:
+> `- [ ]` while unresolved, `- [x]` only on evidence. Before a task becomes `done`,
+> every criterion is checked, waived `(waived: rationale)`, or moved
+> `(follow-up: T-042 or #123)`. See README Section 8.7.
 
 Current version: **v[VERSION]**
 
@@ -25,7 +29,7 @@ Current version: **v[VERSION]**
 - `path/to/relevant/file.ts`: what it does
 - `path/to/config.yml`: what it configures
 
-**Definition of done:**
+**Acceptance criteria:**
 - [ ] Tests pass
 - [ ] Type-check passes
 - [ ] `STATUS.md` updated
@@ -44,6 +48,9 @@ Current version: **v[VERSION]**
 ---
 
 ## Recently Completed
+
+> Resolution records the closure evidence: the commit, PR, test run, or live
+> verification that satisfied the criteria, plus any waiver or follow-up reference.
 
 | Item | Resolution |
 |------|-----------|

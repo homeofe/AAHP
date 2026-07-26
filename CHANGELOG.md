@@ -11,6 +11,120 @@ independently of the npm version).
 
 ## [Unreleased]
 
+## [3.9.0] - 2026-07-26
+**Acceptance-criteria lifecycle, plus an advisory report that is deliberately not a gate**
+
+### Added
+- Specification Section 8.7 defines the acceptance-criteria lifecycle: one canonical
+  `Acceptance criteria` section per task, `- [ ]` while a criterion is unresolved, `- [x]`
+  only on evidence, and, before a task becomes `done` or a linked issue closes, every
+  remaining criterion completed, explicitly waived (`(waived: rationale)`), or moved to a
+  linked open follow-up (`(follow-up: T-042)`). `Completion criteria` and
+  `Definition of done` stay recognized as legacy aliases with a documented rename path.
+- `aahp criteria [path]`, an ADVISORY report over the lifecycle, backed by
+  `scripts/report-acceptance-criteria.mjs`. It is not part of `aahp check`, it has no
+  enforcing mode, and it always exits 0 whatever it finds; the known non-zero exits are the
+  report failing to run at all (an unparseable config, or no git work tree). Best effort
+  by construction, which is why it is advisory and gates nothing. It reports
+  three lifecycle defects (`legacy-heading`, `plain-bullets`, `unresolved-on-done`) and
+  ten comprehension defects so that input it could not read is never presented as a
+  clean document: `config-unusable`, `include-unusable`, `no-files-matched`,
+  `file-unreadable`, `manifest-missing`, `manifest-outside-root`, `manifest-unreadable`,
+  `unparsed-criteria-section`, `unbound-criteria-section`, and `unterminated-fence`. It
+  reads tracked files plus the `MANIFEST.json` task registry and makes no network calls,
+  so a run is complete and deterministic offline.
+- The always-exits-0 guarantee holds for every input the report accepts. A syntactically
+  valid `acceptanceCriteria.include` pathspec that git nonetheless refuses (an unknown
+  pathspec magic word, a path outside the repository) is reported as `include-unusable`
+  rather than throwing out of the process, so the documented pair of non-zero exits is the
+  complete list. The same holds at every level of the configuration: an `aahp.config.json`
+  that parses but is not a JSON object (`null`, a string, a number, a boolean, an array) is
+  reported as `config-unusable` and the report continues on its defaults. A file containing
+  only `null` previously threw a `TypeError` out of the process on a config that parses
+  perfectly well, and the other non-object shapes read as no configuration at all without
+  saying so. The same shapes are covered for `acceptanceCriteria`, for
+  `acceptanceCriteria.include`, and for `acceptanceCriteria.manifest`.
+- Every configuration finding names `aahp.config.json`, the only file `loadConfig` reads.
+  When no config file existed they named `package.json`, which the loader never opens, so a
+  reader was sent to correct `acceptanceCriteria.include` in the wrong file.
+- `acceptanceCriteria.manifest` is required to resolve inside the project root. A value
+  containing `..` used to be joined to the root and read from outside the work tree; it is
+  now reported as `manifest-outside-root` and the file is never opened.
+- README Section 8.7 publishes the report's known blind spots by name, starting with the
+  most reachable one: the criteria heading must match a recognized phrase exactly after
+  normalization, so `## Acceptance criteria for release` opens no section and everything
+  under it is missed in silence. The list also covers the case where a bold line inside a
+  criteria section ends the section and hides every criterion after it. It states in plain
+  words that the report is best effort, that a clean report is not proof the criteria are
+  resolved, and that it must not be used as a merge gate.
+- Task ids bind from ATX headings, setext headings, and bold labels, so the three heading
+  forms that appear in hand-written handoff files all scope a criteria section. Anything
+  still unattributable is reported as `unbound-criteria-section` instead of being exempted
+  from the done-state rule in silence.
+- `acceptanceCriteria` (`include` / `manifest`) in `schema/aahp-config.schema.json` and
+  `aahp.config.example.json`. It supplies the report's input paths only; it configures no
+  gate and it cannot enable one.
+- Acceptance-criteria task boxes in both `.github/ISSUE_TEMPLATE` files, the lifecycle rule
+  in `templates/CONVENTIONS.md`, and `tests/acceptance-criteria.bats` covering canonical,
+  legacy-heading, plain-bullet, waived, follow-up, invalid-closure, and offline cases, the
+  comprehension defects above, the exit-0-with-findings guarantee, the unchanged `aahp
+  check` gate set, and the published blind spots as explicit known-limitation tests.
+- ADR-017: a heuristic over hand-written prose is a report, never a gate. It records the
+  three adversarial review rounds that produced the decision and why an opt-in enforcing
+  mode is not a sufficient safeguard.
+
+### Changed
+- `aahp check` is untouched by this release. The acceptance-criteria detection is a
+  standalone command, so the gate list, the `aahp check --json` record shape and its exit
+  code are exactly what they were in 3.8.2: the same eight gate ids with the same statuses,
+  verified by running both the 3.8.2 and the 3.9.0 CLI against the same tree.
+- This repository's own handoff is conformant under the report. `MANIFEST.json` task keys
+  now match the ids used in `NEXT_ACTIONS.md` (the two entries whose titles carried a
+  different id in brackets were re-keyed), and the criteria of the completed tasks are
+  resolved individually: checked with the evidence named inline, or left unchecked with a
+  stated waiver where the criterion was superseded. The npm publish task is recorded `done`
+  with the registry as its evidence, and its stale "blocked on human npm auth" note is
+  removed; its second criterion is waived because the package shipped under a scoped name,
+  so the bare `npx aahp` form the criterion names cannot resolve to it.
+- `templates/NEXT_ACTIONS.md` uses the canonical `Acceptance criteria` heading instead of
+  `Definition of done`, and states the lifecycle rule in its header.
+- The shipped scaffolding is self-consistent. `templates/MANIFEST.json` marked the example
+  `T-001` as `done` while `templates/NEXT_ACTIONS.md` carried unchecked criteria for it.
+  `T-001` is now `in_progress`, which is what the template document actually shows.
+
+### Fixed
+- Criteria written as an ordered list (`1.`, `2)`) are recognized. They were invisible to
+  every rule, so a task marked `done` with unresolved numbered criteria reported completely
+  clean. Both list forms now count, and README Section 8.7 states which forms are criteria
+  and which are not.
+- Fenced code blocks are skipped. The parser carried no fence state, so documentation that
+  SHOWS an example of the criteria format was read as criteria that exist, which fired
+  hardest on the projects most likely to document the convention.
+- A `MANIFEST.json` that is present but unparseable is reported as `manifest-unreadable`
+  instead of being treated as an absent one, and a task registry path that was configured
+  explicitly but does not exist is reported as `manifest-missing`. Both used to disable the
+  `unresolved-on-done` rule in silence.
+- A config value of the wrong shape is reported as `config-unusable` instead of being
+  replaced by a default without a word, and a tracked file that cannot be read is reported
+  as `file-unreadable` instead of being skipped silently.
+- Task scope survives an intervening heading. Any non-task heading between a task heading
+  and its criteria heading used to reset scope to null, so `unresolved-on-done` could never
+  fire for a task whose document puts a `### Context` or `### Files` subsection in between.
+  Scope now closes only on a sibling or ancestor heading.
+- `scripts/report-acceptance-criteria.mjs` has no import-time side effects. It runs only
+  when the module is the process entry point, so `parseCriteriaSections` and
+  `findSectionDefects` can be imported without it reading the filesystem, printing, or
+  calling `process.exit`.
+- `package-lock.json` is regenerated so its root name and version match `package.json`
+  (it had drifted to the pre-scope name at `3.5.0`).
+
+### Removed
+- The `acceptanceCriteria.strict` config key, and with it every way to make an
+  acceptance-criteria finding fail a build. It never shipped in a release. An enforcing
+  option would be switched on somewhere, and then a document shape nobody anticipated
+  becomes a red build in a consumer repo, so the option does not exist rather than
+  defaulting to off. See ADR-017.
+
 ## [3.8.3] - 2026-07-26
 
 ### Fixed
@@ -298,6 +412,9 @@ independently of the npm version).
 
 ### Changed
 - Relicensed to Apache-2.0 (earlier commits carried MIT, then CC BY 4.0, headers).
+
+[Unreleased]: https://github.com/homeofe/AAHP/compare/v3.9.0...HEAD
+[3.9.0]: https://github.com/homeofe/AAHP/compare/v3.8.3...v3.9.0
 
 [Unreleased]: https://github.com/homeofe/AAHP/compare/v3.8.3...HEAD
 [3.8.3]: https://github.com/homeofe/AAHP/compare/v3.8.2...v3.8.3

@@ -57,6 +57,10 @@ Commands:
   migrate-grounding [path]  Add the Grounded Reflection Layer to an existing project
   verify [path]     Run the canonical handoff gate (checksum + drift + TTL)
   check [path]      Run the config-driven governance gates as one aggregate
+  criteria [path]   ADVISORY report on the acceptance-criteria lifecycle.
+                    Not a gate: it is not part of the check command and always
+                    exits 0 unless the report itself cannot run. A clean report
+                    is not proof; see the blind spots in README Section 8.7.
   archive [path]    Rotate or verify LOG.md -> LOG-ARCHIVE.md
   status [path]     Show a quick state summary from MANIFEST.json
   doctor [path]     Conformance self-check; emits a JSON conformance record
@@ -840,6 +844,33 @@ function cmdCheck(targetPath, flags) {
   process.exit(failing.length === 0 ? 0 : 1)
 }
 
+// ---------------------------------------------------------------------------
+// criteria command - an ADVISORY report, deliberately not a gate.
+//
+// Detection over hand-written Markdown is a heuristic, and a heuristic cannot
+// be sound: there is always another document shape it does not recognize. A
+// gate's whole value is that green means safe, so a heuristic wired to an exit
+// code manufactures false confidence and people stop reading the document. This
+// command therefore has NO authority. It is absent from CHECK_GATES, it has no
+// enforcing mode to switch on, and it exits 0 whether or not it found anything.
+// The only non-zero exit is the report failing to run at all (an unparseable
+// config, or no git work tree to enumerate files from), which is a property of
+// the environment and never of a document's shape.
+//
+// Output is inherited rather than captured: this is text for a human to read.
+// ---------------------------------------------------------------------------
+
+function cmdCriteria(targetPath) {
+  const r = spawnSync(process.execPath, [join(PACKAGE_ROOT, 'scripts', 'report-acceptance-criteria.mjs'), targetPath], {
+    stdio: 'inherit',
+  })
+  if (r.error) {
+    console.error(`Error running the acceptance-criteria report: ${r.error.message}`)
+    process.exit(1)
+  }
+  process.exit(r.status ?? 1)
+}
+
 // Shell script commands -spawn bash scripts
 //
 // The bash scripts already handle their own argument parsing, including
@@ -969,6 +1000,12 @@ switch (command) {
   case 'check': {
     const { targetPath, flags } = extractPathAndFlags(rest)
     cmdCheck(targetPath, flags)
+    break
+  }
+
+  case 'criteria': {
+    const { targetPath } = extractPathAndFlags(rest)
+    cmdCriteria(targetPath)
     break
   }
 

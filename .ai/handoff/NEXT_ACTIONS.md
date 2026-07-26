@@ -3,18 +3,23 @@
 > Priority order. Work top-down.
 > Each item should be self-contained, the agent must be able to start without asking questions.
 > Blocked tasks go to the bottom. Completed tasks move to "Recently Completed".
+> Acceptance criteria use the canonical heading and task boxes (README Section 8.7):
+> `- [ ]` while unresolved, `- [x]` only on evidence; before a task is `done` every
+> criterion is checked, waived `(waived: rationale)`, or moved `(follow-up: ref)`.
 
-Current version: **v3.8.3**
+Current version: **v3.9.0**
 
 ---
 
 ## Status Summary
 
+Counts mirror the `tasks` registry in `MANIFEST.json`.
+
 | Status | Count |
 |--------|-------|
-| Done | 12 |
-| Ready | 4 |
-| Blocked | 1 |
+| Done | 5 |
+| Ready | 0 |
+| Blocked | 0 |
 
 ---
 
@@ -39,7 +44,7 @@ Current version: **v3.8.3**
 
 ---
 
-## Ready - Work These Next
+## Completed - Detail and Closure Evidence
 
 ### T-014: Add CLI integration tests for bin/aahp.js [high] (issue #14)
 **Priority:** high
@@ -66,10 +71,10 @@ Current version: **v3.8.3**
 
 **Files:** `bin/aahp.js`, `tests/cli.bats`, `tests/test_helper.bash`
 
-**Definition of done:**
-- [ ] `tests/cli.bats` exists with 10+ tests covering all subcommands
-- [ ] All tests pass locally and in CI
-- [ ] Init command tested: creates correct files, handles --force, custom paths
+**Acceptance criteria:**
+- [x] `tests/cli.bats` exists with 10+ tests covering all subcommands (57 tests; `--help`, `init`, `manifest`, `lint`, `migrate`, `verify`, `check`, `archive`, `status`, unknown-command)
+- [x] All tests pass locally and in CI (`tests/cli.bats` runs in the `lint-and-validate` job on every push)
+- [x] Init command tested: creates correct files, handles --force, custom paths (`aahp init --force overwrites existing files`, `aahp init with absolute path works regardless of cwd`, `aahp init with relative path resolves from cwd`)
 
 ---
 
@@ -93,11 +98,11 @@ Current version: **v3.8.3**
 
 **Files:** `bin/aahp.js`, `tests/cli.bats`
 
-**Definition of done:**
-- [ ] `aahp status` reads MANIFEST.json and prints a human-readable summary
-- [ ] Shows task breakdown (ready/blocked/done counts)
-- [ ] Graceful error when no MANIFEST.json exists
-- [ ] Tests cover the happy path and missing-manifest case
+**Acceptance criteria:**
+- [x] `aahp status` reads MANIFEST.json and prints a human-readable summary (`status` case in `bin/aahp.js`; test `aahp status prints project, phase, and task counts`)
+- [x] Shows task breakdown (ready/blocked/done counts) (same test; open ready/in_progress tasks are listed separately)
+- [x] Graceful error when no MANIFEST.json exists (tests `aahp status fails when MANIFEST.json is missing` and `aahp status hint mentions init or manifest when MANIFEST is missing`)
+- [x] Tests cover the happy path and missing-manifest case (`aahp status exits 0 on a generated manifest` plus the two missing-manifest tests above)
 
 ---
 
@@ -125,11 +130,11 @@ Current version: **v3.8.3**
 
 **Files:** `scripts/aahp-archive.sh`, `bin/aahp.js`, `tests/archive.bats`, `templates/LOG-ARCHIVE.md`
 
-**Definition of done:**
-- [ ] `aahp archive` splits LOG.md entries into LOG.md (recent) + LOG-ARCHIVE.md (older)
-- [ ] `--keep N` flag controls retention count (default 5)
-- [ ] Idempotent - running twice produces the same result
-- [ ] Bats tests cover all edge cases
+**Acceptance criteria:**
+- [x] `aahp archive` splits LOG.md entries into LOG.md (recent) + LOG-ARCHIVE.md (older) (`scripts/aahp-archive.sh`, dispatched from `bin/aahp.js`)
+- [ ] `--keep N` flag controls retention count (default 5) (waived: the flag ships and controls retention, but the default landed at 10, not 5, because the archive integrity work in T-032 set the retention floor there; the "5" in this criterion was superseded, not skipped)
+- [x] Idempotent - running twice produces the same result (covered by `tests/archive.bats`, 7 tests)
+- [x] Bats tests cover all edge cases (`tests/archive.bats` plus the `aahp archive` cases in `tests/cli.bats`)
 
 ---
 
@@ -154,46 +159,35 @@ Current version: **v3.8.3**
 
 **Files:** `CLAUDE.md` (new file in project root)
 
-**Definition of done:**
-- [ ] `CLAUDE.md` exists in project root with build/test/lint commands
-- [ ] Covers project-specific conventions not in workspace CLAUDE.md
-- [ ] Under 80 lines
+**Acceptance criteria:**
+- [x] `CLAUDE.md` exists in project root with build/test/lint commands
+- [x] Covers project-specific conventions not in workspace CLAUDE.md (zero-dependency Node ESM plus bash, `_aahp-lib.sh` sourcing, bats, shellcheck, the v3 handoff format)
+- [ ] Under 80 lines (waived: the file is 121 lines. The governance gates and the archive command arrived after this criterion was written and both need documenting; cutting back to 80 would remove instructions an incoming agent needs. The length target is dropped rather than met)
+
+---
+
+### T-006: Publish npm package (issue #18)
+**Priority:** medium
+
+**Goal:** Publish the AAHP CLI to the npm registry so it can be run with `npx`.
+
+**Resolution:** shipped. The package is on the public npm registry as
+`@elvatis_com/aahp`, first published 2026-03-19 and continuously since; the registry
+lists eleven versions with `latest` at 3.8.1 (2026-07-19). CI publishes it, so the
+"blocked on human npm auth" note that stood in this file was years of releases out of
+date. The registry itself is the evidence: `npm view @elvatis_com/aahp version`.
+
+**Files:** `package.json`, `bin/aahp.js`, `.github/workflows/publish.yml`
+
+**Acceptance criteria:**
+- [x] Package published to npm registry (public registry, `@elvatis_com/aahp`, `latest` 3.8.1, eleven versions since 2026-03-19)
+- [ ] `npx aahp init` works from any directory (waived: the package shipped under the scoped name `@elvatis_com/aahp`, so the bare `npx aahp` form this criterion names resolves to a different package and always will. The intent, runnable without a global install, is met by `npx @elvatis_com/aahp init`. The criterion was superseded by the naming decision rather than met)
 
 ---
 
 ## Blocked
 
-### T-006: Publish npm package (issue #18)
-**Priority:** medium
-
-**Goal:** Publish the `aahp` CLI to the npm registry so users can `npx aahp init`.
-
-**Context:**
-- `package.json` fully prepared: `test` and `prepublishOnly` scripts configured
-- `npm pack --dry-run` verified: 19 files, 26.5 kB tarball, correct contents
-- Package name `aahp` confirmed available on npm
-- All 48 bats tests pass
-- GitHub Actions publish workflow added at `.github/workflows/publish.yml`
-- **Blocked on human action:** npm auth token expired, interactive browser login required
-
-**What to do (two options):**
-
-Option A - CI publish (recommended):
-1. Go to npmjs.com > Settings > Access Tokens > Generate New Token (type: Automation)
-2. Add the token as a GitHub secret named `NPM_TOKEN` in the repo settings
-3. Go to Actions > "Publish to npm" > Run workflow (optionally do a dry run first)
-4. Verify with `npx aahp --version` from a clean directory
-
-Option B - Local publish:
-1. Run `npm login` in an interactive terminal (opens browser for auth)
-2. Run `npm publish --access public` (prepublishOnly will run tests first)
-3. Verify with `npx aahp --version` from a clean directory
-
-**Files:** `package.json`, `bin/aahp.js`, `.github/workflows/publish.yml`
-
-**Definition of done:**
-- [ ] Package published to npm registry
-- [ ] `npx aahp init` works from any directory
+None.
 
 ---
 

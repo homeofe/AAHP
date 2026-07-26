@@ -229,6 +229,24 @@
       },
       "additionalProperties": false
     },
+    "acceptanceCriteria": {
+      "type": "object",
+      "description": "Input paths for the ADVISORY `aahp criteria` report (report-acceptance-criteria.mjs). This is not a gate: it is not part of `aahp check`, it has no enforcing mode, and it always exits 0. It reports legacy heading aliases, plain bullets where task boxes belong, criteria left unresolved on tasks the manifest marks done, and everything it could not read. Optional: absent, the report uses these defaults. A clean report is not proof; see README Section 8.7 for the published blind spots.",
+      "properties": {
+        "include": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "git pathspecs of documents to scan (default: .ai/handoff/NEXT_ACTIONS.md). List live task documents, not templates: a template task id can collide with a real task id in the manifest."
+        },
+        "manifest": {
+          "type": "string",
+          "description": "Path to the task registry that supplies task status (default .ai/handoff/MANIFEST.json), relative to the project root and required to resolve inside it. A value that escapes the root is reported as manifest-outside-root and is never opened. Absent, the done-state rule is skipped rather than guessed."
+        }
+      },
+      "additionalProperties": false
+    },
     "check": {
       "type": "object",
       "description": "Selects which gates `aahp check` runs. Both lists are optional; omit to run every applicable gate. Gate ids: changelog, changelog-format, version-sync, claims, forbidden-patterns, schema-doc-sync, doc-links, handoff.",

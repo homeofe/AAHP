@@ -37,5 +37,9 @@
   ],
   "docLinks": {
     "include": ["README.md", "CLAUDE.md", "CONTRIBUTING.md", "CONSTITUTION.md", ".ai/handoff/*.md"]
+  },
+  "acceptanceCriteria": {
+    "include": [".ai/handoff/NEXT_ACTIONS.md"],
+    "manifest": ".ai/handoff/MANIFEST.json"
   }
 }

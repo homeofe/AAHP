@@ -42,10 +42,11 @@
 //
 // Do not read "no findings" as "the criteria are resolved".
 //
-// EXIT CODE. 0, always, whatever it finds. The only non-zero exit is the report
+// EXIT CODE. 0, always, whatever it finds. The known non-zero exits are the report
 // failing to run at all: an unparseable aahp config, or no git work tree to
-// enumerate tracked files from. Both are properties of the environment, never
-// of a document's shape, so neither can be triggered by writing Markdown.
+// enumerate tracked files from. This is a best-effort reader of hand-written prose,
+// so it is NOT claimed that no document can ever make it fail or run slowly. That is
+// exactly why it is advisory and must never gate anything.
 // Everything else that goes wrong while the report runs, including a pathspec
 // git refuses and a manifest path that escapes the root, is a finding.
 //
@@ -169,7 +170,13 @@ const DEFAULT_MANIFEST = ".ai/handoff/MANIFEST.json";
 // label form and GitHub issues use the heading form. It closes on the next
 // heading, the next bold label, a thematic break, or end of file.
 const HEADING_RE = /^\s{0,3}(#{1,6})\s+(.+?)\s*$/;
-const BOLD_LABEL_RE = /^\s{0,3}\*\*\s*([^*]+?)\s*\*\*\s*:?\s*$/;
+// Linear by construction. The earlier form wrapped a lazy group in \s* on both
+// sides, so the split of a whitespace run between the three parts was ambiguous and
+// a line of "**" followed by a long run of spaces or tabs backtracked super-linearly
+// (4000 spaces took 21 seconds; 8000 did not finish). A greedy [^*]+ with no
+// surrounding \s* has exactly one way to match, so the label is trimmed at the use
+// site instead of inside the pattern.
+const BOLD_LABEL_RE = /^\s{0,3}\*\*([^*]+)\*\*\s*:?\s*$/;
 const BOLD_START_RE = /^\s{0,3}\*\*/;
 const BREAK_RE = /^\s{0,3}(-{3,}|={3,}|\*{3,})\s*$/;
 // A setext underline: a run of "=" (level 1) or "-" (level 2) under a paragraph
@@ -259,7 +266,7 @@ export function parseCriteriaSections(rel, text) {
 
     const headingText = atxMatch ? atxMatch[2] : setext ? line.trim() : null;
     const headingDepth = atxMatch ? atxMatch[1].length : setext;
-    const rawLabel = headingText !== null ? headingText : labelMatch ? labelMatch[1] : null;
+    const rawLabel = headingText !== null ? headingText : labelMatch ? labelMatch[1].trim() : null;
     const kind = rawLabel === null ? undefined : CRITERIA_HEADINGS.get(normalizeLabel(rawLabel));
 
     if (headingText !== null) {

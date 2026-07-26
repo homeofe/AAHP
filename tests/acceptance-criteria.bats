@@ -1336,3 +1336,37 @@ EOF
     [[ "$output" == *"unresolved-on-done"* ]]
     [[ "$output" == *"T-007"* ]]
 }
+
+# A line of "**" followed by a long run of whitespace used to make BOLD_LABEL_RE
+# backtrack super-linearly: 4000 spaces took 21 seconds and 8000 never finished. An
+# ordinary Markdown document could therefore hang the report, and under a CI job
+# timeout that turns a document shape into a red build, which is exactly the false
+# authority this report was demoted to avoid. The pattern is now linear by
+# construction. The assertion is on wall clock because the defect was never a wrong
+# answer, it was no answer at all.
+@test "acceptance-criteria: a bold marker followed by a long whitespace run stays linear" {
+    enable_gate
+    manifest_with_tasks
+    {
+        printf '## T-007 Closed task
+
+### Acceptance criteria
+
+- [x] done
+
+'
+        printf '**%8000s
+' ''
+        printf '
+- [ ] after the bold line
+'
+    } > "$TEST_TMPDIR/.ai/handoff/NEXT_ACTIONS.md"
+    gadd
+    start=$SECONDS
+    run node "$AC" "$TEST_TMPDIR"
+    elapsed=$(( SECONDS - start ))
+    [ "$status" -eq 0 ]
+    # Pre-fix this did not finish inside 45 seconds. Ten is generous for a linear
+    # scan even on a slow runner and far below any plausible CI timeout.
+    [ "$elapsed" -lt 10 ]
+}

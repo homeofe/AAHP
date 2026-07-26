@@ -23,8 +23,9 @@ independently of the npm version).
   `Definition of done` stay recognized as legacy aliases with a documented rename path.
 - `aahp criteria [path]`, an ADVISORY report over the lifecycle, backed by
   `scripts/report-acceptance-criteria.mjs`. It is not part of `aahp check`, it has no
-  enforcing mode, and it always exits 0 whatever it finds; the only non-zero exit is the
-  report failing to run at all (an unparseable config, or no git work tree). It reports
+  enforcing mode, and it always exits 0 whatever it finds; the known non-zero exits are the
+  report failing to run at all (an unparseable config, or no git work tree). Best effort
+  by construction, which is why it is advisory and gates nothing. It reports
   three lifecycle defects (`legacy-heading`, `plain-bullets`, `unresolved-on-done`) and
   ten comprehension defects so that input it could not read is never presented as a
   clean document: `config-unusable`, `include-unusable`, `no-files-matched`,

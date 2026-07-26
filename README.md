@@ -1047,8 +1047,9 @@ aliases would lose information that already exists.
 documents plus the `MANIFEST.json` task registry and prints what it found. It is
 **advisory**. It is not part of `aahp check`, it has no enforcing mode, and it **always
 exits 0** whatever it finds. The only non-zero exit is the report failing to run at all
-(an unparseable AAHP config, or no git work tree to enumerate tracked files from), and
-both are properties of the environment rather than of any document's shape. Everything
+(an unparseable AAHP config, or no git work tree to enumerate tracked files from).
+It is a best-effort reader of hand-written prose, so it is not claimed that no document
+can ever make it fail or run slowly; that is precisely why it must not gate anything. Everything
 else that can go wrong while it runs is a finding, including a configured `include`
 pathspec that git refuses and a configured `manifest` path that resolves outside the
 work tree.

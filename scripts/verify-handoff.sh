@@ -149,7 +149,10 @@ else
     MISSING_INDEXED=$(aahp_manifest_missing_files "$HANDOFF_DIR/MANIFEST.json" "$HANDOFF_DIR")
     if [ -n "$MISSING_INDEXED" ]; then
         log_fail "MANIFEST.json indexes file(s) that are not present in the working tree."
-        echo "$MISSING_INDEXED" | sed 's/^/    Missing indexed file: /'
+        while IFS= read -r missing_file; do
+            [ -n "$missing_file" ] || continue
+            echo "    Missing indexed file: $missing_file"
+        done <<< "$MISSING_INDEXED"
         echo "    Fix: restore the file(s), or regenerate the manifest with /handoff."
         FAILURES=$((FAILURES + 1))
         LAYER1_FAILED=1

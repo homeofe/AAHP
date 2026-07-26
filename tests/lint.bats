@@ -93,6 +93,9 @@ teardown() {
 @test "detects secret patterns: private key header" {
     create_full_handoff
     echo "-----BEGIN RSA PRIVATE KEY-----" >> "$TEST_TMPDIR/.ai/handoff/STATUS.md"
+    # Re-index after the edit: this test is about secret detection, not about
+    # MANIFEST integrity, and an unindexed edit is a real integrity violation.
+    create_manifest_json
 
     run bash "$SCRIPTS_DIR/lint-handoff.sh" "$TEST_TMPDIR"
 
@@ -154,6 +157,8 @@ teardown() {
     create_full_handoff
     echo "Co-authored-by: Copilot <123456+Copilot@users.noreply.github.com>" \
         >> "$TEST_TMPDIR/.ai/handoff/STATUS.md"
+    # Re-index after the edit: this test is about PII, not MANIFEST integrity.
+    create_manifest_json
 
     run bash "$SCRIPTS_DIR/lint-handoff.sh" "$TEST_TMPDIR"
     [ "$status" -eq 0 ]
@@ -209,6 +214,8 @@ teardown() {
     create_full_handoff
     echo "See admin@example.com for the template format." \
         >> "$TEST_TMPDIR/.ai/handoff/STATUS.md"
+    # Re-index after the edit: this test is about PII, not MANIFEST integrity.
+    create_manifest_json
 
     run bash "$SCRIPTS_DIR/lint-handoff.sh" "$TEST_TMPDIR"
     [ "$status" -eq 0 ]

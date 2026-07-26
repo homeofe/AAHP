@@ -166,3 +166,4 @@ Removed stray aahp-swarm-link gitlink and noop.patch that git add -A swept into 
 > 2026-06-30 ci: exempt Dependabot from the aahp-verify handoff gate (keep supply-chain-guard/codeql/build).
 
 <!-- Layer 1 hardening: both MANIFEST integrity verdicts are now computed by the gate itself; unproven integrity fails. -->
+<!-- Test fixture manifests now carry a real file index; an empty index is a finding. -->

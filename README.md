@@ -1074,7 +1074,8 @@ cannot. It is not exhaustive, and that is the point: the space of shapes is open
 | A thematic break (`---`, `***`) inside a criteria section ends it | same: criteria after the break are not seen |
 | A criteria section stated as a table, a definition list, or prose | yields zero recognized items, so nothing is verified (reported as `unparsed-criteria-section`, but no criterion is read) |
 | Criteria indented two or more spaces | read as detail lines belonging to the criterion above, not as criteria |
-| A criteria section inside an HTML block or a blockquote | not parsed as Markdown structure by this reader |
+| A criteria section inside a blockquote (`> ## Acceptance criteria`) | the `>` prefix is not stripped, so neither the heading nor the task boxes under it are recognized and no section is opened |
+| A task heading and its criteria heading at the **same** ATX depth (`## T-001 Title` then `## Acceptance criteria`, the ordinary GitHub issue layout) | the sibling heading closes the task scope, so the section binds to no task and the done-state rule never applies (reported as `unbound-criteria-section`) |
 | A task id form other than an ATX heading, a setext heading, or a bold label | the section is unbound, so the done-state rule cannot apply (reported as `unbound-criteria-section`) |
 | A `- [x]` with no evidence behind it | no tool can see intent; this stays a review responsibility |
 | Documents not matched by `acceptanceCriteria.include`, or not tracked by git | never read at all |
@@ -1084,6 +1085,13 @@ unusual construction at all: the heading has to match one of the three recognize
 **exactly** after normalization (case, surrounding whitespace, a trailing colon and
 surrounding `*` are normalized away; nothing else is), so an ordinary descriptive heading
 is missed in complete silence.
+
+An earlier revision of this table also listed an HTML block alongside the blockquote. That
+was wrong, and it is corrected above: the reader has no HTML-block handling at all, so a
+criteria section written inside `<div>...</div>` is read straight through, heading and task
+boxes alike, with or without the blank line that ends a CommonMark HTML block. It is not a
+miss. The mirror risk applies instead: criteria shown for illustration inside an HTML block
+are read as real criteria, the way a fenced code block is not.
 
 The worked example of the bold-line row, which passed clean under the enforcing version:
 

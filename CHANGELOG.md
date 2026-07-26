@@ -36,7 +36,16 @@ independently of the npm version).
   valid `acceptanceCriteria.include` pathspec that git nonetheless refuses (an unknown
   pathspec magic word, a path outside the repository) is reported as `include-unusable`
   rather than throwing out of the process, so the documented pair of non-zero exits is the
-  complete list.
+  complete list. The same holds at every level of the configuration: an `aahp.config.json`
+  that parses but is not a JSON object (`null`, a string, a number, a boolean, an array) is
+  reported as `config-unusable` and the report continues on its defaults. A file containing
+  only `null` previously threw a `TypeError` out of the process on a config that parses
+  perfectly well, and the other non-object shapes read as no configuration at all without
+  saying so. The same shapes are covered for `acceptanceCriteria`, for
+  `acceptanceCriteria.include`, and for `acceptanceCriteria.manifest`.
+- Every configuration finding names `aahp.config.json`, the only file `loadConfig` reads.
+  When no config file existed they named `package.json`, which the loader never opens, so a
+  reader was sent to correct `acceptanceCriteria.include` in the wrong file.
 - `acceptanceCriteria.manifest` is required to resolve inside the project root. A value
   containing `..` used to be joined to the root and read from outside the work tree; it is
   now reported as `manifest-outside-root` and the file is never opened.

@@ -65,9 +65,14 @@
 // COMPREHENSION DEFECTS - the report could not do its job and says so rather
 // than falling silent. Silence is the failure mode that made an enforcing
 // version untrustworthy, so anything unreadable is reported:
-//   config-unusable           the acceptanceCriteria config, or one of its
-//                             members, is not the shape it must be, so a
-//                             default was used instead of what was written
+//   config-unusable           the top-level config value, the
+//                             acceptanceCriteria section, or one of its
+//                             members is not the shape it must be, so a
+//                             default was used instead of what was written.
+//                             A config file that PARSES but is not an object
+//                             ("null", a string, a number, a boolean, an
+//                             array) is reported here; it is never an exit
+//                             code
 //   include-unusable          git rejected the include pathspecs (an unknown
 //                             pathspec magic word, a path outside the
 //                             repository), so no file could be enumerated
@@ -460,6 +465,15 @@ export function loadTaskStatus(root, relPath) {
 
 // --- report ----------------------------------------------------------------
 
+// Name a JSON value's shape for a finding message. Every config value below is
+// checked for the shape it must have, and every one of them says what it got
+// instead, so one helper keeps the three messages worded the same way.
+function describeShape(value) {
+  if (Array.isArray(value)) return "an array";
+  if (value === null) return "null";
+  return `a ${typeof value}`;
+}
+
 // The human-readable half of a failed `git ls-files`. execFileSync builds a
 // message that repeats the whole command line, including the absolute root
 // path; git's own first stderr line ("fatal: ...") is what a reader needs.
@@ -491,7 +505,11 @@ function main() {
     process.exit(1);
   }
 
-  const configFile = existsSync(join(root, "aahp.config.json")) ? "aahp.config.json" : "package.json";
+  // `loadConfig` reads aahp.config.json and nothing else, so every config
+  // finding below names that file, whether or not it exists: it is where the
+  // key a reader has to correct belongs. Naming package.json instead sent
+  // readers to a file the loader never opens.
+  const configFile = "aahp.config.json";
   const findings = [];
 
   // Configuration is optional, but a value of the WRONG SHAPE must not be
@@ -499,7 +517,26 @@ function main() {
   // because silently using a default while the project believes its own
   // setting is in force is exactly the kind of quiet this report exists to
   // avoid.
-  const raw = config.acceptanceCriteria;
+  //
+  // The check starts at the TOP LEVEL. `loadConfig` returns whatever the file
+  // parses to, so a file whose entire content is `null` used to reach
+  // `config.acceptanceCriteria` and throw a TypeError out of the process,
+  // breaking the always-exits-0 promise on a config that parses perfectly
+  // well. A string, a number, a boolean or an array did not throw but read as
+  // no configuration at all, which is the same silence one level up. Every one
+  // of those shapes is a finding now, and none of them is an exit code.
+  const configUsable = !!config && typeof config === "object" && !Array.isArray(config);
+  const rootConfig = configUsable ? config : {};
+  if (!configUsable) {
+    findings.push({
+      file: configFile,
+      line: 1,
+      id: "config-unusable",
+      message: `the top-level value is ${describeShape(config)}, not a JSON object, so no configuration could be read and the report used its defaults`,
+    });
+  }
+
+  const raw = rootConfig.acceptanceCriteria;
   const sectionUsable = !!raw && typeof raw === "object" && !Array.isArray(raw);
   const section = sectionUsable ? raw : {};
   if (raw !== undefined && !sectionUsable) {
@@ -507,7 +544,7 @@ function main() {
       file: configFile,
       line: 1,
       id: "config-unusable",
-      message: `"acceptanceCriteria" is ${Array.isArray(raw) ? "an array" : raw === null ? "null" : `a ${typeof raw}`}, not an object, so the report used its defaults instead of what is configured`,
+      message: `"acceptanceCriteria" is ${describeShape(raw)}, not an object, so the report used its defaults instead of what is configured`,
     });
   }
 

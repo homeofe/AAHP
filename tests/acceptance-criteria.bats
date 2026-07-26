@@ -1017,6 +1017,120 @@ EOF
     [[ "$output" == *"manifest-unreadable"* ]]
 }
 
+# --- comprehension: a config that PARSES but is the wrong shape --------------
+#
+# `loadConfig` returns whatever aahp.config.json parses to, so the TOP-LEVEL
+# value is untrusted input like every other config value. A file whose entire
+# content is `null` used to reach `config.acceptanceCriteria` and throw a
+# TypeError out of the process: a perfectly parseable config, exit 1, a stack
+# trace, and the always-exits-0 promise false. The other non-object shapes did
+# not throw, but read as no configuration at all, which is the same silence one
+# level up. Every shape at every level is a finding now, and none of them is an
+# exit code.
+#
+# Every fixture below keeps a real unresolved criterion on a `done` task, so
+# the report must still do its job on the defaults after reporting the config.
+
+config_shape_fixture() {
+    manifest_with_tasks
+    next_actions <<'EOF'
+## T-007: Closed task
+
+**Acceptance criteria:**
+- [ ] unresolved
+EOF
+    gadd
+}
+
+# Run the report once per config shape and assert the same three things each
+# time: exit 0, a config-unusable finding, no stack trace, and the defaults
+# actually used.
+assert_config_shapes() {
+    for shape in "$@"; do
+        printf '%s\n' "$shape" > "$TEST_TMPDIR/aahp.config.json"
+        run node "$AC" "$TEST_TMPDIR"
+        [ "$status" -eq 0 ] || { echo "exit $status on shape: $shape"; echo "$output"; false; }
+        [[ "$output" == *"config-unusable"* ]] || { echo "no config-unusable on shape: $shape"; echo "$output"; false; }
+        [[ "$output" != *"TypeError"* ]] || { echo "crashed on shape: $shape"; echo "$output"; false; }
+        [[ "$output" == *"unresolved-on-done"* ]] || { echo "defaults not used on shape: $shape"; echo "$output"; false; }
+    done
+}
+
+@test "acceptance-criteria: a config file that is null is a finding, not a crash" {
+    config_shape_fixture
+    mkconfig <<'EOF'
+null
+EOF
+    run node "$AC" "$TEST_TMPDIR"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"config-unusable"* ]]
+    [[ "$output" == *"the top-level value is null"* ]]
+    [[ "$output" != *"TypeError"* ]]
+    # It reported the config AND still read the documents on the defaults.
+    [[ "$output" == *"unresolved-on-done"* ]]
+}
+
+@test "acceptance-criteria: every non-object top-level config shape is a finding at exit 0" {
+    config_shape_fixture
+    assert_config_shapes 'null' '"a string"' '42' 'true' '[".ai/handoff/NEXT_ACTIONS.md"]'
+}
+
+@test "acceptance-criteria: every non-object acceptanceCriteria shape is a finding at exit 0" {
+    config_shape_fixture
+    assert_config_shapes \
+        '{ "acceptanceCriteria": null }' \
+        '{ "acceptanceCriteria": "a string" }' \
+        '{ "acceptanceCriteria": 7 }' \
+        '{ "acceptanceCriteria": false }' \
+        '{ "acceptanceCriteria": [] }'
+}
+
+@test "acceptance-criteria: every unusable include shape is a finding at exit 0" {
+    config_shape_fixture
+    assert_config_shapes \
+        '{ "acceptanceCriteria": { "include": null } }' \
+        '{ "acceptanceCriteria": { "include": ".ai/handoff/NEXT_ACTIONS.md" } }' \
+        '{ "acceptanceCriteria": { "include": 3 } }' \
+        '{ "acceptanceCriteria": { "include": true } }' \
+        '{ "acceptanceCriteria": { "include": [] } }' \
+        '{ "acceptanceCriteria": { "include": [1, 2] } }' \
+        '{ "acceptanceCriteria": { "include": {} } }'
+}
+
+@test "acceptance-criteria: every unusable manifest shape is a finding at exit 0" {
+    config_shape_fixture
+    assert_config_shapes \
+        '{ "acceptanceCriteria": { "manifest": null } }' \
+        '{ "acceptanceCriteria": { "manifest": "" } }' \
+        '{ "acceptanceCriteria": { "manifest": 5 } }' \
+        '{ "acceptanceCriteria": { "manifest": true } }' \
+        '{ "acceptanceCriteria": { "manifest": [] } }' \
+        '{ "acceptanceCriteria": { "manifest": {} } }'
+}
+
+@test "acceptance-criteria: config findings name the file the loader reads" {
+    # No aahp.config.json exists at all. The finding still has to send the
+    # reader to aahp.config.json, because that is the only file loadConfig
+    # opens and the only place the key it names can live. It used to say
+    # package.json:1, which the loader never reads.
+    manifest_with_tasks
+    next_actions <<'EOF'
+## T-007: Closed task
+
+**Acceptance criteria:**
+- [ ] unresolved
+EOF
+    # Track the manifest but NOT the criteria document, so include matches zero
+    # tracked files and the config finding fires without a config file present.
+    git -C "$TEST_TMPDIR" add .ai/handoff/MANIFEST.json
+    [ ! -f "$TEST_TMPDIR/aahp.config.json" ]
+    run node "$AC" "$TEST_TMPDIR"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"no-files-matched"* ]]
+    [[ "$output" == *"aahp.config.json:1"* ]]
+    [[ "$output" != *"package.json:1"* ]]
+}
+
 # --- parser coverage: the heading forms that bind a task id ------------------
 
 @test "acceptance-criteria: a setext heading binds a task id" {
@@ -1156,4 +1270,69 @@ EOF
     [ "$status" -eq 0 ]
     [[ "$output" == *"no findings"* ]]
     [[ "$output" != *"unresolved-on-done"* ]]
+}
+
+@test "acceptance-criteria: KNOWN BLIND SPOT - a blockquoted criteria section is not read" {
+    enable_gate
+    manifest_with_tasks
+    next_actions <<'EOF'
+## T-007 Closed task
+
+> ### Acceptance criteria
+>
+> - [ ] NOT DONE AND INVISIBLE
+EOF
+    gadd
+    run node "$AC" "$TEST_TMPDIR"
+    # DOCUMENTED LIMITATION: the ">" prefix is not stripped, so neither the
+    # heading nor the task box matches and no section is opened at all.
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"no findings"* ]]
+    [[ "$output" == *"0 section(s)"* ]]
+}
+
+@test "acceptance-criteria: KNOWN BLIND SPOT - a criteria section at the same heading depth is unbound" {
+    enable_gate
+    manifest_with_tasks
+    next_actions <<'EOF'
+## T-007 Closed task
+
+## Acceptance criteria
+
+- [ ] NOT DONE
+EOF
+    gadd
+    run node "$AC" "$TEST_TMPDIR"
+    # DOCUMENTED LIMITATION, and the most ordinary document shape of the lot:
+    # the standard GitHub issue layout puts the task title and the criteria
+    # heading at the SAME depth. The sibling heading closes the task scope, so
+    # the section binds to no task and the done-state rule never applies. The
+    # section is at least reported as unbound rather than passed over in
+    # silence, which is what separates this row from the rows above it.
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"unbound-criteria-section"* ]]
+    [[ "$output" != *"unresolved-on-done"* ]]
+}
+
+# NOT a blind spot, asserted so the published table cannot regain a false row:
+# the reader has no HTML-block handling, so a criteria section written inside
+# an HTML block is read straight through rather than missed. An earlier
+# revision of README Section 8.7 claimed it was missed; it is not.
+@test "acceptance-criteria: a criteria section inside an HTML block IS read" {
+    enable_gate
+    manifest_with_tasks
+    next_actions <<'EOF'
+## T-007 Closed task
+
+<div>
+### Acceptance criteria
+
+- [ ] NOT DONE
+</div>
+EOF
+    gadd
+    run node "$AC" "$TEST_TMPDIR"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"unresolved-on-done"* ]]
+    [[ "$output" == *"T-007"* ]]
 }

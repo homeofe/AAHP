@@ -40,7 +40,6 @@
   },
   "acceptanceCriteria": {
     "include": [".ai/handoff/NEXT_ACTIONS.md"],
-    "manifest": ".ai/handoff/MANIFEST.json",
-    "strict": false
+    "manifest": ".ai/handoff/MANIFEST.json"
   }
 }

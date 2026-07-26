@@ -82,6 +82,10 @@ canonical **Acceptance criteria** section written as task boxes.
 6. **GitHub is optional.** The lifecycle is an AAHP task rule. Where a project syncs tasks
    to issues, the adapter mirrors the same boxes onto the issue and reconciles them before
    the issue closes.
+7. **Tooling is advisory.** `aahp criteria` prints a best-effort report over these
+   documents. It is not a gate, it always exits 0, and a clean report is not proof that
+   the criteria are resolved: the shapes it is known to miss are listed in README
+   Section 8.7. The lifecycle is upheld by review, not by an exit code.
 
 ## Formatting
 

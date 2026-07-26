@@ -57,6 +57,10 @@ Commands:
   migrate-grounding [path]  Add the Grounded Reflection Layer to an existing project
   verify [path]     Run the canonical handoff gate (checksum + drift + TTL)
   check [path]      Run the config-driven governance gates as one aggregate
+  criteria [path]   ADVISORY report on the acceptance-criteria lifecycle.
+                    Not a gate: it is not part of the check command and always
+                    exits 0 unless the report itself cannot run. A clean report
+                    is not proof; see the blind spots in README Section 8.7.
   archive [path]    Rotate or verify LOG.md -> LOG-ARCHIVE.md
   status [path]     Show a quick state summary from MANIFEST.json
   doctor [path]     Conformance self-check; emits a JSON conformance record
@@ -70,8 +74,7 @@ Init options:
 
 Check options:
   --json            Print only the JSON governance record to stdout
-  --quiet           Print only failing and warning gates (plus the summary)
-                    A gate may report warn: advisory, never changes the exit code
+  --quiet           Print only failing gates (plus the summary)
 
 Manifest options:
   --agent NAME      Agent identifier (default: "cli-tool")
@@ -510,8 +513,6 @@ function gateApplies(id, targetPath, config) {
       return !!cfg.docLinks
     case 'handoff':
       return has('.ai', 'handoff', 'MANIFEST.json')
-    case 'acceptance-criteria':
-      return !!cfg.acceptanceCriteria
     default:
       return false
   }
@@ -762,20 +763,6 @@ const CHECK_GATES = [
   { id: 'handoff', script: 'aahp-dashboard.mjs', args: ['--check'] },
 ]
 
-// Opt-in gates. Unlike the gates above, these are appended to the run ONLY when
-// the project asks for them in aahp.config.json, so a repo that never opts in
-// keeps the exact gate SET (and therefore the exact --json record shape) it had
-// before this gate existed. Same backward-compatibility stance as the
-// governance-mode `mode` field on the doctor record.
-const OPTIONAL_CHECK_GATES = [
-  {
-    id: 'acceptance-criteria',
-    script: 'check-acceptance-criteria.mjs',
-    args: [],
-    enabled: (config) => !!config.acceptanceCriteria,
-  },
-]
-
 // Applicability comes from the shared gateApplies predicate defined above, which
 // `doctor` consults too, so the two commands cannot disagree about which gates a
 // given repository is subject to.
@@ -791,8 +778,7 @@ function cmdCheck(targetPath, flags) {
   const skip = Array.isArray(sel.skip) ? sel.skip : []
 
   const results = {}
-  const gatesToRun = [...CHECK_GATES, ...OPTIONAL_CHECK_GATES.filter((g) => g.enabled(config))]
-  for (const gate of gatesToRun) {
+  for (const gate of CHECK_GATES) {
     let status, reason
     if ((only && !only.includes(gate.id)) || skip.includes(gate.id)) {
       status = 'skip'
@@ -807,15 +793,8 @@ function cmdCheck(targetPath, flags) {
         status = 'fail'
         reason = `failed to run gate: ${r.error.message}`
       } else if (r.status === 0) {
-        // Exit 0 whose first stdout line starts with "WARN " is an ADVISORY
-        // result: the gate found something worth reporting but deliberately did
-        // not fail. `warn` is reported and never affects the exit code. The
-        // "WARN" token and a self-identifying "<gate-id>: " label are stripped,
-        // because this line is already printed under the gate's own id.
-        const head = firstLine(r.stdout)
-        const isWarn = /^WARN\b/.test(head)
-        status = isWarn ? 'warn' : 'pass'
-        reason = isWarn ? head.replace(/^WARN\s+/, '').replace(`${gate.id}: `, '') : head
+        status = 'pass'
+        reason = firstLine(r.stdout)
       } else {
         // Non-zero exit, or r.status === null when the gate was killed by a signal.
         status = 'fail'
@@ -828,7 +807,6 @@ function cmdCheck(targetPath, flags) {
   const gates = {}
   for (const [k, v] of Object.entries(results)) gates[k] = v.status
   const failing = Object.entries(gates).filter(([, s]) => s === 'fail')
-  const warning = Object.entries(gates).filter(([, s]) => s === 'warn')
 
   const record = {
     schemaVersion: 1,
@@ -844,29 +822,53 @@ function cmdCheck(targetPath, flags) {
     process.exit(failing.length === 0 ? 0 : 1)
   }
 
-  const labels = { pass: 'PASS', fail: 'FAIL', skip: 'SKIP', warn: 'WARN' }
+  const labels = { pass: 'PASS', fail: 'FAIL', skip: 'SKIP' }
   if (!quiet) {
     console.log(`\naahp check - governance gates for ${record.repo} (aahp v${record.aahpVersion})`)
     console.log('=========================================')
   }
   for (const [k, v] of Object.entries(results)) {
-    // --quiet keeps failures AND advisory warnings; a warning nobody prints is
-    // a warning nobody acts on.
-    const ok = v.status !== 'fail' && v.status !== 'warn'
+    const ok = v.status !== 'fail'
     if (!ok || !quiet) console.log(`  ${(labels[v.status] || v.status).padEnd(6)} ${k}: ${v.reason}`)
   }
   if (!quiet) console.log('=========================================')
   if (failing.length === 0) {
     if (!quiet) {
       const ran = Object.values(gates).filter((s) => s !== 'skip').length
-      const warnNote = warning.length > 0 ? `, ${warning.length} warning(s)` : ''
-      console.log(`Governance OK: ${ran} gate(s) ran, no failures${warnNote}.`)
+      console.log(`Governance OK: ${ran} gate(s) ran, no failures.`)
     }
   } else {
     console.log(`Governance FAILED: ${failing.map(([k]) => k).join(', ')}.`)
   }
 
   process.exit(failing.length === 0 ? 0 : 1)
+}
+
+// ---------------------------------------------------------------------------
+// criteria command - an ADVISORY report, deliberately not a gate.
+//
+// Detection over hand-written Markdown is a heuristic, and a heuristic cannot
+// be sound: there is always another document shape it does not recognize. A
+// gate's whole value is that green means safe, so a heuristic wired to an exit
+// code manufactures false confidence and people stop reading the document. This
+// command therefore has NO authority. It is absent from CHECK_GATES, it has no
+// enforcing mode to switch on, and it exits 0 whether or not it found anything.
+// The only non-zero exit is the report failing to run at all (an unparseable
+// config, or no git work tree to enumerate files from), which is a property of
+// the environment and never of a document's shape.
+//
+// Output is inherited rather than captured: this is text for a human to read.
+// ---------------------------------------------------------------------------
+
+function cmdCriteria(targetPath) {
+  const r = spawnSync(process.execPath, [join(PACKAGE_ROOT, 'scripts', 'report-acceptance-criteria.mjs'), targetPath], {
+    stdio: 'inherit',
+  })
+  if (r.error) {
+    console.error(`Error running the acceptance-criteria report: ${r.error.message}`)
+    process.exit(1)
+  }
+  process.exit(r.status ?? 1)
 }
 
 // Shell script commands -spawn bash scripts
@@ -998,6 +1000,12 @@ switch (command) {
   case 'check': {
     const { targetPath, flags } = extractPathAndFlags(rest)
     cmdCheck(targetPath, flags)
+    break
+  }
+
+  case 'criteria': {
+    const { targetPath } = extractPathAndFlags(rest)
+    cmdCriteria(targetPath)
     break
   }
 

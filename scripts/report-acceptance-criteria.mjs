@@ -1,17 +1,48 @@
 #!/usr/bin/env node
-// check-acceptance-criteria.mjs - Config-driven acceptance-criteria lifecycle
-// gate.
+// report-acceptance-criteria.mjs - ADVISORY acceptance-criteria lifecycle
+// report. This is NOT a gate and it has no enforcing mode.
 //
-// THE CONTRACT: THIS GATE NEVER CONVERTS "I DO NOT UNDERSTAND THIS INPUT" INTO
-// A PASS. Handoff documents are hand-written and their shapes are unbounded, so
-// any parser will meet a shape it cannot read. When that happens the gate says
-// so instead of falling silent, because a silent pass is indistinguishable from
-// a clean document and that is the failure mode this gate exists to prevent.
-// Everything it cannot interpret is a finding. Findings are warnings by
-// default, so the cost of a shape the parser does not know is a line of noise a
-// human can dismiss, never an undetected defect.
+// WHY IT IS ADVISORY. Acceptance criteria live in hand-written Markdown, whose
+// shapes are unbounded, so recognizing them is a heuristic and a heuristic
+// cannot be sound. Three rounds of adversarial review against an enforcing
+// version of this code each fixed real defects and each found new document
+// shapes that still slipped through: ordered lists, indented lists, empty
+// sections, setext headings, bold-label tasks, an indented closing fence, a
+// bold line in the middle of a criteria section, and more. The pattern is not
+// "five more shapes to fix"; it is that no fixed set of patterns closes the
+// space.
 //
-// Findings, in two families.
+// A gate's entire value is that green means safe. Tie an unsound heuristic to
+// an exit code and a clean result manufactures false confidence: people stop
+// reading the document because the build was green, which is worse than having
+// no check at all. So the authority is removed and the detection is kept. The
+// report prints what it found, for a human to read, and ALWAYS exits 0.
+//
+// There is deliberately no strict/enforce option. An option to make findings
+// fail would be switched on somewhere, and then the first unanticipated
+// document shape turns into a red build in a consumer repo. It is not
+// configurable off-by-default; it does not exist.
+//
+// PUBLISHED BLIND SPOTS. An honest tool names what it misses. README Section
+// 8.7 carries the authoritative list; the headline case is that a bold line
+// inside a criteria section ends the section, so criteria written after it are
+// invisible:
+//
+//   ### Acceptance criteria
+//   - [x] done
+//
+//   **Note:** the rest follow.
+//
+//   - [ ] NOT SEEN
+//
+// Do not read "no findings" as "the criteria are resolved".
+//
+// EXIT CODE. 0, always, whatever it finds. The only non-zero exit is the report
+// failing to run at all: an unparseable aahp config, or no git work tree to
+// enumerate tracked files from. Both are properties of the environment, never
+// of a document's shape, so neither can be triggered by writing Markdown.
+//
+// WHAT IT REPORTS, in two families.
 //
 // LIFECYCLE DEFECTS - the document was understood and it is wrong:
 //   legacy-heading      a section titled with a legacy alias ("Completion
@@ -24,49 +55,43 @@
 //                       in its section are still unresolved: not checked, not
 //                       waived, and not moved to a follow-up
 //
-// COMPREHENSION DEFECTS - the gate could not do its job and refuses to pretend
-// otherwise:
-//   no-files-matched          the gate is configured but its include pathspec
-//                             matched zero tracked files. A renamed file or a
-//                             config typo would otherwise disable the gate
-//                             wholesale while it reported success.
+// COMPREHENSION DEFECTS - the report could not do its job and says so rather
+// than falling silent. Silence is the failure mode that made an enforcing
+// version untrustworthy, so anything unreadable is reported:
+//   config-unusable           the acceptanceCriteria config, or one of its
+//                             members, is not the shape it must be, so a
+//                             default was used instead of what was written
+//   no-files-matched          the include pathspecs matched zero tracked
+//                             files, so the report covered nothing
+//   file-unreadable           a tracked file matched but could not be read
+//   manifest-missing          a task registry path was configured explicitly
+//                             and does not exist, so no done-state check ran
+//   manifest-unreadable       the task registry is present but unusable: not
+//                             valid JSON, or a "tasks" member that is not a
+//                             plain object. Either way "done" cannot be
+//                             resolved for any task.
 //   unparsed-criteria-section a recognized criteria heading whose body yields
-//                             zero recognized criterion items. A human wrote
-//                             "Acceptance criteria" and the parser found
-//                             nothing under it, so the parser is wrong, not the
-//                             document. This one finding covers the empty
-//                             section, the table form, the prose form, the
-//                             indented list, and every list form nobody has
-//                             invented yet.
-//   unbound-criteria-section  a criteria section the parser could not attribute
+//                             zero recognized criterion items: an empty
+//                             section, a table, prose, an indented list, or a
+//                             list form nobody has invented yet
+//   unbound-criteria-section  a criteria section that could not be attributed
 //                             to a task id present in the registry, so the
-//                             done-state rule cannot be applied to it.
+//                             done-state rule cannot be applied to it
 //   unterminated-fence        a code fence still open at end of file, with the
-//                             number of lines that were skipped as a result.
-//   manifest-unreadable       the configured task registry is present but
-//                             unusable: not valid JSON, or a "tasks" member
-//                             that is not a plain object. Either way "done"
-//                             cannot be resolved for any task.
+//                             number of lines that were skipped as a result
 //
-// SEVERITY IS WARN BY DEFAULT. With findings the gate prints them and still
-// exits 0, so adopting a newer aahp release can never turn a green repository
-// red. Enforcement is opt-in per project: "strict": true makes findings fail
-// the gate (exit 1). This mirrors the staged rollout the protocol asks for -
-// warn first, enforce when the project has migrated.
+// Configuration is optional. Absent, the defaults below are used, because the
+// report only runs when a human asked for it by name.
 //
 //   "acceptanceCriteria": {
 //     "include": [".ai/handoff/NEXT_ACTIONS.md"],
-//     "manifest": ".ai/handoff/MANIFEST.json",
-//     "strict": false
+//     "manifest": ".ai/handoff/MANIFEST.json"
 //   }
 //
-// The whole section is optional; absent, the gate is a clean no-op, and
-// `aahp check` does not even list it (see bin/aahp.js OPTIONAL_CHECK_GATES).
-//
-// OFFLINE BY CONSTRUCTION. The gate reads tracked files and the manifest task
+// OFFLINE BY CONSTRUCTION. It reads tracked files and the manifest task
 // registry only. It opens no socket, so a run is deterministic and complete
 // without network access. Reconciling linked GitHub issues is an adapter
-// concern documented in the README, never a precondition for a clean run.
+// concern documented in the README.
 //
 // WHICH LIST FORMS COUNT AS CRITERIA:
 //
@@ -77,36 +102,32 @@
 //
 // Nested items (indent >= 2) are detail lines belonging to the criterion above
 // them, in either list form. Tables, definition lists and prose are not
-// criteria. A section written that way now yields zero items and reports
-// unparsed-criteria-section rather than passing clean.
+// criteria. A section written that way yields zero items and is reported as
+// unparsed-criteria-section.
 //
 // WHICH HEADING FORMS BIND A TASK ID. Task scope is opened by an ATX heading
 // ("### T-007: ..."), a setext heading (a line underlined with "===" or "---"),
-// or a bold label ("**T-007: ...**"). All three are supported rather than left
-// to the comprehension defects, because all three appear in hand-written
-// handoff files and a document written that way would otherwise report an
-// unbound section on every task. Any form still unsupported is caught by
-// unbound-criteria-section.
+// or a bold label ("**T-007: ...**"), because all three appear in hand-written
+// handoff files. Any form not supported is reported as unbound.
 //
 // FENCED CODE BLOCKS ARE NOT CONTENT. Lines inside a ``` or ~~~ fence are
 // skipped, so documentation that SHOWS the criteria format is not mistaken for
 // criteria that exist. Fence closing follows CommonMark: a closing fence
 // indented by four or more spaces is content, not a fence, so the block
-// legitimately runs to end of file. That behaviour is correct and is kept. What
-// changes is that the consequence is no longer silent - an open fence at end of
-// file is reported with the number of lines it swallowed.
+// legitimately runs to end of file. An open fence at end of file is reported
+// with the number of lines it swallowed.
 //
 // Recognized resolution markers on an unchecked criterion (case-insensitive):
 //   (waived: rationale)      an accepted, justified exception
 //   (follow-up: T-042)       moved to a linked follow-up task or issue
 //
 // Files are enumerated with `git ls-files` through the shared helper, so only
-// tracked files are read and the gate fails loud outside a git work tree
-// instead of vacuously passing on an empty file list.
+// tracked files are read.
 //
-// The module has no import-time side effects: the gate runs only when this file
-// is the process entry point, so parseCriteriaSections and findSectionDefects
-// can be imported and unit-tested without the gate exiting the test process.
+// The module has no import-time side effects: the report runs only when this
+// file is the process entry point, so parseCriteriaSections and
+// findSectionDefects can be imported and unit-tested without it exiting the
+// test process.
 
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -408,7 +429,7 @@ export function loadTaskStatus(root, relPath) {
   return { statuses, state: "parsed", error: null };
 }
 
-// --- gate ------------------------------------------------------------------
+// --- report ----------------------------------------------------------------
 
 function main() {
   const root = resolveRoot();
@@ -417,46 +438,92 @@ function main() {
   try {
     config = loadConfig(root);
   } catch (err) {
-    console.error(`  acceptance-criteria: ${err.message}`);
+    console.error(`  acceptance-criteria report: ${err.message}`);
     process.exit(1);
   }
 
-  const section = config.acceptanceCriteria;
-  if (!section || typeof section !== "object") {
-    console.log("Acceptance criteria: not configured; nothing to check.");
-    process.exit(0);
-  }
-
-  // Fail loud outside a git work tree: `git ls-files` would enumerate zero files
-  // and the gate would vacuously pass, so a lifecycle defect could ship unseen.
+  // One of the report's only two non-zero exits. Outside a git work tree
+  // `git ls-files` enumerates nothing and the report would be empty for a
+  // reason that has nothing to do with the documents.
   if (!isInsideWorkTree(root)) {
     console.error(
-      `  acceptance-criteria: not inside a git work tree at ${root}; cannot enumerate files - run this gate inside a git checkout (in CI use actions/checkout)`,
+      `  acceptance-criteria report: not inside a git work tree at ${root}; cannot enumerate files - run this report inside a git checkout (in CI use actions/checkout)`,
     );
     process.exit(1);
   }
 
-  const include = Array.isArray(section.include) && section.include.length ? section.include : DEFAULT_INCLUDE;
-  const manifestPath = typeof section.manifest === "string" && section.manifest ? section.manifest : DEFAULT_MANIFEST;
-  const strict = section.strict === true;
   const configFile = existsSync(join(root, "aahp.config.json")) ? "aahp.config.json" : "package.json";
+  const findings = [];
+
+  // Configuration is optional, but a value of the WRONG SHAPE must not be
+  // indistinguishable from no value at all. Each fallback below is reported,
+  // because silently using a default while the project believes its own
+  // setting is in force is exactly the kind of quiet this report exists to
+  // avoid.
+  const raw = config.acceptanceCriteria;
+  const sectionUsable = !!raw && typeof raw === "object" && !Array.isArray(raw);
+  const section = sectionUsable ? raw : {};
+  if (raw !== undefined && !sectionUsable) {
+    findings.push({
+      file: configFile,
+      line: 1,
+      id: "config-unusable",
+      message: `"acceptanceCriteria" is ${Array.isArray(raw) ? "an array" : raw === null ? "null" : `a ${typeof raw}`}, not an object, so the report used its defaults instead of what is configured`,
+    });
+  }
+
+  const includeRaw = section.include;
+  const includeUsable =
+    Array.isArray(includeRaw) && includeRaw.length > 0 && includeRaw.every((p) => typeof p === "string" && p.trim() !== "");
+  const include = includeUsable ? includeRaw : DEFAULT_INCLUDE;
+  if (includeRaw !== undefined && !includeUsable) {
+    findings.push({
+      file: configFile,
+      line: 1,
+      id: "config-unusable",
+      message: `"acceptanceCriteria.include" is not a non-empty array of pathspec strings, so the report scanned the default (${DEFAULT_INCLUDE.join(", ")}) instead`,
+    });
+  }
+
+  const manifestRaw = section.manifest;
+  const manifestConfigured = typeof manifestRaw === "string" && manifestRaw.trim() !== "";
+  const manifestPath = manifestConfigured ? manifestRaw : DEFAULT_MANIFEST;
+  if (manifestRaw !== undefined && !manifestConfigured) {
+    findings.push({
+      file: configFile,
+      line: 1,
+      id: "config-unusable",
+      message: `"acceptanceCriteria.manifest" is not a non-empty string, so the report read the default (${DEFAULT_MANIFEST}) instead`,
+    });
+  }
 
   const { statuses, state: manifestState, error: manifestError } = loadTaskStatus(root, manifestPath);
   const registryKnown = manifestState === "parsed";
 
-  const findings = [];
   let sectionCount = 0;
   let fileCount = 0;
 
   // A registry that exists but cannot be used is a finding in its own right,
-  // not a silent skip. It is listed first because every done-state verdict below
-  // it would be unreliable while it stands.
+  // not a silent skip. Every done-state verdict below it would be unreliable.
   if (manifestState === "corrupt") {
     findings.push({
       file: manifestPath,
       line: 1,
       id: "manifest-unreadable",
-      message: `task registry is present but unusable: ${manifestError}; done-state checks cannot run until it is fixed`,
+      message: `task registry is present but unusable: ${manifestError}; no done-state check could run`,
+    });
+  }
+
+  // An ABSENT registry at the default path means the done-state rule genuinely
+  // does not apply here. An absent registry at a path the project wrote down
+  // itself is a typo or a rename, and it disables the done-state rule
+  // completely, so it is reported.
+  if (manifestState === "absent" && manifestConfigured) {
+    findings.push({
+      file: manifestPath,
+      line: 1,
+      id: "manifest-missing",
+      message: `the configured task registry does not exist, so no done-state check ran at all; correct acceptanceCriteria.manifest or drop it to accept the default (${DEFAULT_MANIFEST})`,
     });
   }
 
@@ -466,7 +533,14 @@ function main() {
     let text;
     try {
       text = readFileSync(join(root, rel), "utf8");
-    } catch {
+    } catch (err) {
+      // Skipping a file in silence would shrink the report without saying so.
+      findings.push({
+        file: rel,
+        line: 1,
+        id: "file-unreadable",
+        message: `tracked file matched the include pathspecs but could not be read (${err.message}), so nothing in it was reported on`,
+      });
       continue;
     }
     fileCount++;
@@ -480,15 +554,14 @@ function main() {
     }
   }
 
-  // Configured but pointed at nothing. Without this the gate reports success on
-  // a renamed file or a mistyped pathspec, which is the loudest possible way to
-  // be quiet: the project believes it is covered and it is not.
+  // Pointed at nothing. Without this the report says "no findings" on a renamed
+  // file or a mistyped pathspec, which is the loudest possible way to be quiet.
   if (fileCount === 0) {
     findings.push({
       file: configFile,
       line: 1,
       id: "no-files-matched",
-      message: `acceptanceCriteria.include matched zero tracked files (${include.join(", ")}); the gate is enabled but checking nothing - correct the pathspec, track the file, or remove the config section`,
+      message: `the include pathspecs matched zero tracked files (${include.join(", ")}), so this report covered nothing - correct acceptanceCriteria.include or track the documents`,
     });
   }
 
@@ -503,30 +576,25 @@ function main() {
 
   if (findings.length === 0) {
     console.log(
-      `Acceptance criteria OK: ${sectionCount} section(s) in ${fileCount} file(s), no findings (offline check; ${manifestNote}).`,
+      `Acceptance criteria: no findings in ${sectionCount} section(s) across ${fileCount} file(s) (offline report; ${manifestNote}).`,
     );
-    process.exit(0);
+  } else {
+    console.log(
+      `Acceptance criteria: ${findings.length} finding(s) in ${sectionCount} section(s) across ${fileCount} file(s) (offline report; ${manifestNote}).`,
+    );
+    for (const f of findings) console.log(`  - ${f.file}:${f.line} [${f.id}] ${f.message}`);
+    console.log("");
+    console.log(`  Lifecycle: one "${CANONICAL_HEADING}" section, "- [ ]" while unresolved, "- [x]" only on`);
+    console.log("  evidence. Before a task is done, every criterion is checked, waived, or moved.");
   }
 
-  if (strict) {
-    console.error(`\n  Acceptance-criteria check failed (${findings.length} finding(s), strict mode).\n`);
-    for (const f of findings) console.error(`  - ${f.file}:${f.line} [${f.id}] ${f.message}`);
-    console.error("");
-    console.error(`  Lifecycle: one "${CANONICAL_HEADING}" section, "- [ ]" while unresolved, "- [x]" only on`);
-    console.error("  evidence. Before a task is done, every criterion is checked, waived, or moved.");
-    console.error("  A finding also fires when the gate cannot read the input: that is deliberate, because");
-    console.error("  an unreadable document must never be reported as a clean one.\n");
-    process.exit(1);
-  }
-
-  // Warn severity: report everything, change nothing about the exit code. The
-  // leading "WARN " token is the contract `aahp check` reads to report this gate
-  // as WARN rather than PASS.
-  console.log(
-    `WARN acceptance-criteria: ${findings.length} finding(s) in ${sectionCount} section(s) (advisory; set acceptanceCriteria.strict to enforce).`,
-  );
-  for (const f of findings) console.log(`  - ${f.file}:${f.line} [${f.id}] ${f.message}`);
-  console.log(`  Offline check; ${manifestNote}.`);
+  // The same closing note in both cases, because the clean case is the one
+  // that misleads. This report is a heuristic over hand-written Markdown with
+  // published blind spots; it must never be read as a proof or used as a gate.
+  console.log("");
+  console.log("  ADVISORY: this report is best effort and always exits 0. No findings is NOT proof");
+  console.log("  that the acceptance criteria are resolved, and this must not be used as a merge");
+  console.log("  gate. Known blind spots are listed by name in README Section 8.7.");
   process.exit(0);
 }
 

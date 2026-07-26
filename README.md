@@ -475,9 +475,7 @@ aahp check --quiet     # only failing gate lines plus the footer
 Each gate is applicable only when its inputs exist (for example the `handoff` gate runs
 only when `.ai/handoff/MANIFEST.json` is present); otherwise it is reported `skip`, not
 run. `config.check.only` (a whitelist) and `config.check.skip` (a blacklist) narrow the
-set explicitly. A gate may also report `warn`: a finding worth printing that deliberately
-does not fail the run. `warn` never changes the exit code, and `--quiet` still prints it.
-The same governance-only stance is available from the record side:
+set explicitly. The same governance-only stance is available from the record side:
 `aahp doctor --governance` (alias `--no-handoff`) forces the three handoff gates to
 `skip` without evaluating them, so a repo with no `.ai/handoff/` still emits a green
 conformance record; the default mode is unchanged.
@@ -493,7 +491,10 @@ a repo that never opts in keeps working:
 | changelog format | `check-changelog-format.mjs` | uses `CHANGELOG.md` | Keep a Changelog 1.1.0 + SemVer grammar |
 | claims | `check-claims.mjs` | `claims` | capability numbers agree across surfaces and do not exceed a ground-truth floor |
 | generator + freshness | `aahp-dashboard.mjs` | `generate` | an optional LOG release journal stays in sync; a `Current version` header matches the package |
-| acceptance criteria | `check-acceptance-criteria.mjs` | `acceptanceCriteria` | the acceptance-criteria lifecycle (Section 8.7): canonical heading, task boxes not plain list items, nothing unresolved on a `done` task, plus the comprehension findings that keep the gate from passing on input it could not read (no files matched, unparsed section, unbound section, unterminated fence, unusable task registry). Warn by default, `"strict": true` to enforce |
+
+The acceptance-criteria lifecycle of Section 8.7 is deliberately **not** in this table.
+It ships as `aahp criteria`, an advisory report with no exit-code authority, for the
+reason ADR-017 records.
 
 The changelog validator and the LOG generator import the release-heading grammar
 from a single module (`scripts/changelog-grammar.mjs`), so the two cannot diverge.
@@ -749,17 +750,27 @@ exact-pin behavior, and a repo whose own package name matches still reports `sel
 vendored paths), is opt-in, and never mutates the repo. `aahp-verify.yml` gates handoff
 state; `aahp-govern.yml` gates governance. Two workflows, two concerns.
 
-### ADR-017: new detection ships warn-first, and a new gate joins the set only on opt-in
-**Why it recurs:** a new rule looks obviously correct, so wiring it in as a failing gate
-by default feels like the honest thing to do. Every AAHP consumer runs these gates, so a
-new default failure is a fleet-wide outage rather than a bug in one repo.
-**Decision:** detection lands at warn severity (reported, exit code unchanged) and
-enforcement is opt-in through `aahp.config.json`. The `acceptance-criteria` gate is the
-worked example: absent `acceptanceCriteria`, the gate does not run and does not even
-appear in the `aahp check` record, so the gate SET a consumer sees is unchanged; present,
-findings are warnings; with `"strict": true`, they fail. `aahp check` reports the extra
-`warn` status, which never changes the exit code. Promotion of a warn rule to a default
-failure is a separate, deliberate major decision, never a side effect of an upgrade.
+### ADR-017: a heuristic over hand-written prose is a report, never a gate
+**Why it recurs:** a detection rule that finds real defects feels like it has earned an
+exit code, and "warn by default with a strict switch" feels like the safe compromise.
+**Evidence:** the acceptance-criteria detector was built that way and put through three
+independent adversarial reviews. Each round fixed real defects and each round found new
+document shapes that still slipped through: ordered lists, indented lists, empty
+sections, setext headings, bold-label tasks, an indented closing fence, a `tasks` array,
+a bold line mid-section. The last of those is ordinary Markdown and it silently hides
+every criterion after it.
+**Decision:** a rule whose input is hand-written prose ships as a REPORT with no
+authority over any exit code, and it does not get an enforcing option at all. A gate's
+entire value is that green means safe; wiring an unsound heuristic to an exit code
+manufactures false confidence, and readers stop checking the document because the build
+was green, which is worse than having no check. An enforcing option would be switched on
+somewhere and then the first unanticipated shape becomes a red build in a consumer repo,
+so "off by default" is not sufficient: the option must not exist. The report earns trust
+a different way, by publishing the shapes it is known to miss (Section 8.7).
+**Consequence:** `aahp criteria` is a command in its own right, absent from the `aahp
+check` gate list, and it exits 0 whatever it finds. The non-enforcement is structural
+rather than a default that could drift back. Gates keep binary pass/fail; a rule that
+cannot be sound does not become one.
 
 ---
 
@@ -810,6 +821,7 @@ Agents should always regenerate the manifest as the final step before committing
 | `aahp lint [path]` | Validate handoff files for safety violations |
 | `aahp verify [path]` | Run the canonical handoff gate (checksum + drift + pointer + TTL) |
 | `aahp check [path]` | Run the config-driven governance gates as one aggregate |
+| `aahp criteria [path]` | Advisory acceptance-criteria report (Section 8.7); never a gate, always exits 0 |
 | `aahp archive [path]` | Rotate or verify `LOG.md` into `LOG-ARCHIVE.md` |
 | `aahp migrate [path]` | Migrate an AAHP v1 project to v2/v3 |
 | `aahp migrate-grounding [path]` | Add the Grounded Reflection Layer to an existing project |
@@ -1030,24 +1042,54 @@ Migration is a rename: the criteria themselves do not change, so a project can m
 document at a time. Nothing forces the rename, because a reader that stops accepting the
 aliases would lose information that already exists.
 
-**Verification, and its stated contract.** The opt-in `acceptance-criteria` gate
-(Section 2.11) reads the configured documents plus the `MANIFEST.json` task registry.
-Its contract is one sentence:
+**Verification is a report, not a gate.** `aahp criteria [path]` reads the configured
+documents plus the `MANIFEST.json` task registry and prints what it found. It is
+**advisory**. It is not part of `aahp check`, it has no enforcing mode, and it **always
+exits 0** whatever it finds. The only non-zero exit is the report failing to run at all
+(an unparseable AAHP config, or no git work tree to enumerate tracked files from), and
+both are properties of the environment rather than of any document's shape.
 
-> **The gate never turns "I do not understand this input" into a pass.**
+That is a deliberate demotion, recorded in ADR-017. Acceptance criteria live in
+hand-written Markdown, whose shapes are unbounded, so recognizing them is a heuristic and
+a heuristic cannot be sound. An earlier enforcing version of this code went through three
+independent adversarial reviews; every round fixed real defects and every round found new
+ordinary document shapes that still slipped through. A gate's entire value is that green
+means safe, so an unsound heuristic tied to an exit code manufactures false confidence
+and people stop reading the document because the build was green. **A clean report is not
+proof that the criteria are resolved, and this report must not be used as a merge gate.**
 
-Handoff documents are hand-written, so their shapes are unbounded and any parser will
-eventually meet one it cannot read. A gate that stays quiet in that situation is worse
-than no gate: a silent pass is indistinguishable from a clean document, so a renamed file,
-a mistyped pathspec, or a criteria list written in an unexpected form disables the check
-while the project still believes it is covered. Every such case is therefore a finding.
-Because findings are warnings by default, the cost of a shape the parser does not know is
-a line of output a human can read and dismiss, never an undetected defect. That trade is
-deliberate: **noise is acceptable, silence is not.**
+**Known blind spots.** These are the shapes the report is known to miss. The list is
+published because an honest tool that names its limits can be trusted and a silent one
+cannot. It is not exhaustive, and that is the point: the space of shapes is open.
 
-The findings come in two families.
+| Blind spot | Effect |
+|------------|--------|
+| A bold line inside a criteria section (`**Note:** ...`) ends the section | every criterion written after it is invisible, including on a `done` task |
+| A thematic break (`---`, `***`) inside a criteria section ends it | same: criteria after the break are not seen |
+| A criteria section stated as a table, a definition list, or prose | yields zero recognized items, so nothing is verified (reported as `unparsed-criteria-section`, but no criterion is read) |
+| Criteria indented two or more spaces | read as detail lines belonging to the criterion above, not as criteria |
+| A criteria section inside an HTML block or a blockquote | not parsed as Markdown structure by this reader |
+| A task id form other than an ATX heading, a setext heading, or a bold label | the section is unbound, so the done-state rule cannot apply (reported as `unbound-criteria-section`) |
+| A `- [x]` with no evidence behind it | no tool can see intent; this stays a review responsibility |
+| Documents not matched by `acceptanceCriteria.include`, or not tracked by git | never read at all |
 
-Lifecycle defects, where the document was understood and it is wrong:
+The worked example of the first row, which passed clean under the enforcing version:
+
+```markdown
+## T-001 Example
+### Acceptance criteria
+- [x] this one really is done
+
+**Note:** the rest of the criteria follow.
+
+- [ ] NOT DONE AND INVISIBLE
+```
+
+The task is `done` in the registry and the report says no findings. It is wrong, and it
+is wrong quietly, which is exactly why the report has no authority over an exit code.
+
+**What it does report,** in two families. Lifecycle defects, where the document was
+understood and it is wrong:
 
 | Finding | Meaning |
 |---------|---------|
@@ -1055,18 +1097,22 @@ Lifecycle defects, where the document was understood and it is wrong:
 | `plain-bullets` | criteria are plain list items, so nothing can tell resolved from unresolved |
 | `unresolved-on-done` | a task the registry marks `done` still has criteria that are neither checked, nor waived, nor moved to a follow-up |
 
-Comprehension defects, where the gate could not do its job and refuses to pretend
-otherwise:
+Comprehension defects, where the report could not do its job and says so instead of
+falling silent. Silence is the failure mode that made an enforcing version untrustworthy,
+so anything unreadable is reported and the noise is accepted:
 
 | Finding | Meaning |
 |---------|---------|
-| `no-files-matched` | the gate is configured but `include` matched zero tracked files, so it is enabled and checking nothing |
-| `unparsed-criteria-section` | a recognized criteria heading whose body yields zero recognized criterion items |
-| `unbound-criteria-section` | a criteria section that cannot be attributed to a task id present in the registry, so the done-state rule cannot be applied to it |
-| `unterminated-fence` | a code fence still open at end of file, reported with the number of lines it caused to be skipped |
+| `config-unusable` | the `acceptanceCriteria` config, or one of its members, is not the shape it must be, so a default was used instead of what was written |
+| `no-files-matched` | `include` matched zero tracked files, so the report covered nothing |
+| `file-unreadable` | a tracked file matched but could not be read |
+| `manifest-missing` | a task registry path was configured explicitly and does not exist, so no done-state check ran |
 | `manifest-unreadable` | the task registry is present but unusable, so `done` cannot be resolved for any task |
+| `unparsed-criteria-section` | a recognized criteria heading whose body yields zero recognized criterion items |
+| `unbound-criteria-section` | a criteria section that cannot be attributed to a task id present in the registry |
+| `unterminated-fence` | a code fence still open at end of file, reported with the number of lines it caused to be skipped |
 
-The gate makes no network calls, so a run is complete and deterministic offline.
+The report makes no network calls, so a run is complete and deterministic offline.
 
 **What counts as a criterion.** Both Markdown list forms do, because the choice between
 them is a matter of taste and a rule that only sees one of them under-reports silently:
@@ -1080,35 +1126,17 @@ them is a matter of taste and a rule that only sees one of them under-reports si
 
 Nested items (indent two or more) are detail lines belonging to the criterion above them.
 Lines inside a fenced code block are never criteria, so documentation that shows the
-format is not mistaken for criteria that exist. Prose, tables, definition lists, an
-indented list, and an empty section are not criteria, and a section written any of those
-ways yields zero recognized items. That is exactly the `unparsed-criteria-section` case:
-one finding covers every one of those shapes, and every shape nobody has invented yet.
+format is not mistaken for criteria that exist.
 
 **Which forms bind a task id.** A criteria section is attributed to the task whose scope
 encloses it. Three forms open a task scope: an ATX heading (`### T-042: ...`), a setext
-heading (a line underlined with `===` or `---`), and a bold label (`**T-042: ...**`). All
-three appear in hand-written handoff files. Anything the parser still cannot attribute is
-an `unbound-criteria-section` rather than a section quietly exempted from the done rule.
+heading (a line underlined with `===` or `---`), and a bold label (`**T-042: ...**`).
 
-**An unterminated fence is loud.** Fence handling follows CommonMark, where a closing
-fence indented by four or more spaces is content rather than a fence, so the block
-legitimately runs to end of file. That behaviour is correct and stays. What must not
-happen is for the consequence to be invisible: everything after the opening fence was
-skipped and may have contained criteria, so the gate reports `unterminated-fence` together
-with the number of lines skipped.
-
-**A configured gate that matches nothing is loud.** If `include` resolves to zero tracked
-files, the gate reports `no-files-matched` instead of "no findings". Renaming a document or
-mistyping a pathspec otherwise disables the check in the quietest possible way.
-
-**An unusable task registry is loud.** An absent `MANIFEST.json` means the done-state rule
-genuinely does not apply and the gate says so. A `MANIFEST.json` that is present but
-unusable is a finding of its own (`manifest-unreadable`): it does not parse, or its `tasks`
-member is not a plain object keyed by task id. An array in particular reads as an object to
-a naive check and would report a reassuring task count while no task id could ever match.
-Every done-state verdict is unreliable while this stands; under `"strict": true` it fails
-the gate.
+**Configuration.** `acceptanceCriteria` (`include` / `manifest`) supplies the input paths
+and is optional; absent, the report uses `.ai/handoff/NEXT_ACTIONS.md` and
+`.ai/handoff/MANIFEST.json`. There is no `strict` key and there is no other enforcement
+switch: an option to make findings fail would eventually be switched on, and then an
+unanticipated document shape becomes a red build in a consumer repo.
 
 **Optional GitHub synchronization.** The lifecycle belongs to AAHP task semantics; issue
 task boxes are one rendering of it. Where a project links tasks to issues (by convention,
@@ -1331,10 +1359,9 @@ Markdown links, and `generate` drives an optional LOG release-journal plus a
 `NEXT_ACTIONS.md` current-version freshness gate. Two selection keys tune the surface:
 `check` (`only`/`skip`) chooses which gates `aahp check` runs, and `pinnedDep`
 (`name`/`location`/`allowRange`) opts the `doctor` pinned-dep gate in (absent, it is a clean
-skip). `acceptanceCriteria` (`include`/`manifest`/`strict`) opts into the acceptance-criteria
-lifecycle gate of Section 8.7: absent, the gate does not run and does not appear in the
-`aahp check` record at all; present, its findings are warnings until the project sets
-`"strict": true`. Every section is optional.
+skip). `acceptanceCriteria` (`include`/`manifest`) supplies the input paths for the
+advisory `aahp criteria` report of Section 8.7; it configures no gate, because that report
+is not one. Every section is optional.
 
 Run the gates two ways. `npx --no-install aahp check .` is the pass/fail RUN whose exit code
 gates CI: it aggregates every applicable gate and continues past failures so one run surfaces

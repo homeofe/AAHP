@@ -69,8 +69,10 @@ section written as task boxes.
   run, live verification). Bulk-checking to close something out is invalid.
 - Before a task becomes `done`, every remaining criterion is checked, waived
   (`(waived: rationale)`), or moved to a linked open follow-up (`(follow-up: T-042)`).
-- `aahp check` runs the `acceptance-criteria` gate on this file's sibling
-  `NEXT_ACTIONS.md`. Findings are warnings; they are still defects to fix.
+- `aahp criteria` prints an ADVISORY report over this file's sibling `NEXT_ACTIONS.md`.
+  It is not a gate: it is not part of `aahp check` and always exits 0. Its findings are
+  still defects to fix, and a clean report is not proof that the criteria are resolved
+  (README Section 8.7 lists the shapes it is known to miss).
 
 ## Formatting
 

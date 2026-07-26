@@ -17,9 +17,9 @@ Counts mirror the `tasks` registry in `MANIFEST.json`.
 
 | Status | Count |
 |--------|-------|
-| Done | 4 |
+| Done | 5 |
 | Ready | 0 |
-| Blocked | 1 |
+| Blocked | 0 |
 
 ---
 
@@ -166,39 +166,28 @@ Counts mirror the `tasks` registry in `MANIFEST.json`.
 
 ---
 
-## Blocked
-
 ### T-006: Publish npm package (issue #18)
 **Priority:** medium
 
-**Goal:** Publish the `aahp` CLI to the npm registry so users can `npx aahp init`.
+**Goal:** Publish the AAHP CLI to the npm registry so it can be run with `npx`.
 
-**Context:**
-- `package.json` fully prepared: `test` and `prepublishOnly` scripts configured
-- `npm pack --dry-run` verified: 19 files, 26.5 kB tarball, correct contents
-- Package name `aahp` confirmed available on npm
-- All 48 bats tests pass
-- GitHub Actions publish workflow added at `.github/workflows/publish.yml`
-- **Blocked on human action:** npm auth token expired, interactive browser login required
-
-**What to do (two options):**
-
-Option A - CI publish (recommended):
-1. Go to npmjs.com > Settings > Access Tokens > Generate New Token (type: Automation)
-2. Add the token as a GitHub secret named `NPM_TOKEN` in the repo settings
-3. Go to Actions > "Publish to npm" > Run workflow (optionally do a dry run first)
-4. Verify with `npx aahp --version` from a clean directory
-
-Option B - Local publish:
-1. Run `npm login` in an interactive terminal (opens browser for auth)
-2. Run `npm publish --access public` (prepublishOnly will run tests first)
-3. Verify with `npx aahp --version` from a clean directory
+**Resolution:** shipped. The package is on the public npm registry as
+`@elvatis_com/aahp`, first published 2026-03-19 and continuously since; the registry
+lists eleven versions with `latest` at 3.8.1 (2026-07-19). CI publishes it, so the
+"blocked on human npm auth" note that stood in this file was years of releases out of
+date. The registry itself is the evidence: `npm view @elvatis_com/aahp version`.
 
 **Files:** `package.json`, `bin/aahp.js`, `.github/workflows/publish.yml`
 
 **Acceptance criteria:**
-- [ ] Package published to npm registry
-- [ ] `npx aahp init` works from any directory
+- [x] Package published to npm registry (public registry, `@elvatis_com/aahp`, `latest` 3.8.1, eleven versions since 2026-03-19)
+- [ ] `npx aahp init` works from any directory (waived: the package shipped under the scoped name `@elvatis_com/aahp`, so the bare `npx aahp` form this criterion names resolves to a different package and always will. The intent, runnable without a global install, is met by `npx @elvatis_com/aahp init`. The criterion was superseded by the naming decision rather than met)
+
+---
+
+## Blocked
+
+None.
 
 ---
 

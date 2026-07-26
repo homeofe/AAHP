@@ -222,6 +222,76 @@ PY
     [[ "$output" != *"aahp verify passed"* ]]
 }
 
+@test "Layer 1 FAILS when a present handoff file is not indexed at all" {
+    # A PARTIAL index defeats the whole guard: drop a file's entry, rewrite the
+    # file, and every remaining comparison still matches. Zero comparisons ran
+    # for the one file that changed, which is the empty-index defect at N-1
+    # iterations. The deletion check cannot see it (the file is present) and
+    # the checksum check cannot see it (there is nothing to compare against).
+    local py
+    py="$(bash -c "source '$SCRIPTS_DIR/_aahp-lib.sh'; aahp_python_cmd")"
+    [ -n "$py" ] || skip "no working python interpreter"
+    printf 'MALICIOUS CONTENT\n' > "$TEST_TMPDIR/.ai/handoff/LOG.md"
+    "$py" - "$TEST_TMPDIR/.ai/handoff/MANIFEST.json" <<'PY'
+import json, sys
+path = sys.argv[1]
+manifest = json.load(open(path, encoding="utf-8"))
+manifest["files"].pop("LOG.md", None)
+json.dump(manifest, open(path, "w", encoding="utf-8"), indent=2)
+PY
+    git -C "$TEST_TMPDIR" add -A
+    git -C "$TEST_TMPDIR" commit -q -m "drop one entry from the index"
+
+    run bash "$SCRIPTS_DIR/verify-handoff.sh" "$TEST_TMPDIR" --level ci
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Unindexed handoff file: LOG.md"* ]]
+    [[ "$output" == *"present on disk but NOT indexed"* ]]
+    [[ "$output" != *"aahp verify passed"* ]]
+}
+
+@test "Layer 1 tolerates a CRLF-terminated index on an intact handoff set" {
+    # The python fallback used to write the index through text-mode stdout, so
+    # on Windows every line came back CRLF and the trailing CR was carried into
+    # the recorded checksum, making every file mismatch. The emitter now writes
+    # bytes; the reader additionally strips a trailing CR, so a stale or
+    # third-party emitter cannot resurrect the false mismatch.
+    local stub="$TEST_TMPDIR/stub-crlf"
+    rm -rf "$stub"
+    cp -r "$SCRIPTS_DIR" "$stub"
+    local py
+    py="$(bash -c "source '$SCRIPTS_DIR/_aahp-lib.sh'; aahp_python_cmd")"
+    [ -n "$py" ] || skip "no working python interpreter"
+    cat >> "$stub/_aahp-lib.sh" <<LIBSTUB
+
+aahp_manifest_index() {
+    "$py" -c '
+import json, sys
+m = json.load(open(sys.argv[1], encoding="utf-8"))
+for name, meta in (m.get("files") or {}).items():
+    sys.stdout.buffer.write(("%s\t%s\r\n" % (name, meta.get("checksum", ""))).encode("utf-8"))
+' "\$1"
+}
+LIBSTUB
+
+    run bash "$stub/verify-handoff.sh" "$TEST_TMPDIR" --level ci
+    [ "$status" -eq 0 ]
+    [[ "$output" != *"checksums do not match"* ]]
+}
+
+@test "aahp_checksum fails instead of returning an empty digest" {
+    # When the checksum tool produces nothing, returning success with "sha256:"
+    # and nothing after it sends the operator to the wrong fix: regenerating
+    # the manifest bakes the empty digest in, after which the broken toolchain
+    # reports a clean handoff set forever.
+    run bash -c "source '$SCRIPTS_DIR/_aahp-lib.sh'
+                 sha256sum() { :; }
+                 shasum() { :; }
+                 aahp_checksum '$TEST_TMPDIR/.ai/handoff/STATUS.md'"
+    [ "$status" -ne 0 ]
+    [[ "$output" != "sha256:" ]]
+    [[ "$output" == *"Could not compute a checksum"* ]]
+}
+
 # ─── Layer 4: TRUST-TTL (advisory) ───────────────────────────
 
 @test "reports expired verified trust rows as a warning (non-blocking)" {

@@ -316,15 +316,19 @@ JSON
 
 # ─── Missing MANIFEST.json ──────────────────────────────────
 
-@test "warns on missing MANIFEST.json" {
+@test "a missing MANIFEST.json is a violation, not a warning" {
     create_status_md
     create_next_actions_md
     create_log_md
     # Do NOT create MANIFEST.json
 
     run bash "$SCRIPTS_DIR/lint-handoff.sh" "$TEST_TMPDIR"
-    # Missing MANIFEST.json is a warning, not a violation -exit 0
+    # No manifest means no index, so not one handoff file was compared. That
+    # is the maximal "integrity unproven" state and it must not end the run
+    # with "All checks passed" while the aahp-lint job treats 0 as green.
+    [ "$status" -eq 1 ]
     [[ "$output" == *"MANIFEST.json not found"* ]]
+    [[ "$output" != *"All checks passed"* ]]
 }
 
 # ─── Stale HANDOFF.lock ─────────────────────────────────────
@@ -423,6 +427,32 @@ PY
     run bash "$SCRIPTS_DIR/lint-handoff.sh" "$TEST_TMPDIR"
     [ "$status" -eq 1 ]
     [[ "$output" == *"indexes no files"* ]]
+    [[ "$output" != *"All checks passed"* ]]
+}
+
+@test "a handoff file present but not indexed is a violation" {
+    # The partial-index case: every entry that is still there matches, and the
+    # one file that was rewritten has no entry, so it is never compared. An
+    # index that covers all but one file proves no more about that file than
+    # an empty index proves about any of them.
+    create_full_handoff
+    bash "$SCRIPTS_DIR/aahp-manifest.sh" "$TEST_TMPDIR" --quiet --phase implementation
+
+    local py
+    py="$(bash -c "source '$SCRIPTS_DIR/_aahp-lib.sh'; aahp_python_cmd")"
+    [ -n "$py" ] || skip "no working python interpreter"
+    printf 'MALICIOUS CONTENT\n' > "$TEST_TMPDIR/.ai/handoff/LOG.md"
+    "$py" - "$TEST_TMPDIR/.ai/handoff/MANIFEST.json" <<'PY'
+import json, sys
+path = sys.argv[1]
+manifest = json.load(open(path, encoding="utf-8"))
+manifest["files"].pop("LOG.md", None)
+json.dump(manifest, open(path, "w", encoding="utf-8"), indent=2)
+PY
+
+    run bash "$SCRIPTS_DIR/lint-handoff.sh" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Not indexed by MANIFEST.json: LOG.md"* ]]
     [[ "$output" != *"All checks passed"* ]]
 }
 

@@ -45,6 +45,30 @@ independently of the npm version).
   A manifest that is absent, unreadable, or unparseable, and the case where neither node
   nor python is available, are each reported with a distinct exit code, and Layer 1 fails
   on all of them rather than printing an affirmative pass.
+- A PARTIAL `files` index is now a finding in both scripts, exactly like an empty one.
+  Removing one entry and rewriting that file used to pass both gates: every remaining
+  entry still matched, and the file that changed had nothing to be compared against. The
+  missing-file check could not see it either, because the file is present. Both scripts
+  now fail when a canonical handoff file exists in `.ai/handoff/` and has no entry in
+  `files`, which is the invariant the manifest generator already produces.
+- The python fallback in the manifest-reading helper wrote the file index through
+  text-mode stdout, so on Windows every line came back CRLF. The trailing carriage return
+  was carried into the recorded checksum and every comparison mismatched, which would have
+  reported a false integrity failure in every repository on any machine that takes that
+  fallback (that is, any machine without node). The helper now writes bytes, and the
+  reader additionally strips a trailing carriage return so a stale emitter cannot bring
+  the false mismatch back.
+- A deleted `.ai/handoff/MANIFEST.json` is a violation in `scripts/lint-handoff.sh`
+  instead of a yellow note. With no manifest there is no index, so not one handoff file
+  was compared, which is the maximal unproven state; lint nevertheless printed
+  "All checks passed" and exited 0, and the `aahp-lint` workflow job runs that exit code
+  as its own blocking check. `aahp verify` Layer 1 already failed here, so the two gates
+  now agree.
+- `aahp_checksum` returns non-zero instead of succeeding with an empty digest. When the
+  checksum tool produced no output the function reported success with `sha256:` and
+  nothing after it, so the branch written for "could not compute a checksum" was
+  unreachable and the operator was sent to the wrong fix: regenerating the manifest baked
+  the empty digest in, after which a broken toolchain reported a clean handoff set.
 
 ### Changed
 - Consequence of the exit-code fix, worth knowing before upgrading: `aahp lint` now exits 1
@@ -58,6 +82,13 @@ independently of the npm version).
   between two scripts, and it survives `lint-handoff.sh` being unavailable, changing its
   wording, or dying before it prints anything. `lint-handoff.sh` still runs for the checks
   Layer 1 does not cover, and its non-zero exit is still honoured.
+- `scripts/lint-handoff.sh` no longer ends with "All checks passed" when it skipped its
+  integrity check because no Python interpreter is available. That single case stays a
+  warning with exit 0 on purpose, since making it a violation would turn currently green
+  node-only environments red without catching anything `aahp verify` Layer 1 does not
+  already catch; the summary now says that MANIFEST integrity was not verified, and the
+  README documents the exception instead of claiming that every unverifiable state exits
+  1.
 
 ## [3.8.2] - 2026-07-25
 

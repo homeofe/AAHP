@@ -4,9 +4,11 @@
 # Runs up to 4 layers that together stop staled handoff state from being
 # committed or pushed:
 #   1. MANIFEST integrity: every file MANIFEST.json indexes must exist and
-#      must still match its recorded checksum. Both are checked here, against
-#      MANIFEST.json and the bytes on disk. lint-handoff.sh also runs and its
-#      exit code still blocks, but no Layer 1 verdict is read out of it.
+#      must still match its recorded checksum, AND every canonical handoff
+#      file present on disk must be indexed. All three are checked here,
+#      against MANIFEST.json and the bytes on disk. lint-handoff.sh also runs
+#      and its exit code still blocks, but no Layer 1 verdict is read out of
+#      it.
 #   2. Content-drift gate (THE key check): if a commit/push changes any source
 #      file OUTSIDE .ai/handoff/, it MUST also include STATUS.md AND a
 #      regenerated MANIFEST.json. Otherwise FAIL.
@@ -123,12 +125,15 @@ echo "  AAHP Verify (level: $LEVEL)"
 echo "========================================="
 
 # --- Layer 1: MANIFEST integrity -------------------------------
-# Two distinct failures, reported separately because the fixes differ:
-#   - an indexed file is MISSING  -> restore it, or regenerate the manifest
-#   - an indexed file MISMATCHES  -> it changed outside the protocol
-# Both are decided by this script, from MANIFEST.json and the bytes on disk.
+# Three distinct failures, reported separately because the fixes differ:
+#   - an indexed file is MISSING     -> restore it, or regenerate the manifest
+#   - an indexed file MISMATCHES     -> it changed outside the protocol
+#   - a present file is NOT INDEXED  -> the index is partial, so that file was
+#                                       never compared at all
+# All are decided by this script, from MANIFEST.json and the bytes on disk.
 # Anything that leaves integrity unproven (no JSON interpreter, an unparseable
-# manifest, an empty index, no checksum tool) is a FAILURE here, not a note:
+# manifest, an empty or partial index, no checksum tool) is a FAILURE here,
+# not a note:
 # "could not check" is never allowed to read as "checked and clean".
 # lint-handoff.sh still runs for the checks Layer 1 does not cover, and its
 # exit code still blocks, but no Layer 1 verdict depends on its output.
@@ -182,8 +187,16 @@ else
             MISSING_INDEXED=""
             MISMATCHED_INDEXED=""
             UNVERIFIABLE_INDEXED=""
+            INDEXED_NAMES=""
             while IFS=$'\t' read -r idx_name idx_sum; do
+                # Tolerate a CR-terminated index line. The helper writes LF
+                # only, but a stale or third-party emitter on Windows can hand
+                # back CRLF, and a CR left on the recorded checksum would make
+                # every single file look tampered with.
+                idx_name="${idx_name%$'\r'}"
+                idx_sum="${idx_sum%$'\r'}"
                 [ -n "$idx_name" ] || continue
+                INDEXED_NAMES="${INDEXED_NAMES}${idx_name}"$'\n'
                 if [ ! -f "$HANDOFF_DIR/$idx_name" ]; then
                     MISSING_INDEXED="${MISSING_INDEXED}${idx_name}"$'\n'
                     continue
@@ -196,6 +209,33 @@ else
                     MISMATCHED_INDEXED="${MISMATCHED_INDEXED}${idx_name}"$'\t'"${idx_sum}"$'\t'"${ACTUAL_SUM}"$'\n'
                 fi
             done <<< "$MANIFEST_INDEX"
+
+            # A PARTIAL index proves as little as an empty one. Comparing the
+            # entries that are there says nothing about a canonical handoff
+            # file that was dropped from "files" and then rewritten: zero
+            # comparisons ran for it. The manifest generator indexes exactly
+            # the canonical files present on disk, so anything present but not
+            # indexed means the manifest is stale or was edited by hand.
+            UNINDEXED_PRESENT=""
+            for canon_name in "${AAHP_HANDOFF_FILES[@]}"; do
+                [ -f "$HANDOFF_DIR/$canon_name" ] || continue
+                case $'\n'"$INDEXED_NAMES" in
+                    *$'\n'"$canon_name"$'\n'*) continue ;;
+                esac
+                UNINDEXED_PRESENT="${UNINDEXED_PRESENT}${canon_name}"$'\n'
+            done
+
+            if [ -n "$UNINDEXED_PRESENT" ]; then
+                log_fail "Handoff file(s) present on disk but NOT indexed by MANIFEST.json."
+                while IFS= read -r unindexed_file; do
+                    [ -n "$unindexed_file" ] || continue
+                    echo "    Unindexed handoff file: $unindexed_file"
+                done <<< "$UNINDEXED_PRESENT"
+                echo "    Nothing was verified for those files, so their contents are unproven."
+                echo "    Fix: regenerate the manifest with /handoff (aahp manifest)."
+                FAILURES=$((FAILURES + 1))
+                LAYER1_FAILED=1
+            fi
 
             if [ -n "$MISSING_INDEXED" ]; then
                 log_fail "MANIFEST.json indexes file(s) that are not present in the working tree."

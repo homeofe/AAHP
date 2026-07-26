@@ -184,11 +184,23 @@ A JSON Schema (`schema/aahp-manifest.schema.json`) is included for reference and
 ```
 
 `lint-handoff.sh` decides as well as reports: it exits `1` when it finds any
-violation, including a checksum mismatch, a missing indexed file, an empty file
-index, and a checksum verifier that could not run at all. Integrity that cannot
-be established is a violation, not a note. Its exit code is therefore safe to
-wire into a hook or a CI job. `aahp verify` Layer 1 computes both integrity
-verdicts itself, so blocking never depends on that exit code either.
+violation, including a checksum mismatch, a missing indexed file, a handoff
+file that is present on disk but has no entry in the index, an absent
+`MANIFEST.json`, an empty file index, and a checksum verifier that started and
+then failed. Integrity that cannot be established is a violation, not a note.
+
+There is exactly one documented exception, and it is deliberate: on a machine
+with **no Python interpreter at all** this script cannot run its integrity
+check, so it reports that as a warning and still exits `0`. Making it a
+violation would turn currently green node-only environments red without
+catching anything the blocking gate does not already catch. Such a run does
+**not** print "All checks passed"; it says that MANIFEST integrity was not
+verified. `aahp verify` Layer 1 covers that state and fails outright when
+neither node nor python is available.
+
+The exit code is therefore safe to wire into a hook or a CI job. `aahp verify`
+Layer 1 computes its integrity verdicts itself, so blocking never depends on
+that exit code either.
 
 To use AJV for strict schema validation in CI, install it separately:
 

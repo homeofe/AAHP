@@ -118,12 +118,14 @@ EOF
 
 # Create a minimal valid MANIFEST.json (v3-compatible).
 #
-# The index covers the standard handoff files that exist in $dir RIGHT NOW,
-# with their real checksums. It used to be hard-coded to `"files": {}`, which
-# no manifest the generator produces ever looks like, and which both gates now
-# treat as a finding: an empty index means zero comparisons ran, so nothing was
-# verified. Files absent from $dir are not indexed, so a fixture that seeds no
-# handoff files still gets a manifest with no dangling entries.
+# The index covers EVERY canonical handoff file that exists in $dir RIGHT NOW,
+# with its real checksum, exactly like the generator in aahp-manifest.sh. It
+# used to be hard-coded to `"files": {}`, and then to three files out of the
+# eleven canonical ones, which is a partial index: both gates now treat that as
+# a finding, because a file with no entry is never compared to anything. A
+# fixture whose baseline is partial could never catch a partial-index defect.
+# Files absent from $dir are not indexed, so a fixture that seeds no handoff
+# files still gets a manifest with no dangling entries.
 #
 # Call this AGAIN after editing a handoff file if the test expects lint or
 # verify to pass; otherwise the edit is a genuine integrity violation and the
@@ -134,7 +136,7 @@ create_manifest_json() {
     source "$SCRIPTS_DIR/_aahp-lib.sh"
 
     local entries="" f sum lines
-    for f in STATUS.md NEXT_ACTIONS.md LOG.md; do
+    for f in "${AAHP_HANDOFF_FILES[@]}"; do
         [ -f "$dir/$f" ] || continue
         sum="$(aahp_checksum "$dir/$f")"
         lines="$(aahp_line_count "$dir/$f")"

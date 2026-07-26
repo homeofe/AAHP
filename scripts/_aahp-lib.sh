@@ -17,6 +17,12 @@ YELLOW='\033[1;33m'
 NC='\033[0m'
 
 # Compute SHA-256 checksum for a file, output as "sha256:<hash>"
+#
+# Returns non-zero when no digest could be produced. An empty digest must
+# never be reported as success: callers write the result into MANIFEST.json or
+# compare it against a recorded checksum, and "sha256:" with nothing after it
+# would be baked in as if it were a real hash, after which a broken toolchain
+# reports a clean handoff set forever.
 aahp_checksum() {
     local filepath="$1"
     local hash
@@ -29,6 +35,10 @@ aahp_checksum() {
         hash=$(tr -d '\r' < "$filepath" | shasum -a 256 | awk '{print $1}')
     else
         echo "ERROR: No SHA-256 tool found (need sha256sum or shasum)" >&2
+        return 1
+    fi
+    if [ -z "$hash" ]; then
+        echo "ERROR: Could not compute a checksum for: $filepath" >&2
         return 1
     fi
     echo "sha256:$hash"
@@ -155,13 +165,19 @@ aahp_manifest_index() {
     py=$(aahp_python_cmd)
     [ -n "$py" ] || return 2
 
+    # Written through the BINARY stdout buffer on purpose. Text-mode stdout
+    # translates "\n" into CRLF on Windows, the trailing CR is then read back
+    # into the recorded-checksum field, and every comparison mismatches on a
+    # machine that takes this fallback. Bytes out, exactly what was written.
     "$py" -c '
 import json, sys
 m = json.load(open(sys.argv[1], encoding="utf-8"))
 files = (m.get("files") or {}) if isinstance(m, dict) else {}
+out = sys.stdout.buffer
 for name, meta in files.items():
     checksum = meta.get("checksum", "") if isinstance(meta, dict) else ""
-    sys.stdout.write("%s\t%s\n" % (name, checksum))
+    out.write(("%s\t%s\n" % (name, checksum)).encode("utf-8"))
+out.flush()
 ' "$manifest" || return 1
 }
 

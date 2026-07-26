@@ -1030,13 +1030,14 @@ below is protocol-level, and task boxes are its Markdown representation.
    Completed" resolution column.
 
 **Canonical heading and legacy aliases.** New content uses `Acceptance criteria`. Two
-aliases exist in the wild and every reader, including the gate, still recognizes them:
+aliases exist in the wild and every reader, including the advisory report, still
+recognizes them:
 
 | Heading | Status |
 |---------|--------|
 | `Acceptance criteria` | canonical |
-| `Completion criteria` | legacy alias, recognized, reported at warn level |
-| `Definition of done` | legacy alias, recognized, reported at warn level |
+| `Completion criteria` | legacy alias, recognized, reported as `legacy-heading` |
+| `Definition of done` | legacy alias, recognized, reported as `legacy-heading` |
 
 Migration is a rename: the criteria themselves do not change, so a project can migrate one
 document at a time. Nothing forces the rename, because a reader that stops accepting the
@@ -1047,7 +1048,10 @@ documents plus the `MANIFEST.json` task registry and prints what it found. It is
 **advisory**. It is not part of `aahp check`, it has no enforcing mode, and it **always
 exits 0** whatever it finds. The only non-zero exit is the report failing to run at all
 (an unparseable AAHP config, or no git work tree to enumerate tracked files from), and
-both are properties of the environment rather than of any document's shape.
+both are properties of the environment rather than of any document's shape. Everything
+else that can go wrong while it runs is a finding, including a configured `include`
+pathspec that git refuses and a configured `manifest` path that resolves outside the
+work tree.
 
 That is a deliberate demotion, recorded in ADR-017. Acceptance criteria live in
 hand-written Markdown, whose shapes are unbounded, so recognizing them is a heuristic and
@@ -1064,6 +1068,8 @@ cannot. It is not exhaustive, and that is the point: the space of shapes is open
 
 | Blind spot | Effect |
 |------------|--------|
+| A heading carrying anything beyond the recognized phrase (`## Acceptance criteria for release`, `## Acceptance criteria (v2)`, `## Acceptance criteria ##`) | opens no section at all: no criteria are read, and nothing is reported, not even a comprehension finding |
+| A bold label that does not occupy the whole line (`**Acceptance criteria:** (v2)`) | same: the label form must be the entire line, so the section is never opened |
 | A bold line inside a criteria section (`**Note:** ...`) ends the section | every criterion written after it is invisible, including on a `done` task |
 | A thematic break (`---`, `***`) inside a criteria section ends it | same: criteria after the break are not seen |
 | A criteria section stated as a table, a definition list, or prose | yields zero recognized items, so nothing is verified (reported as `unparsed-criteria-section`, but no criterion is read) |
@@ -1073,7 +1079,13 @@ cannot. It is not exhaustive, and that is the point: the space of shapes is open
 | A `- [x]` with no evidence behind it | no tool can see intent; this stays a review responsibility |
 | Documents not matched by `acceptanceCriteria.include`, or not tracked by git | never read at all |
 
-The worked example of the first row, which passed clean under the enforcing version:
+The first two rows are the most reachable misses in the table, because they need no
+unusual construction at all: the heading has to match one of the three recognized phrases
+**exactly** after normalization (case, surrounding whitespace, a trailing colon and
+surrounding `*` are normalized away; nothing else is), so an ordinary descriptive heading
+is missed in complete silence.
+
+The worked example of the bold-line row, which passed clean under the enforcing version:
 
 ```markdown
 ## T-001 Example
@@ -1104,9 +1116,11 @@ so anything unreadable is reported and the noise is accepted:
 | Finding | Meaning |
 |---------|---------|
 | `config-unusable` | the `acceptanceCriteria` config, or one of its members, is not the shape it must be, so a default was used instead of what was written |
+| `include-unusable` | git refused the `include` pathspecs (an unknown pathspec magic word, a path outside the repository), so no file could be enumerated |
 | `no-files-matched` | `include` matched zero tracked files, so the report covered nothing |
 | `file-unreadable` | a tracked file matched but could not be read |
 | `manifest-missing` | a task registry path was configured explicitly and does not exist, so no done-state check ran |
+| `manifest-outside-root` | the configured task registry path resolves outside the project root, so it was not opened and no done-state check ran |
 | `manifest-unreadable` | the task registry is present but unusable, so `done` cannot be resolved for any task |
 | `unparsed-criteria-section` | a recognized criteria heading whose body yields zero recognized criterion items |
 | `unbound-criteria-section` | a criteria section that cannot be attributed to a task id present in the registry |
@@ -1134,9 +1148,12 @@ heading (a line underlined with `===` or `---`), and a bold label (`**T-042: ...
 
 **Configuration.** `acceptanceCriteria` (`include` / `manifest`) supplies the input paths
 and is optional; absent, the report uses `.ai/handoff/NEXT_ACTIONS.md` and
-`.ai/handoff/MANIFEST.json`. There is no `strict` key and there is no other enforcement
-switch: an option to make findings fail would eventually be switched on, and then an
-unanticipated document shape becomes a red build in a consumer repo.
+`.ai/handoff/MANIFEST.json`. `manifest` must resolve inside the project root: a value that
+escapes it is reported as `manifest-outside-root` and the file is never opened, so a
+config value cannot pull a task registry in from elsewhere on the machine. There is no
+`strict` key and there is no other enforcement switch: an option to make findings fail
+would eventually be switched on, and then an unanticipated document shape becomes a red
+build in a consumer repo.
 
 **Optional GitHub synchronization.** The lifecycle belongs to AAHP task semantics; issue
 task boxes are one rendering of it. Where a project links tasks to issues (by convention,
@@ -1154,8 +1171,8 @@ round trip:
 4. Record the closing evidence (commit, PR, or test run) in the closing comment.
 
 Verification of live issue state needs the network and is therefore an optional online
-extra a harness or adapter provides. The offline gate never depends on it: a repository
-with no network access gets the full offline result and exits 0.
+extra a harness or adapter provides. The offline report never depends on it: a repository
+with no network access gets the full offline result.
 
 ---
 

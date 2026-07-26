@@ -242,7 +242,7 @@
         },
         "manifest": {
           "type": "string",
-          "description": "Path to the task registry that supplies task status (default .ai/handoff/MANIFEST.json). Absent, the done-state rule is skipped rather than guessed."
+          "description": "Path to the task registry that supplies task status (default .ai/handoff/MANIFEST.json), relative to the project root and required to resolve inside it. A value that escapes the root is reported as manifest-outside-root and is never opened. Absent, the done-state rule is skipped rather than guessed."
         }
       },
       "additionalProperties": false

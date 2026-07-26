@@ -35,12 +35,19 @@
 //
 //   - [ ] NOT SEEN
 //
+// The most reachable one is simpler still: the heading must match a recognized
+// phrase EXACTLY after normalization, so "### Acceptance criteria for release"
+// or "**Acceptance criteria:** (v2)" opens no section at all and everything
+// under it is invisible.
+//
 // Do not read "no findings" as "the criteria are resolved".
 //
 // EXIT CODE. 0, always, whatever it finds. The only non-zero exit is the report
 // failing to run at all: an unparseable aahp config, or no git work tree to
 // enumerate tracked files from. Both are properties of the environment, never
 // of a document's shape, so neither can be triggered by writing Markdown.
+// Everything else that goes wrong while the report runs, including a pathspec
+// git refuses and a manifest path that escapes the root, is a finding.
 //
 // WHAT IT REPORTS, in two families.
 //
@@ -61,11 +68,17 @@
 //   config-unusable           the acceptanceCriteria config, or one of its
 //                             members, is not the shape it must be, so a
 //                             default was used instead of what was written
+//   include-unusable          git rejected the include pathspecs (an unknown
+//                             pathspec magic word, a path outside the
+//                             repository), so no file could be enumerated
 //   no-files-matched          the include pathspecs matched zero tracked
 //                             files, so the report covered nothing
 //   file-unreadable           a tracked file matched but could not be read
 //   manifest-missing          a task registry path was configured explicitly
 //                             and does not exist, so no done-state check ran
+//   manifest-outside-root     the configured task registry path resolves
+//                             outside the project root, so it was not read
+//                             and no done-state check ran
 //   manifest-unreadable       the task registry is present but unusable: not
 //                             valid JSON, or a "tasks" member that is not a
 //                             plain object. Either way "done" cannot be
@@ -130,7 +143,7 @@
 // test process.
 
 import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { resolveRoot, loadConfig, isInsideWorkTree, listTrackedFiles } from "./aahp-config.mjs";
 
@@ -338,7 +351,7 @@ export function findSectionDefects(section, taskStatus, registryKnown = true) {
 
   // Zero recognized items is the catch-all for every shape the parser cannot
   // read: an empty section, a table, prose, an indented list, or a list form
-  // that does not exist yet. Reporting it is the whole point of the gate: a
+  // that does not exist yet. Reporting it is the whole point of this report: a
   // human wrote the heading, so criteria were meant to be there.
   if (section.items.length === 0) {
     defects.push({
@@ -389,20 +402,36 @@ export function findSectionDefects(section, taskStatus, registryKnown = true) {
   return defects;
 }
 
+// True when `relPath` resolves inside `root`. The manifest path comes from
+// configuration and is joined to the repository root, so without this a value
+// containing ".." (or an absolute path) reads a task registry from outside the
+// work tree entirely.
+export function isInsideRoot(root, relPath) {
+  const base = resolve(root);
+  const target = resolve(base, relPath);
+  const rel = relative(base, target);
+  return rel === "" || (!rel.startsWith("..") && !isAbsolute(rel));
+}
+
 // Read the task registry so "done" is taken from the machine-readable source of
 // truth (MANIFEST.json), not from prose.
 //
-// Three outcomes, deliberately distinguished, because collapsing the last two
-// silently disables the unresolved-on-done rule while asserting the registry is
-// missing:
+// Four outcomes, deliberately distinguished, because collapsing them silently
+// disables the unresolved-on-done rule while asserting the registry is missing:
 //   absent   -> the rule genuinely does not apply, report that and move on
 //   parsed   -> the rule applies
 //   corrupt  -> a real error: the registry is there and unusable
+//   escaped  -> the configured path leaves the work tree, so it is not read
 //
 // "Unusable" includes a `tasks` member that is not a plain object. An array
 // passes `typeof x === "object"`, and treating it as a registry produced a
 // reassuring task count from index keys while no task id could ever match.
 export function loadTaskStatus(root, relPath) {
+  // Containment first: a path that escapes the root is never opened, so this
+  // report cannot be pointed at a file outside the repository it was run in.
+  if (!isInsideRoot(root, relPath)) {
+    return { statuses: new Map(), state: "escaped", error: "resolves outside the project root" };
+  }
   const p = join(root, relPath);
   if (!existsSync(p)) return { statuses: new Map(), state: "absent", error: null };
   let manifest;
@@ -430,6 +459,16 @@ export function loadTaskStatus(root, relPath) {
 }
 
 // --- report ----------------------------------------------------------------
+
+// The human-readable half of a failed `git ls-files`. execFileSync builds a
+// message that repeats the whole command line, including the absolute root
+// path; git's own first stderr line ("fatal: ...") is what a reader needs.
+function gitReason(err) {
+  const stderr = String(err && err.stderr ? err.stderr : "");
+  const line = stderr.split(/\r?\n/).find((l) => l.trim() !== "");
+  if (line) return line.trim();
+  return String((err && err.message) || "unknown error").split(/\r?\n/)[0].trim();
+}
 
 function main() {
   const root = resolveRoot();
@@ -527,7 +566,38 @@ function main() {
     });
   }
 
-  const tracked = listTrackedFiles(root, include);
+  // A configured path that leaves the work tree is not read at all. Reading it
+  // would let a config value pull a task registry in from anywhere on the
+  // machine, and staying silent about it would disable the done-state rule
+  // while the project believes its setting is in force.
+  if (manifestState === "escaped") {
+    findings.push({
+      file: configFile,
+      line: 1,
+      id: "manifest-outside-root",
+      message: `"acceptanceCriteria.manifest" (${manifestPath}) ${manifestError}, so it was not read and no done-state check ran; the task registry must live inside the work tree`,
+    });
+  }
+
+  // The one call in this function that hands input to git. A pathspec can be a
+  // perfectly well-formed string and still be rejected (an unknown pathspec
+  // magic word, a path outside the repository), and an unguarded throw here
+  // would break the always-exits-0 promise with a stack trace. A rejected
+  // pathspec is a configuration problem for a human to read, so it is a
+  // finding like every other input this report cannot use.
+  let tracked = [];
+  let enumerationFailed = false;
+  try {
+    tracked = listTrackedFiles(root, include);
+  } catch (err) {
+    enumerationFailed = true;
+    findings.push({
+      file: configFile,
+      line: 1,
+      id: "include-unusable",
+      message: `git rejected the include pathspecs (${include.join(", ")}), so no file could be enumerated and this report covered nothing: ${gitReason(err)}`,
+    });
+  }
 
   for (const rel of tracked) {
     let text;
@@ -556,7 +626,9 @@ function main() {
 
   // Pointed at nothing. Without this the report says "no findings" on a renamed
   // file or a mistyped pathspec, which is the loudest possible way to be quiet.
-  if (fileCount === 0) {
+  // Suppressed when enumeration itself failed: include-unusable already said
+  // so, and "matched zero tracked files" would misdescribe what happened.
+  if (fileCount === 0 && !enumerationFailed) {
     findings.push({
       file: configFile,
       line: 1,
@@ -572,7 +644,9 @@ function main() {
       ? `${statuses.size} task(s) in ${manifestPath}`
       : manifestState === "corrupt"
         ? `${manifestPath} is present but unusable, so done-state checks could not run`
-        : `no task registry at ${manifestPath}, so done-state checks were skipped`;
+        : manifestState === "escaped"
+          ? `${manifestPath} resolves outside the project root, so done-state checks could not run`
+          : `no task registry at ${manifestPath}, so done-state checks were skipped`;
 
   if (findings.length === 0) {
     console.log(
@@ -599,7 +673,7 @@ function main() {
 }
 
 // Run only as the process entry point. Importing this module for its exported
-// helpers must not run the gate, read the filesystem, or exit the process.
+// helpers must not run the report, read the filesystem, or exit the process.
 const invokedPath = process.argv[1] ? pathToFileURL(process.argv[1]).href : null;
 if (invokedPath && invokedPath === import.meta.url) main();
 else if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) main();

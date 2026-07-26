@@ -26,16 +26,27 @@ independently of the npm version).
   enforcing mode, and it always exits 0 whatever it finds; the only non-zero exit is the
   report failing to run at all (an unparseable config, or no git work tree). It reports
   three lifecycle defects (`legacy-heading`, `plain-bullets`, `unresolved-on-done`) and
-  eight comprehension defects so that input it could not read is never presented as a
-  clean document: `config-unusable`, `no-files-matched`, `file-unreadable`,
-  `manifest-missing`, `manifest-unreadable`, `unparsed-criteria-section`,
-  `unbound-criteria-section`, and `unterminated-fence`. It reads tracked files plus the
-  `MANIFEST.json` task registry and makes no network calls, so a run is complete and
-  deterministic offline.
-- README Section 8.7 publishes the report's known blind spots by name, including the case
-  where a bold line inside a criteria section ends the section and hides every criterion
-  after it. It states in plain words that the report is best effort, that a clean report
-  is not proof the criteria are resolved, and that it must not be used as a merge gate.
+  ten comprehension defects so that input it could not read is never presented as a
+  clean document: `config-unusable`, `include-unusable`, `no-files-matched`,
+  `file-unreadable`, `manifest-missing`, `manifest-outside-root`, `manifest-unreadable`,
+  `unparsed-criteria-section`, `unbound-criteria-section`, and `unterminated-fence`. It
+  reads tracked files plus the `MANIFEST.json` task registry and makes no network calls,
+  so a run is complete and deterministic offline.
+- The always-exits-0 guarantee holds for every input the report accepts. A syntactically
+  valid `acceptanceCriteria.include` pathspec that git nonetheless refuses (an unknown
+  pathspec magic word, a path outside the repository) is reported as `include-unusable`
+  rather than throwing out of the process, so the documented pair of non-zero exits is the
+  complete list.
+- `acceptanceCriteria.manifest` is required to resolve inside the project root. A value
+  containing `..` used to be joined to the root and read from outside the work tree; it is
+  now reported as `manifest-outside-root` and the file is never opened.
+- README Section 8.7 publishes the report's known blind spots by name, starting with the
+  most reachable one: the criteria heading must match a recognized phrase exactly after
+  normalization, so `## Acceptance criteria for release` opens no section and everything
+  under it is missed in silence. The list also covers the case where a bold line inside a
+  criteria section ends the section and hides every criterion after it. It states in plain
+  words that the report is best effort, that a clean report is not proof the criteria are
+  resolved, and that it must not be used as a merge gate.
 - Task ids bind from ATX headings, setext headings, and bold labels, so the three heading
   forms that appear in hand-written handoff files all scope a criteria section. Anything
   still unattributable is reported as `unbound-criteria-section` instead of being exempted

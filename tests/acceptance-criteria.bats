@@ -706,6 +706,79 @@ EOF
     [[ "$output" == *"no findings"* ]]
 }
 
+@test "acceptance-criteria: a pathspec git refuses is a finding, not a crash" {
+    # REGRESSION. The include value is a well-formed string in a well-formed,
+    # parseable config, inside a git work tree, so neither documented non-zero
+    # exit applies. git still rejects the pathspec magic word, and the
+    # enumeration call used to be the one call in main() with no guard: it threw
+    # execFileSync's error out of the process with a stack trace and exit 1,
+    # which falsified the always-exits-0 promise the README, this script's
+    # header, the schema and the CHANGELOG all make.
+    mkconfig <<'EOF'
+{ "acceptanceCriteria": { "include": [":(nosuchmagic)docs/*.md"] } }
+EOF
+    manifest_with_tasks
+    next_actions <<'EOF'
+## T-008: Open task
+
+**Acceptance criteria:**
+- [ ] still open
+EOF
+    gadd
+    run node "$AC" "$TEST_TMPDIR"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"include-unusable"* ]]
+    [[ "$output" != *"no findings"* ]]
+    # The message names the pathspec and quotes git's own reason.
+    [[ "$output" == *"nosuchmagic"* ]]
+    # It is not ALSO reported as a zero-match: nothing was enumerated at all.
+    [[ "$output" != *"no-files-matched"* ]]
+    # No stack trace.
+    [[ "$output" != *"at listTrackedFiles"* ]]
+}
+
+@test "acceptance-criteria: a manifest path escaping the root is a finding, not a read" {
+    # REGRESSION. acceptanceCriteria.manifest was joined to the project root
+    # with no containment check, so a value containing ".." resolved outside the
+    # work tree and its contents were read and echoed into the report.
+    printf 'not-json-and-not-yours\n' > "$TEST_TMPDIR/../outside-registry.json"
+    mkconfig <<'EOF'
+{ "acceptanceCriteria": { "manifest": "../outside-registry.json" } }
+EOF
+    manifest_with_tasks
+    next_actions <<'EOF'
+## T-008: Open task
+
+**Acceptance criteria:**
+- [ ] still open
+EOF
+    gadd
+    run node "$AC" "$TEST_TMPDIR"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"manifest-outside-root"* ]]
+    # The escaping path is never opened, so its contents cannot appear.
+    [[ "$output" != *"not-json-and-not-yours"* ]]
+    [[ "$output" != *"manifest-unreadable"* ]]
+    rm -f "$TEST_TMPDIR/../outside-registry.json"
+}
+
+@test "acceptance-criteria: an absolute manifest path is treated as escaping the root" {
+    mkconfig <<'EOF'
+{ "acceptanceCriteria": { "manifest": "/etc/hostname" } }
+EOF
+    manifest_with_tasks
+    next_actions <<'EOF'
+## T-008: Open task
+
+**Acceptance criteria:**
+- [ ] still open
+EOF
+    gadd
+    run node "$AC" "$TEST_TMPDIR"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"manifest-outside-root"* ]]
+}
+
 @test "acceptance-criteria: a code fence left open at end of file is a finding" {
     # CommonMark-correct behaviour: the closing fence is indented four spaces, so
     # it is content and the block runs to end of file. That is kept. What changes
@@ -1001,6 +1074,45 @@ EOF
 # If a future change makes one of these visible, that is an improvement: update
 # the test AND the published blind-spot table together, and do NOT take it as
 # licence to give the report authority over an exit code (ADR-017).
+
+@test "acceptance-criteria: KNOWN BLIND SPOT - a heading with extra words opens no section" {
+    enable_gate
+    manifest_with_tasks
+    next_actions <<'EOF'
+## T-007 Closed task
+
+### Acceptance criteria for release
+
+- [ ] NOT DONE AND INVISIBLE
+EOF
+    gadd
+    run node "$AC" "$TEST_TMPDIR"
+    # DOCUMENTED LIMITATION, and the most reachable one in the table: the
+    # heading must match a recognized phrase EXACTLY after normalization, so a
+    # heading carrying any extra word opens no section. Nothing is read and
+    # nothing is reported, not even a comprehension finding.
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"no findings"* ]]
+    [[ "$output" == *"0 section(s)"* ]]
+}
+
+@test "acceptance-criteria: KNOWN BLIND SPOT - a bold label with a trailer opens no section" {
+    enable_gate
+    manifest_with_tasks
+    next_actions <<'EOF'
+## T-007 Closed task
+
+**Acceptance criteria:** (v2)
+
+- [ ] NOT DONE AND INVISIBLE
+EOF
+    gadd
+    run node "$AC" "$TEST_TMPDIR"
+    # DOCUMENTED LIMITATION: the bold-label form must be the whole line.
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"no findings"* ]]
+    [[ "$output" == *"0 section(s)"* ]]
+}
 
 @test "acceptance-criteria: KNOWN BLIND SPOT - a bold line ends the criteria section" {
     enable_gate

@@ -12,9 +12,30 @@
 #   5. HANDOFF.lock stale check
 #   6. Parallel agent detection (advisory)
 #
-# Exit codes:
+# Exit codes (this script DECIDES, it does not merely report):
 #   0 = all checks passed
 #   1 = violations found
+#
+# Check 4 covers every kind of MANIFEST.json integrity failure, and each one
+# counts as a violation, so a hook or a CI job can trust this exit code:
+#   - a checksum mismatch (an indexed file changed outside the protocol)
+#   - a missing indexed file (the manifest indexes a path that is gone)
+#   - a handoff file present on disk with no entry in "files" (a partial index
+#     compares everything except the file that was tampered with)
+#   - an absent MANIFEST.json, an empty index, or a verifier that started and
+#     then failed: integrity is UNPROVEN, and unproven counts as a violation
+#
+# ONE case is deliberately NOT a violation: no Python interpreter at all. That
+# environment cannot run this check, and failing it would turn currently green
+# node-only environments red without catching anything 'aahp verify' Layer 1
+# does not already catch (Layer 1 hard-fails when no interpreter is present).
+# The run then exits 0 but does NOT print "All checks passed"; it says plainly
+# that integrity was not verified here.
+#
+# aahp verify Layer 1 computes its verdicts itself, from MANIFEST.json and the
+# bytes on disk, so blocking never depends on this script's exit code or on
+# its output text. The two implementations are deliberately different
+# (embedded Python here, shell plus sha256sum there) so they cross-check.
 
 set -euo pipefail
 
@@ -36,6 +57,9 @@ cd "$PROJECT_ROOT" || { echo "Error: cannot cd into project root: $PROJECT_ROOT"
 PROJECT_ROOT="."
 HANDOFF_DIR=".ai/handoff"
 VIOLATIONS=0
+# Set when a check was skipped rather than passed, so the summary can say so
+# instead of printing "All checks passed" over an integrity check that never ran.
+INTEGRITY_UNVERIFIED=0
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -203,7 +227,14 @@ echo -e "${GREEN}[4/6]${NC} Validating MANIFEST.json..."
 
 if [ -f "$HANDOFF_DIR/MANIFEST.json" ]; then
     if [ -z "$PYTHON_CMD" ]; then
-        echo -e "  ${YELLOW}⚠ Python not found. Skipping MANIFEST.json validation.${NC}"
+        echo -e "  ${YELLOW}⚠ Python not found. MANIFEST.json integrity NOT verified here.${NC}"
+        echo "    The blocking check is 'aahp verify' Layer 1, which uses node or"
+        echo "    python and FAILS outright when neither is available."
+        # Deliberately a warning, not a violation: making it one would turn
+        # currently green node-only environments red without catching anything
+        # Layer 1 does not already catch. The summary below must therefore not
+        # claim that all checks passed, because this one did not run.
+        INTEGRITY_UNVERIFIED=1
     elif "$PYTHON_CMD" -c "import json; json.load(open('$HANDOFF_DIR/MANIFEST.json'))" 2>/dev/null; then
         echo -e "  ${GREEN}✓ Valid JSON.${NC}"
 
@@ -216,33 +247,89 @@ if [ -f "$HANDOFF_DIR/MANIFEST.json" ]; then
             fi
         done
 
-        # Verify checksums
-        echo "  Verifying checksums..."
+        # Verify the existence AND the checksum of every indexed file.
+        #
+        # Existence is asserted FIRST and reported separately. A deleted file
+        # has no content to compare, so the checksum comparison alone can never
+        # see it; and the two failures need different fixes (restore the file
+        # vs. regenerate the manifest), so they must not share a message.
+        #
+        # An empty index is a finding too: zero iterations means nothing was
+        # compared, which is not the same as everything matching. A PARTIAL
+        # index is the same defect at N-1 iterations, so a canonical handoff
+        # file that is present on disk but absent from "files" is a finding as
+        # well: dropping its entry and rewriting the file would otherwise pass
+        # both gates untouched.
+        #
+        # Exit contract of the embedded script: 0 = clean, 3 = findings,
+        # anything else = the interpreter itself failed, and that ALSO counts
+        # as a violation. If the tool cannot tell whether the files match,
+        # integrity is unproven, and unproven must not print "All checks
+        # passed". stderr is deliberately not discarded so the real cause of
+        # an interpreter failure is visible in the gate log.
+        echo "  Verifying indexed files..."
+        CHECKSUM_RC=0
+        AAHP_CANONICAL_HANDOFF_FILES="${AAHP_HANDOFF_FILES[*]}" \
         "$PYTHON_CMD" -c "
 import json, hashlib, os, sys
 sys.stdout.reconfigure(errors='replace')
 manifest = json.load(open('$HANDOFF_DIR/MANIFEST.json'))
-for fname, meta in manifest.get('files', {}).items():
+findings = 0
+indexed = manifest.get('files') or {}
+if not indexed:
+    print('  ! MANIFEST.json indexes no files.')
+    print('    Nothing could be verified, so nothing is verified.')
+    print('    Fix: regenerate the manifest (aahp manifest).')
+    sys.exit(3)
+for fname, meta in indexed.items():
     fpath = os.path.join('$HANDOFF_DIR', fname)
-    if os.path.exists(fpath):
-        actual = 'sha256:' + hashlib.sha256(open(fpath, 'rb').read().replace(b'\r', b'')).hexdigest()
-        expected = meta.get('checksum', '')
-        if actual != expected:
-            print(f'  ! Checksum mismatch: {fname}')
-            print(f'    Expected: {expected}')
-            print(f'    Actual:   {actual}')
-        else:
-            print(f'  OK: {fname}')
+    if not os.path.exists(fpath):
+        print(f'  ! Missing indexed file: {fname}')
+        print('    Indexed by MANIFEST.json but not present in the working tree.')
+        print('    Fix: restore the file, or regenerate the manifest (aahp manifest).')
+        findings += 1
+        continue
+    actual = 'sha256:' + hashlib.sha256(open(fpath, 'rb').read().replace(b'\r', b'')).hexdigest()
+    expected = meta.get('checksum', '')
+    if actual != expected:
+        print(f'  ! Checksum mismatch: {fname}')
+        print(f'    Expected: {expected}')
+        print(f'    Actual:   {actual}')
+        findings += 1
     else:
-        print(f'  ! {fname}: file not found')
-" 2>/dev/null || echo -e "  ${YELLOW}⚠ Could not verify checksums (Python error)${NC}"
+        print(f'  OK: {fname}')
+for fname in os.environ.get('AAHP_CANONICAL_HANDOFF_FILES', '').split():
+    if fname in indexed:
+        continue
+    if not os.path.exists(os.path.join('$HANDOFF_DIR', fname)):
+        continue
+    print(f'  ! Not indexed by MANIFEST.json: {fname}')
+    print('    The file is present but has no entry, so it was never compared.')
+    print('    Fix: regenerate the manifest (aahp manifest).')
+    findings += 1
+sys.exit(3 if findings else 0)
+" || CHECKSUM_RC=$?
+        if [ "$CHECKSUM_RC" -eq 3 ]; then
+            VIOLATIONS=$((VIOLATIONS + 1))
+        elif [ "$CHECKSUM_RC" -ne 0 ]; then
+            echo -e "  ${RED}✗ Could not verify indexed files (verifier exited $CHECKSUM_RC).${NC}"
+            echo "    Integrity is UNPROVEN. That counts as a violation, not a note."
+            VIOLATIONS=$((VIOLATIONS + 1))
+        fi
 
     else
         echo -e "  ${RED}✗ Invalid JSON.${NC}"
         VIOLATIONS=$((VIOLATIONS + 1))
     fi
 else
-    echo -e "  ${YELLOW}⚠ MANIFEST.json not found (v1 project?).${NC}"
+    # A deleted manifest is the maximal "integrity unproven" state: there is
+    # no index at all, so not one handoff file was compared. It used to print
+    # a yellow note and let the run end with "All checks passed", which made
+    # the blocking aahp-lint job green on a repository whose manifest was
+    # gone. aahp verify Layer 1 has always failed here; both gates now agree.
+    echo -e "  ${RED}✗ MANIFEST.json not found. Nothing about the handoff set is verified.${NC}"
+    echo "    Fix: generate it with /handoff (aahp manifest)."
+    VIOLATIONS=$((VIOLATIONS + 1))
 fi
 
 # ─── Check 5: Stale HANDOFF.lock ─────────────────────────────
@@ -289,7 +376,12 @@ fi
 
 echo ""
 echo "========================================="
-if [ "$VIOLATIONS" -eq 0 ]; then
+if [ "$VIOLATIONS" -eq 0 ] && [ "$INTEGRITY_UNVERIFIED" -eq 1 ]; then
+    echo -e "  ${YELLOW}No violations found, but MANIFEST integrity was NOT verified here.${NC}"
+    echo "  Run 'aahp verify', which blocks when integrity cannot be established."
+    echo "========================================="
+    exit 0
+elif [ "$VIOLATIONS" -eq 0 ]; then
     echo -e "  ${GREEN}All checks passed. ✓${NC}"
     echo "========================================="
     exit 0

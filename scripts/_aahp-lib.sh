@@ -17,6 +17,12 @@ YELLOW='\033[1;33m'
 NC='\033[0m'
 
 # Compute SHA-256 checksum for a file, output as "sha256:<hash>"
+#
+# Returns non-zero when no digest could be produced. An empty digest must
+# never be reported as success: callers write the result into MANIFEST.json or
+# compare it against a recorded checksum, and "sha256:" with nothing after it
+# would be baked in as if it were a real hash, after which a broken toolchain
+# reports a clean handoff set forever.
 aahp_checksum() {
     local filepath="$1"
     local hash
@@ -29,6 +35,10 @@ aahp_checksum() {
         hash=$(tr -d '\r' < "$filepath" | shasum -a 256 | awk '{print $1}')
     else
         echo "ERROR: No SHA-256 tool found (need sha256sum or shasum)" >&2
+        return 1
+    fi
+    if [ -z "$hash" ]; then
+        echo "ERROR: Could not compute a checksum for: $filepath" >&2
         return 1
     fi
     echo "sha256:$hash"
@@ -114,6 +124,61 @@ if cur is not None:
     sys.stdout.write(str(cur))
 " "$manifest" "$dotted" 2>/dev/null || true
     fi
+}
+
+# Read the file index out of a MANIFEST.json.
+# Echoes one TAB-separated "<name>\t<recorded-checksum>" line per indexed file.
+#
+# This exists so aahp verify Layer 1 can reach its OWN verdict on both
+# MANIFEST integrity failures (a missing indexed file and a checksum mismatch)
+# without reading another script's exit code or string-matching its stdout.
+# The caller does the existence test and the checksum comparison itself, so a
+# helper that cannot answer must SAY SO rather than echo an empty, innocent
+# looking index. Hence the exit codes below: every failure mode is
+# distinguishable from "the manifest indexes nothing", and none of them is
+# silently converted into a pass.
+#
+# Exit codes:
+#   0 = index read successfully (zero output lines = the manifest indexes
+#       nothing, which is a finding for the caller, not a clean result)
+#   1 = MANIFEST.json is absent, unreadable, or not valid JSON
+#   2 = no JSON interpreter available (neither node nor python)
+aahp_manifest_index() {
+    local manifest="$1"
+    [ -f "$manifest" ] && [ -r "$manifest" ] || return 1
+
+    if command -v node &>/dev/null; then
+        node -e '
+            const fs = require("fs");
+            const m = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+            const files = (m && typeof m === "object" && m.files) || {};
+            for (const name of Object.keys(files)) {
+                const meta = files[name];
+                const sum = (meta && typeof meta === "object" && meta.checksum) || "";
+                process.stdout.write(name + "\t" + String(sum) + "\n");
+            }
+        ' "$manifest" || return 1
+        return 0
+    fi
+
+    local py
+    py=$(aahp_python_cmd)
+    [ -n "$py" ] || return 2
+
+    # Written through the BINARY stdout buffer on purpose. Text-mode stdout
+    # translates "\n" into CRLF on Windows, the trailing CR is then read back
+    # into the recorded-checksum field, and every comparison mismatches on a
+    # machine that takes this fallback. Bytes out, exactly what was written.
+    "$py" -c '
+import json, sys
+m = json.load(open(sys.argv[1], encoding="utf-8"))
+files = (m.get("files") or {}) if isinstance(m, dict) else {}
+out = sys.stdout.buffer
+for name, meta in files.items():
+    checksum = meta.get("checksum", "") if isinstance(meta, dict) else ""
+    out.write(("%s\t%s\n" % (name, checksum)).encode("utf-8"))
+out.flush()
+' "$manifest" || return 1
 }
 
 # Report expired "verified" trust rows from a TRUST.md file.

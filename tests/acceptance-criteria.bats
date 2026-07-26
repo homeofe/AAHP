@@ -536,6 +536,10 @@ EOF
 # --- fenced code blocks are not content --------------------------------------
 
 @test "acceptance-criteria: criteria shown inside a fenced block are not live criteria" {
+    # The fence sits inside a live criteria section whose one real criterion is
+    # checked. If fenced lines counted, the unchecked boxes and the plain bullet
+    # inside the block would fire plain-bullets and unresolved-on-done on a task
+    # the registry calls done.
     enable_gate
     manifest_with_tasks
     next_actions <<'EOF'
@@ -544,9 +548,7 @@ EOF
 **Acceptance criteria:**
 - [x] Tests pass
 
-## How to write criteria
-
-**Acceptance criteria:**
+The format, for reference:
 
 ```markdown
 - [ ] Something not yet done
@@ -558,6 +560,28 @@ EOF
     run node "$AC" "$TEST_TMPDIR"
     [ "$status" -eq 0 ]
     [[ "$output" == *"Acceptance criteria OK"* ]]
+}
+
+@test "acceptance-criteria: a criteria heading holding only a fence is reported" {
+    # The other half of the rule above. A documentation section that titles a
+    # fenced example "Acceptance criteria" yields zero recognized criteria, and
+    # under the fail-loud contract that is a finding rather than a clean pass:
+    # from the outside it is indistinguishable from criteria the parser missed.
+    enable_gate_strict
+    manifest_with_tasks
+    next_actions <<'EOF'
+## How to write criteria
+
+**Acceptance criteria:**
+
+```markdown
+- [ ] Something not yet done
+```
+EOF
+    gadd
+    run node "$AC" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"unparsed-criteria-section"* ]]
 }
 
 @test "acceptance-criteria: a tilde fence is skipped too" {
@@ -598,7 +622,7 @@ EOF
     run node "$AC" "$TEST_TMPDIR"
     [ "$status" -eq 0 ]
     [[ "$output" == *"manifest-unreadable"* ]]
-    [[ "$output" == *"present but not valid JSON"* ]]
+    [[ "$output" == *"present but unusable: not valid JSON"* ]]
     [[ "$output" != *"no task registry at"* ]]
 }
 

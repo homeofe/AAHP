@@ -45,6 +45,33 @@ independently of the npm version).
 - `package-lock.json` is regenerated so its root name and version match `package.json`
   (it had drifted to the pre-scope name at `3.5.0`).
 
+## [3.8.2] - 2026-07-25
+
+### Fixed
+- Gate applicability on a project root with no `package.json` is now decided by a single
+  predicate shared by `aahp doctor` and `aahp check`, so the two commands can no longer
+  hold different opinions about the same repository. A polyglot root (for example a Python
+  service whose only `package.json` lives in a frontend subdirectory) with a valid
+  `.ai/handoff/` set and a `CHANGELOG.md` used to be green under `aahp verify` but red
+  under both diagnostics: `doctor` reported `changelog-format = fail` because the gate
+  loaded the root `package.json` for a version before it ever opened the changelog, and
+  `check` reported `handoff = fail` with "package.json not found". A gate that cannot
+  apply now skips instead of failing.
+- `scripts/aahp-dashboard.mjs` treats the root `package.json` as optional. Without one it
+  skips the `NEXT_ACTIONS` current-version comparison (there is no version to compare
+  against) and falls back to the root directory name for a generated LOG title, instead of
+  exiting 1 before doing any work. A `package.json` that is present but malformed still
+  fails loudly.
+- `aahp doctor` also skips `version-sync` and `pinned-dep` on a root with no
+  `package.json`, for the same reason: neither gate has anything to check against.
+
+### Changed
+- Applicability of the version-derived gates is decided on the PRESENCE of a root
+  `package.json`, not on it parsing. A `package.json` that exists but is not valid JSON no
+  longer makes `changelog`, `changelog-format` and `version-sync` skip silently in
+  `aahp check`; the gates run and fail with the parse error, so a broken manifest is loud
+  rather than invisible.
+
 ## [3.8.1] - 2026-07-19
 
 ### Fixed
@@ -228,7 +255,8 @@ independently of the npm version).
 - Relicensed to Apache-2.0 (earlier commits carried MIT, then CC BY 4.0, headers).
 
 [Unreleased]: https://github.com/homeofe/AAHP/compare/v3.9.0...HEAD
-[3.9.0]: https://github.com/homeofe/AAHP/compare/v3.8.1...v3.9.0
+[3.9.0]: https://github.com/homeofe/AAHP/compare/v3.8.2...v3.9.0
+[3.8.2]: https://github.com/homeofe/AAHP/compare/v3.8.1...v3.8.2
 [3.8.1]: https://github.com/homeofe/AAHP/compare/v3.8.0...v3.8.1
 [3.8.0]: https://github.com/homeofe/AAHP/compare/v3.7.0...v3.8.0
 [3.7.0]: https://github.com/homeofe/AAHP/compare/v3.6.1...v3.7.0

@@ -468,6 +468,67 @@ function firstLine(text) {
     .find((l) => l.length > 0) || 'gate failed'
 }
 
+// ---------------------------------------------------------------------------
+// Gate applicability - ONE predicate, shared by `doctor` and `check`.
+//
+// A gate that cannot apply must SKIP, never FAIL: a structural absence (no root
+// package.json, no config section, no adopted handoff set) is not a governance
+// violation. This lives in one place because the alternative was three commands
+// holding three different opinions about the same repository - `doctor` failed
+// changelog-format on a root with no package.json while `check` skipped it, and
+// `verify` was green throughout.
+//
+// The version-derived gates (changelog, changelog-format, version-sync) and the
+// distribution-pin gate need a root package.json: it is the single version
+// source and the only place a pin can be declared. A polyglot project can adopt
+// AAHP at a root that has none (a Python service whose only package.json lives
+// in a frontend subdirectory, say) and still keep a valid handoff set.
+//
+// Applicability is decided on the PRESENCE of package.json, never on it parsing.
+// A file that exists but is not valid JSON keeps its gates applicable, so they
+// run and fail loudly with the parse error instead of vanishing into a skip.
+// ---------------------------------------------------------------------------
+
+function gateApplies(id, targetPath, config) {
+  const has = (...p) => existsSync(join(targetPath, ...p))
+  const cfg = config || {}
+  switch (id) {
+    case 'changelog':
+    case 'changelog-format':
+      return has('package.json') && has('CHANGELOG.md')
+    case 'version-sync':
+      return has('package.json') && Array.isArray(cfg.versionSites) && cfg.versionSites.length > 0
+    case 'pinned-dep':
+      return has('package.json')
+    case 'claims':
+      return Array.isArray(cfg.claims) && cfg.claims.length > 0
+    case 'forbidden-patterns':
+      return Array.isArray(cfg.forbiddenPatterns) && cfg.forbiddenPatterns.length > 0
+    case 'schema-doc-sync':
+      return Array.isArray(cfg.docSync) && cfg.docSync.length > 0
+    case 'doc-links':
+      return !!cfg.docLinks
+    case 'handoff':
+      return has('.ai', 'handoff', 'MANIFEST.json')
+    case 'acceptance-criteria':
+      return !!cfg.acceptanceCriteria
+    default:
+      return false
+  }
+}
+
+// Why a gate did not apply, phrased for a human reading `doctor` output. The
+// most specific missing precondition wins, so "no CHANGELOG.md" is preferred
+// over the generic version-source message when both are absent.
+function notApplicableReason(id, targetPath, config) {
+  const has = (...p) => existsSync(join(targetPath, ...p))
+  const cfg = config || {}
+  if ((id === 'changelog' || id === 'changelog-format') && !has('CHANGELOG.md')) return 'no CHANGELOG.md'
+  if (id === 'version-sync' && !(Array.isArray(cfg.versionSites) && cfg.versionSites.length > 0)) return 'no versionSites configured'
+  if (!has('package.json')) return 'no root package.json, so this gate has nothing to check against'
+  return 'not applicable here'
+}
+
 // Parse the canonical handoff file list from the bash source of truth so the
 // Node tooling never drifts from _aahp-lib.sh.
 function handoffFileSet() {
@@ -564,10 +625,15 @@ function gateGrounding(handoffDir) {
 
 // Distribution-pin gate. Config-driven and opt-in (C-7): the package name, the
 // dependency block, and whether a range is acceptable all come from the optional
-// pinnedDep config. A repo whose own name equals the target name is `self`
-// (checked before config so AAHP stays self with no config). When pinnedDep is
-// absent the gate is `skip` - it never forces an unrelated consumer red.
-function gatePinnedDep(pkg, config) {
+// pinnedDep config. A repo with no root package.json has nowhere to declare a
+// pin, so the gate skips before anything else. A repo whose own name equals the
+// target name is `self` (checked before config so AAHP stays self with no
+// config). When pinnedDep is absent the gate is `skip` - it never forces an
+// unrelated consumer red.
+function gatePinnedDep(targetPath, pkg, config) {
+  if (!gateApplies('pinned-dep', targetPath, config)) {
+    return { status: 'skip', reason: notApplicableReason('pinned-dep', targetPath, config) }
+  }
   const cfg = (config && typeof config.pinnedDep === 'object' && config.pinnedDep) || null
   const name = (cfg && typeof cfg.name === 'string' && cfg.name) || '@elvatis_com/aahp'
   if (pkg && pkg.name === name) return { status: 'self', reason: `this repo is ${name} itself` }
@@ -585,17 +651,24 @@ function gatePinnedDep(pkg, config) {
   return { status: 'fail', reason: `not an exact pin: "${spec}" (use an exact version, or set pinnedDep.allowRange:true)` }
 }
 
-function gateChangelogFormat(targetPath) {
-  if (!existsSync(join(targetPath, 'CHANGELOG.md'))) return { status: 'skip', reason: 'no CHANGELOG.md' }
+// The underlying gate reads the top release heading and compares it with the
+// package.json version, so without a root package.json it exits on the missing
+// version source before it ever opens the changelog. That is inapplicability,
+// not a format violation, so it skips here exactly as it does in `check`.
+function gateChangelogFormat(targetPath, config) {
+  if (!gateApplies('changelog-format', targetPath, config)) {
+    return { status: 'skip', reason: notApplicableReason('changelog-format', targetPath, config) }
+  }
   const r = runGate('check-changelog-format.mjs', targetPath)
   if (r.status === 0) return { status: 'pass', reason: 'Keep a Changelog format valid' }
   return { status: 'fail', reason: firstLine(r.stderr || r.stdout) }
 }
 
-function gateVersionSync(targetPath) {
-  const cfg = readJsonSafe(join(targetPath, 'aahp.config.json'))
-  const sites = cfg && Array.isArray(cfg.versionSites) ? cfg.versionSites : []
-  if (sites.length === 0) return { status: 'skip', reason: 'no versionSites configured' }
+function gateVersionSync(targetPath, config) {
+  const sites = Array.isArray(config && config.versionSites) ? config.versionSites : []
+  if (!gateApplies('version-sync', targetPath, config)) {
+    return { status: 'skip', reason: notApplicableReason('version-sync', targetPath, config) }
+  }
   const r = runGate('check-version-sync.mjs', targetPath)
   if (r.status === 0) return { status: 'pass', reason: `version matches ${sites.length} site(s)` }
   return { status: 'fail', reason: firstLine(r.stderr || r.stdout) }
@@ -616,9 +689,9 @@ function cmdDoctor(targetPath, flags) {
     'handoff-set': governance ? handoffSkip : gateHandoffSet(handoffDir),
     'manifest-schema': governance ? handoffSkip : gateManifestSchema(handoffDir),
     grounding: governance ? handoffSkip : gateGrounding(handoffDir),
-    'pinned-dep': gatePinnedDep(pkg, config),
-    'changelog-format': gateChangelogFormat(targetPath),
-    'version-sync': gateVersionSync(targetPath),
+    'pinned-dep': gatePinnedDep(targetPath, pkg, config),
+    'changelog-format': gateChangelogFormat(targetPath, config),
+    'version-sync': gateVersionSync(targetPath, config),
   }
 
   const gates = {}
@@ -703,34 +776,9 @@ const OPTIONAL_CHECK_GATES = [
   },
 ]
 
-// A gate is applicable only when its trigger is present, mirroring how each
-// underlying gate self-skips: the package-dependent gates need package.json (so
-// a bare repo never trips AAHP_NO_PKG), the config gates need their section, and
-// the handoff gate needs an adopted .ai/handoff/MANIFEST.json.
-function gateApplies(id, targetPath, pkg, config) {
-  const has = (...p) => existsSync(join(targetPath, ...p))
-  switch (id) {
-    case 'changelog':
-    case 'changelog-format':
-      return !!pkg && has('CHANGELOG.md')
-    case 'version-sync':
-      return !!pkg && Array.isArray(config.versionSites) && config.versionSites.length > 0
-    case 'claims':
-      return Array.isArray(config.claims) && config.claims.length > 0
-    case 'forbidden-patterns':
-      return Array.isArray(config.forbiddenPatterns) && config.forbiddenPatterns.length > 0
-    case 'schema-doc-sync':
-      return Array.isArray(config.docSync) && config.docSync.length > 0
-    case 'doc-links':
-      return !!config.docLinks
-    case 'handoff':
-      return has('.ai', 'handoff', 'MANIFEST.json')
-    case 'acceptance-criteria':
-      return !!config.acceptanceCriteria
-    default:
-      return false
-  }
-}
+// Applicability comes from the shared gateApplies predicate defined above, which
+// `doctor` consults too, so the two commands cannot disagree about which gates a
+// given repository is subject to.
 
 function cmdCheck(targetPath, flags) {
   const jsonOnly = flags.includes('--json')
@@ -749,7 +797,7 @@ function cmdCheck(targetPath, flags) {
     if ((only && !only.includes(gate.id)) || skip.includes(gate.id)) {
       status = 'skip'
       reason = 'deselected by config.check'
-    } else if (!gateApplies(gate.id, targetPath, pkg, config)) {
+    } else if (!gateApplies(gate.id, targetPath, config)) {
       status = 'skip'
       reason = 'not applicable here'
     } else {

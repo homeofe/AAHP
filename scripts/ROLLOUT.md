@@ -35,7 +35,11 @@ first so the repo starts from a clean, in-sync state.
 
 ## The 4 layers (recap)
 
-1. MANIFEST checksum integrity (reuses `lint-handoff.sh`).
+1. MANIFEST integrity: indexed files present and matching their checksums, and
+   every canonical handoff file on disk actually indexed (a partial index
+   compares everything except the file that was dropped from it).
+   The gate computes those verdicts itself; `lint-handoff.sh` also runs and its
+   exit code still blocks, but no Layer 1 verdict is read out of its output.
 2. Content-drift gate (THE key check): if a commit/push changes any source file
    OUTSIDE `.ai/handoff/`, it MUST also include `STATUS.md` AND a regenerated
    `MANIFEST.json`, else FAIL: "Code changed but handoff state did not. Run /handoff."

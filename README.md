@@ -183,6 +183,25 @@ A JSON Schema (`schema/aahp-manifest.schema.json`) is included for reference and
 ./scripts/lint-handoff.sh [path-to-project]
 ```
 
+`lint-handoff.sh` decides as well as reports: it exits `1` when it finds any
+violation, including a checksum mismatch, a missing indexed file, a handoff
+file that is present on disk but has no entry in the index, an absent
+`MANIFEST.json`, an empty file index, and a checksum verifier that started and
+then failed. Integrity that cannot be established is a violation, not a note.
+
+There is exactly one documented exception, and it is deliberate: on a machine
+with **no Python interpreter at all** this script cannot run its integrity
+check, so it reports that as a warning and still exits `0`. Making it a
+violation would turn currently green node-only environments red without
+catching anything the blocking gate does not already catch. Such a run does
+**not** print "All checks passed"; it says that MANIFEST integrity was not
+verified. `aahp verify` Layer 1 covers that state and fails outright when
+neither node nor python is available.
+
+The exit code is therefore safe to wire into a hook or a CI job. `aahp verify`
+Layer 1 computes its integrity verdicts itself, so blocking never depends on
+that exit code either.
+
 To use AJV for strict schema validation in CI, install it separately:
 
 ```bash
@@ -311,7 +330,16 @@ but they do not stop an agent from committing code while leaving `STATUS.md` and
 `aahp verify` (`scripts/verify-handoff.sh`) is the single canonical gate. It runs
 up to 4 layers:
 
-1. **MANIFEST checksum integrity** - reuses `lint-handoff.sh`.
+1. **MANIFEST integrity** - every file `MANIFEST.json` indexes must still be
+   present AND still match its recorded checksum. A missing indexed file and a
+   checksum mismatch are reported as different failures, because the fix
+   differs: restore the file, or regenerate the manifest. The gate reads the
+   index out of `MANIFEST.json` and hashes the files itself, so neither verdict
+   depends on another script's exit code or on string-matching its output.
+   Anything that leaves integrity unproven fails too: no JSON interpreter, an
+   unparseable manifest, an index that lists no files, or a missing checksum
+   tool. `lint-handoff.sh` still runs for the checks this layer does not cover
+   (injection, secrets, PII, stale lock) and its non-zero exit still blocks.
 2. **Content-drift gate (the key check)** - if the change set touches any source
    file OUTSIDE `.ai/handoff/`, it MUST also include `STATUS.md` AND a regenerated
    `MANIFEST.json`. Otherwise it HARD-FAILS with:

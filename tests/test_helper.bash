@@ -116,10 +116,40 @@ create_log_md() {
 EOF
 }
 
-# Create a minimal valid MANIFEST.json (v3-compatible)
+# Create a minimal valid MANIFEST.json (v3-compatible).
+#
+# The index covers EVERY canonical handoff file that exists in $dir RIGHT NOW,
+# with its real checksum, exactly like the generator in aahp-manifest.sh. It
+# used to be hard-coded to `"files": {}`, and then to three files out of the
+# eleven canonical ones, which is a partial index: both gates now treat that as
+# a finding, because a file with no entry is never compared to anything. A
+# fixture whose baseline is partial could never catch a partial-index defect.
+# Files absent from $dir are not indexed, so a fixture that seeds no handoff
+# files still gets a manifest with no dangling entries.
+#
+# Call this AGAIN after editing a handoff file if the test expects lint or
+# verify to pass; otherwise the edit is a genuine integrity violation and the
+# gate is right to say so.
 create_manifest_json() {
     local dir="${1:-$TEST_TMPDIR/.ai/handoff}"
-    cat > "$dir/MANIFEST.json" <<'MANIFEST'
+    # shellcheck source=../scripts/_aahp-lib.sh
+    source "$SCRIPTS_DIR/_aahp-lib.sh"
+
+    local entries="" f sum lines
+    for f in "${AAHP_HANDOFF_FILES[@]}"; do
+        [ -f "$dir/$f" ] || continue
+        sum="$(aahp_checksum "$dir/$f")"
+        lines="$(aahp_line_count "$dir/$f")"
+        entries="${entries}${entries:+,}
+    \"$f\": {
+      \"checksum\": \"$sum\",
+      \"updated\": \"2025-06-01T00:00:00Z\",
+      \"lines\": $lines,
+      \"summary\": \"test fixture\"
+    }"
+    done
+
+    cat > "$dir/MANIFEST.json" <<MANIFEST
 {
   "aahp_version": "3.0",
   "project": "TestProject",
@@ -131,7 +161,8 @@ create_manifest_json() {
     "phase": "idle",
     "duration_minutes": 0
   },
-  "files": {},
+  "files": {$entries
+  },
   "quick_context": "Test fixture project.",
   "token_budget": {
     "manifest_only": 85,

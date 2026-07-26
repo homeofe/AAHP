@@ -2,6 +2,10 @@
   "version": 1,
   "entries": [
     {
+      "sha256": "29d8d94e1227ca2a5a1c4a3508143cf11f1c442f05092514ffc92aab41e85a32",
+      "title": "## [2026-02-27] Claude Opus 4.6: T-006 npm publish preparation"
+    },
+    {
       "sha256": "fd444e090086e176dc71c68ae24457df68e1f0f75debe2412ecea58e1f69272c",
       "title": "## [2026-02-26] Claude Opus 4.6: Complete T-003, T-004, T-005 -CI, CLI, Tests"
     },

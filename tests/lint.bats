@@ -93,6 +93,9 @@ teardown() {
 @test "detects secret patterns: private key header" {
     create_full_handoff
     echo "-----BEGIN RSA PRIVATE KEY-----" >> "$TEST_TMPDIR/.ai/handoff/STATUS.md"
+    # Re-index after the edit: this test is about secret detection, not about
+    # MANIFEST integrity, and an unindexed edit is a real integrity violation.
+    create_manifest_json
 
     run bash "$SCRIPTS_DIR/lint-handoff.sh" "$TEST_TMPDIR"
 
@@ -154,6 +157,8 @@ teardown() {
     create_full_handoff
     echo "Co-authored-by: Copilot <123456+Copilot@users.noreply.github.com>" \
         >> "$TEST_TMPDIR/.ai/handoff/STATUS.md"
+    # Re-index after the edit: this test is about PII, not MANIFEST integrity.
+    create_manifest_json
 
     run bash "$SCRIPTS_DIR/lint-handoff.sh" "$TEST_TMPDIR"
     [ "$status" -eq 0 ]
@@ -209,6 +214,8 @@ teardown() {
     create_full_handoff
     echo "See admin@example.com for the template format." \
         >> "$TEST_TMPDIR/.ai/handoff/STATUS.md"
+    # Re-index after the edit: this test is about PII, not MANIFEST integrity.
+    create_manifest_json
 
     run bash "$SCRIPTS_DIR/lint-handoff.sh" "$TEST_TMPDIR"
     [ "$status" -eq 0 ]
@@ -222,9 +229,12 @@ teardown() {
     cat > "$TEST_TMPDIR/.ai/handoff/pii-allowlist.json" <<'JSON'
 {"version":1,"entries":[{"value":"owner@company.test","kind":"email","reason":"Required operational owner reference","owner":"Platform Operations","expires":"2099-01-01"}]}
 JSON
-    bash "$SCRIPTS_DIR/aahp-manifest.sh" "$TEST_TMPDIR" --quiet
-    bash "$SCRIPTS_DIR/aahp-manifest.sh" "$TEST_TMPDIR" --quiet
     echo "Contact owner@company.test for escalation." >> "$TEST_TMPDIR/.ai/handoff/STATUS.md"
+    # Generate the manifest AFTER the edit. Appending to an indexed file and
+    # then leaving the manifest stale is a genuine integrity violation, which
+    # this test is not about.
+    bash "$SCRIPTS_DIR/aahp-manifest.sh" "$TEST_TMPDIR" --quiet
+    bash "$SCRIPTS_DIR/aahp-manifest.sh" "$TEST_TMPDIR" --quiet
     run bash "$SCRIPTS_DIR/lint-handoff.sh" "$TEST_TMPDIR"
     [ "$status" -eq 0 ]
     [[ "$output" == *"Allowed PII email 'owner@company.test'"* ]]
@@ -306,15 +316,19 @@ JSON
 
 # ─── Missing MANIFEST.json ──────────────────────────────────
 
-@test "warns on missing MANIFEST.json" {
+@test "a missing MANIFEST.json is a violation, not a warning" {
     create_status_md
     create_next_actions_md
     create_log_md
     # Do NOT create MANIFEST.json
 
     run bash "$SCRIPTS_DIR/lint-handoff.sh" "$TEST_TMPDIR"
-    # Missing MANIFEST.json is a warning, not a violation -exit 0
+    # No manifest means no index, so not one handoff file was compared. That
+    # is the maximal "integrity unproven" state and it must not end the run
+    # with "All checks passed" while the aahp-lint job treats 0 as green.
+    [ "$status" -eq 1 ]
     [[ "$output" == *"MANIFEST.json not found"* ]]
+    [[ "$output" != *"All checks passed"* ]]
 }
 
 # ─── Stale HANDOFF.lock ─────────────────────────────────────
@@ -334,6 +348,112 @@ JSON
     run bash "$SCRIPTS_DIR/lint-handoff.sh" "$TEST_TMPDIR"
     [ "$status" -eq 0 ]
     [[ "$output" == *"No stale lock"* ]]
+}
+
+# ─── Indexed-file integrity (exit code, not just output) ────
+
+@test "exits non-zero when an indexed file's checksum no longer matches" {
+    create_full_handoff
+    bash "$SCRIPTS_DIR/aahp-manifest.sh" "$TEST_TMPDIR" --quiet --phase implementation
+    # Change an indexed file without regenerating the manifest.
+    printf '
+unmanaged edit
+' >> "$TEST_TMPDIR/.ai/handoff/STATUS.md"
+
+    run bash "$SCRIPTS_DIR/lint-handoff.sh" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Checksum mismatch: STATUS.md"* ]]
+    [[ "$output" == *"violation(s) found"* ]]
+    [[ "$output" != *"All checks passed"* ]]
+}
+
+@test "exits non-zero and names the file when an indexed file is deleted" {
+    create_full_handoff
+    bash "$SCRIPTS_DIR/aahp-manifest.sh" "$TEST_TMPDIR" --quiet --phase implementation
+    rm "$TEST_TMPDIR/.ai/handoff/LOG.md"
+
+    run bash "$SCRIPTS_DIR/lint-handoff.sh" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Missing indexed file: LOG.md"* ]]
+    # A deletion must be distinguishable from a tampered file.
+    [[ "$output" != *"Checksum mismatch"* ]]
+}
+
+@test "an unverifiable checksum run is a violation, not a yellow note" {
+    create_full_handoff
+    bash "$SCRIPTS_DIR/aahp-manifest.sh" "$TEST_TMPDIR" --quiet --phase implementation
+
+    local py real_py
+    py="$(bash -c "source '$SCRIPTS_DIR/_aahp-lib.sh'; aahp_python_cmd")"
+    [ -n "$py" ] || skip "no working python interpreter"
+    real_py="$(command -v "$py")"
+
+    # A wrapper that behaves exactly like the real interpreter except for the
+    # checksum verifier, which it kills with an unexpected exit code. Both
+    # names are wrapped because the detection helper may select either.
+    local fake="$TEST_TMPDIR/fakebin" name
+    mkdir -p "$fake"
+    for name in python python3; do
+        cat > "$fake/$name" <<WRAP
+#!/usr/bin/env bash
+for a in "\$@"; do case "\$a" in *hashlib*) exit 9 ;; esac; done
+exec "$real_py" "\$@"
+WRAP
+        chmod +x "$fake/$name"
+    done
+
+    PATH="$fake:$PATH" run bash "$SCRIPTS_DIR/lint-handoff.sh" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Could not verify indexed files"* ]]
+    [[ "$output" == *"violation(s) found"* ]]
+    [[ "$output" != *"All checks passed"* ]]
+}
+
+@test "a MANIFEST that indexes nothing is a violation" {
+    create_full_handoff
+    bash "$SCRIPTS_DIR/aahp-manifest.sh" "$TEST_TMPDIR" --quiet --phase implementation
+
+    local py
+    py="$(bash -c "source '$SCRIPTS_DIR/_aahp-lib.sh'; aahp_python_cmd")"
+    [ -n "$py" ] || skip "no working python interpreter"
+    "$py" - "$TEST_TMPDIR/.ai/handoff/MANIFEST.json" <<'PY'
+import json, sys
+path = sys.argv[1]
+manifest = json.load(open(path, encoding="utf-8"))
+manifest["files"] = {}
+json.dump(manifest, open(path, "w", encoding="utf-8"), indent=2)
+PY
+
+    run bash "$SCRIPTS_DIR/lint-handoff.sh" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"indexes no files"* ]]
+    [[ "$output" != *"All checks passed"* ]]
+}
+
+@test "a handoff file present but not indexed is a violation" {
+    # The partial-index case: every entry that is still there matches, and the
+    # one file that was rewritten has no entry, so it is never compared. An
+    # index that covers all but one file proves no more about that file than
+    # an empty index proves about any of them.
+    create_full_handoff
+    bash "$SCRIPTS_DIR/aahp-manifest.sh" "$TEST_TMPDIR" --quiet --phase implementation
+
+    local py
+    py="$(bash -c "source '$SCRIPTS_DIR/_aahp-lib.sh'; aahp_python_cmd")"
+    [ -n "$py" ] || skip "no working python interpreter"
+    printf 'MALICIOUS CONTENT\n' > "$TEST_TMPDIR/.ai/handoff/LOG.md"
+    "$py" - "$TEST_TMPDIR/.ai/handoff/MANIFEST.json" <<'PY'
+import json, sys
+path = sys.argv[1]
+manifest = json.load(open(path, encoding="utf-8"))
+manifest["files"].pop("LOG.md", None)
+json.dump(manifest, open(path, "w", encoding="utf-8"), indent=2)
+PY
+
+    run bash "$SCRIPTS_DIR/lint-handoff.sh" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Not indexed by MANIFEST.json: LOG.md"* ]]
+    [[ "$output" != *"All checks passed"* ]]
 }
 
 # ─── Missing handoff directory ───────────────────────────────

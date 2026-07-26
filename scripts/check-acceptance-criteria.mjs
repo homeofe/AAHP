@@ -1,19 +1,52 @@
 #!/usr/bin/env node
 // check-acceptance-criteria.mjs - Config-driven acceptance-criteria lifecycle
-// gate. It reads the acceptance-criteria sections of the configured Markdown
-// files and reports four lifecycle defects:
+// gate.
 //
+// THE CONTRACT: THIS GATE NEVER CONVERTS "I DO NOT UNDERSTAND THIS INPUT" INTO
+// A PASS. Handoff documents are hand-written and their shapes are unbounded, so
+// any parser will meet a shape it cannot read. When that happens the gate says
+// so instead of falling silent, because a silent pass is indistinguishable from
+// a clean document and that is the failure mode this gate exists to prevent.
+// Everything it cannot interpret is a finding. Findings are warnings by
+// default, so the cost of a shape the parser does not know is a line of noise a
+// human can dismiss, never an undetected defect.
+//
+// Findings, in two families.
+//
+// LIFECYCLE DEFECTS - the document was understood and it is wrong:
 //   legacy-heading      a section titled with a legacy alias ("Completion
 //                       criteria" / "Definition of done") instead of the
 //                       canonical "Acceptance criteria"
 //   plain-bullets       a recognized criteria section whose criteria are plain
 //                       list items instead of task boxes, so no reader (human,
 //                       agent, or GitHub) can tell resolved from unresolved
-//   unresolved-on-done  a task whose manifest status is "done" while criteria
+//   unresolved-on-done  a task whose registry status is "done" while criteria
 //                       in its section are still unresolved: not checked, not
 //                       waived, and not moved to a follow-up
-//   manifest-unreadable the configured task registry exists but is not valid
-//                       JSON, so "done" cannot be resolved for any task
+//
+// COMPREHENSION DEFECTS - the gate could not do its job and refuses to pretend
+// otherwise:
+//   no-files-matched          the gate is configured but its include pathspec
+//                             matched zero tracked files. A renamed file or a
+//                             config typo would otherwise disable the gate
+//                             wholesale while it reported success.
+//   unparsed-criteria-section a recognized criteria heading whose body yields
+//                             zero recognized criterion items. A human wrote
+//                             "Acceptance criteria" and the parser found
+//                             nothing under it, so the parser is wrong, not the
+//                             document. This one finding covers the empty
+//                             section, the table form, the prose form, the
+//                             indented list, and every list form nobody has
+//                             invented yet.
+//   unbound-criteria-section  a criteria section the parser could not attribute
+//                             to a task id present in the registry, so the
+//                             done-state rule cannot be applied to it.
+//   unterminated-fence        a code fence still open at end of file, with the
+//                             number of lines that were skipped as a result.
+//   manifest-unreadable       the configured task registry is present but
+//                             unusable: not valid JSON, or a "tasks" member
+//                             that is not a plain object. Either way "done"
+//                             cannot be resolved for any task.
 //
 // SEVERITY IS WARN BY DEFAULT. With findings the gate prints them and still
 // exits 0, so adopting a newer aahp release can never turn a green repository
@@ -35,27 +68,33 @@
 // without network access. Reconciling linked GitHub issues is an adapter
 // concern documented in the README, never a precondition for a clean run.
 //
-// WHICH LIST FORMS COUNT AS CRITERIA (a deliberate decision, not an accident):
+// WHICH LIST FORMS COUNT AS CRITERIA:
 //
 //   - [ ] / - [x]   bullet task box            criterion, resolution readable
 //   - plain          bullet list item          criterion, reported as plain
 //   1. [ ] / 1. [x]  ordered task box          criterion, resolution readable
 //   1. plain         ordered list item         criterion, reported as plain
 //
-// Ordered items count because "1." is the form a human reaches for when the
-// criteria are a sequence, and a rule that cannot see them lets a `done` task
-// with unresolved numbered criteria pass completely clean. A gate that silently
-// under-reports is worse than no gate, so both list forms are criteria.
-//
 // Nested items (indent >= 2) are detail lines belonging to the criterion above
-// them, in either list form. Definition lists, tables, and prose lines are not
-// criteria: a section that states its criteria that way reports zero items,
-// which is visible in the section/finding counts rather than silently clean.
+// them, in either list form. Tables, definition lists and prose are not
+// criteria. A section written that way now yields zero items and reports
+// unparsed-criteria-section rather than passing clean.
+//
+// WHICH HEADING FORMS BIND A TASK ID. Task scope is opened by an ATX heading
+// ("### T-007: ..."), a setext heading (a line underlined with "===" or "---"),
+// or a bold label ("**T-007: ...**"). All three are supported rather than left
+// to the comprehension defects, because all three appear in hand-written
+// handoff files and a document written that way would otherwise report an
+// unbound section on every task. Any form still unsupported is caught by
+// unbound-criteria-section.
 //
 // FENCED CODE BLOCKS ARE NOT CONTENT. Lines inside a ``` or ~~~ fence are
-// skipped entirely, so documentation that SHOWS the criteria format is not
-// mistaken for criteria that exist. Without this the gate fires hardest on the
-// projects that document the convention properly.
+// skipped, so documentation that SHOWS the criteria format is not mistaken for
+// criteria that exist. Fence closing follows CommonMark: a closing fence
+// indented by four or more spaces is content, not a fence, so the block
+// legitimately runs to end of file. That behaviour is correct and is kept. What
+// changes is that the consequence is no longer silent - an open fence at end of
+// file is reported with the number of lines it swallowed.
 //
 // Recognized resolution markers on an unchecked criterion (case-insensitive):
 //   (waived: rationale)      an accepted, justified exception
@@ -94,6 +133,11 @@ const HEADING_RE = /^\s{0,3}(#{1,6})\s+(.+?)\s*$/;
 const BOLD_LABEL_RE = /^\s{0,3}\*\*\s*([^*]+?)\s*\*\*\s*:?\s*$/;
 const BOLD_START_RE = /^\s{0,3}\*\*/;
 const BREAK_RE = /^\s{0,3}(-{3,}|={3,}|\*{3,})\s*$/;
+// A setext underline: a run of "=" (level 1) or "-" (level 2) under a paragraph
+// line. CommonMark resolves the "---" ambiguity in favour of the heading when
+// the preceding line is paragraph content, which is what the lookahead below
+// reproduces.
+const SETEXT_UNDERLINE_RE = /^\s{0,3}(=+|-+)\s*$/;
 // Bullet and ordered list items are both criteria. "- item", "* item",
 // "+ item", "1. item", "2) item".
 const LIST_RE = /^(\s*)(?:[-*+]|\d{1,9}[.)])\s+(.*)$/;
@@ -106,6 +150,10 @@ const FENCE_RE = /^(\s{0,3})(`{3,}|~{3,})(.*)$/;
 const WAIVED_RE = /\((?:waived|waiver)\s*:\s*\S[^)]*\)/i;
 const FOLLOWUP_RE = /\((?:follow-?up|moved)\s*:\s*\S[^)]*\)/i;
 
+// A bold label deeper than any ATX heading level, so the first heading of any
+// depth closes a task scope that a bold label opened.
+const BOLD_LABEL_DEPTH = 7;
+
 function normalizeLabel(text) {
   return String(text)
     .replace(/^[*\s]+|[*\s]+$/g, "")
@@ -114,19 +162,35 @@ function normalizeLabel(text) {
     .toLowerCase();
 }
 
-// Parse one Markdown file into the criteria sections it contains. Only
-// top-level list items (indent < 2) are criteria; deeper items are treated as
-// detail lines belonging to the criterion above them.
+// True when `line` is a paragraph line that `next` underlines as a setext
+// heading. Blank lines, list items, fences, ATX headings and thematic-break
+// candidates are excluded so an existing "---" separator is not reinterpreted
+// as a heading for the paragraph above it.
+function setextLevel(line, next) {
+  if (next === undefined) return 0;
+  if (!SETEXT_UNDERLINE_RE.test(next)) return 0;
+  if (line.trim() === "") return 0;
+  if (/^\s{4,}/.test(line)) return 0;
+  if (HEADING_RE.test(line) || LIST_RE.test(line) || FENCE_RE.test(line) || BREAK_RE.test(line)) return 0;
+  return next.trim()[0] === "=" ? 1 : 2;
+}
+
+// Parse one Markdown file into the criteria sections it contains, plus the
+// file-level defects found while reading it. Only top-level list items
+// (indent < 2) are criteria; deeper items are detail lines belonging to the
+// criterion above them.
 export function parseCriteriaSections(rel, text) {
   const lines = String(text).split(/\r?\n/);
   const sections = [];
+  const defects = [];
   let current = null;
   let currentTask = null;
   // Depth of the heading that opened the current task scope. Only a heading at
   // the same or a shallower depth closes it, so prose subsections between a
   // task heading and its criteria heading stay inside the task.
   let currentTaskDepth = 0;
-  let fence = null; // { char: "`" | "~", len: number }
+  let fence = null; // { char, len, line }
+  let fenceSkipped = 0;
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -134,6 +198,7 @@ export function parseCriteriaSections(rel, text) {
     // --- fenced code blocks: never content -----------------------------
     const fenceMatch = line.match(FENCE_RE);
     if (fence) {
+      fenceSkipped++;
       if (fenceMatch && fenceMatch[2][0] === fence.char && fenceMatch[2].length >= fence.len && fenceMatch[3].trim() === "") {
         fence = null;
       }
@@ -142,19 +207,24 @@ export function parseCriteriaSections(rel, text) {
     if (fenceMatch) {
       // An info string may not contain a backtick when the fence is backticks.
       if (!(fenceMatch[2][0] === "`" && fenceMatch[3].includes("`"))) {
-        fence = { char: fenceMatch[2][0], len: fenceMatch[2].length };
+        fence = { char: fenceMatch[2][0], len: fenceMatch[2].length, line: i + 1 };
+        fenceSkipped = 0;
         continue;
       }
     }
 
-    const headingMatch = line.match(HEADING_RE);
-    const labelMatch = headingMatch ? null : line.match(BOLD_LABEL_RE);
-    const rawLabel = headingMatch ? headingMatch[2] : labelMatch ? labelMatch[1] : null;
+    // --- headings, in all three binding forms --------------------------
+    const atxMatch = line.match(HEADING_RE);
+    const setext = atxMatch ? 0 : setextLevel(line, lines[i + 1]);
+    const labelMatch = atxMatch || setext ? null : line.match(BOLD_LABEL_RE);
+
+    const headingText = atxMatch ? atxMatch[2] : setext ? line.trim() : null;
+    const headingDepth = atxMatch ? atxMatch[1].length : setext;
+    const rawLabel = headingText !== null ? headingText : labelMatch ? labelMatch[1] : null;
     const kind = rawLabel === null ? undefined : CRITERIA_HEADINGS.get(normalizeLabel(rawLabel));
 
-    if (headingMatch) {
-      const depth = headingMatch[1].length;
-      const id = headingMatch[2].match(TASK_ID_RE);
+    if (headingText !== null) {
+      const id = headingText.match(TASK_ID_RE);
       // A heading that names a task opens that task's scope. Any OTHER heading
       // closes it only when it is a sibling or an ancestor (depth <= the task
       // heading's depth). A deeper heading is a subsection of the task, so
@@ -163,10 +233,18 @@ export function parseCriteriaSections(rel, text) {
       // and unresolved-on-done could never fire for that task.
       if (id) {
         currentTask = id[0];
-        currentTaskDepth = depth;
-      } else if (currentTask && depth <= currentTaskDepth) {
+        currentTaskDepth = headingDepth;
+      } else if (currentTask && headingDepth <= currentTaskDepth) {
         currentTask = null;
         currentTaskDepth = 0;
+      }
+    } else if (labelMatch && !kind) {
+      // A bold label is how handoff files title a task inline. It binds only
+      // when it names a task id; other labels are ordinary section labels.
+      const id = labelMatch[1].match(TASK_ID_RE);
+      if (id) {
+        currentTask = id[0];
+        currentTaskDepth = BOLD_LABEL_DEPTH;
       }
     }
 
@@ -181,12 +259,15 @@ export function parseCriteriaSections(rel, text) {
         items: [],
       };
       sections.push(current);
+      if (setext) i++; // consume the underline
       continue;
     }
 
+    if (setext) i++; // consume the underline
+
     if (!current) continue;
 
-    if (headingMatch || BOLD_START_RE.test(line) || BREAK_RE.test(line)) {
+    if (headingText !== null || BOLD_START_RE.test(line) || BREAK_RE.test(line)) {
       current = null;
       continue;
     }
@@ -204,12 +285,24 @@ export function parseCriteriaSections(rel, text) {
     }
   }
 
-  return sections;
+  // An open fence at end of file is CommonMark-correct (a closing fence
+  // indented four or more spaces is content), but its consequence must not be
+  // silent: everything after it was skipped and could contain criteria.
+  if (fence) {
+    defects.push({
+      id: "unterminated-fence",
+      line: fence.line,
+      message: `code fence opened here is still open at end of file, so ${fenceSkipped} line(s) after it were skipped and any acceptance criteria among them were not checked; close the fence with an unindented "${fence.char.repeat(fence.len)}"`,
+    });
+  }
+
+  return { sections, defects };
 }
 
-// Classify one parsed section. Exported so the lifecycle rules have one
-// implementation that both the gate and any future fixer share.
-export function findSectionDefects(section, taskStatus) {
+// Classify one parsed section. `taskStatus` is the registry map; `registryKnown`
+// says whether that map is trustworthy, because binding cannot be judged
+// against a registry that could not be read.
+export function findSectionDefects(section, taskStatus, registryKnown = true) {
   const defects = [];
   const plain = section.items.filter((item) => item.plain);
   const boxes = section.items.filter((item) => !item.plain);
@@ -222,6 +315,18 @@ export function findSectionDefects(section, taskStatus) {
     });
   }
 
+  // Zero recognized items is the catch-all for every shape the parser cannot
+  // read: an empty section, a table, prose, an indented list, or a list form
+  // that does not exist yet. Reporting it is the whole point of the gate: a
+  // human wrote the heading, so criteria were meant to be there.
+  if (section.items.length === 0) {
+    defects.push({
+      id: "unparsed-criteria-section",
+      line: section.line,
+      message: `"${section.display}" contains no recognized criterion; acceptance criteria must be top-level task boxes ("- [ ] ..." or "1. [ ] ..."), and a section stating them as a table, as prose, as an indented list, or not at all cannot be verified`,
+    });
+  }
+
   if (plain.length > 0) {
     defects.push({
       id: "plain-bullets",
@@ -230,7 +335,23 @@ export function findSectionDefects(section, taskStatus) {
     });
   }
 
+  if (!registryKnown) return defects;
+
   const status = section.taskId ? taskStatus.get(section.taskId) : undefined;
+
+  // A section nobody can attribute to a registered task silently escapes the
+  // done rule. Say so.
+  if (status === undefined) {
+    defects.push({
+      id: "unbound-criteria-section",
+      line: section.line,
+      message: section.taskId
+        ? `"${section.display}" binds to ${section.taskId}, which is not a key in the task registry, so its done-state cannot be checked; register the task under that id or correct the heading`
+        : `"${section.display}" is not inside any task section, so its done-state cannot be checked; put it under a heading or bold label naming the task ("### T-042: ...")`,
+    });
+    return defects;
+  }
+
   if (status === "done") {
     const unresolved = boxes.filter(
       (item) => !item.checked && !WAIVED_RE.test(item.text) && !FOLLOWUP_RE.test(item.text),
@@ -255,7 +376,11 @@ export function findSectionDefects(section, taskStatus) {
 // missing:
 //   absent   -> the rule genuinely does not apply, report that and move on
 //   parsed   -> the rule applies
-//   corrupt  -> a real error: the registry is there and unreadable
+//   corrupt  -> a real error: the registry is there and unusable
+//
+// "Unusable" includes a `tasks` member that is not a plain object. An array
+// passes `typeof x === "object"`, and treating it as a registry produced a
+// reassuring task count from index keys while no task id could ever match.
 export function loadTaskStatus(root, relPath) {
   const p = join(root, relPath);
   if (!existsSync(p)) return { statuses: new Map(), state: "absent", error: null };
@@ -263,11 +388,21 @@ export function loadTaskStatus(root, relPath) {
   try {
     manifest = JSON.parse(readFileSync(p, "utf8"));
   } catch (err) {
-    return { statuses: new Map(), state: "corrupt", error: err.message };
+    return { statuses: new Map(), state: "corrupt", error: `not valid JSON (${err.message})` };
+  }
+  if (!manifest || typeof manifest !== "object" || Array.isArray(manifest)) {
+    return { statuses: new Map(), state: "corrupt", error: "the top-level value is not a JSON object" };
+  }
+  const tasks = manifest.tasks;
+  if (tasks !== undefined && (tasks === null || typeof tasks !== "object" || Array.isArray(tasks))) {
+    return {
+      statuses: new Map(),
+      state: "corrupt",
+      error: `"tasks" is ${Array.isArray(tasks) ? "an array" : tasks === null ? "null" : `a ${typeof tasks}`}, not an object keyed by task id`,
+    };
   }
   const statuses = new Map();
-  const tasks = manifest && typeof manifest.tasks === "object" && manifest.tasks ? manifest.tasks : {};
-  for (const [id, task] of Object.entries(tasks)) {
+  for (const [id, task] of Object.entries(tasks || {})) {
     if (task && typeof task === "object" && typeof task.status === "string") statuses.set(id, task.status);
   }
   return { statuses, state: "parsed", error: null };
@@ -304,26 +439,30 @@ function main() {
   const include = Array.isArray(section.include) && section.include.length ? section.include : DEFAULT_INCLUDE;
   const manifestPath = typeof section.manifest === "string" && section.manifest ? section.manifest : DEFAULT_MANIFEST;
   const strict = section.strict === true;
+  const configFile = existsSync(join(root, "aahp.config.json")) ? "aahp.config.json" : "package.json";
 
   const { statuses, state: manifestState, error: manifestError } = loadTaskStatus(root, manifestPath);
+  const registryKnown = manifestState === "parsed";
 
   const findings = [];
   let sectionCount = 0;
   let fileCount = 0;
 
-  // A registry that exists but cannot be parsed is a finding in its own right,
-  // not a silent skip. It is listed first because every unresolved-on-done
-  // verdict below it is unreliable while it stands.
+  // A registry that exists but cannot be used is a finding in its own right,
+  // not a silent skip. It is listed first because every done-state verdict below
+  // it would be unreliable while it stands.
   if (manifestState === "corrupt") {
     findings.push({
       file: manifestPath,
       line: 1,
       id: "manifest-unreadable",
-      message: `task registry is present but not valid JSON (${manifestError}); done-state checks cannot run until it parses`,
+      message: `task registry is present but unusable: ${manifestError}; done-state checks cannot run until it is fixed`,
     });
   }
 
-  for (const rel of listTrackedFiles(root, include)) {
+  const tracked = listTrackedFiles(root, include);
+
+  for (const rel of tracked) {
     let text;
     try {
       text = readFileSync(join(root, rel), "utf8");
@@ -331,12 +470,26 @@ function main() {
       continue;
     }
     fileCount++;
-    for (const parsed of parseCriteriaSections(rel, text)) {
+    const { sections, defects } = parseCriteriaSections(rel, text);
+    for (const defect of defects) findings.push({ file: rel, ...defect });
+    for (const parsed of sections) {
       sectionCount++;
-      for (const defect of findSectionDefects(parsed, statuses)) {
+      for (const defect of findSectionDefects(parsed, statuses, registryKnown)) {
         findings.push({ file: rel, ...defect });
       }
     }
+  }
+
+  // Configured but pointed at nothing. Without this the gate reports success on
+  // a renamed file or a mistyped pathspec, which is the loudest possible way to
+  // be quiet: the project believes it is covered and it is not.
+  if (fileCount === 0) {
+    findings.push({
+      file: configFile,
+      line: 1,
+      id: "no-files-matched",
+      message: `acceptanceCriteria.include matched zero tracked files (${include.join(", ")}); the gate is enabled but checking nothing - correct the pathspec, track the file, or remove the config section`,
+    });
   }
 
   findings.sort((a, b) => (a.file === b.file ? a.line - b.line : a.file < b.file ? -1 : 1));
@@ -345,7 +498,7 @@ function main() {
     manifestState === "parsed"
       ? `${statuses.size} task(s) in ${manifestPath}`
       : manifestState === "corrupt"
-        ? `${manifestPath} is present but unparseable, so done-state checks could not run`
+        ? `${manifestPath} is present but unusable, so done-state checks could not run`
         : `no task registry at ${manifestPath}, so done-state checks were skipped`;
 
   if (findings.length === 0) {
@@ -360,7 +513,9 @@ function main() {
     for (const f of findings) console.error(`  - ${f.file}:${f.line} [${f.id}] ${f.message}`);
     console.error("");
     console.error(`  Lifecycle: one "${CANONICAL_HEADING}" section, "- [ ]" while unresolved, "- [x]" only on`);
-    console.error("  evidence. Before a task is done, every criterion is checked, waived, or moved.\n");
+    console.error("  evidence. Before a task is done, every criterion is checked, waived, or moved.");
+    console.error("  A finding also fires when the gate cannot read the input: that is deliberate, because");
+    console.error("  an unreadable document must never be reported as a clean one.\n");
     process.exit(1);
   }
 

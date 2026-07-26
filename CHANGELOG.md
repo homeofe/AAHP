@@ -21,11 +21,21 @@ independently of the npm version).
   remaining criterion completed, explicitly waived (`(waived: rationale)`), or moved to a
   linked open follow-up (`(follow-up: T-042)`). `Completion criteria` and
   `Definition of done` stay recognized as legacy aliases with a documented rename path.
-- `scripts/check-acceptance-criteria.mjs`, an opt-in gate that reports three lifecycle
-  defects: a legacy heading alias, plain bullets where task boxes belong, and criteria left
-  unresolved on a task the manifest marks `done`. It reads tracked files plus the
-  `MANIFEST.json` task registry and makes no network calls, so a run is complete and
-  deterministic offline.
+- `scripts/check-acceptance-criteria.mjs`, an opt-in gate built on one contract: it never
+  turns "I do not understand this input" into a pass. It reports three lifecycle defects
+  (`legacy-heading`, `plain-bullets`, `unresolved-on-done`) and five comprehension defects
+  that keep an unreadable document from being reported as a clean one: `no-files-matched`
+  when the configured pathspec matches zero tracked files, `unparsed-criteria-section` when
+  a recognized criteria heading yields no recognized criterion, `unbound-criteria-section`
+  when a section cannot be attributed to a registered task, `unterminated-fence` when a code
+  fence is still open at end of file (reported with the number of lines it skipped), and
+  `manifest-unreadable` when the task registry is present but unusable. It reads tracked
+  files plus the `MANIFEST.json` task registry and makes no network calls, so a run is
+  complete and deterministic offline.
+- Task ids bind from ATX headings, setext headings, and bold labels, so the three heading
+  forms that appear in hand-written handoff files all scope a criteria section. Anything
+  still unattributable is reported as `unbound-criteria-section` instead of being exempted
+  from the done-state rule in silence.
 - `acceptanceCriteria` (`include` / `manifest` / `strict`) in
   `schema/aahp-config.schema.json` and `aahp.config.example.json`. Absent, the gate does not
   run and does not appear in the `aahp check` record, so the gate set an existing consumer
@@ -36,10 +46,17 @@ independently of the npm version).
 - Acceptance-criteria task boxes in both `.github/ISSUE_TEMPLATE` files, the lifecycle rule
   in `templates/CONVENTIONS.md`, and `tests/acceptance-criteria.bats` covering canonical,
   legacy-heading, plain-bullet, waived, follow-up, invalid-closure, strict, offline, and
-  gate-set-unchanged cases.
+  gate-set-unchanged cases, plus the comprehension defects above.
 - ADR-017: new detection ships warn-first, and a new gate joins the gate set only on opt-in.
 
 ### Changed
+- This repository's own handoff is conformant under the gate it introduces. `MANIFEST.json`
+  task keys now match the ids used in `NEXT_ACTIONS.md` (the two entries whose titles
+  carried a different id in brackets were re-keyed), the npm publish task is recorded as
+  `blocked` rather than `done` because the package is not on the registry, and the criteria
+  of the four completed tasks are resolved individually: checked with the evidence named
+  inline, or left unchecked with a stated waiver where the criterion was superseded. The
+  gate reports zero findings on this repository.
 - `templates/NEXT_ACTIONS.md` uses the canonical `Acceptance criteria` heading instead of
   `Definition of done`, and states the lifecycle rule in its header.
 - The shipped scaffolding passes its own gate. `templates/MANIFEST.json` marked the example

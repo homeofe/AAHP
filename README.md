@@ -493,7 +493,7 @@ a repo that never opts in keeps working:
 | changelog format | `check-changelog-format.mjs` | uses `CHANGELOG.md` | Keep a Changelog 1.1.0 + SemVer grammar |
 | claims | `check-claims.mjs` | `claims` | capability numbers agree across surfaces and do not exceed a ground-truth floor |
 | generator + freshness | `aahp-dashboard.mjs` | `generate` | an optional LOG release journal stays in sync; a `Current version` header matches the package |
-| acceptance criteria | `check-acceptance-criteria.mjs` | `acceptanceCriteria` | the acceptance-criteria lifecycle (Section 8.7): canonical heading, task boxes not plain list items, nothing unresolved on a `done` task, a parseable task registry. Warn by default, `"strict": true` to enforce |
+| acceptance criteria | `check-acceptance-criteria.mjs` | `acceptanceCriteria` | the acceptance-criteria lifecycle (Section 8.7): canonical heading, task boxes not plain list items, nothing unresolved on a `done` task, plus the comprehension findings that keep the gate from passing on input it could not read (no files matched, unparsed section, unbound section, unterminated fence, unusable task registry). Warn by default, `"strict": true` to enforce |
 
 The changelog validator and the LOG generator import the release-heading grammar
 from a single module (`scripts/changelog-grammar.mjs`), so the two cannot diverge.
@@ -1030,13 +1030,43 @@ Migration is a rename: the criteria themselves do not change, so a project can m
 document at a time. Nothing forces the rename, because a reader that stops accepting the
 aliases would lose information that already exists.
 
-**Verification.** The opt-in `acceptance-criteria` gate (Section 2.11) reads the configured
-documents plus the `MANIFEST.json` task registry and reports four findings: a legacy
-heading, plain bullets where task boxes belong, criteria left unresolved on a task the
-manifest marks `done` (a criterion that carries a waiver or follow-up marker is resolved,
-not unresolved), and a task registry that is present but not valid JSON. Findings are
-warnings by default. The gate makes no network calls, so a run is complete and
-deterministic offline.
+**Verification, and its stated contract.** The opt-in `acceptance-criteria` gate
+(Section 2.11) reads the configured documents plus the `MANIFEST.json` task registry.
+Its contract is one sentence:
+
+> **The gate never turns "I do not understand this input" into a pass.**
+
+Handoff documents are hand-written, so their shapes are unbounded and any parser will
+eventually meet one it cannot read. A gate that stays quiet in that situation is worse
+than no gate: a silent pass is indistinguishable from a clean document, so a renamed file,
+a mistyped pathspec, or a criteria list written in an unexpected form disables the check
+while the project still believes it is covered. Every such case is therefore a finding.
+Because findings are warnings by default, the cost of a shape the parser does not know is
+a line of output a human can read and dismiss, never an undetected defect. That trade is
+deliberate: **noise is acceptable, silence is not.**
+
+The findings come in two families.
+
+Lifecycle defects, where the document was understood and it is wrong:
+
+| Finding | Meaning |
+|---------|---------|
+| `legacy-heading` | the section uses a legacy alias instead of `Acceptance criteria` |
+| `plain-bullets` | criteria are plain list items, so nothing can tell resolved from unresolved |
+| `unresolved-on-done` | a task the registry marks `done` still has criteria that are neither checked, nor waived, nor moved to a follow-up |
+
+Comprehension defects, where the gate could not do its job and refuses to pretend
+otherwise:
+
+| Finding | Meaning |
+|---------|---------|
+| `no-files-matched` | the gate is configured but `include` matched zero tracked files, so it is enabled and checking nothing |
+| `unparsed-criteria-section` | a recognized criteria heading whose body yields zero recognized criterion items |
+| `unbound-criteria-section` | a criteria section that cannot be attributed to a task id present in the registry, so the done-state rule cannot be applied to it |
+| `unterminated-fence` | a code fence still open at end of file, reported with the number of lines it caused to be skipped |
+| `manifest-unreadable` | the task registry is present but unusable, so `done` cannot be resolved for any task |
+
+The gate makes no network calls, so a run is complete and deterministic offline.
 
 **What counts as a criterion.** Both Markdown list forms do, because the choice between
 them is a matter of taste and a rule that only sees one of them under-reports silently:
@@ -1050,14 +1080,35 @@ them is a matter of taste and a rule that only sees one of them under-reports si
 
 Nested items (indent two or more) are detail lines belonging to the criterion above them.
 Lines inside a fenced code block are never criteria, so documentation that shows the
-format is not mistaken for criteria that exist. Prose, tables, and definition lists are
-not criteria: a section written that way reports zero items, which is visible in the
-section count rather than silently clean.
+format is not mistaken for criteria that exist. Prose, tables, definition lists, an
+indented list, and an empty section are not criteria, and a section written any of those
+ways yields zero recognized items. That is exactly the `unparsed-criteria-section` case:
+one finding covers every one of those shapes, and every shape nobody has invented yet.
 
-**A corrupt task registry is loud.** An absent `MANIFEST.json` means the done-state rule
-genuinely does not apply and the gate says so. A `MANIFEST.json` that exists but does not
-parse is a finding of its own (`manifest-unreadable`), because every done-state verdict
-below it is unreliable while it stands; under `"strict": true` it fails the gate.
+**Which forms bind a task id.** A criteria section is attributed to the task whose scope
+encloses it. Three forms open a task scope: an ATX heading (`### T-042: ...`), a setext
+heading (a line underlined with `===` or `---`), and a bold label (`**T-042: ...**`). All
+three appear in hand-written handoff files. Anything the parser still cannot attribute is
+an `unbound-criteria-section` rather than a section quietly exempted from the done rule.
+
+**An unterminated fence is loud.** Fence handling follows CommonMark, where a closing
+fence indented by four or more spaces is content rather than a fence, so the block
+legitimately runs to end of file. That behaviour is correct and stays. What must not
+happen is for the consequence to be invisible: everything after the opening fence was
+skipped and may have contained criteria, so the gate reports `unterminated-fence` together
+with the number of lines skipped.
+
+**A configured gate that matches nothing is loud.** If `include` resolves to zero tracked
+files, the gate reports `no-files-matched` instead of "no findings". Renaming a document or
+mistyping a pathspec otherwise disables the check in the quietest possible way.
+
+**An unusable task registry is loud.** An absent `MANIFEST.json` means the done-state rule
+genuinely does not apply and the gate says so. A `MANIFEST.json` that is present but
+unusable is a finding of its own (`manifest-unreadable`): it does not parse, or its `tasks`
+member is not a plain object keyed by task id. An array in particular reads as an object to
+a naive check and would report a reassuring task count while no task id could ever match.
+Every done-state verdict is unreliable while this stands; under `"strict": true` it fails
+the gate.
 
 **Optional GitHub synchronization.** The lifecycle belongs to AAHP task semantics; issue
 task boxes are one rendering of it. Where a project links tasks to issues (by convention,

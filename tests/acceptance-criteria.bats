@@ -5,7 +5,13 @@
 #   1. DETECTION: legacy heading aliases, plain bullets where task boxes belong,
 #      and criteria left unresolved on a task the manifest calls "done" (unless
 #      the criterion is waived or moved to a follow-up).
-#   2. SEVERITY: findings are WARN by default (exit 0, gate absent from the
+#   2. COMPREHENSION: the gate never reports a document it could not read as a
+#      clean one. A configured pathspec that matches nothing, a criteria section
+#      with no recognized criterion, a section that binds to no registered task,
+#      a code fence left open at end of file, and an unusable task registry are
+#      all findings. Each of these was, before this contract, an exit-0 "no
+#      findings" - which is why they are tested one by one below.
+#   3. SEVERITY: findings are WARN by default (exit 0, gate absent from the
 #      `aahp check` record unless configured) and only fail when a project opts
 #      into "strict": true. That is what keeps a newer aahp release from turning
 #      a green consumer repository red.
@@ -674,7 +680,10 @@ EOF
     gadd
     run node "$AC" "$TEST_TMPDIR"
     [ "$status" -eq 0 ]
+    # Scope closed, so the done rule of T-007 must not reach this section - but
+    # the section is now reported as unbound rather than passed over in silence.
     [[ "$output" != *"unresolved-on-done"* ]]
+    [[ "$output" == *"unbound-criteria-section"* ]]
 }
 
 # --- the shipped scaffolding passes its own gate -----------------------------
@@ -694,7 +703,7 @@ EOF
 @test "acceptance-criteria: importing the module runs no gate and exits nothing" {
     # The path travels in the environment, not in argv, so this process is not
     # the gate's entry point and the guard in the module must keep it inert.
-    run env AC_PATH="$AC" node -e "const { pathToFileURL } = require('node:url'); import(pathToFileURL(process.env.AC_PATH).href).then((m) => { const s = m.parseCriteriaSections('x.md', '## T-007: t\n\n**Acceptance criteria:**\n1. [ ] a\n'); if (s.length !== 1) throw new Error('sections ' + s.length); if (s[0].items.length !== 1) throw new Error('items ' + s[0].items.length); console.log('IMPORT_OK'); });"
+    run env AC_PATH="$AC" node -e "const { pathToFileURL } = require('node:url'); import(pathToFileURL(process.env.AC_PATH).href).then((m) => { const r = m.parseCriteriaSections('x.md', '## T-007: t\n\n**Acceptance criteria:**\n1. [ ] a\n'); const s = r.sections; if (s.length !== 1) throw new Error('sections ' + s.length); if (s[0].items.length !== 1) throw new Error('items ' + s[0].items.length); if (r.defects.length !== 0) throw new Error('defects ' + r.defects.length); console.log('IMPORT_OK'); });"
     [ "$status" -eq 0 ]
     [[ "$output" == *"IMPORT_OK"* ]]
     [[ "$output" != *"section(s)"* ]]
@@ -711,4 +720,348 @@ EOF
     run node -e "const { readFileSync } = require('node:fs'); const { dirname, resolve } = require('node:path'); const seen = new Set(); const stack = [process.argv[1]]; const banned = /(?:node:)?(?:net|tls|http|https|http2|dgram|dns)['\"]|fetch\s*\(|XMLHttpRequest|WebSocket/; while (stack.length) { const f = resolve(stack.pop()); if (seen.has(f)) continue; seen.add(f); const src = readFileSync(f, 'utf8'); if (banned.test(src)) throw new Error('network capability in ' + f); for (const m of src.matchAll(/from\s+['\"](\.[^'\"]+)['\"]/g)) stack.push(resolve(dirname(f), m[1])); } console.log('OFFLINE_OK modules=' + seen.size);" "$AC"
     [ "$status" -eq 0 ]
     [[ "$output" == *"OFFLINE_OK"* ]]
+}
+# --- comprehension: the gate refuses to pass on input it could not read ------
+#
+# Every test in this block was an exit-0 "Acceptance criteria OK ... no findings"
+# before the fail-loud redesign. Each fixture keeps a real, unresolved criterion
+# on a task the registry marks `done`, so a clean verdict would be a false
+# negative and not merely a missing nicety.
+
+@test "acceptance-criteria: an include pathspec matching zero tracked files is a finding" {
+    # The pathspec is one character off from the file that exists. Previously:
+    # "OK: 0 section(s) in 0 file(s), no findings", exit 0, in strict mode.
+    mkconfig <<'EOF'
+{ "acceptanceCriteria": { "include": [".ai/handoff/NEXT-ACTIONS.md"], "strict": true } }
+EOF
+    manifest_with_tasks
+    next_actions <<'EOF'
+## T-007: Closed task
+
+**Acceptance criteria:**
+- [ ] first thing
+- [ ] second thing
+EOF
+    gadd
+    run node "$AC" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"no-files-matched"* ]]
+    [[ "$output" != *"no findings"* ]]
+}
+
+@test "acceptance-criteria: a matching pathspec does not report no-files-matched" {
+    enable_gate_strict
+    manifest_with_tasks
+    next_actions <<'EOF'
+## T-008: Open task
+
+**Acceptance criteria:**
+- [ ] still open, and that is fine
+EOF
+    gadd
+    run node "$AC" "$TEST_TMPDIR"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Acceptance criteria OK"* ]]
+}
+
+@test "acceptance-criteria: no-files-matched stays a warning by default" {
+    mkconfig <<'EOF'
+{ "acceptanceCriteria": { "include": [".ai/handoff/NEXT-ACTIONS.md"] } }
+EOF
+    manifest_with_tasks
+    next_actions <<'EOF'
+## T-007: Closed task
+
+**Acceptance criteria:**
+- [ ] first thing
+EOF
+    gadd
+    run node "$AC" "$TEST_TMPDIR"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"WARN acceptance-criteria"* ]]
+    [[ "$output" == *"no-files-matched"* ]]
+}
+
+@test "acceptance-criteria: a code fence left open at end of file is a finding" {
+    # CommonMark-correct behaviour: the closing fence is indented four spaces, so
+    # it is content and the block runs to end of file. That is kept. What changes
+    # is that the consequence is reported instead of silently swallowing the
+    # criteria that follow.
+    enable_gate_strict
+    manifest_with_tasks
+    next_actions <<'EOF'
+## T-007: Closed task
+
+```
+example block
+    ```
+
+**Acceptance criteria:**
+- [ ] still unresolved
+EOF
+    gadd
+    run node "$AC" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"unterminated-fence"* ]]
+    [[ "$output" == *"line(s) after it were skipped"* ]]
+}
+
+@test "acceptance-criteria: the same document with the fence closed reports the real defect" {
+    # The twin of the fixture above, one character different: the closing fence
+    # is not indented. The criteria become visible and the done rule fires. This
+    # is what proves the fence finding is about the skipped lines, not noise.
+    enable_gate_strict
+    manifest_with_tasks
+    next_actions <<'EOF'
+## T-007: Closed task
+
+```
+example block
+```
+
+**Acceptance criteria:**
+- [ ] still unresolved
+EOF
+    gadd
+    run node "$AC" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" != *"unterminated-fence"* ]]
+    [[ "$output" == *"unresolved-on-done"* ]]
+}
+
+@test "acceptance-criteria: an empty criteria section is a finding" {
+    enable_gate_strict
+    manifest_with_tasks
+    next_actions <<'EOF'
+## T-007: Closed task
+
+**Acceptance criteria:**
+
+## Something else
+EOF
+    gadd
+    run node "$AC" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"unparsed-criteria-section"* ]]
+}
+
+@test "acceptance-criteria: criteria written as a table are a finding" {
+    enable_gate_strict
+    manifest_with_tasks
+    next_actions <<'EOF'
+## T-007: Closed task
+
+**Acceptance criteria:**
+
+| Criterion | Met |
+|-----------|-----|
+| ships     | no  |
+EOF
+    gadd
+    run node "$AC" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"unparsed-criteria-section"* ]]
+}
+
+@test "acceptance-criteria: criteria written as prose are a finding" {
+    enable_gate_strict
+    manifest_with_tasks
+    next_actions <<'EOF'
+## T-007: Closed task
+
+**Acceptance criteria:**
+
+The feature ships and the tests pass.
+EOF
+    gadd
+    run node "$AC" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"unparsed-criteria-section"* ]]
+}
+
+@test "acceptance-criteria: an indented criteria list is a finding, not silence" {
+    # Indented items are detail lines by design. A section made only of them has
+    # no criterion the gate can read, which is the case this finding exists for.
+    enable_gate_strict
+    manifest_with_tasks
+    next_actions <<'EOF'
+## T-007: Closed task
+
+**Acceptance criteria:**
+
+  - [ ] indented and unresolved
+  - [ ] also unresolved
+EOF
+    gadd
+    run node "$AC" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"unparsed-criteria-section"* ]]
+}
+
+@test "acceptance-criteria: a section with real criteria and nested detail is clean" {
+    # The guard on the finding above: nested detail lines under a real criterion
+    # must not make the section look unparsed.
+    enable_gate_strict
+    manifest_with_tasks
+    next_actions <<'EOF'
+## T-008: Open task
+
+**Acceptance criteria:**
+- [ ] the criterion
+  - a detail line
+  - another detail line
+EOF
+    gadd
+    run node "$AC" "$TEST_TMPDIR"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Acceptance criteria OK"* ]]
+}
+
+@test "acceptance-criteria: a criteria section outside any task is a finding" {
+    enable_gate_strict
+    manifest_with_tasks
+    next_actions <<'EOF'
+## Appendix
+
+**Acceptance criteria:**
+- [ ] belongs to nothing
+EOF
+    gadd
+    run node "$AC" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"unbound-criteria-section"* ]]
+    [[ "$output" == *"not inside any task section"* ]]
+}
+
+@test "acceptance-criteria: a task id absent from the registry is a finding" {
+    enable_gate_strict
+    manifest_with_tasks
+    next_actions <<'EOF'
+## T-999: A task the registry has never heard of
+
+**Acceptance criteria:**
+- [ ] unresolved
+EOF
+    gadd
+    run node "$AC" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"unbound-criteria-section"* ]]
+    [[ "$output" == *"T-999"* ]]
+}
+
+@test "acceptance-criteria: with no task registry at all binding is not judged" {
+    # Absent registry means the done rule genuinely does not apply, so unbound is
+    # not a defect - reporting it there would be noise with no possible fix.
+    enable_gate_strict
+    next_actions <<'EOF'
+## Appendix
+
+**Acceptance criteria:**
+- [ ] belongs to nothing
+EOF
+    gadd
+    run node "$AC" "$TEST_TMPDIR"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Acceptance criteria OK"* ]]
+    [[ "$output" != *"unbound-criteria-section"* ]]
+}
+
+@test "acceptance-criteria: a tasks array is an unusable registry, not one task" {
+    # An array satisfies `typeof x === "object"`. Treating it as a registry
+    # reported a reassuring task count while no task id could ever match.
+    enable_gate_strict
+    cat > "$TEST_TMPDIR/.ai/handoff/MANIFEST.json" <<'EOF'
+{
+  "aahp_version": "3.0",
+  "project": "fixture",
+  "last_session": { "agent": "t", "session_id": "s", "timestamp": "2026-01-01T00:00:00Z", "phase": "idle" },
+  "files": {},
+  "quick_context": "fixture",
+  "next_task_id": 9,
+  "tasks": [ { "id": "T-007", "status": "done" } ]
+}
+EOF
+    next_actions <<'EOF'
+## T-007: Closed task
+
+**Acceptance criteria:**
+- [ ] unresolved
+EOF
+    gadd
+    run node "$AC" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"manifest-unreadable"* ]]
+    [[ "$output" == *"is an array"* ]]
+    [[ "$output" != *"1 task(s)"* ]]
+}
+
+@test "acceptance-criteria: a null tasks member is an unusable registry" {
+    enable_gate_strict
+    cat > "$TEST_TMPDIR/.ai/handoff/MANIFEST.json" <<'EOF'
+{
+  "aahp_version": "3.0",
+  "project": "fixture",
+  "last_session": { "agent": "t", "session_id": "s", "timestamp": "2026-01-01T00:00:00Z", "phase": "idle" },
+  "files": {},
+  "quick_context": "fixture",
+  "next_task_id": 9,
+  "tasks": null
+}
+EOF
+    next_actions <<'EOF'
+## T-007: Closed task
+
+**Acceptance criteria:**
+- [ ] unresolved
+EOF
+    gadd
+    run node "$AC" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"manifest-unreadable"* ]]
+}
+
+# --- parser coverage: the heading forms that bind a task id ------------------
+
+@test "acceptance-criteria: a setext heading binds a task id" {
+    enable_gate_strict
+    manifest_with_tasks
+    next_actions <<'EOF'
+T-007: Closed task
+==================
+
+Acceptance criteria
+-------------------
+
+- [ ] unresolved
+EOF
+    gadd
+    run node "$AC" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"unresolved-on-done"* ]]
+    [[ "$output" == *"T-007"* ]]
+}
+
+@test "acceptance-criteria: a bold label binds a task id" {
+    enable_gate_strict
+    manifest_with_tasks
+    next_actions <<'EOF'
+**T-007: Closed task**
+
+**Acceptance criteria:**
+- [ ] unresolved
+EOF
+    gadd
+    run node "$AC" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"unresolved-on-done"* ]]
+    [[ "$output" == *"T-007"* ]]
+}
+
+# --- the reference implementation is conformant under its own gate -----------
+
+@test "acceptance-criteria: this repository is clean under its own gate" {
+    run node "$AC" "$AAHP_ROOT"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Acceptance criteria OK"* ]]
+    [[ "$output" != *"WARN"* ]]
 }

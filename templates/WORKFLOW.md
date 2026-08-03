@@ -1,7 +1,8 @@
 # [PROJECT]: Autonomous Multi-Agent Workflow
 
 > Based on the [AAHP Protocol](https://github.com/homeofe/AAHP).
-> No manual triggers. Agents read `handoff/DASHBOARD.md` and work autonomously.
+> No manual triggers. Agents orient from MANIFEST.json, then work autonomously.
+> Model routing is owned by the consuming harness (README Section 9.1).
 
 ---
 
@@ -23,8 +24,8 @@
 ### Phase 1: Research & Context
 
 ```
-Reads:   handoff/NEXT_ACTIONS.md or DASHBOARD.md (top unblocked task)
-         handoff/STATUS.md (current project state)
+Reads:   MANIFEST.json (tasks + quick_context), then STATUS.md
+         NEXT_ACTIONS.md for human-readable task detail when needed
 
 Does:    Researches relevant OSS libraries / APIs / compliance requirements
          Checks whether similar solutions already exist in the project
@@ -136,11 +137,17 @@ Notify:  Project owner -only on fully completed tasks, not phase transitions
 
 ## Task Selection Rules
 
-1. Read `DASHBOARD.md`, take the top task where `Ready? = ✅`
-2. If a task is **blocked** → skip it, take the next unblocked one
-3. If **all tasks are blocked** → notify the project owner, pause
-4. Never start a task without reading `STATUS.md` first
-5. After completing a task → always update `DASHBOARD.md` before stopping
+Authoritative source: **MANIFEST.json `tasks` graph** (README Section 8.4).
+
+1. Read `MANIFEST.json`
+2. Filter tasks where `status = "ready"`
+3. For each ready task, require every `depends_on` entry to have `status = "done"`
+4. Sort by priority; pick the top task
+5. Never start a task without reading `STATUS.md` first
+6. After completing a task, update MANIFEST tasks / NEXT_ACTIONS.md and regenerate the manifest
+
+`DASHBOARD.md` is a **derived display surface** for humans. It is not the task-selection
+authority. If DASHBOARD and MANIFEST disagree, MANIFEST wins.
 
 ---
 

@@ -7,7 +7,7 @@
 > `- [ ]` while unresolved, `- [x]` only on evidence; before a task is `done` every
 > criterion is checked, waived `(waived: rationale)`, or moved `(follow-up: ref)`.
 
-Current version: **v3.9.0**
+Current version: **v3.9.1**
 
 ---
 
@@ -25,6 +25,13 @@ Counts mirror the `tasks` registry in `MANIFEST.json`.
 
 ## Recently Completed
 
+### 2026-08-03: Handoff hygiene + doctor partial-index alignment (issues #56-#61)
+
+- Rewrote STATUS.md to a current-state snapshot; fixed MANIFEST summaries / quick_context.
+- Aligned WORKFLOW.md (Phase 4.5, harness-owned models, MANIFEST task selection).
+- doctor `handoff-set` now fails on a partial index (matches Layer 1 / lint).
+- Closed false LOG "exceeds 10" claim (#58) and Perplexity meta-stamp (#61).
+
 ### T-033: Reusable AAHP badge workflows [medium] (issue #12)
 
 - Added stable per-check workflows for AAHP Verify, Lint, Manifest, Archive, and PII Allowlist.
@@ -35,12 +42,15 @@ Counts mirror the `tasks` registry in `MANIFEST.json`.
 - Added `aahp archive` with default keep=10 behavior and `--verify`.
 - Added archive tests and MANIFEST coverage for `LOG-ARCHIVE.md`.
 
-
 ### T-031: Reviewed, expiring PII allowlist [high] (external backlog item)
 
 - Added a strict exact-email allowlist with owner, reason, and expiry fields.
 - Integrated it into `aahp lint` and MANIFEST integrity; it cannot suppress secrets.
 - Added schema, template, rollout owners, and regression tests.
+
+### T-014 / T-015 / T-016 / T-017 / T-006 (CLI, status, archive, CLAUDE.md, npm)
+
+- Closed via prior releases; detail and criteria evidence remain in the section below.
 
 ---
 
@@ -191,29 +201,6 @@ None.
 
 ---
 
-## Recently Completed
-
-### T-033: Reusable AAHP badge workflows [medium] (issue #12)
-
-- Added stable per-check workflows for AAHP Verify, Lint, Manifest, Archive, and PII Allowlist.
-- Documented badge snippets for downstream repositories.
-
-### T-032: LOG archive integrity [medium] (issue #11)
-
-- Added `aahp archive` with default keep=10 behavior and `--verify`.
-- Added archive tests and MANIFEST coverage for `LOG-ARCHIVE.md`.
-
-
-| ID | Item | Date |
-|----|------|------|
-| T-010 | Fix shellcheck warnings in CI | 2026-02-28 |
-| T-009 | Add bats tests to CI pipeline | 2026-02-28 |
-| T-008 | Add bats tests to CI pipeline (original) | 2026-02-27 |
-| T-007 | Fix shellcheck warnings in CI | 2026-02-27 |
-| T-005 | Add automated script tests (bats) | 2026-02-26 |
-
----
-
 ## Reference: Key File Locations
 
 | What | Where |
@@ -226,5 +213,5 @@ None.
 | CI workflow | `.github/workflows/ci.yml` |
 | Publish workflow | `.github/workflows/publish.yml` |
 | Test suite | `tests/` |
-| License | `LICENSE` (CC BY 4.0) |
+| License | `LICENSE` (Apache-2.0) |
 | Own handoff files | `.ai/handoff/` |

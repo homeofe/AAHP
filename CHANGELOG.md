@@ -11,6 +11,25 @@ independently of the npm version).
 
 ## [Unreleased]
 
+## [3.9.1] - 2026-08-03
+**Doctor handoff-set matches Layer 1 on partial indexes; handoff hygiene**
+
+### Fixed
+- `aahp doctor` `handoff-set` gate now fails when a canonical handoff file is present on
+  disk but missing from `MANIFEST.json` `files{}` (partial index). Previously doctor could
+  report PASS while `aahp verify` Layer 1 / `lint-handoff.sh` already failed the same state.
+  Regression coverage in `tests/doctor.bats`.
+- `aahp_auto_summary` looks past title/blockquote/header chrome (first 40 content lines)
+  so regenerating a manifest no longer collapses every summary to `(no summary available)`
+  on normal handoff files.
+
+### Changed
+- Dogfooded handoff hygiene: STATUS.md rewritten to a current-state snapshot (no session
+  append log), WORKFLOW.md aligned with Phase 4.5 + MANIFEST task selection + harness-owned
+  model routing, NEXT_ACTIONS.md single Recently Completed section, TRUST.md re-verified.
+- Template `WORKFLOW.md` task-selection rules now point at MANIFEST.json as authority
+  (DASHBOARD is display-only), matching README Section 8.4.
+
 ## [3.9.0] - 2026-07-26
 **Acceptance-criteria lifecycle, plus an advisory report that is deliberately not a gate**
 
@@ -413,10 +432,9 @@ independently of the npm version).
 ### Changed
 - Relicensed to Apache-2.0 (earlier commits carried MIT, then CC BY 4.0, headers).
 
-[Unreleased]: https://github.com/homeofe/AAHP/compare/v3.9.0...HEAD
+[Unreleased]: https://github.com/homeofe/AAHP/compare/v3.9.1...HEAD
+[3.9.1]: https://github.com/homeofe/AAHP/compare/v3.9.0...v3.9.1
 [3.9.0]: https://github.com/homeofe/AAHP/compare/v3.8.3...v3.9.0
-
-[Unreleased]: https://github.com/homeofe/AAHP/compare/v3.8.3...HEAD
 [3.8.3]: https://github.com/homeofe/AAHP/compare/v3.8.2...v3.8.3
 [3.8.2]: https://github.com/homeofe/AAHP/compare/v3.8.1...v3.8.2
 [3.8.1]: https://github.com/homeofe/AAHP/compare/v3.8.0...v3.8.1

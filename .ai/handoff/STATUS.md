@@ -38,6 +38,7 @@ NEXT_ACTIONS dedupe, and doctor `handoff-set` alignment with Layer 1 on partial 
 | `aahp doctor` | OK | handoff-set now fails on partial index (aligned with verify Layer 1 / lint) |
 | `aahp verify --level prepush` | OK | re-run after handoff rewrite this session |
 | `doctor.bats` | OK | 16 tests (added partial-index regression); run locally via Git Bash |
+| `nonnpm-root.bats` | OK | 11 tests; fixtures write handoff files before indexing (partial-index alignment) |
 | `lint.bats` | OK | 39 tests incl conflict-marker coverage (CI green on #55) |
 | `verify.bats` | OK | 22 tests (CI authoritative for full suite) |
 | `gates.bats` | OK | 22 tests |

@@ -45,10 +45,10 @@ EOF
 # A handoff set good enough for doctor's three handoff gates: a MANIFEST.json
 # with no dangling indexed files, GROUNDING.md, and a TRUST.md that carries a
 # Provenance column. Every file here is in the canonical handoff file list, so
-# handoff-set reports no strays.
+# handoff-set reports no strays. Write files BEFORE create_manifest_json so the
+# index is complete (partial index fails handoff-set after v3.9.1).
 write_handoff_set() {
     local h="$TEST_TMPDIR/.ai/handoff"
-    create_manifest_json "$h"
     echo "# GROUNDING" > "$h/GROUNDING.md"
     cat > "$h/TRUST.md" <<'EOF'
 # Trust Register
@@ -57,6 +57,7 @@ write_handoff_set() {
 |----------|--------|------------|-------|
 | build passes | verified | test_verified | ok |
 EOF
+    create_manifest_json "$h"
 }
 
 # The issue fixture: no root package.json, a valid handoff set, a CHANGELOG.md.

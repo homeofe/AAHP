@@ -1,7 +1,7 @@
 # AAHP: Autonomous Multi-Agent Workflow
 
 > Based on the [AAHP Protocol](https://github.com/homeofe/AAHP).
-> No manual triggers. Agents read `handoff/DASHBOARD.md` and work autonomously.
+> No manual triggers. Agents orient from MANIFEST.json, then work autonomously.
 
 ---
 
@@ -9,12 +9,14 @@
 
 | Agent | Model | Role | Responsibility |
 |-------|-------|------|---------------|
-| Researcher | perplexity/sonar-pro | Researcher | OSS research, compliance checks, doc review |
-| Architect | claude-opus-4.6 | Architect | System design, ADRs, interface definitions |
-| Implementer | claude-opus-4.6 | Implementer | Code, tests, refactoring, commits |
-| Reviewer | claude-opus-4.6 / second model | Reviewer | Second opinion, edge cases, security review |
+| Researcher | e.g. research harness model | Researcher | OSS research, compliance checks, doc review |
+| Architect | e.g. strong reasoning model | Architect | System design, ADRs, interface definitions |
+| Implementer | e.g. coding model | Implementer | Code, tests, refactoring, commits |
+| Reviewer | e.g. second model / peer | Reviewer | Second opinion, edge cases, security review |
 
-> AAHP is a specification project. Most work is documentation, schema design, and bash scripting.
+> Model routing is owned by the consuming harness (README Section 9.1). Do not hard-code
+> vendor model IDs in this protocol document; the table above is role labels only.
+> AAHP is a specification project: most work is documentation, schema design, and bash.
 
 ---
 
@@ -23,14 +25,14 @@
 ### Phase 1: Research & Context
 
 ```
-Reads:   handoff/NEXT_ACTIONS.md or DASHBOARD.md (top unblocked task)
-         handoff/STATUS.md (current project state)
+Reads:   MANIFEST.json (tasks + quick_context), then STATUS.md
+         NEXT_ACTIONS.md for human-readable task detail when needed
 
 Does:    Researches relevant standards, protocols, prior art
          Checks compatibility with existing AAHP tooling
          Clarifies ambiguities in the task
 
-Writes:  handoff/LOG.md -research findings + sources + recommendation
+Writes:  handoff/LOG.md - research findings + sources + recommendation
 ```
 
 ### Phase 2: Architecture Decision
@@ -38,13 +40,13 @@ Writes:  handoff/LOG.md -research findings + sources + recommendation
 ```
 Reads:   Research output from LOG.md
          handoff/STATUS.md
-         README.md (v2 spec), schema/, templates/
+         README.md (spec), schema/, templates/
 
 Does:    Decides on schema extensions, template changes, script modifications
          Chooses branch name
          Defines exactly what the Implementer should build
 
-Writes:  handoff/LOG.md -ADR (Architecture Decision Record)
+Writes:  handoff/LOG.md - ADR (Architecture Decision Record)
 ```
 
 ### Phase 3: Implementation
@@ -59,9 +61,9 @@ Does:    Creates feature branch
          Commits and pushes branch
 
 Branch convention:
-  feat/<scope>-<short-name>    → new feature
-  fix/<scope>-<short-name>     → bug fix
-  docs/<scope>-<name>          → documentation only
+  feat/<scope>-<short-name>    -> new feature
+  fix/<scope>-<short-name>     -> bug fix
+  docs/<scope>-<name>          -> documentation only
 
 Commit format:
   feat(scope): description [AAHP-auto]
@@ -73,25 +75,42 @@ Commit format:
 ```
 All agents review the completed work.
 
-Architect  → "Does the implementation match the ADR?"
-Reviewer   → "Is it portable? Does it break backward compat?"
-Researcher → "Were all task items fulfilled?"
+Architect  -> "Does the implementation match the ADR?"
+Reviewer   -> "Is it portable? Does it break backward compat?"
+Researcher -> "Were all task items fulfilled?"
 
 Outcome:
-  - Minor fixes → Implementer fixes in the same branch
-  - Larger issues → New tasks added to NEXT_ACTIONS.md / DASHBOARD.md
+  - Minor fixes -> Implementer fixes in the same branch
+  - Larger issues -> New tasks added to MANIFEST tasks / NEXT_ACTIONS.md
 ```
+
+### Phase 4.5 (optional): Grounding Audit
+
+```
+Runs:    On demand, or before handoff for high-impact tasks. Advisory, not a gate.
+Trigger: security-sensitive, agent-governance, or compliance task types
+         (see GROUNDING.md task-type anchor matrix).
+Scope:   Grounding and trust-of-claims only - are STATUS.md / TRUST.md assertions
+         actually grounded? provenance gaps? circular review? expired trust?
+         NOT code review (that is Phase 4).
+Emits:   An advisory verdict SHIP / NEEDS_CHANGES / BLOCK, before the terminal
+         Phase 5 handoff. Never a "Phase 6": Phase 5 is the final atomic step.
+```
+
+> Draft v0.1. See GROUNDING.md and README sections 2.10 and 9.4. The audit reasons
+> on top of the verify gate; it does not restate its checks.
 
 ### Phase 5: Completion & Handoff
 
 ```
-DASHBOARD.md:    Update component status, pipeline state
-STATUS.md:       Update changed system state
-LOG.md:          Append session summary
+STATUS.md:       Rewrite current state (not append)
+LOG.md:          Append session summary (rotate if entry count exceeds 10)
 NEXT_ACTIONS.md: Check off completed task, add newly discovered tasks
+MANIFEST.json:   Regenerate (aahp manifest) with accurate quick_context
+DASHBOARD.md:    Optional human display surface only (derived, not authoritative)
 
 Git:     Branch pushed, PR-ready
-Notify:  Project owner -only on fully completed tasks
+Notify:  Project owner - only on fully completed tasks
 ```
 
 ---
@@ -101,20 +120,26 @@ Notify:  Project owner -only on fully completed tasks
 | Allowed | Not allowed |
 |---------|-------------|
 | Write & commit scripts, templates, schemas | Push directly to `main` without approval |
-| Write & run script tests | Modify LICENSE or project metadata |
+| Write & run script tests | Modify LICENSE or project metadata without review |
 | Push feature branches | Write secrets or PII into any file |
-| Research & propose protocol extensions | Break backward compatibility with v1 |
+| Research & propose protocol extensions | Break backward compatibility with v1 without ADR |
 | Make architecture decisions | Delete existing templates without replacement |
 
 ---
 
 ## Task Selection Rules
 
-1. Read `DASHBOARD.md`, take the top task where `Ready? = Yes`
-2. If a task is **blocked** → skip it, take the next unblocked one
-3. If **all tasks are blocked** → notify the project owner, pause
-4. Never start a task without reading `STATUS.md` first
-5. After completing a task → always update `DASHBOARD.md` before stopping
+Authoritative source: **MANIFEST.json `tasks` graph** (README Section 8.4).
+
+1. Read `MANIFEST.json`
+2. Filter tasks where `status = "ready"`
+3. For each ready task, require every `depends_on` entry to have `status = "done"`
+4. Sort by priority; pick the top task
+5. Never start a task without reading `STATUS.md` first
+6. After completing a task, update MANIFEST tasks / NEXT_ACTIONS.md and regenerate the manifest
+
+`DASHBOARD.md` is a **derived display surface** for humans. It is not the task-selection
+authority. If DASHBOARD and MANIFEST disagree, MANIFEST wins.
 
 ---
 

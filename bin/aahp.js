@@ -565,6 +565,17 @@ function gateHandoffSet(handoffDir) {
   const files = manifest.files || {}
   const missing = Object.keys(files).filter((f) => !existsSync(join(handoffDir, f)))
   if (missing.length) return { status: 'fail', reason: `indexed file(s) missing on disk: ${missing.join(', ')}` }
+  // Partial index: a canonical handoff file is on disk but missing from files{}.
+  // Mirrors Layer 1 / lint-handoff so doctor cannot green-wash a partial index.
+  const unindexed = [...canonical].filter(
+    (f) => existsSync(join(handoffDir, f)) && !Object.prototype.hasOwnProperty.call(files, f)
+  )
+  if (unindexed.length) {
+    return {
+      status: 'fail',
+      reason: `canonical file(s) present but not indexed: ${unindexed.join(', ')}`
+    }
+  }
   let entries = []
   try {
     entries = readdirSync(handoffDir)

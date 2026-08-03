@@ -60,9 +60,12 @@ aahp_line_count() {
 aahp_auto_summary() {
     local filepath="$1"
     local summary
-    summary=$(head -5 "$filepath" \
+    # Look past title/blockquote/header chrome (handoff files often start with
+    # # headings and > rules). First 40 content lines is enough for a one-liner.
+    summary=$(head -40 "$filepath" \
         | tr -d '\r' \
         | grep -v '^#' | grep -v '^>' | grep -v '^---' | grep -v '^$' \
+        | grep -v '^<!--' | grep -v '^|[-:| ]*$' \
         | head -1 | cut -c1-150 || true)
     [ -z "$summary" ] && summary="(no summary available)"
     # Escape double quotes and backslashes for JSON safety

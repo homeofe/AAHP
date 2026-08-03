@@ -27,7 +27,8 @@ EOF
   "pinnedDep": {}
 }
 EOF
-    create_manifest_json "$h"
+    # Write every present handoff file BEFORE create_manifest_json so the
+    # handoff-set gate (which fails on a partial index) sees a complete index.
     echo "# GROUNDING" > "$h/GROUNDING.md"
     cat > "$h/TRUST.md" <<'EOF'
 # Trust Register
@@ -36,6 +37,7 @@ EOF
 |----------|--------|------------|-------|
 | build passes | verified | test_verified | ok |
 EOF
+    create_manifest_json "$h"
 }
 
 @test "doctor: conformant fixture passes with no failing gates" {
@@ -135,6 +137,25 @@ EOF
     [[ "$output" == *"missing on disk"* ]]
 }
 
+@test "doctor: handoff-set fails when a canonical file is present but not indexed" {
+    scaffold_conformant
+    local h="$TEST_TMPDIR/.ai/handoff"
+    # Leave TRUST.md on disk, drop it from the MANIFEST files index only.
+    echo "# STATUS" > "$h/STATUS.md"
+    create_manifest_json "$h"
+    node -e '
+      const fs = require("fs");
+      const p = process.argv[1];
+      const m = JSON.parse(fs.readFileSync(p, "utf8"));
+      delete m.files["TRUST.md"];
+      fs.writeFileSync(p, JSON.stringify(m, null, 2) + "\n");
+    ' "$h/MANIFEST.json"
+    run node "$AAHP" doctor "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"not indexed"* ]]
+    [[ "$output" == *"TRUST.md"* ]]
+}
+
 @test "doctor: manifest-schema fails on a malformed manifest" {
     scaffold_conformant
     cat > "$TEST_TMPDIR/.ai/handoff/MANIFEST.json" <<'EOF'
@@ -148,7 +169,15 @@ EOF
 
 @test "doctor: --quiet prints only failing gates" {
     scaffold_conformant
-    rm -f "$TEST_TMPDIR/.ai/handoff/GROUNDING.md"
+    # Fail grounding only (no Provenance column). Do not delete an indexed file:
+    # that would also fail handoff-set after the partial-index alignment.
+    cat > "$TEST_TMPDIR/.ai/handoff/TRUST.md" <<'EOF'
+# Trust Register
+
+| Property | Status | Notes |
+|----------|--------|-------|
+| build passes | verified | ok |
+EOF
     run node "$AAHP" doctor "$TEST_TMPDIR" --quiet
     [ "$status" -eq 1 ]
     [[ "$output" == *"grounding"* ]]

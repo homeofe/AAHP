@@ -11,6 +11,7 @@
 #   4. MANIFEST.json schema (basic)
 #   5. HANDOFF.lock stale check
 #   6. Parallel agent detection (advisory)
+#   7. Git conflict markers in handoff files 
 #
 # Exit codes (this script DECIDES, it does not merely report):
 #   0 = all checks passed
@@ -79,7 +80,7 @@ fi
 
 # ─── Check 1: Prompt Injection Patterns ──────────────────────
 
-echo -e "${GREEN}[1/6]${NC} Checking for prompt injection patterns..."
+echo -e "${GREEN}[1/7]${NC} Checking for prompt injection patterns..."
 
 INJECTION_PATTERNS=(
     "ignore all previous"
@@ -109,7 +110,7 @@ fi
 
 # ─── Check 2: Secrets & API Keys ─────────────────────────────
 
-echo -e "${GREEN}[2/6]${NC} Checking for secrets and API keys..."
+echo -e "${GREEN}[2/7]${NC} Checking for secrets and API keys..."
 
 # Prefix patterns carry a length floor (\{16,\}) so they only match a
 # realistic key-length run, not a "sk-"/"AKIA" prefix glued to one or two
@@ -150,7 +151,7 @@ fi
 
 # --- Check 3: PII Patterns and Reviewed Allowlist ----------------
 
-echo -e "${GREEN}[3/6]${NC} Checking for PII..."
+echo -e "${GREEN}[3/7]${NC} Checking for PII..."
 
 ALLOWLIST_FILE="$HANDOFF_DIR/pii-allowlist.json"
 ALLOWLIST_ENTRIES=""
@@ -221,7 +222,7 @@ fi
 
 # ─── Check 4: MANIFEST.json Basic Validation ─────────────────
 
-echo -e "${GREEN}[4/6]${NC} Validating MANIFEST.json..."
+echo -e "${GREEN}[4/7]${NC} Validating MANIFEST.json..."
 
 # Python command was detected before the PII allowlist check.
 
@@ -334,7 +335,7 @@ fi
 
 # ─── Check 5: Stale HANDOFF.lock ─────────────────────────────
 
-echo -e "${GREEN}[5/6]${NC} Checking for stale HANDOFF.lock..."
+echo -e "${GREEN}[5/7]${NC} Checking for stale HANDOFF.lock..."
 
 if [ -f "$HANDOFF_DIR/HANDOFF.lock" ]; then
     echo -e "  ${RED}✗ HANDOFF.lock exists! Previous session may not have completed cleanly.${NC}"
@@ -347,7 +348,7 @@ fi
 
 # ─── Check 6: Parallel Agent Detection ────────────────────────
 
-echo -e "${GREEN}[6/6]${NC} Checking for parallel agent sessions..."
+echo -e "${GREEN}[6/7]${NC} Checking for parallel agent sessions..."
 
 if command -v git &>/dev/null && git -C "$PROJECT_ROOT" rev-parse --git-dir &>/dev/null 2>&1; then
     LOCK_BRANCHES=()
@@ -370,6 +371,42 @@ if command -v git &>/dev/null && git -C "$PROJECT_ROOT" rev-parse --git-dir &>/d
     fi
 else
     echo -e "  ${YELLOW}⚠ Not a git repo. Skipping parallel agent check.${NC}"
+fi
+
+# ─── Check 7: Git conflict markers ───────────────────────────
+# Refuse clean status when markers remain (nested-marker damage).
+
+echo -e "${GREEN}[7/7]${NC} Checking for git conflict markers..."
+
+MARKER_RC=0
+# Prefer node (CI/Linux). On some Windows git-bash installs `node` is not on
+# PATH even though Node exists for the package; fall back to absolute `node.exe`
+# discovery is unnecessary - use the same interpreter helper pattern as _aahp-lib.
+if command -v node &>/dev/null; then
+    node "$SCRIPT_DIR/check-conflict-markers.mjs" "$PROJECT_ROOT" || MARKER_RC=$?
+elif command -v node.exe &>/dev/null; then
+    node.exe "$SCRIPT_DIR/check-conflict-markers.mjs" "$PROJECT_ROOT" || MARKER_RC=$?
+else
+    # Pure-bash fallback: strip CR and match markers without node.
+    MARKER_FOUND=0
+    shopt -s nullglob
+    for f in "$HANDOFF_DIR"/*.md "$HANDOFF_DIR"/*.json; do
+        [ -f "$f" ] || continue
+        if tr -d '\r' < "$f" | grep -E '^(<<<<<<<|>>>>>>>|=======)($|[[:space:]])' -q; then
+            echo -e "  ${RED}✗ Conflict markers present in: $f${NC}"
+            MARKER_FOUND=1
+        fi
+    done
+    shopt -u nullglob
+    if [ "$MARKER_FOUND" -eq 1 ]; then
+        MARKER_RC=1
+    fi
+fi
+if [ "$MARKER_RC" -eq 1 ]; then
+    VIOLATIONS=$((VIOLATIONS + 1))
+elif [ "$MARKER_RC" -ne 0 ]; then
+    echo -e "  ${RED}✗ conflict-marker check could not run (exit $MARKER_RC).${NC}"
+    VIOLATIONS=$((VIOLATIONS + 1))
 fi
 
 # ─── Summary ──────────────────────────────────────────────────

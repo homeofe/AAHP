@@ -484,3 +484,29 @@ PY
     [ "$status" -eq 1 ]
     [[ "$output" == *"violation(s) found"* ]]
 }
+
+# --- Conflict markers  --------------------------------
+
+@test "detects LF conflict markers in STATUS.md" {
+    create_full_handoff
+    printf '%s\n' '<<<<<<< HEAD' 'ours' '=======' 'theirs' '>>>>>>> branch' >> "$TEST_TMPDIR/.ai/handoff/STATUS.md"
+
+    run bash "$SCRIPTS_DIR/lint-handoff.sh" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"conflict markers"* ]] || [[ "$output" == *"check-conflict-markers"* ]]
+}
+
+@test "detects CRLF conflict markers" {
+    create_full_handoff
+    node -e "const fs=require('fs');const p=process.argv[1]+'/.ai/handoff/STATUS.md';fs.appendFileSync(p,Buffer.from('<<<<<<< HEAD\r\nours\r\n=======\r\ntheirs\r\n>>>>>>> branch\r\n'));" "$TEST_TMPDIR"
+
+    run bash "$SCRIPTS_DIR/lint-handoff.sh" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"conflict markers"* ]] || [[ "$output" == *"check-conflict-markers"* ]]
+}
+
+@test "check-conflict-markers.mjs is clean on full handoff" {
+    create_full_handoff
+    run node "$SCRIPTS_DIR/check-conflict-markers.mjs" "$TEST_TMPDIR"
+    [ "$status" -eq 0 ]
+}

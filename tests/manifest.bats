@@ -205,6 +205,42 @@ _detect_python() {
     [[ "$manifest_content" == *'"next_task_id": 3'* ]]
 }
 
+@test "preserves existing project name on regeneration" {
+    create_status_md
+    create_next_actions_md
+    create_log_md
+    create_manifest_json
+
+    # TEST_TMPDIR's basename never equals "TestProject", so if regeneration
+    # falls back to deriving the name from the directory basename instead of
+    # preserving the value already in MANIFEST.json, this test catches it.
+    run bash "$SCRIPTS_DIR/aahp-manifest.sh" "$TEST_TMPDIR" --quiet
+    [ "$status" -eq 0 ]
+
+    manifest_content=$(cat "$TEST_TMPDIR/.ai/handoff/MANIFEST.json")
+
+    if [[ "$manifest_content" != *'"project"'* ]]; then
+        skip "project field missing (likely node cannot resolve tmpdir path on this platform)"
+    fi
+
+    [[ "$manifest_content" == *'"project": "TestProject"'* ]]
+}
+
+@test "derives project name from directory basename on first generation" {
+    create_status_md
+    create_next_actions_md
+    create_log_md
+    # No existing MANIFEST.json: this is a first-ever generation, so the
+    # project name must come from the directory basename.
+
+    run bash "$SCRIPTS_DIR/aahp-manifest.sh" "$TEST_TMPDIR" --quiet
+    [ "$status" -eq 0 ]
+
+    manifest_content=$(cat "$TEST_TMPDIR/.ai/handoff/MANIFEST.json")
+    expected_name="$(basename "$TEST_TMPDIR")"
+    [[ "$manifest_content" == *"\"project\": \"$expected_name\""* ]]
+}
+
 # ─── File indexing ───────────────────────────────────────────
 
 @test "indexes all present handoff files" {

@@ -1,6 +1,6 @@
 # AAHP: Current State of the Nation
 
-> Last updated: 2026-08-05 by claude-opus-5
+> Last updated: 2026-08-05 by claude-sonnet-5
 > Commit: (pending this branch)
 >
 > **Rule:** This file is rewritten (not appended) at the end of every session.
@@ -9,9 +9,9 @@
 ---
 
 <!-- SECTION: summary -->
-AAHP **v3.9.1** (npm `@elvatis_com/aahp`). File-based AI-to-AI handoff protocol plus CLI
-for init, lint, migrate, verify, check, doctor, status, archive, criteria, and
-manifest regeneration.
+AAHP **v3.9.1 released** (npm `@elvatis_com/aahp`); this branch adds an unreleased fix on
+top of it. File-based AI-to-AI handoff protocol plus CLI for init, lint, migrate, verify,
+check, doctor, status, archive, criteria, and manifest regeneration.
 
 Shipped surface (high level):
 - **Integrity:** `aahp verify` (4 layers), `aahp lint` (7 checks including conflict-marker
@@ -22,27 +22,27 @@ Shipped surface (high level):
   Layer (TRUST provenance + GROUNDING.md), optional Phase 4.5 in WORKFLOW
 - **Ops:** `aahp status`, `aahp archive`, OIDC npm publish on semver tags, badge workflows
 
-This session (2026-08-05) fixes a Windows-only defect in `handoff-refresh` and removes the
-duplication that caused it. `aahp-dashboard.mjs` shelled out to a bare `bash` with native
-backslash paths. Both halves fail on Windows: bash eats the backslashes as escapes, and a
-bare `bash` can resolve to the WSL launcher, which has no `C:` drive. `LOG.md` is written
-before the regen, so the failure leaves MANIFEST checksums stale against the file just
-produced.
+This session (2026-08-05) is an AAHP-vs-supply-chain-guard (SCG) divergence audit and two
+independent bug fixes, both now merged to `main` per Emre's "no divergence within my
+projects" instruction:
 
-The root cause was a second implementation: `bin/aahp.js` already solved this (its comment
-reads "prefer Git Bash over the WSL bash shim and avoid raw C:\... script arguments") with
-its own `findBashExecutable()`/`toBashScriptArg()`, and the dashboard call site had neither
-and knew nothing of them. There is now ONE implementation in `aahp-config.mjs`, used by
-both, merging what each side got right, plus a test that fails if a copy reappears.
+- **PR #63:** fixed a Windows-only defect in `handoff-refresh`. `aahp-dashboard.mjs`
+  shelled out to a bare `bash` with native backslash paths, which fails on Windows two
+  independent ways: bash eats the backslashes as escapes, and a bare `bash` can resolve to
+  the WSL launcher, which has no `C:` drive. Root cause was a second implementation -
+  `bin/aahp.js` already solved this with its own `findBashExecutable()`/`toBashScriptArg()`,
+  and the dashboard call site had neither. There is now ONE implementation,
+  `resolveBash()`/`toBashPath()` in `aahp-config.mjs`, used by both, with a test that fails
+  if a copy reappears. Found while fixing the identical pattern in supply-chain-guard's
+  divergent fork, then reproduced and fixed upstream directly (not a field report).
+- **PR #64:** fixed `aahp-manifest.sh` unconditionally overwriting MANIFEST `project` with
+  the directory basename on every regeneration, clobbering a consumer's real project name
+  whenever regenerated inside a differently-named checkout. Full detail in the audit section
+  below.
 
-Provenance, stated precisely: found while fixing the identical pattern in
-supply-chain-guard, which runs a **divergent local fork** of this script whose bash call
-has no `generate.log` guard and is therefore always reachable. SCG does not configure
-`generate.log` and does not consume the packaged dashboard in write mode, so it is not a
-consumer of this fix. The upstream defect was reproduced directly against a
-consumer-shaped fixture. Upstream the call is reached only in write mode by a consumer
-that configures `generate.log`; `--check` exits before it. This is therefore a correctness
-fix ahead of a field report, not a response to one.
+Both fixes were found independently while investigating the same underlying problem (AAHP
+vs. SCG divergence); #63's own "What is Missing" already flagged the `project`-clobber bug
+by name and deliberately left it for a separate PR, which is what #64 became.
 <!-- /SECTION: summary -->
 
 ---
@@ -52,20 +52,16 @@ fix ahead of a field report, not a response to one.
 
 | Check | Result | Notes |
 |-------|--------|-------|
-| npm version | OK | 3.9.1 (doctor partial-index alignment + handoff hygiene) |
-| `aahp doctor` | OK | handoff-set now fails on partial index (aligned with verify Layer 1 / lint) |
-| `aahp verify --level prepush` | OK | re-run after handoff rewrite this session |
-| `doctor.bats` | OK | 16 tests (added partial-index regression); run locally via Git Bash |
-| `nonnpm-root.bats` | OK | 11 tests; fixtures write handoff files before indexing (partial-index alignment) |
-| `lint.bats` | OK | 39 tests incl conflict-marker coverage (CI green on #55) |
-| `verify.bats` | OK | 22 tests (CI authoritative for full suite) |
-| `gates.bats` | OK | 22 tests; re-run this session (test 22 exercises the dashboard write path) |
-| `bash-portability.bats` | OK | 13 tests, new; 12 pass + 1 skip on Git Bash (stand-in interpreter needs a POSIX shebang) |
-| `aahp manifest` / `lint` / `verify` | OK | re-run after routing `bin/aahp.js` through the shared helpers; all exit 0 on Windows |
-| `acceptance-criteria.bats` | OK | 66 tests |
+| npm version | OK | 3.9.1 released; #63 + #64 merged to main, release pending |
+| `bash-portability.bats` | OK (#63) | 13 tests, new; 12 pass + 1 skip on Git Bash (stand-in interpreter needs a POSIX shebang); CI green |
+| `tests/manifest.bats` (#64) | OK | 21/21 local, incl. 2 new project-preservation tests; CI green |
+| Real-consumer verification (#64) | OK | Fixed script run against a copy of SCG's actual `.ai/handoff/` from a differently-named directory; preserved `"project": "supply-chain-guard"` |
+| `check-changelog-format.mjs` / `check-forbidden-patterns.mjs` | OK | ran locally for #64 |
+| `aahp doctor` | OK (pre-existing) | handoff-set fails on partial index (aligned with verify Layer 1 / lint) |
+| `doctor.bats` / `lint.bats` / `verify.bats` / `gates.bats` / `acceptance-criteria.bats` | OK (CI, pre-existing) | untouched by #63/#64; CI is authoritative |
 | `cli.bats` | PARTIAL local | known Windows-only flakes; green on Linux CI |
 | `npm run check` | OK | 8 config-driven gates |
-| shellcheck | CI | not installed offline on this Windows host; CI covers shipped scripts |
+| shellcheck | CI | not installed offline on this Windows host; CI covers shipped scripts, incl. both branches' changes |
 | Full bats suite | CI | do not run full suite on this Windows host (~hours); push and let GHA decide |
 <!-- /SECTION: build_health -->
 
@@ -85,7 +81,7 @@ fix ahead of a field report, not a response to one.
 | Release gates | `scripts/check-*.mjs` | Complete | version-sync, changelog, claims, forbidden-patterns, schema-doc-sync, doc-links |
 | Dashboard check | `scripts/aahp-dashboard.mjs` | Complete | handoff freshness; bash call goes through `resolveBash`/`toBashPath` |
 | Shared config lib | `scripts/aahp-config.mjs` | Complete | root/pkg/config resolution, git enumeration, bash interpreter + path portability |
-| Manifest gen | `scripts/aahp-manifest.sh` | Complete | preserves tasks / next_task_id / cross_repo_ref |
+| Manifest gen | `scripts/aahp-manifest.sh` | Complete | preserves tasks / next_task_id / cross_repo_ref / project |
 | Archive | archive command | Complete | keep 10 newest LOG entries |
 | Schemas | `schema/` | Complete | manifest, config, pii-allowlist |
 | Templates | `templates/` | Complete | 12 files incl GROUNDING.md |
@@ -105,10 +101,88 @@ fix ahead of a field report, not a response to one.
 | Template/dogfood DASHBOARD staleness | LOW | DASHBOARD.md still shows early v2 task rows; selection authority is MANIFEST `tasks` (see WORKFLOW). Cosmetic. |
 | Long LOG entry bodies | LOW | LOG.md is at the 10-entry cap with long bodies (~250 lines). Protocol entry count is satisfied; optional future trim of body length only. |
 | Windows full-suite speed | LOW | Full bats is hours on this host; Linux CI / openclaw is the full-suite authority. |
-| No Windows CI runner | MEDIUM | CI is `ubuntu-latest` only, so no job executes the shipped bash tooling under Git Bash. This is how the `handoff-refresh` interpreter defect reached a consumer. Mitigated but not closed: `resolveBash`/`toBashPath` take `platform`/`env` as parameters, so their win32 behaviour is asserted on the Linux runner. A `windows-latest` bats job would cover the remaining surface (`_aahp-lib.sh`, `verify-handoff.sh`, `lint-handoff.sh`), and is a larger change than this fix. |
+| No Windows CI runner | MEDIUM | CI is `ubuntu-latest` only, so no job executes the shipped bash tooling under Git Bash. This is how the `handoff-refresh` interpreter defect (fixed in #63) reached a consumer. Mitigated but not closed: `resolveBash`/`toBashPath` take `platform`/`env` as parameters, so their win32 behaviour is asserted on the Linux runner. A `windows-latest` bats job would cover the remaining surface (`_aahp-lib.sh`, `verify-handoff.sh`, `lint-handoff.sh`), and is a larger change than either #63 or #64. |
 | Consumer-only code paths untested | MEDIUM | AAHP configures only `generate.freshness`, so `writeLog()` returns before the bash call and AAHP's own dogfooding never executes it. Any AAHP-only gate run, on any platform, is blind to that branch. Coverage has to come from a consumer-shaped fixture. |
-| `aahp-manifest.sh` clobbers `project` on regeneration | MEDIUM | `PROJECT_NAME=$(basename ...)` is unconditional (`scripts/aahp-manifest.sh`), so regenerating inside a differently-named checkout (temp dir, CI dir, tarball) overwrites a consumer's real project name. supply-chain-guard already carries the fix (preserve the existing MANIFEST `project`, derive from basename only on first generation) and it was never upstreamed. The estate's most-depended-upon repo is the one carrying the bug. Not fixed here to keep this PR to one concern. |
+| AAHP/SCG shared-primitive duplication | MEDIUM | `_aahp-lib.sh` and `aahp-manifest.sh` are hand-copied into `homeofe/supply-chain-guard` because SCG's fork `aahp-dashboard.mjs` calls the local copies. See "AAHP vs supply-chain-guard divergence audit" below. Decision needed from Emre before Step 3 (SCG-side) can land. |
 <!-- /SECTION: what_is_missing -->
+
+---
+
+## AAHP vs supply-chain-guard divergence audit (2026-08-05)
+
+Emre asked to eliminate divergence between AAHP and its consumer `homeofe/supply-chain-guard`
+(SCG, v5.25.4, pins `@elvatis_com/aahp` at exact 3.9.1). Audited by execution (diffs, greps,
+functional tests, live gate runs), not by reading claims. Full per-claim evidence lives in
+this session's transcript; summary below.
+
+**Confirmed:** SCG shadows exactly three AAHP-published files (`_aahp-lib.sh`,
+`aahp-manifest.sh`, `aahp-dashboard.mjs`) because SCG's fork dashboard calls the local
+`aahp-manifest.sh`, which sources the local `_aahp-lib.sh`. `propagate.sh` (AAHP's
+anti-divergence mechanism) copies the first two but not the third by design.
+`aahp-dashboard.mjs` is architecturally a different program in each repo (AAHP: generic,
+config-driven, arbitrary consumer root via `resolveRoot()`; SCG: hardcoded to itself,
+generates DASHBOARD.md/TRUST.md/LOG.md from `src/`, `tsconfig.json`, a dependency table).
+`scripts/` is published with no `package.json` `exports` map, so a consumer can deep-import
+`@elvatis_com/aahp/scripts/*.mjs` today with zero AAHP change; adding an `exports` map later
+is a breaking-shaped change (allowlists every unlisted deep import).
+
+**Fixed this session (Step 1):** `aahp-manifest.sh` unconditionally overwrote MANIFEST
+`project` with the directory basename on every regeneration - confirmed by a functional
+test (not just a code read), including against a real copy of SCG's own `.ai/handoff/`.
+Fixed to preserve the existing value except on first-ever generation. Also fixed a latent
+bug this uncovered in the *same* preservation mechanism added in 3.9.1: the tasks/
+`next_task_id`/`cross_repo_ref` fields were tab-joined and split with `IFS=$'\t' read`, but
+tab is IFS whitespace, so bash silently strips/collapses leading empty fields whenever an
+earlier field is empty and a later one isn't (e.g. no tasks but a `cross_repo_ref` present).
+Switched the delimiter to `\x1f` (Unit Separator). Bats coverage added; merged to main as #64.
+
+**Corrections to the pre-session brief (verify before trusting a summary of this audit -
+these were wrong or overstated in the original working notes, don't re-propagate them):**
+- SCG's `aahp.config.json` `check.skip: ["handoff"]` does **not** disable the real 4-layer
+  handoff gate. It only skips one narrow sub-check inside `aahp check`. The actual gate
+  (`aahp verify . --level ci`) runs unconditionally in SCG's `aahp-verify.yml`, no escape
+  hatch. SCG's handoff protocol enforcement is intact.
+- SCG's TRUST records are **not** stale/expired. All 5 rows are within TTL as of
+  2026-08-05 (2 of them expire *today* and need refreshing by 2026-08-06, but that is a
+  same-day risk, not an active false-pass).
+- No gate named or shaped like "schema-doc-sync" enforces "new `aahp.config.json` key needs
+  a schema + README update." `check-schema-doc-sync.mjs` is an unrelated generic value-set
+  comparator. `additionalProperties: false` is real in the schema but is only exercised by
+  one bats test on `aahp init --gates` output, not on hand-edited configs.
+- SCG's CHANGELOG-heading and NEXT_ACTIONS-freshness regexes in SCG's fork dashboard **do**
+  silently drop SemVer prerelease/build-metadata versions (confirmed, both instances) - this
+  is a real latent bug in SCG's fork, not currently observable (no prerelease headings exist
+  yet), out of scope for this AAHP session, worth a note in SCG's own backlog.
+
+## Decisions from Emre
+
+1. **Step 2 - primitive-sharing mechanism: resolved.** Emre approved merging #63 and #64
+   and cutting a release, 2026-08-05. Both merged to `main`. Recommendation carried forward:
+   SCG deep-imports `resolveBash`/`toBashPath` (and similar shared primitives) from
+   `@elvatis_com/aahp/scripts/aahp-config.mjs` - this works today with zero further AAHP
+   change. A declared `exports` map is cleaner but is a breaking-shaped change (allowlists
+   every unlisted deep import) and was not added.
+2. **Step 4 - generalize SCG's generators into AAHP?: still open.** Emre pushed back on the
+   "logic only, stop at Step 3" recommendation, asking for the actual argument against fully
+   upstreaming rather than a restatement of "it's a lot of work." Answered in-session:
+   (a) after Step 3 there is no *shared* logic left to diverge - the two vendored bash files
+   are deleted outright, and what remains in SCG imports AAHP rather than duplicating it,
+   structurally the same as any consumer importing a library and writing its own code on
+   top; (b) AAHP's own CLAUDE.md commits it to being stack-agnostic (Node + bash + standard
+   tools only), while SCG's generator is Node/TypeScript-shaped (`tsconfig.json`, `src/`
+   layout, a `commander` pin) - absorbing it means redesigning it as config-driven, not
+   moving code, which is the actual multi-session cost; (c) blast radius is asymmetric - a
+   bug in SCG's generator today (two were found this session, see corrections above) affects
+   only SCG, but the same bug upstreamed ships to every AAHP consumer; (d) renaming/moving
+   the generator changes its AUTO-GENERATED banner, which changes DASHBOARD/TRUST/LOG
+   content, which changes MANIFEST checksums - not additive, a breaking change needing its
+   own migration. A middle path (AAHP owns a plugin mechanism, consumers register their own
+   sections) was floated as worth scoping separately rather than deciding by default. Emre
+   has not yet picked an option pending this answer - revisit before starting Step 4.
+3. **Step 3 - SCG-side changes** (bump pin, delete SCG's duplicated primitives, pull
+   `aahp_manifest_index()` down, delete the two stale bash copies, rename
+   `aahp-dashboard.mjs`) can now start: the release exists to pin to. Not started this
+   session - next incoming agent or session should pick this up in supply-chain-guard.
 
 ---
 
@@ -116,16 +190,24 @@ fix ahead of a field report, not a response to one.
 
 | Item | Resolution |
 |------|------------|
-| `handoff-refresh` MANIFEST regen fails on Windows | `resolveBash()` prefers an installed Git Bash over a bare PATH lookup; `toBashPath()` normalises separators. `AAHP_BASH` still overrides both. |
-| Windows behaviour untestable on Linux CI | Helpers take `platform`/`env` as parameters, so `tests/bash-portability.bats` asserts the win32 paths deterministically on `ubuntu-latest`. |
+| `handoff-refresh` MANIFEST regen fails on Windows (#63) | `resolveBash()` prefers an installed Git Bash over a bare PATH lookup; `toBashPath()` normalises separators. `AAHP_BASH` still overrides both. |
+| Windows behaviour untestable on Linux CI (#63) | Helpers take `platform`/`env` as parameters, so `tests/bash-portability.bats` asserts the win32 paths deterministically on `ubuntu-latest`. |
+| AAHP/SCG divergence audit | Verified by execution; several pre-session claims corrected (see section above) |
+| MANIFEST `project` clobber bug (#64) | Fixed; preserves existing value except on first-ever generation |
+| Latent tab/IFS field-misalignment bug (#64) | Found while fixing the above (same code block, added in 3.9.1); fixed by switching the field delimiter to `\x1f` |
+
+Prior sessions' resolved items (#55-#61, 2026-08-03 handoff hygiene sweep) are in LOG.md
+and CHANGELOG.md; not repeated here per this file's own "current reality, not history" rule.
 
 ---
 
 ## Trust Levels
 
-- **(Verified):** the defect reproduces on Windows with unmodified 3.9.1 against a consumer-shaped config (`generate.log` set). Observed: `/bin/bash: C:UsersrootworkspaceAAHPscriptsaahp-manifest.sh: No such file or directory`, with the separators stripped and the interpreter resolved to WSL.
-- **(Verified):** mutation proof on the new suite. Reverting both helpers to their pre-fix behaviour turns exactly the two defect-specific tests red; restoring turns them green.
-- **(Verified):** `gates.bats` 22/22 and `npm run check` green after the change; `handoff-refresh` completes end-to-end on the consumer fixture and now resolves an absolute Git Bash rather than relying on PATH order.
-- **(Assumed):** full suite green on Linux CI after push (only the two affected suites were run locally).
-- **(Known gap):** no Windows CI runner, and AAHP's own config cannot reach the fixed code path (see What is Missing).
+- **(Verified):** #63's defect reproduces on Windows with unmodified 3.9.1 against a consumer-shaped config (`generate.log` set); mutation proof on `tests/bash-portability.bats` (revert turns the two defect-specific tests red).
+- **(Verified):** #64's MANIFEST `project`-preservation fix, by functional test plus a real-consumer run against a copy of SCG's actual `.ai/handoff/`.
+- **(Verified):** `gates.bats` 22/22, `npm run check`, and `tests/manifest.bats` 21/21 green locally; both PRs' CI (10 checks each) green before merge.
+- **(Assumed):** full suite green on Linux CI after push (not re-run locally end-to-end on Windows; shellcheck unavailable on this host).
+- **(Known gap):** no Windows CI runner, and AAHP's own config cannot reach the `writeLog()` bash-call path (see What is Missing).
 - **(Known gap):** delete-both-sides Layer 1 hole remains (see What is Missing).
+- **(Known gap):** AAHP/SCG shared-primitive duplication remains until Emre decides Step 2/4
+  (see "Decisions needed from Emre" above).

@@ -20,6 +20,20 @@ independently of the npm version).
   left the manifest checksums stale against the file just produced. Only a project that
   configures `generate.log` reaches this code path, and only in write mode (`--check` exits
   before it), which is why AAHP's own dogfooding never hit it.
+- `aahp-manifest.sh` no longer overwrites an existing MANIFEST.json `project` value with
+  the checkout's directory basename on regeneration. Only a first-ever generation (no
+  `MANIFEST.json` on disk yet) derives `project` from the basename; every regeneration
+  after that preserves the recorded name. Previously, regenerating inside a
+  differently-named checkout (a temp dir, a CI working directory, a tarball extraction)
+  silently clobbered a consumer's real project name. Regression coverage in
+  `tests/manifest.bats`.
+- The same fix corrected a latent misalignment bug in the tasks/`next_task_id`/
+  `cross_repo_ref` preservation added in 3.9.1: the single-node-process read joined
+  fields with a tab and split them with `IFS=$'\t' read`, but tab is IFS whitespace, so
+  bash silently collapses and strips leading empty fields. Any manifest with an empty
+  earlier field and a non-empty later one (e.g. no `tasks` but a `cross_repo_ref`) had its
+  fields shifted into the wrong variables. The delimiter is now `\x1f` (Unit Separator),
+  which is not IFS whitespace.
 
 ### Changed
 - Bash interpreter resolution and Windows path conversion now have a single implementation,

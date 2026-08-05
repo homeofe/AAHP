@@ -145,14 +145,20 @@ CROSS_REPO_REF=""
 if [ -f "$HANDOFF_DIR/MANIFEST.json" ]; then
     # Extract tasks block and next_task_id if they exist
     if command -v node &>/dev/null; then
-        # Read tasks, next_task_id, and cross_repo_ref in a SINGLE node process
-        # (not three) and emit them tab-separated. Fewer spawns matter on Windows,
-        # where process creation is slow. Capture stderr separately so an
-        # interpreter warning cannot corrupt the TSV, and surface a read/parse
-        # error on stderr instead of silently dropping the fields. The path is
-        # passed as argv (process.argv[1]) so native Node can read it on Windows
-        # and MSYS, not only on Linux. JSON.stringify emits a single line with no
-        # literal tab, so the TSV split is safe. The command substitution sits in
+        # Read tasks, next_task_id, cross_repo_ref, and project in a SINGLE node
+        # process (not four) and emit them separated by \x1f (Unit Separator).
+        # Fewer spawns matter on Windows, where process creation is slow.
+        # Capture stderr separately so an interpreter warning cannot corrupt the
+        # record, and surface a read/parse error on stderr instead of silently
+        # dropping the fields. The path is passed as argv (process.argv[1]) so
+        # native Node can read it on Windows and MSYS, not only on Linux.
+        # JSON.stringify emits a single line with no literal \x1f, so the split
+        # is safe. \x1f is used instead of a tab because tab is IFS whitespace:
+        # bash's `read` collapses runs of IFS-whitespace delimiters and strips
+        # leading/trailing ones even with a custom single-character IFS, which
+        # silently misaligns every field once an earlier one is empty (e.g. no
+        # tasks but a project name present). \x1f is not whitespace, so empty
+        # fields are preserved positionally. The command substitution sits in
         # an if-condition, which is exempt from 'set -e', so a missing or corrupt
         # MANIFEST is non-fatal: regeneration continues without the preserved
         # fields rather than aborting.
@@ -163,14 +169,15 @@ if [ -f "$HANDOFF_DIR/MANIFEST.json" ]; then
                 process.stdout.write([
                     m.tasks ? JSON.stringify(m.tasks) : '',
                     m.next_task_id !== undefined ? String(m.next_task_id) : '',
-                    m.cross_repo_ref ? JSON.stringify(m.cross_repo_ref) : ''
-                ].join('\t'));
+                    m.cross_repo_ref ? JSON.stringify(m.cross_repo_ref) : '',
+                    m.project ? String(m.project) : ''
+                ].join('\x1f'));
             } catch (e) {
                 console.error(e.message);
                 process.exit(1);
             }
         " "$HANDOFF_DIR/MANIFEST.json" 2>"$ERR_FILE"); then
-            IFS=$'\t' read -r EXISTING EXISTING_ID EXISTING_CRR <<< "$MANIFEST_FIELDS" || true
+            IFS=$'\x1f' read -r EXISTING EXISTING_ID EXISTING_CRR EXISTING_PROJECT <<< "$MANIFEST_FIELDS" || true
             if [ -n "$EXISTING" ]; then
                 TASKS_JSON="$EXISTING"
             fi
@@ -180,8 +187,16 @@ if [ -f "$HANDOFF_DIR/MANIFEST.json" ]; then
             if [ -n "$EXISTING_CRR" ]; then
                 CROSS_REPO_REF="$EXISTING_CRR"
             fi
+            if [ -n "$EXISTING_PROJECT" ]; then
+                # Preserve the project name already on record instead of
+                # re-deriving it from the directory basename: regenerating
+                # inside a differently-named checkout (a temp dir, a CI
+                # workdir, a tarball) must not overwrite a consumer's real
+                # project name with that checkout's basename.
+                PROJECT_NAME="$EXISTING_PROJECT"
+            fi
         else
-            echo "aahp-manifest: could not read the existing MANIFEST.json to preserve tasks/next_task_id/cross_repo_ref; regenerating without them." >&2
+            echo "aahp-manifest: could not read the existing MANIFEST.json to preserve tasks/next_task_id/cross_repo_ref/project; regenerating without them." >&2
             cat "$ERR_FILE" >&2
         fi
         rm -f "$ERR_FILE"

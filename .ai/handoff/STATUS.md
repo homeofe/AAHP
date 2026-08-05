@@ -1,6 +1,6 @@
 # AAHP: Current State of the Nation
 
-> Last updated: 2026-08-03 by grok-4.5
+> Last updated: 2026-08-05 by claude-opus-5
 > Commit: (pending this branch)
 >
 > **Rule:** This file is rewritten (not appended) at the end of every session.
@@ -22,9 +22,27 @@ Shipped surface (high level):
   Layer (TRUST provenance + GROUNDING.md), optional Phase 4.5 in WORKFLOW
 - **Ops:** `aahp status`, `aahp archive`, OIDC npm publish on semver tags, badge workflows
 
-This session (2026-08-03) closes handoff hygiene drift found by a flawed external
-"cross-check": STATUS rewrite, MANIFEST summaries, WORKFLOW alignment, TRUST re-verify,
-NEXT_ACTIONS dedupe, and doctor `handoff-set` alignment with Layer 1 on partial indexes.
+This session (2026-08-05) fixes a Windows-only defect in `handoff-refresh` and removes the
+duplication that caused it. `aahp-dashboard.mjs` shelled out to a bare `bash` with native
+backslash paths. Both halves fail on Windows: bash eats the backslashes as escapes, and a
+bare `bash` can resolve to the WSL launcher, which has no `C:` drive. `LOG.md` is written
+before the regen, so the failure leaves MANIFEST checksums stale against the file just
+produced.
+
+The root cause was a second implementation: `bin/aahp.js` already solved this (its comment
+reads "prefer Git Bash over the WSL bash shim and avoid raw C:\... script arguments") with
+its own `findBashExecutable()`/`toBashScriptArg()`, and the dashboard call site had neither
+and knew nothing of them. There is now ONE implementation in `aahp-config.mjs`, used by
+both, merging what each side got right, plus a test that fails if a copy reappears.
+
+Provenance, stated precisely: found while fixing the identical pattern in
+supply-chain-guard, which runs a **divergent local fork** of this script whose bash call
+has no `generate.log` guard and is therefore always reachable. SCG does not configure
+`generate.log` and does not consume the packaged dashboard in write mode, so it is not a
+consumer of this fix. The upstream defect was reproduced directly against a
+consumer-shaped fixture. Upstream the call is reached only in write mode by a consumer
+that configures `generate.log`; `--check` exits before it. This is therefore a correctness
+fix ahead of a field report, not a response to one.
 <!-- /SECTION: summary -->
 
 ---
@@ -41,7 +59,9 @@ NEXT_ACTIONS dedupe, and doctor `handoff-set` alignment with Layer 1 on partial 
 | `nonnpm-root.bats` | OK | 11 tests; fixtures write handoff files before indexing (partial-index alignment) |
 | `lint.bats` | OK | 39 tests incl conflict-marker coverage (CI green on #55) |
 | `verify.bats` | OK | 22 tests (CI authoritative for full suite) |
-| `gates.bats` | OK | 22 tests |
+| `gates.bats` | OK | 22 tests; re-run this session (test 22 exercises the dashboard write path) |
+| `bash-portability.bats` | OK | 13 tests, new; 12 pass + 1 skip on Git Bash (stand-in interpreter needs a POSIX shebang) |
+| `aahp manifest` / `lint` / `verify` | OK | re-run after routing `bin/aahp.js` through the shared helpers; all exit 0 on Windows |
 | `acceptance-criteria.bats` | OK | 66 tests |
 | `cli.bats` | PARTIAL local | known Windows-only flakes; green on Linux CI |
 | `npm run check` | OK | 8 config-driven gates |
@@ -63,7 +83,8 @@ NEXT_ACTIONS dedupe, and doctor `handoff-set` alignment with Layer 1 on partial 
 | Conflict markers | `scripts/check-conflict-markers.mjs` | Complete | CRLF-safe; bash/grep fallback |
 | Doctor | `bin/aahp.js` cmdDoctor | Complete | handoff-set matches Layer 1 partial-index rule |
 | Release gates | `scripts/check-*.mjs` | Complete | version-sync, changelog, claims, forbidden-patterns, schema-doc-sync, doc-links |
-| Dashboard check | `scripts/aahp-dashboard.mjs` | Complete | handoff freshness |
+| Dashboard check | `scripts/aahp-dashboard.mjs` | Complete | handoff freshness; bash call goes through `resolveBash`/`toBashPath` |
+| Shared config lib | `scripts/aahp-config.mjs` | Complete | root/pkg/config resolution, git enumeration, bash interpreter + path portability |
 | Manifest gen | `scripts/aahp-manifest.sh` | Complete | preserves tasks / next_task_id / cross_repo_ref |
 | Archive | archive command | Complete | keep 10 newest LOG entries |
 | Schemas | `schema/` | Complete | manifest, config, pii-allowlist |
@@ -84,6 +105,9 @@ NEXT_ACTIONS dedupe, and doctor `handoff-set` alignment with Layer 1 on partial 
 | Template/dogfood DASHBOARD staleness | LOW | DASHBOARD.md still shows early v2 task rows; selection authority is MANIFEST `tasks` (see WORKFLOW). Cosmetic. |
 | Long LOG entry bodies | LOW | LOG.md is at the 10-entry cap with long bodies (~250 lines). Protocol entry count is satisfied; optional future trim of body length only. |
 | Windows full-suite speed | LOW | Full bats is hours on this host; Linux CI / openclaw is the full-suite authority. |
+| No Windows CI runner | MEDIUM | CI is `ubuntu-latest` only, so no job executes the shipped bash tooling under Git Bash. This is how the `handoff-refresh` interpreter defect reached a consumer. Mitigated but not closed: `resolveBash`/`toBashPath` take `platform`/`env` as parameters, so their win32 behaviour is asserted on the Linux runner. A `windows-latest` bats job would cover the remaining surface (`_aahp-lib.sh`, `verify-handoff.sh`, `lint-handoff.sh`), and is a larger change than this fix. |
+| Consumer-only code paths untested | MEDIUM | AAHP configures only `generate.freshness`, so `writeLog()` returns before the bash call and AAHP's own dogfooding never executes it. Any AAHP-only gate run, on any platform, is blind to that branch. Coverage has to come from a consumer-shaped fixture. |
+| `aahp-manifest.sh` clobbers `project` on regeneration | MEDIUM | `PROJECT_NAME=$(basename ...)` is unconditional (`scripts/aahp-manifest.sh`), so regenerating inside a differently-named checkout (temp dir, CI dir, tarball) overwrites a consumer's real project name. supply-chain-guard already carries the fix (preserve the existing MANIFEST `project`, derive from basename only on first generation) and it was never upstreamed. The estate's most-depended-upon repo is the one carrying the bug. Not fixed here to keep this PR to one concern. |
 <!-- /SECTION: what_is_missing -->
 
 ---
@@ -92,21 +116,16 @@ NEXT_ACTIONS dedupe, and doctor `handoff-set` alignment with Layer 1 on partial 
 
 | Item | Resolution |
 |------|------------|
-| PR #55 conflict markers | Merged: lint check 7 fails closed on `<<<<<<<` / `=======` / `>>>>>>>` |
-| STATUS append-log drift (#56) | Rewrote to current-state snapshot (this file) |
-| MANIFEST null summaries (#57) | Regenerated with meaningful quick_context + auto_summary depth fix |
-| LOG "exceeds 10" claim (#58) | Closed as incorrect: exactly 10 entries (at cap, not over) |
-| WORKFLOW drift (#59) | Phase 4.5, harness-owned models, MANIFEST task selection |
-| Doctor partial index (#60.1) | handoff-set fails when canonical file present but not indexed |
-| TRUST TTL drift (#60.2) | Re-verification sweep 2026-08-03 |
-| NEXT_ACTIONS duplicate sections (#60.3) | Single Recently Completed section, max 5 |
-| Perplexity meta-audit (#61) | Closed as non-evidence (model identity faked; rubber-stamped false #58) |
+| `handoff-refresh` MANIFEST regen fails on Windows | `resolveBash()` prefers an installed Git Bash over a bare PATH lookup; `toBashPath()` normalises separators. `AAHP_BASH` still overrides both. |
+| Windows behaviour untestable on Linux CI | Helpers take `platform`/`env` as parameters, so `tests/bash-portability.bats` asserts the win32 paths deterministically on `ubuntu-latest`. |
 
 ---
 
 ## Trust Levels
 
-- **(Verified):** doctor handoff-set fails on partial index (new doctor.bats regression); conflict-marker check shipped in #55.
-- **(Verified):** handoff rewrite + MANIFEST regeneration + `aahp verify --level prepush` this session.
-- **(Assumed):** full suite green on Linux CI after push (not re-run locally end-to-end).
+- **(Verified):** the defect reproduces on Windows with unmodified 3.9.1 against a consumer-shaped config (`generate.log` set). Observed: `/bin/bash: C:UsersrootworkspaceAAHPscriptsaahp-manifest.sh: No such file or directory`, with the separators stripped and the interpreter resolved to WSL.
+- **(Verified):** mutation proof on the new suite. Reverting both helpers to their pre-fix behaviour turns exactly the two defect-specific tests red; restoring turns them green.
+- **(Verified):** `gates.bats` 22/22 and `npm run check` green after the change; `handoff-refresh` completes end-to-end on the consumer fixture and now resolves an absolute Git Bash rather than relying on PATH order.
+- **(Assumed):** full suite green on Linux CI after push (only the two affected suites were run locally).
+- **(Known gap):** no Windows CI runner, and AAHP's own config cannot reach the fixed code path (see What is Missing).
 - **(Known gap):** delete-both-sides Layer 1 hole remains (see What is Missing).

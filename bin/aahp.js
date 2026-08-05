@@ -23,9 +23,10 @@
 //   --version, -v     Show version number
 
 import { fileURLToPath } from 'node:url'
-import { dirname, join, resolve, relative, isAbsolute } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import { existsSync, mkdirSync, copyFileSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { spawn, spawnSync } from 'node:child_process'
+import { resolveBash, toBashPath } from '../scripts/aahp-config.mjs'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -889,36 +890,11 @@ function cmdCriteria(targetPath) {
 // We pass the arguments through directly so the scripts see them unchanged.
 // ---------------------------------------------------------------------------
 
-function toBashScriptArg(scriptPath) {
-  if (process.platform !== 'win32') {
-    return scriptPath
-  }
-
-  const relativePath = relative(process.cwd(), scriptPath)
-  if (relativePath && !relativePath.startsWith('..') && !isAbsolute(relativePath)) {
-    return relativePath.replace(/\\/g, '/')
-  }
-
-  const drivePath = scriptPath.match(/^([A-Za-z]):\\(.*)$/)
-  if (drivePath) {
-    return `/${drivePath[1].toLowerCase()}/${drivePath[2].replace(/\\/g, '/')}`
-  }
-
-  return scriptPath.replace(/\\/g, '/')
-}
-
-function findBashExecutable() {
-  if (process.platform !== 'win32') {
-    return 'bash'
-  }
-
-  const candidates = [
-    'C:\\Program Files\\Git\\bin\\bash.exe',
-    'C:\\Program Files\\Git\\usr\\bin\\bash.exe',
-    'C:\\Program Files (x86)\\Git\\bin\\bash.exe',
-  ]
-  return candidates.find((candidate) => existsSync(candidate)) ?? 'bash'
-}
+// Path conversion and bash resolution live in scripts/aahp-config.mjs so this
+// file and scripts/aahp-dashboard.mjs cannot drift apart. They used to be two
+// separate implementations: this one knew about relative paths and the /c/ MSYS
+// form but not AAHP_BASH, while the dashboard call site knew neither. The same
+// Windows defect then had to be found twice.
 
 function runScript(scriptName, rest) {
   const scriptPath = join(PACKAGE_ROOT, 'scripts', scriptName)
@@ -930,8 +906,10 @@ function runScript(scriptName, rest) {
 
   // Pass all arguments after the subcommand directly to the bash script.
   // On Windows, prefer Git Bash over the WSL bash shim and avoid raw C:\... script arguments.
-  const args = [toBashScriptArg(scriptPath), ...rest]
-  const bashExecutable = findBashExecutable()
+  // The child spawns with cwd: process.cwd() below, so toBashPath's default cwd
+  // is the right one here and must not be overridden.
+  const args = [toBashPath(scriptPath), ...rest]
+  const bashExecutable = resolveBash()
 
   const child = spawn(bashExecutable, args, {
     stdio: 'inherit',

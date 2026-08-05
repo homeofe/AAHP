@@ -11,6 +11,28 @@ independently of the npm version).
 
 ## [Unreleased]
 
+### Fixed
+- `handoff-refresh` no longer fails on Windows when it regenerates `MANIFEST.json`.
+  `aahp-dashboard.mjs` shelled out to a bare `bash` with native backslash paths, which
+  breaks in two independent ways: bash consumes each backslash as an escape, and a bare
+  `bash` on Windows can resolve to `C:\Windows\System32\bash.exe` (the WSL launcher),
+  whose filesystem has no `C:` drive. `LOG.md` is written before the regen, so the failure
+  left the manifest checksums stale against the file just produced. Only a project that
+  configures `generate.log` reaches this code path, and only in write mode (`--check` exits
+  before it), which is why AAHP's own dogfooding never hit it.
+
+### Changed
+- Bash interpreter resolution and Windows path conversion now have a single implementation,
+  `resolveBash()` and `toBashPath()` in `aahp-config.mjs`, used by both `bin/aahp.js` and
+  `scripts/aahp-dashboard.mjs`. `bin/aahp.js` previously carried its own
+  `findBashExecutable()`/`toBashScriptArg()` pair; the dashboard call site had neither, so
+  the same Windows defect had to be found a second time. The merged helper keeps what each
+  side got right: the relative-path and `/c/` MSYS strategies from the CLI, and the
+  `AAHP_BASH` override plus environment-driven candidate paths (including Git's `usr/bin`
+  layout and per-user `LOCALAPPDATA` installs) from the new one. `platform`, `env` and `cwd`
+  are injectable, so the win32 behaviour is asserted on the Linux CI runner
+  (`tests/bash-portability.bats`), and a test fails if a second copy is reintroduced.
+
 ## [3.9.1] - 2026-08-03
 **Doctor handoff-set matches Layer 1 on partial indexes; handoff hygiene**
 

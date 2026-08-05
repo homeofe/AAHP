@@ -11,6 +11,9 @@ independently of the npm version).
 
 ## [Unreleased]
 
+## [3.9.2] - 2026-08-05
+**Windows bash portability, one resolver; MANIFEST project-name preservation**
+
 ### Fixed
 - `handoff-refresh` no longer fails on Windows when it regenerates `MANIFEST.json`.
   `aahp-dashboard.mjs` shelled out to a bare `bash` with native backslash paths, which
@@ -468,7 +471,8 @@ independently of the npm version).
 ### Changed
 - Relicensed to Apache-2.0 (earlier commits carried MIT, then CC BY 4.0, headers).
 
-[Unreleased]: https://github.com/homeofe/AAHP/compare/v3.9.1...HEAD
+[Unreleased]: https://github.com/homeofe/AAHP/compare/v3.9.2...HEAD
+[3.9.2]: https://github.com/homeofe/AAHP/compare/v3.9.1...v3.9.2
 [3.9.1]: https://github.com/homeofe/AAHP/compare/v3.9.0...v3.9.1
 [3.9.0]: https://github.com/homeofe/AAHP/compare/v3.8.3...v3.9.0
 [3.8.3]: https://github.com/homeofe/AAHP/compare/v3.8.2...v3.8.3

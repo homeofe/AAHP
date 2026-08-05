@@ -1,7 +1,7 @@
 # AAHP: Current State of the Nation
 
 > Last updated: 2026-08-05 by claude-sonnet-5
-> Commit: (pending this branch)
+> Commit: (pending merge to main)
 >
 > **Rule:** This file is rewritten (not appended) at the end of every session.
 > It reflects the *current* reality, not history. History lives in LOG.md.
@@ -9,9 +9,9 @@
 ---
 
 <!-- SECTION: summary -->
-AAHP **v3.9.1 released** (npm `@elvatis_com/aahp`); this branch adds an unreleased fix on
-top of it. File-based AI-to-AI handoff protocol plus CLI for init, lint, migrate, verify,
-check, doctor, status, archive, criteria, and manifest regeneration.
+AAHP **v3.9.2** (npm `@elvatis_com/aahp`), CHANGELOG cut and version bumped on this branch,
+release tag pending merge to main. File-based AI-to-AI handoff protocol plus CLI for init,
+lint, migrate, verify, check, doctor, status, archive, criteria, and manifest regeneration.
 
 Shipped surface (high level):
 - **Integrity:** `aahp verify` (4 layers), `aahp lint` (7 checks including conflict-marker
@@ -52,7 +52,7 @@ by name and deliberately left it for a separate PR, which is what #64 became.
 
 | Check | Result | Notes |
 |-------|--------|-------|
-| npm version | OK | 3.9.1 released; #63 + #64 merged to main, release pending |
+| npm version | OK | 3.9.2 cut on this branch (CHANGELOG + package.json); tag/publish pending merge |
 | `bash-portability.bats` | OK (#63) | 13 tests, new; 12 pass + 1 skip on Git Bash (stand-in interpreter needs a POSIX shebang); CI green |
 | `tests/manifest.bats` (#64) | OK | 21/21 local, incl. 2 new project-preservation tests; CI green |
 | Real-consumer verification (#64) | OK | Fixed script run against a copy of SCG's actual `.ai/handoff/` from a differently-named directory; preserved `"project": "supply-chain-guard"` |

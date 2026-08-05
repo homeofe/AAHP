@@ -7,7 +7,7 @@
 > `- [ ]` while unresolved, `- [x]` only on evidence; before a task is `done` every
 > criterion is checked, waived `(waived: rationale)`, or moved `(follow-up: ref)`.
 
-Current version: **v3.9.1**
+Current version: **v3.9.2**
 
 ---
 
@@ -24,6 +24,17 @@ Counts mirror the `tasks` registry in `MANIFEST.json`.
 ---
 
 ## Recently Completed
+
+### 2026-08-05: v3.9.2 - Windows bash portability + MANIFEST project-name preservation (#63, #64)
+
+- #63: unified bash interpreter resolution / Windows path handling into one implementation
+  (`resolveBash`/`toBashPath` in `aahp-config.mjs`), used by both `bin/aahp.js` and
+  `scripts/aahp-dashboard.mjs`; fixed a Windows-only `handoff-refresh` crash.
+- #64: `aahp-manifest.sh` no longer clobbers an existing MANIFEST `project` value with the
+  checkout's basename on regeneration; also fixed a latent tab/IFS field-misalignment bug
+  in the same tasks/next_task_id/cross_repo_ref preservation mechanism.
+- Both found while auditing AAHP-vs-supply-chain-guard divergence; full detail and open
+  decisions in STATUS.md.
 
 ### 2026-08-03: Handoff hygiene + doctor partial-index alignment (issues #56-#61)
 

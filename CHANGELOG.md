@@ -11,6 +11,9 @@ independently of the npm version).
 
 ## [Unreleased]
 
+## [3.9.2] - 2026-08-05
+**Windows bash portability, one resolver; MANIFEST project-name preservation**
+
 ### Fixed
 - `handoff-refresh` no longer fails on Windows when it regenerates `MANIFEST.json`.
   `aahp-dashboard.mjs` shelled out to a bare `bash` with native backslash paths, which
@@ -20,6 +23,20 @@ independently of the npm version).
   left the manifest checksums stale against the file just produced. Only a project that
   configures `generate.log` reaches this code path, and only in write mode (`--check` exits
   before it), which is why AAHP's own dogfooding never hit it.
+- `aahp-manifest.sh` no longer overwrites an existing MANIFEST.json `project` value with
+  the checkout's directory basename on regeneration. Only a first-ever generation (no
+  `MANIFEST.json` on disk yet) derives `project` from the basename; every regeneration
+  after that preserves the recorded name. Previously, regenerating inside a
+  differently-named checkout (a temp dir, a CI working directory, a tarball extraction)
+  silently clobbered a consumer's real project name. Regression coverage in
+  `tests/manifest.bats`.
+- The same fix corrected a latent misalignment bug in the tasks/`next_task_id`/
+  `cross_repo_ref` preservation added in 3.9.1: the single-node-process read joined
+  fields with a tab and split them with `IFS=$'\t' read`, but tab is IFS whitespace, so
+  bash silently collapses and strips leading empty fields. Any manifest with an empty
+  earlier field and a non-empty later one (e.g. no `tasks` but a `cross_repo_ref`) had its
+  fields shifted into the wrong variables. The delimiter is now `\x1f` (Unit Separator),
+  which is not IFS whitespace.
 
 ### Changed
 - Bash interpreter resolution and Windows path conversion now have a single implementation,
@@ -454,7 +471,8 @@ independently of the npm version).
 ### Changed
 - Relicensed to Apache-2.0 (earlier commits carried MIT, then CC BY 4.0, headers).
 
-[Unreleased]: https://github.com/homeofe/AAHP/compare/v3.9.1...HEAD
+[Unreleased]: https://github.com/homeofe/AAHP/compare/v3.9.2...HEAD
+[3.9.2]: https://github.com/homeofe/AAHP/compare/v3.9.1...v3.9.2
 [3.9.1]: https://github.com/homeofe/AAHP/compare/v3.9.0...v3.9.1
 [3.9.0]: https://github.com/homeofe/AAHP/compare/v3.8.3...v3.9.0
 [3.8.3]: https://github.com/homeofe/AAHP/compare/v3.8.2...v3.8.3

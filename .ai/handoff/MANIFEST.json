@@ -2,23 +2,23 @@
   "aahp_version": "3.0",
   "project": "AAHP",
   "last_session": {
-    "agent": "grok-4.5",
-    "session_id": "cli-1785783933",
-    "timestamp": "2026-08-03T19:05:33Z",
-    "commit": "ed75ba4",
-    "phase": "implementation",
+    "agent": "claude-opus-5",
+    "session_id": "cli-1785924628",
+    "timestamp": "2026-08-05T10:10:28Z",
+    "commit": "9207aab",
+    "phase": "idle",
     "duration_minutes": 0
   },
   "files": {
     "STATUS.md": {
-      "checksum": "sha256:68e01e1a49f03dc8d6ce7bd8e87b9eccd970fc77ef9580dfa9dd23aca845e0eb",
-      "updated": "2026-08-03T19:05:32Z",
-      "lines": 112,
+      "checksum": "sha256:ec6177f81bc982bb5036bbebd54cbf58de251bd2a987df34e0876c1f3162777f",
+      "updated": "2026-08-05T09:55:45Z",
+      "lines": 131,
       "summary": "AAHP **v3.9.1** (npm `@elvatis_com/aahp`). File-based AI-to-AI handoff protocol plus CLI"
     },
     "NEXT_ACTIONS.md": {
       "checksum": "sha256:25bd60fc7675be3defec2d612178aedf2da05c6bc3b2f24fb24a2d44a2fbc1d7",
-      "updated": "2026-08-03T18:53:11Z",
+      "updated": "2026-08-03T19:09:11Z",
       "lines": 217,
       "summary": "Current version: **v3.9.1**"
     },
@@ -48,7 +48,7 @@
     },
     "TRUST.md": {
       "checksum": "sha256:91f124fe10a934779ef1d7442dd54af6656bbc03c4b1cde13a9d4cac9ab248e6",
-      "updated": "2026-08-03T18:53:11Z",
+      "updated": "2026-08-03T19:09:11Z",
       "lines": 93,
       "summary": "| Level | Meaning |"
     },
@@ -60,7 +60,7 @@
     },
     "WORKFLOW.md": {
       "checksum": "sha256:ef005f24e399791abb986b3a76403295c33ad3b28bb9b7dc777d1d0528b31151",
-      "updated": "2026-08-03T18:52:12Z",
+      "updated": "2026-08-03T19:09:11Z",
       "lines": 156,
       "summary": "| Agent | Model | Role | Responsibility |"
     },
@@ -77,11 +77,11 @@
       "summary": "{"
     }
   },
-  "quick_context": "AAHP v3.9.1. Doctor handoff-set fails on partial index. Handoff hygiene closed for issues 56-61. nonnpm-root fixtures write files before indexing.",
+  "quick_context": "AAHP **v3.9.1** (npm `@elvatis_com/aahp`). File-based AI-to-AI handoff protocol plus CLI Current version: **v3.9.1** ",
   "token_budget": {
     "manifest_only": 85,
-    "manifest_plus_core": 3494,
-    "full_read": 13564
+    "manifest_plus_core": 4129,
+    "full_read": 14199
   }
   ,"next_task_id": 18
   ,"tasks": {"T-006":{"title":"Publish npm package","status":"done","priority":"medium","depends_on":[],"created":"2026-06-28T10:10:21.975Z","notes":"**AAHP Task:** `T-006`  \n**Status:** blocked  \n**Priority:** medium  \n\n\n\n\n---\n*Auto-created from AAHP manifest · project: AAHP*","github_issue":18,"github_repo":"homeofe/AAHP","completed":"2026-07-14T00:00:00Z"},"T-014":{"title":"Add CLI integration tests for bin/aahp.js [high]","status":"done","priority":"high","depends_on":[],"created":"2026-06-28T10:10:21.975Z","notes":"**AAHP Task:** `T-014`  \n**Status:** ready  \n**Priority:** high  \n\n\n\n\n---\n*Auto-created from AAHP manifest · project: AAHP*","github_issue":14,"github_repo":"homeofe/AAHP","completed":"2026-07-14T00:00:00Z"},"T-015":{"title":"Add `aahp status` quick-look command [medium]","status":"done","priority":"medium","depends_on":[],"created":"2026-06-28T10:10:21.978Z","github_issue":22,"github_repo":"homeofe/AAHP","completed":"2026-07-14T00:00:00Z"},"T-016":{"title":"Add `aahp archive` command for LOG.md rotation [medium]","status":"done","priority":"medium","depends_on":[],"created":"2026-06-28T10:10:21.979Z","github_issue":23,"github_repo":"homeofe/AAHP","completed":"2026-07-14T00:00:00Z"},"T-017":{"title":"Add project-level CLAUDE.md [low]","status":"done","priority":"low","depends_on":[],"created":"2026-06-28T10:10:21.979Z","github_issue":24,"github_repo":"homeofe/AAHP","completed":"2026-07-14T00:00:00Z"}}

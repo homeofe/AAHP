@@ -38,7 +38,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { basename, dirname, join } from "node:path";
-import { resolveRoot, loadPkg, loadConfig } from "./aahp-config.mjs";
+import { resolveRoot, loadPkg, loadConfig, resolveBash, toBashPath } from "./aahp-config.mjs";
 import { parseReleases } from "./changelog-grammar.mjs";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
@@ -166,10 +166,25 @@ if (isCheck) {
   writeFileSync(target, content);
   // Regenerate MANIFEST.json so its checksums match the file we just wrote.
   // Delegate to the canonical writer (sibling script), overridable via AAHP_BASH.
+  //
+  // The interpreter and both path arguments go through the helpers rather than
+  // being passed raw: on Windows a bare "bash" can resolve to the WSL launcher,
+  // which cannot see the C: drive, and native backslash paths are eaten as
+  // escapes by any bash. See resolveBash/toBashPath in aahp-config.mjs.
   try {
     execFileSync(
-      process.env.AAHP_BASH || "bash",
-      [join(scriptDir, "aahp-manifest.sh"), root, "--agent", "handoff-refresh", "--phase", "idle", "--quiet"],
+      resolveBash(),
+      [
+        // The child spawns with cwd: root below, so root - not process.cwd() -
+        // is the base a relative path must be computed against.
+        toBashPath(join(scriptDir, "aahp-manifest.sh"), process.platform, root),
+        toBashPath(root, process.platform, root),
+        "--agent",
+        "handoff-refresh",
+        "--phase",
+        "idle",
+        "--quiet",
+      ],
       { stdio: "inherit", cwd: root },
     );
   } catch (err) {

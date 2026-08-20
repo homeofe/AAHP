@@ -38,7 +38,7 @@ actor. The gate remains verify-only and never regenerates handoff state.
 | `tests/verify.bats` | FOCUSED PASS | 22/22 under Git Bash with explicit CI bases |
 | schema validation | FOCUSED PASS | example and repository config both validate against the updated schema |
 | shell syntax | FOCUSED PASS | changed shell scripts parse under Git Bash |
-| shellcheck | CI | not installed on this Windows host; Linux CI is authoritative |
+| shellcheck | FIXED, CI RERUN PENDING | first Linux run caught SC2015/SC2016 in the new parser; idiom corrected and intentional JS quoting scoped |
 | full Bats suite | CI | deliberately not run on Windows; Linux CI is authoritative |
 <!-- /SECTION: build_health -->
 

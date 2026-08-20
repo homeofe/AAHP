@@ -207,12 +207,15 @@ aahp_non_impacting_modified_files() {
     if [ ! -e "$config" ] && [ ! -L "$config" ]; then
         return 0
     fi
-    [ -f "$config" ] && [ -r "$config" ] || {
+    if [ ! -f "$config" ] || [ ! -r "$config" ]; then
         echo "aahp.config.json is not a readable regular file" >&2
         return 1
-    }
+    fi
 
     if command -v node &>/dev/null; then
+        # Single quotes are intentional: the embedded JavaScript contains
+        # template literals whose ${...} expressions belong to Node, not bash.
+        # shellcheck disable=SC2016
         node -e '
             const fs = require("fs");
             const fail = (message) => { throw new Error(message); };

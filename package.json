@@ -29,6 +29,7 @@
     "bin/",
     "scripts/",
     "!scripts/ROLLOUT.md",
+    ".github/workflows/aahp-verify.yml",
     "assets/",
     "templates/",
     "schema/",

@@ -300,8 +300,8 @@ aahp_non_impacting_modified_files() {
               if (typeof file !== "string" || file.length === 0 || file.trim() !== file) {
                 fail(`${label}.file must be a non-empty, trimmed string`);
               }
-              if (typeof reason !== "string" || reason.trim().length === 0 || /[\u0000-\u001f\u007f]/.test(reason)) {
-                fail(`${label}.reason must be a non-empty reviewable string without control characters`);
+              if (typeof reason !== "string" || !/[\p{L}\p{N}]/u.test(reason) || /[\p{Cc}\p{Cf}]/u.test(reason)) {
+                fail(`${label}.reason must contain a letter or number and no control or format characters`);
               }
               if (/^[\\/]/.test(file) || /^[A-Za-z]:/.test(file) || file.includes("\\")) {
                 fail(`${label}.file must be repo-relative and use forward slashes`);
@@ -331,7 +331,7 @@ aahp_non_impacting_modified_files() {
     py=$(aahp_python_cmd)
     [ -n "$py" ] || return 2
     "$py" -c '
-import json, re, sys
+import json, re, sys, unicodedata
 
 def fail(message):
     raise ValueError(message)
@@ -345,7 +345,11 @@ def no_duplicate_keys(pairs):
     return result
 
 with open(sys.argv[1], encoding="utf-8") as handle:
-    cfg = json.load(handle, object_pairs_hook=no_duplicate_keys)
+    cfg = json.load(
+        handle,
+        object_pairs_hook=no_duplicate_keys,
+        parse_constant=lambda value: fail("non-standard JSON constant: " + value),
+    )
 if not isinstance(cfg, dict):
     fail("top level must be an object")
 if "handoffImpact" not in cfg:
@@ -369,8 +373,12 @@ for index, entry in enumerate(entries):
     reason = entry["reason"]
     if not isinstance(file, str) or not file or file.strip() != file:
         fail(label + ".file must be a non-empty, trimmed string")
-    if not isinstance(reason, str) or not reason.strip() or re.search(r"[\x00-\x1f\x7f]", reason):
-        fail(label + ".reason must be a non-empty reviewable string without control characters")
+    if (
+        not isinstance(reason, str)
+        or not any(char.isalnum() for char in reason)
+        or any(unicodedata.category(char) in ("Cc", "Cf") for char in reason)
+    ):
+        fail(label + ".reason must contain a letter or number and no control or format characters")
     if file.startswith(("/", "\\")) or re.match(r"^[A-Za-z]:", file) or "\\" in file:
         fail(label + ".file must be repo-relative and use forward slashes")
     if not re.fullmatch(r"[A-Za-z0-9._@+ -]+(?:/[A-Za-z0-9._@+ -]+)*", file):

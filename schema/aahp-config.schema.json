@@ -280,8 +280,11 @@
               "reason": {
                 "type": "string",
                 "minLength": 1,
-                "pattern": "\\S",
-                "description": "Non-empty review rationale explaining why modifying this file cannot stale handoff state."
+                "pattern": "[\\p{L}\\p{N}]",
+                "not": {
+                  "pattern": "[\\p{Cc}\\p{Cf}]"
+                },
+                "description": "Review rationale explaining why modifying this file cannot stale handoff state. It must contain a Unicode letter or number and cannot contain control or invisible format characters."
               }
             },
             "additionalProperties": false

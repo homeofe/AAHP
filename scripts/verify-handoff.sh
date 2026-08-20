@@ -100,6 +100,11 @@ case "$LEVEL" in
         ;;
 esac
 
+if [ "$BASE_EXPLICIT" = true ] && [ -z "$BASE_SHA" ]; then
+    echo "Error: --base requires a non-empty commit SHA" >&2
+    exit 1
+fi
+
 # Path-format-agnostic file access (cross-platform fix).
 # Windows-native Python/Node cannot open an absolute MSYS path like
 # /c/Users/...; helpers that read MANIFEST.json (aahp_manifest_field) would
@@ -317,6 +322,7 @@ git_in_repo() { git -C "$PROJECT_ROOT" rev-parse --git-dir &>/dev/null 2>&1; }
 
 CHANGED_RECORDS=""
 DIFF_FAILED=0
+DIFF_OLD_TREE="HEAD"
 if git_in_repo; then
     if [ "$LEVEL" = "precommit" ]; then
         if ! CHANGED_RECORDS=$(git -C "$PROJECT_ROOT" diff --cached --name-status --find-renames --find-copies --find-copies-harder 2>&1); then
@@ -374,6 +380,8 @@ if git_in_repo; then
                     FAILURES=$((FAILURES + 1))
                     DIFF_FAILED=1
                     CHANGED_RECORDS=""
+                else
+                    DIFF_OLD_TREE="$BASE_COMMIT"
                 fi
             fi
         elif [ "$DIFF_FAILED" -eq 0 ]; then
@@ -385,6 +393,8 @@ if git_in_repo; then
                     DIFF_FAILED=1
                     CHANGED_RECORDS=""
                 fi
+            else
+                DIFF_OLD_TREE=$(git -C "$PROJECT_ROOT" rev-parse --verify 'HEAD~1^{commit}' 2>/dev/null || printf 'HEAD')
             fi
         fi
 
@@ -419,6 +429,14 @@ if git_in_repo && [ "$DIFF_FAILED" -eq 0 ]; then
         if [ "$CONFIG_INDEX_MATCH" != "aahp.config.json" ]; then
             log_fail "aahp.config.json exists in the working tree but is not tracked in the index."
             echo "    Layer 2 will not apply policy that is absent from the change snapshot."
+            FAILURES=$((FAILURES + 1))
+            CONFIG_VALID=0
+        fi
+        CONFIG_INDEX_ENTRY=$(git -C "$PROJECT_ROOT" --literal-pathspecs ls-files -s -- "aahp.config.json" 2>/dev/null || true)
+        CONFIG_INDEX_MODE=$(printf '%s\n' "$CONFIG_INDEX_ENTRY" | sed -n '1s/ .*//p')
+        if [ "$CONFIG_INDEX_MODE" != "100644" ] && [ "$CONFIG_INDEX_MODE" != "100755" ]; then
+            log_fail "aahp.config.json is not a regular tracked file (mode ${CONFIG_INDEX_MODE:-unknown})."
+            echo "    Layer 2 will not follow a symlink or read policy from another Git object type."
             FAILURES=$((FAILURES + 1))
             CONFIG_VALID=0
         fi
@@ -472,17 +490,17 @@ if git_in_repo && [ "$DIFF_FAILED" -eq 0 ]; then
                 CONFIG_VALID=0
             fi
             INDEX_MODE_RC=0
-            HEAD_MODE_RC=0
+            OLD_MODE_RC=0
             INDEX_MODE_ENTRY=$(git -C "$PROJECT_ROOT" --literal-pathspecs ls-files -s -- "$configured_file" 2>/dev/null) || INDEX_MODE_RC=$?
-            HEAD_MODE_ENTRY=$(git -C "$PROJECT_ROOT" --literal-pathspecs ls-tree HEAD -- "$configured_file" 2>/dev/null) || HEAD_MODE_RC=$?
+            OLD_MODE_ENTRY=$(git -C "$PROJECT_ROOT" --literal-pathspecs ls-tree "$DIFF_OLD_TREE" -- "$configured_file" 2>/dev/null) || OLD_MODE_RC=$?
             INDEX_MODE=$(printf '%s\n' "$INDEX_MODE_ENTRY" | sed -n '1s/ .*//p')
-            HEAD_MODE=$(printf '%s\n' "$HEAD_MODE_ENTRY" | sed -n '1s/ .*//p')
-            if [ "$INDEX_MODE_RC" -ne 0 ] || [ "$HEAD_MODE_RC" -ne 0 ] || { [ -z "$INDEX_MODE" ] && [ -z "$HEAD_MODE" ]; }; then
+            OLD_MODE=$(printf '%s\n' "$OLD_MODE_ENTRY" | sed -n '1s/ .*//p')
+            if [ "$INDEX_MODE_RC" -ne 0 ] || [ "$OLD_MODE_RC" -ne 0 ] || { [ -z "$INDEX_MODE" ] && [ -z "$OLD_MODE" ]; }; then
                 log_fail "Could not prove configured non-impacting path is a regular tracked file: $configured_file"
                 FAILURES=$((FAILURES + 1))
                 CONFIG_VALID=0
             fi
-            for tracked_mode in "$INDEX_MODE" "$HEAD_MODE"; do
+            for tracked_mode in "$INDEX_MODE" "$OLD_MODE"; do
                 [ -n "$tracked_mode" ] || continue
                 case "$tracked_mode" in
                     100644|100755) ;;
@@ -494,6 +512,12 @@ if git_in_repo && [ "$DIFF_FAILED" -eq 0 ]; then
                         ;;
                 esac
             done
+            if [ -n "$INDEX_MODE" ] && [ -n "$OLD_MODE" ] && [ "$INDEX_MODE" != "$OLD_MODE" ]; then
+                log_fail "Configured non-impacting path changed Git mode: $configured_file ($OLD_MODE -> $INDEX_MODE)"
+                echo "    The reviewed M-only exception permits content changes, not executable-bit changes."
+                FAILURES=$((FAILURES + 1))
+                CONFIG_VALID=0
+            fi
         done <<< "$NON_IMPACTING_CONFIG"
     fi
 

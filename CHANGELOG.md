@@ -17,8 +17,9 @@ independently of the npm version).
 ### Added
 - `handoffImpact.nonImpactingModifiedFiles` provides an optional, reviewed Layer 2
   classification for maintenance-only files. Each entry requires one exact
-  repo-relative regular tracked `file` and a non-empty `reason`. Only a content modification
-  (`M`) can be non-impacting; additions, deletions, renames, copies, type changes, and
+  repo-relative regular tracked `file` and a reviewable `reason` containing a visible
+  letter or number. Only a content-only modification (`M`) whose old and new regular-file
+  modes match can be non-impacting; additions, deletions, renames, copies, type changes, and
   mixed source changes remain impacting. Every applied classification logs the file and
   reason.
 - `aahp verify --base SHA` and its `AAHP_BASE_SHA` environment equivalent anchor the
@@ -34,18 +35,27 @@ independently of the npm version).
 - The required workflow no longer bypasses verification for an actor. Layer 1 now runs
   for every change, including automated dependency updates.
 - The optional impact parser fails closed without relying on an external schema command:
-  malformed JSON and types, empty reasons, absolute or traversal paths, globs and
+  malformed JSON and types, non-standard numeric constants, empty or invisible reasons,
+  control or format characters, absolute or traversal paths, globs and
   metacharacters, directories, untracked paths, symlinks, gitlinks, handoff paths,
   the config itself, duplicate JSON keys, duplicate entries, and prefix-like ambiguity
-  are rejected. Untracked or unstaged working-tree policy cannot authorize an index
-  change.
+  are rejected. The policy file itself must be a regular tracked Git object; a symlink
+  cannot delegate policy to a mutable referent. Untracked or unstaged working-tree policy
+  cannot authorize an index change, and mode-only or content-plus-mode changes cannot use
+  the content-only exception.
 
 ### Changed
 - The config schema, example, specification, architectural decision log, and rollout
   guidance now define the exact-file M-only contract and explicit CI base requirement.
 - The required workflow declares read-only contents permission, disables persisted
   checkout credentials, and pins every third-party action to an immutable commit.
+- Documentation now states the pull-request trust boundary explicitly: requiring the
+  status is not sufficient unless repository rules also require trusted review for the
+  workflow and the gate/parser paths it executes.
 - Propagation coverage proves the workflow and shared parser travel together.
+- The npm artifact now includes the canonical verify workflow consumed by
+  `scripts/propagate.sh`; packed-artifact coverage installs the tarball and proves the
+  propagated gate, parser, and workflow are byte-identical to the release sources.
 
 ## [3.9.2] - 2026-08-05
 **Windows bash portability, one resolver; MANIFEST project-name preservation**
@@ -366,7 +376,8 @@ independently of the npm version).
 ### Changed
 - Git hooks are de-vendored: they resolve `scripts/verify-handoff.sh` when it is vendored,
   else the installed `aahp` CLI via `npx --no-install`, and skip when neither resolves. The
-  required CI check remains the non-bypassable authority.
+  required CI check remains the off-machine authority (the evaluator-path trust boundary
+  is clarified in 3.10.0).
 - The enumerating governance gates (`check-forbidden-patterns.mjs`, `check-doc-links.mjs`)
   fail loud outside a git work tree instead of silently scanning zero files: file
   enumeration goes through a shared `git ls-files` helper that throws when the project root

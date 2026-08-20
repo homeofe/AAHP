@@ -62,9 +62,11 @@ first so the repo starts from a clean, in-sync state.
 - Non-impacting classifications are exact regular tracked files with review reasons,
   never directories, globs, actors, or change types other than `M`.
 - TRUST-TTL expiry is advisory (warn) and never blocks a commit on its own.
-- Escape hatch `AAHP_SKIP_VERIFY=1` skips LOCAL verification only. It is caught
-  by the required CI check (`aahp verify --level ci`, which ignores the hatch).
-  Do NOT use it to bypass CI. Never use `git commit/push --no-verify`.
+- Escape hatch `AAHP_SKIP_VERIFY=1` skips LOCAL verification only. The required
+  CI invocation ignores the hatch. Protect the workflow, gate, parser, and invoked
+  scripts with trusted review, because a pull-request workflow otherwise evaluates
+  the proposed branch. Do NOT use the hatch to bypass CI. Never use
+  `git commit/push --no-verify`.
 - CI activation: if hosted CI is currently unavailable to you (cost controls, a
   paused plan, a migration to self-hosted runners), commit the workflow anyway.
   It activates by itself the moment CI is switched back on, and until then the
@@ -190,4 +192,8 @@ the rollout can answer "what is left" without the answer living in public.
       still fail before accepting it.
 - [ ] Commit (the gate will enforce that STATUS.md + MANIFEST.json move with it).
 - [ ] When CI is available: set `aahp-verify` as a required check.
+- [ ] Require trusted review (CODEOWNERS or an equivalent ruleset) for
+      `.github/workflows/aahp-verify.yml`, `scripts/verify-handoff.sh`,
+      `scripts/_aahp-lib.sh`, and every script the workflow executes; the supplied
+      pull-request workflow is not an independent trust boundary without it.
 - [ ] Record the outcome in the private fleet list, including deliberate skips.

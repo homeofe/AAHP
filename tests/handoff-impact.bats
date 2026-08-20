@@ -25,6 +25,19 @@ parse_impact_config() {
         "$SCRIPTS_DIR/_aahp-lib.sh" "$TEST_TMPDIR/aahp.config.json"
 }
 
+make_python_fallback_lib() {
+    local fallback_lib="$TEST_TMPDIR/fallback-lib.sh"
+    cp "$SCRIPTS_DIR/_aahp-lib.sh" "$fallback_lib"
+    sed '0,/if command -v node .*then/s//if false; then/' "$fallback_lib" > "$fallback_lib.tmp"
+    mv "$fallback_lib.tmp" "$fallback_lib"
+    printf '%s\n' "$fallback_lib"
+}
+
+parse_impact_config_with_lib() {
+    bash -c 'source "$1"; aahp_non_impacting_modified_files "$2"' _ \
+        "$1" "$TEST_TMPDIR/aahp.config.json"
+}
+
 prepare_gate_baseline() {
     create_full_handoff
     git -C "$TEST_TMPDIR" add -A
@@ -84,10 +97,8 @@ commit_reviewed_file() {
 }
 
 @test "Python fallback also rejects duplicate JSON keys" {
-    local fallback_lib="$TEST_TMPDIR/fallback-lib.sh"
-    cp "$SCRIPTS_DIR/_aahp-lib.sh" "$fallback_lib"
-    sed '0,/if command -v node .*then/s//if false; then/' "$fallback_lib" > "$fallback_lib.tmp"
-    mv "$fallback_lib.tmp" "$fallback_lib"
+    local fallback_lib
+    fallback_lib="$(make_python_fallback_lib)"
     printf '%s\n' '{"handoffImpact":{"nonImpactingModifiedFiles":[]},"handoffImpact":{"nonImpactingModifiedFiles":[]}}' \
         > "$TEST_TMPDIR/aahp.config.json"
 
@@ -95,6 +106,29 @@ commit_reviewed_file() {
         "$fallback_lib" "$TEST_TMPDIR/aahp.config.json"
     [ "$status" -ne 0 ]
     [[ "$output" == *"duplicate JSON object key: handoffImpact"* ]]
+}
+
+@test "Node and Python parsers reject non-standard constants and invisible reasons" {
+    local fallback_lib value
+    fallback_lib="$(make_python_fallback_lib)"
+    local cases=(
+        '{"handoffImpact":NaN}'
+        '{"handoffImpact":Infinity}'
+        '{"handoffImpact":-Infinity}'
+        '{"handoffImpact":{"nonImpactingModifiedFiles":[{"file":"docs/a.md","reason":"\u200B"}]}}'
+        '{"handoffImpact":{"nonImpactingModifiedFiles":[{"file":"docs/a.md","reason":"reviewed \u202E rationale"}]}}'
+        '{"handoffImpact":{"nonImpactingModifiedFiles":[{"file":"docs/a.md","reason":"\uFEFF"}]}}'
+        '{"handoffImpact":{"nonImpactingModifiedFiles":[{"file":"docs/a.md","reason":"..."}]}}'
+    )
+    for value in "${cases[@]}"; do
+        printf '%s\n' "$value" > "$TEST_TMPDIR/aahp.config.json"
+
+        run parse_impact_config
+        [ "$status" -ne 0 ] || { echo "Node accepted invalid policy: $value"; false; }
+
+        run parse_impact_config_with_lib "$fallback_lib"
+        [ "$status" -ne 0 ] || { echo "Python accepted invalid policy: $value"; false; }
+    done
 }
 
 @test "absent handoffImpact config preserves the original impacting behavior" {
@@ -270,6 +304,78 @@ commit_reviewed_file() {
     [[ "$output" == *"base resolves to HEAD"* ]]
 }
 
+@test "an explicit empty base is rejected instead of using the local fallback" {
+    prepare_gate_baseline
+
+    run bash "$SCRIPTS_DIR/verify-handoff.sh" "$TEST_TMPDIR" --level ci --base ""
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"--base requires a non-empty commit SHA"* ]]
+    [[ "$output" != *"aahp verify passed"* ]]
+}
+
+@test "a symlinked config cannot supply Layer 2 policy" {
+    prepare_gate_baseline
+    mkdir -p "$TEST_TMPDIR/docs"
+    printf 'baseline\n' > "$TEST_TMPDIR/docs/sensitive.md"
+    printf '%s\n' '{"handoffImpact":{"nonImpactingModifiedFiles":[{"file":"docs/sensitive.md","reason":"Policy reached through a symlink."}]}}' \
+        > "$TEST_TMPDIR/policy.json"
+    ln -s policy.json "$TEST_TMPDIR/aahp.config.json"
+    [ -L "$TEST_TMPDIR/aahp.config.json" ] || skip "requires filesystem symlink support"
+    git -C "$TEST_TMPDIR" add docs/sensitive.md policy.json aahp.config.json
+    git -C "$TEST_TMPDIR" commit -q -m "track a symlinked policy"
+    printf 'modified\n' >> "$TEST_TMPDIR/docs/sensitive.md"
+    git -C "$TEST_TMPDIR" add docs/sensitive.md
+
+    run bash "$SCRIPTS_DIR/verify-handoff.sh" "$TEST_TMPDIR" --level precommit
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"aahp.config.json is not a regular tracked file (mode 120000)"* ]]
+    [[ "$output" != *"Reviewed non-impacting modification"* ]]
+}
+
+@test "reviewed modifications reject mode-only and content-plus-mode changes" {
+    prepare_gate_baseline
+    commit_reviewed_file "docs/maintenance.md"
+    git -C "$TEST_TMPDIR" update-index --chmod=+x docs/maintenance.md
+
+    run bash "$SCRIPTS_DIR/verify-handoff.sh" "$TEST_TMPDIR" --level precommit
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"changed Git mode: docs/maintenance.md (100644 -> 100755)"* ]]
+    [[ "$output" != *"Reviewed non-impacting modification"* ]]
+
+    git -C "$TEST_TMPDIR" reset -q HEAD -- docs/maintenance.md
+    git -C "$TEST_TMPDIR" checkout -q -- docs/maintenance.md
+    printf 'modified\n' >> "$TEST_TMPDIR/docs/maintenance.md"
+    git -C "$TEST_TMPDIR" add docs/maintenance.md
+    git -C "$TEST_TMPDIR" update-index --chmod=+x docs/maintenance.md
+
+    run bash "$SCRIPTS_DIR/verify-handoff.sh" "$TEST_TMPDIR" --level precommit
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"changed Git mode: docs/maintenance.md (100644 -> 100755)"* ]]
+    [[ "$output" != *"Reviewed non-impacting modification"* ]]
+}
+
+@test "CI compares reviewed file modes across the base and HEAD endpoints" {
+    prepare_gate_baseline
+    commit_reviewed_file "docs/maintenance.md"
+    local base
+    base="$(git -C "$TEST_TMPDIR" rev-parse HEAD)"
+
+    git -C "$TEST_TMPDIR" update-index --chmod=+x docs/maintenance.md
+    git -C "$TEST_TMPDIR" commit -q -m "mode-only change"
+    run bash "$SCRIPTS_DIR/verify-handoff.sh" "$TEST_TMPDIR" --level ci --base "$base"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"changed Git mode: docs/maintenance.md (100644 -> 100755)"* ]]
+    [[ "$output" != *"Reviewed non-impacting modification"* ]]
+
+    printf 'modified\n' >> "$TEST_TMPDIR/docs/maintenance.md"
+    git -C "$TEST_TMPDIR" add docs/maintenance.md
+    git -C "$TEST_TMPDIR" commit -q -m "content plus mode change"
+    run bash "$SCRIPTS_DIR/verify-handoff.sh" "$TEST_TMPDIR" --level ci --base "$base"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"changed Git mode: docs/maintenance.md (100644 -> 100755)"* ]]
+    [[ "$output" != *"Reviewed non-impacting modification"* ]]
+}
+
 @test "AAHP_BASE_SHA supplies a valid non-vacuous CI base" {
     prepare_gate_baseline
     AAHP_BASE_SHA="$CI_BASE" run bash "$SCRIPTS_DIR/verify-handoff.sh" "$TEST_TMPDIR" --level ci
@@ -382,6 +488,10 @@ try {
         '{"handoffImpact":{"nonImpactingModifiedFiles":{}}}'
         '{"handoffImpact":{"nonImpactingModifiedFiles":[{"file":"docs/a.md"}]}}'
         '{"handoffImpact":{"nonImpactingModifiedFiles":[{"file":"docs/a.md","reason":"   "}]}}'
+        '{"handoffImpact":{"nonImpactingModifiedFiles":[{"file":"docs/a.md","reason":"\u200B"}]}}'
+        '{"handoffImpact":{"nonImpactingModifiedFiles":[{"file":"docs/a.md","reason":"reviewed \u202E rationale"}]}}'
+        '{"handoffImpact":{"nonImpactingModifiedFiles":[{"file":"docs/a.md","reason":"\uFEFF"}]}}'
+        '{"handoffImpact":{"nonImpactingModifiedFiles":[{"file":"docs/a.md","reason":"..."}]}}'
         '{"handoffImpact":{"nonImpactingModifiedFiles":[{"file":"/tmp/a","reason":"x"}]}}'
         '{"handoffImpact":{"nonImpactingModifiedFiles":[{"file":"../a","reason":"x"}]}}'
         '{"handoffImpact":{"nonImpactingModifiedFiles":[{"file":"docs/*.md","reason":"x"}]}}'

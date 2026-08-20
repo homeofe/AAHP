@@ -1,8 +1,8 @@
 # AAHP Verify - the intended REQUIRED status check for the handoff gate.
 #
 # Runs `aahp verify --level ci`, which executes all 4 layers with NO escape
-# hatch (AAHP_SKIP_VERIFY is ignored at --level ci). This is the off-machine,
-# non-bypassable backstop behind the local pre-commit / pre-push hooks:
+# hatch (AAHP_SKIP_VERIFY is ignored at --level ci). This is the off-machine
+# backstop behind the local pre-commit / pre-push hooks:
 #   Layer 1: MANIFEST checksum integrity
 #   Layer 2: content-drift gate (code changed => STATUS.md + MANIFEST.json must change)
 #   Layer 3: commit-pointer freshness
@@ -12,8 +12,10 @@
 # event's explicit base commit so pull requests compare against their base and
 # pushes compare against the pre-push commit instead of HEAD against itself.
 #
-# Mark this job as a REQUIRED status check in branch protection so the gate
-# cannot be bypassed by skipping local hooks.
+# Mark this job as a REQUIRED status check, and require trusted review for
+# changes to this workflow and the gate/parser it executes. A pull_request
+# workflow runs the proposed branch, so the status alone is self-authorizing
+# unless repository rules protect those evaluator paths.
 
 name: AAHP Verify
 

@@ -40,7 +40,8 @@ remains verify-only and never regenerates handoff state.
 | schema validation | FOCUSED PASS | example and repository config both validate against the updated schema |
 | shell syntax | FOCUSED PASS | changed shell scripts parse under Git Bash |
 | `npm run check` | PASS | changelog, version sync, claims, forbidden patterns, schema/doc sync, doc links, and handoff freshness |
-| shellcheck | FIXED, CI RERUN PENDING | first Linux run caught SC2015/SC2016 in the new parser; idiom corrected and intentional JS quoting scoped |
+| shellcheck | LINUX PASS | replacement head `c332a23` reached the full Bats step after shellcheck |
+| hosted Linux suite | REPLACEMENT REQUIRED | `c332a23` passed 361/362; the CI mode fixture let `git add` restore mode 100644 on Linux, so it now reasserts 100755 before its content-plus-mode commit |
 | full Bats suite | CI | deliberately not run on Windows; Linux CI is authoritative |
 <!-- /SECTION: build_health -->
 

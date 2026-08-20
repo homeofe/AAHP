@@ -369,6 +369,7 @@ commit_reviewed_file() {
 
     printf 'modified\n' >> "$TEST_TMPDIR/docs/maintenance.md"
     git -C "$TEST_TMPDIR" add docs/maintenance.md
+    git -C "$TEST_TMPDIR" update-index --chmod=+x docs/maintenance.md
     git -C "$TEST_TMPDIR" commit -q -m "content plus mode change"
     run bash "$SCRIPTS_DIR/verify-handoff.sh" "$TEST_TMPDIR" --level ci --base "$base"
     [ "$status" -eq 1 ]

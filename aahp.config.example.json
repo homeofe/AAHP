@@ -47,6 +47,14 @@
     "include": [".ai/handoff/NEXT_ACTIONS.md"],
     "manifest": ".ai/handoff/MANIFEST.json"
   },
+  "handoffImpact": {
+    "nonImpactingModifiedFiles": [
+      {
+        "file": ".github/dependabot.yml",
+        "reason": "Dependency update scheduling does not describe product or implementation state."
+      }
+    ]
+  },
   "check": {
     "skip": ["claims"]
   },

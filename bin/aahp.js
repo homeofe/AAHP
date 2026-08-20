@@ -87,6 +87,7 @@ Manifest options:
 
 Verify options:
   --level LEVEL     Layers to run: precommit|prepush|full|ci (default: full)
+  --base SHA        Exact Layer 2 base commit (required at --level ci)
   --quiet           Suppress per-check OK output, keep failures
 
 Doctor options:

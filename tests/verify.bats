@@ -23,6 +23,7 @@ EOF
     bash "$SCRIPTS_DIR/aahp-manifest.sh" "$TEST_TMPDIR" --quiet --phase implementation
     git -C "$TEST_TMPDIR" add -A
     git -C "$TEST_TMPDIR" commit -q -m "manifest"
+    CI_BASE="$(git -C "$TEST_TMPDIR" rev-parse HEAD~1)"
 }
 
 teardown() {
@@ -50,7 +51,7 @@ teardown() {
 
     run bash "$SCRIPTS_DIR/verify-handoff.sh" "$TEST_TMPDIR" --level precommit
     [ "$status" -eq 1 ]
-    [[ "$output" == *"Code changed but handoff state did not. Run /handoff."* ]]
+    [[ "$output" == *"Handoff-impacting files changed but handoff state did not. Run /handoff."* ]]
 }
 
 @test "drift gate PASSES when code + STATUS.md + MANIFEST.json change together" {
@@ -61,7 +62,7 @@ teardown() {
 
     run bash "$SCRIPTS_DIR/verify-handoff.sh" "$TEST_TMPDIR" --level precommit
     [ "$status" -eq 0 ]
-    [[ "$output" == *"handoff state (STATUS.md + MANIFEST.json) changed with it"* ]]
+    [[ "$output" == *"Handoff-impacting files changed and handoff state (STATUS.md + MANIFEST.json) changed with them"* ]]
 }
 
 @test "drift gate FAILS when code + MANIFEST change but STATUS.md does not" {
@@ -102,9 +103,9 @@ teardown() {
     echo "console.log('x')" > "$TEST_TMPDIR/feature.js"
     git -C "$TEST_TMPDIR" add feature.js
 
-    AAHP_SKIP_VERIFY=1 run bash "$SCRIPTS_DIR/verify-handoff.sh" "$TEST_TMPDIR" --level ci
+    AAHP_SKIP_VERIFY=1 run bash "$SCRIPTS_DIR/verify-handoff.sh" "$TEST_TMPDIR" --level ci --base "$CI_BASE"
     [ "$status" -eq 1 ]
-    [[ "$output" == *"Code changed but handoff state did not"* ]]
+    [[ "$output" == *"Handoff-impacting files changed but handoff state did not"* ]]
 }
 
 # ─── Layer 1: checksum integrity ─────────────────────────────
@@ -123,7 +124,7 @@ teardown() {
     git -C "$TEST_TMPDIR" add -A
     git -C "$TEST_TMPDIR" commit -q -m "delete an indexed handoff file"
 
-    run bash "$SCRIPTS_DIR/verify-handoff.sh" "$TEST_TMPDIR" --level ci
+    run bash "$SCRIPTS_DIR/verify-handoff.sh" "$TEST_TMPDIR" --level ci --base "$CI_BASE"
     [ "$status" -eq 1 ]
     [[ "$output" == *"Missing indexed file: LOG.md"* ]]
     [[ "$output" == *"indexes file(s) that are not present"* ]]
@@ -156,7 +157,7 @@ STUB
     # Real tampering, not a stubbed message.
     printf '\nunmanaged edit\n' >> "$TEST_TMPDIR/.ai/handoff/STATUS.md"
 
-    run bash "$stub/verify-handoff.sh" "$TEST_TMPDIR" --level ci
+    run bash "$stub/verify-handoff.sh" "$TEST_TMPDIR" --level ci --base "$CI_BASE"
     [ "$status" -eq 1 ]
     [[ "$output" == *"checksums do not match"* ]]
     [[ "$output" == *"Checksum mismatch: STATUS.md"* ]]
@@ -167,7 +168,7 @@ STUB
     stub="$(_stub_scripts_dir_with_silent_passing_lint)"
     rm "$TEST_TMPDIR/.ai/handoff/NEXT_ACTIONS.md"
 
-    run bash "$stub/verify-handoff.sh" "$TEST_TMPDIR" --level ci
+    run bash "$stub/verify-handoff.sh" "$TEST_TMPDIR" --level ci --base "$CI_BASE"
     [ "$status" -eq 1 ]
     [[ "$output" == *"Missing indexed file: NEXT_ACTIONS.md"* ]]
 }
@@ -183,7 +184,7 @@ STUB
     cp -r "$SCRIPTS_DIR" "$stub"
     printf '\nunset -f aahp_manifest_index\n' >> "$stub/_aahp-lib.sh"
 
-    run bash "$stub/verify-handoff.sh" "$TEST_TMPDIR" --level ci
+    run bash "$stub/verify-handoff.sh" "$TEST_TMPDIR" --level ci --base "$CI_BASE"
     [ "$status" -eq 1 ]
     [[ "$output" == *"aahp_manifest_index"* ]]
     [[ "$output" == *"out of date"* ]]
@@ -198,7 +199,7 @@ STUB
     cp -r "$SCRIPTS_DIR" "$stub"
     printf '\naahp_manifest_index() { return 2; }\n' >> "$stub/_aahp-lib.sh"
 
-    run bash "$stub/verify-handoff.sh" "$TEST_TMPDIR" --level ci
+    run bash "$stub/verify-handoff.sh" "$TEST_TMPDIR" --level ci --base "$CI_BASE"
     [ "$status" -eq 1 ]
     [[ "$output" == *"No JSON interpreter available"* ]]
     [[ "$output" != *"aahp verify passed"* ]]
@@ -216,7 +217,7 @@ manifest["files"] = {}
 json.dump(manifest, open(path, "w", encoding="utf-8"), indent=2)
 PY
 
-    run bash "$SCRIPTS_DIR/verify-handoff.sh" "$TEST_TMPDIR" --level ci
+    run bash "$SCRIPTS_DIR/verify-handoff.sh" "$TEST_TMPDIR" --level ci --base "$CI_BASE"
     [ "$status" -eq 1 ]
     [[ "$output" == *"indexes no files"* ]]
     [[ "$output" != *"aahp verify passed"* ]]
@@ -242,7 +243,7 @@ PY
     git -C "$TEST_TMPDIR" add -A
     git -C "$TEST_TMPDIR" commit -q -m "drop one entry from the index"
 
-    run bash "$SCRIPTS_DIR/verify-handoff.sh" "$TEST_TMPDIR" --level ci
+    run bash "$SCRIPTS_DIR/verify-handoff.sh" "$TEST_TMPDIR" --level ci --base "$CI_BASE"
     [ "$status" -eq 1 ]
     [[ "$output" == *"Unindexed handoff file: LOG.md"* ]]
     [[ "$output" == *"present on disk but NOT indexed"* ]]
@@ -273,7 +274,7 @@ for name, meta in (m.get("files") or {}).items():
 }
 LIBSTUB
 
-    run bash "$stub/verify-handoff.sh" "$TEST_TMPDIR" --level ci
+    run bash "$stub/verify-handoff.sh" "$TEST_TMPDIR" --level ci --base "$CI_BASE"
     [ "$status" -eq 0 ]
     [[ "$output" != *"checksums do not match"* ]]
 }

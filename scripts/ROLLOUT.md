@@ -40,15 +40,27 @@ first so the repo starts from a clean, in-sync state.
    compares everything except the file that was dropped from it).
    The gate computes those verdicts itself; `lint-handoff.sh` also runs and its
    exit code still blocks, but no Layer 1 verdict is read out of its output.
-2. Content-drift gate (THE key check): if a commit/push changes any source file
-   OUTSIDE `.ai/handoff/`, it MUST also include `STATUS.md` AND a regenerated
-   `MANIFEST.json`, else FAIL: "Code changed but handoff state did not. Run /handoff."
+2. Content-drift gate (THE key check): if a commit/push changes any
+   handoff-impacting file OUTSIDE `.ai/handoff/`, it MUST also include
+   `STATUS.md` AND a regenerated `MANIFEST.json`, else FAIL. Every outside file
+   is impacting by default. A consumer may review an exact regular tracked file into
+   `handoffImpact.nonImpactingModifiedFiles`, with a non-empty reason, but only
+   git status `M` uses that classification. A/D/R/C and mixed source changes
+   remain impacting. CI receives an explicit event base and fails closed when
+   the base or diff cannot be proven.
+   The comparison is base-to-HEAD, not merge-base-to-HEAD, so a rollback or
+   force-push remains visible instead of collapsing to an empty three-dot diff.
 3. Commit-pointer freshness (`MANIFEST.last_session.commit` vs HEAD).
 4. TRUST-TTL expiry (advisory).
 
 ## Defaults (do not change without an ADR)
 
 - Drift gate HARD-FAILS (exit 1). It does not warn.
+- Layer 1 runs for every actor. Do not add an actor-wide dependency-bot bypass.
+- At `--level ci`, pass the pull request base SHA or push event `before` SHA.
+  Missing, zero, invalid, unreadable, HEAD-equal, and undiffable bases fail.
+- Non-impacting classifications are exact regular tracked files with review reasons,
+  never directories, globs, actors, or change types other than `M`.
 - TRUST-TTL expiry is advisory (warn) and never blocks a commit on its own.
 - Escape hatch `AAHP_SKIP_VERIFY=1` skips LOCAL verification only. It is caught
   by the required CI check (`aahp verify --level ci`, which ignores the hatch).
@@ -173,6 +185,9 @@ the rollout can answer "what is left" without the answer living in public.
 - [ ] `bash scripts/install-hooks.sh .`
 - [ ] Run `/handoff` if `aahp verify --level full` reports drift.
 - [ ] Confirm `aahp verify --level full` is green.
+- [ ] If the consumer needs a non-impacting classification, review each exact regular
+      file and reason in `aahp.config.json`; verify A/D/R/C and a mixed change
+      still fail before accepting it.
 - [ ] Commit (the gate will enforce that STATUS.md + MANIFEST.json move with it).
 - [ ] When CI is available: set `aahp-verify` as a required check.
 - [ ] Record the outcome in the private fleet list, including deliberate skips.

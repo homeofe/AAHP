@@ -7,7 +7,7 @@
 > `- [ ]` while unresolved, `- [x]` only on evidence; before a task is `done` every
 > criterion is checked, waived `(waived: rationale)`, or moved `(follow-up: ref)`.
 
-Current version: **v3.9.2**
+Current version: **v3.10.0**
 
 ---
 
@@ -24,6 +24,17 @@ Counts mirror the `tasks` registry in `MANIFEST.json`.
 ---
 
 ## Recently Completed
+
+### 2026-08-20: v3.10.0 prepared - fail-closed CI base + reviewed M-only impact
+
+- Added explicit `--base SHA` / `AAHP_BASE_SHA` anchoring. CI rejects missing, zero,
+  invalid, unreadable, HEAD-equal, and undiffable bases.
+- Added exact regular tracked-file `handoffImpact.nonImpactingModifiedFiles` entries with
+  required reasons. Only `M` can be non-impacting; A/D/R/C and mixed source changes
+  remain impacting.
+- Removed the actor-wide dependency-bot workflow bypass, so Layer 1 always runs.
+- Added focused mutation, schema, workflow, CLI, and propagation coverage.
+- Prepared version 3.10.0 without tagging, publishing, or merging it.
 
 ### 2026-08-05: v3.9.2 - Windows bash portability + MANIFEST project-name preservation (#63, #64)
 

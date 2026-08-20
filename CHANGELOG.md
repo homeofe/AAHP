@@ -11,6 +11,42 @@ independently of the npm version).
 
 ## [Unreleased]
 
+## [3.10.0] - 2026-08-20
+**Fail-closed Layer 2 base selection and reviewed exact-file impact classification**
+
+### Added
+- `handoffImpact.nonImpactingModifiedFiles` provides an optional, reviewed Layer 2
+  classification for maintenance-only files. Each entry requires one exact
+  repo-relative regular tracked `file` and a non-empty `reason`. Only a content modification
+  (`M`) can be non-impacting; additions, deletions, renames, copies, type changes, and
+  mixed source changes remain impacting. Every applied classification logs the file and
+  reason.
+- `aahp verify --base SHA` and its `AAHP_BASE_SHA` environment equivalent anchor the
+  Layer 2 diff explicitly. The required workflow passes the pull request base SHA for a
+  pull request, the event `before` SHA for a push, and a required input for a manual run.
+
+### Fixed
+- `--level ci` no longer guesses a base or permits a vacuous HEAD-versus-HEAD diff.
+  Missing, all-zero, malformed, unreadable, HEAD-equal bases and any git diff failure
+  are blocking findings rather than empty change sets that can report green. The gate
+  compares base and HEAD endpoint trees so a rollback or force-push cannot collapse to
+  an empty merge-base-to-HEAD diff.
+- The required workflow no longer bypasses verification for an actor. Layer 1 now runs
+  for every change, including automated dependency updates.
+- The optional impact parser fails closed without relying on an external schema command:
+  malformed JSON and types, empty reasons, absolute or traversal paths, globs and
+  metacharacters, directories, untracked paths, symlinks, gitlinks, handoff paths,
+  the config itself, duplicate JSON keys, duplicate entries, and prefix-like ambiguity
+  are rejected. Untracked or unstaged working-tree policy cannot authorize an index
+  change.
+
+### Changed
+- The config schema, example, specification, architectural decision log, and rollout
+  guidance now define the exact-file M-only contract and explicit CI base requirement.
+- The required workflow declares read-only contents permission, disables persisted
+  checkout credentials, and pins every third-party action to an immutable commit.
+- Propagation coverage proves the workflow and shared parser travel together.
+
 ## [3.9.2] - 2026-08-05
 **Windows bash portability, one resolver; MANIFEST project-name preservation**
 
@@ -471,7 +507,8 @@ independently of the npm version).
 ### Changed
 - Relicensed to Apache-2.0 (earlier commits carried MIT, then CC BY 4.0, headers).
 
-[Unreleased]: https://github.com/homeofe/AAHP/compare/v3.9.2...HEAD
+[Unreleased]: https://github.com/homeofe/AAHP/compare/v3.10.0...HEAD
+[3.10.0]: https://github.com/homeofe/AAHP/compare/v3.9.2...v3.10.0
 [3.9.2]: https://github.com/homeofe/AAHP/compare/v3.9.1...v3.9.2
 [3.9.1]: https://github.com/homeofe/AAHP/compare/v3.9.0...v3.9.1
 [3.9.0]: https://github.com/homeofe/AAHP/compare/v3.8.3...v3.9.0

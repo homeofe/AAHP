@@ -340,23 +340,60 @@ up to 4 layers:
    unparseable manifest, an index that lists no files, or a missing checksum
    tool. `lint-handoff.sh` still runs for the checks this layer does not cover
    (injection, secrets, PII, stale lock) and its non-zero exit still blocks.
-2. **Content-drift gate (the key check)** - if the change set touches any source
-   file OUTSIDE `.ai/handoff/`, it MUST also include `STATUS.md` AND a regenerated
-   `MANIFEST.json`. Otherwise it HARD-FAILS with:
-   `Code changed but handoff state did not. Run /handoff.`
+2. **Content-drift gate (the key check)** - if the change set touches any
+   handoff-impacting file OUTSIDE `.ai/handoff/`, it MUST also include
+   `STATUS.md` AND a regenerated `MANIFEST.json`. Otherwise it HARD-FAILS with:
+   `Handoff-impacting files changed but handoff state did not. Run /handoff.`
+   Every outside file is impacting by default. A repository may classify an
+   exact regular tracked file as non-impacting under `handoffImpact` in
+   `aahp.config.json`, but only a content modification (`M`) uses that reviewed
+   exception. Additions, deletions, renames, copies, type changes, config edits,
+   handoff edits, and any mixed source change remain impacting. The gate logs
+   every applied classification with its required review reason.
 3. **Commit-pointer freshness** - `MANIFEST.last_session.commit` vs HEAD.
 4. **TRUST-TTL expiry** - reports expired `verified` rows (advisory).
 
 ```bash
 ./scripts/verify-handoff.sh [path] --level precommit   # fast: layers 1-2
 ./scripts/verify-handoff.sh [path] --level prepush      # full: layers 1-4
-./scripts/verify-handoff.sh [path] --level ci           # full, no escape hatch
+./scripts/verify-handoff.sh [path] --level ci --base SHA # full, explicit diff base
 ```
 
 **Wiring.** `scripts/install-hooks.sh` installs a git `pre-commit` hook (fast:
 checksum + drift gate) and a `pre-push` hook (full verify + TTL). A CI workflow
 (`.github/workflows/aahp-verify.yml`) runs `aahp verify --level ci` as the
-intended REQUIRED status check, the non-bypassable off-machine backstop.
+intended REQUIRED status check, the non-bypassable off-machine backstop. The
+workflow passes the pull request base SHA on pull requests and the event's
+`before` SHA on pushes. At `--level ci`, a missing, all-zero, unreadable,
+invalid, or HEAD-equal base and every failed git diff are blocking failures.
+`AAHP_BASE_SHA` is the environment equivalent of `--base`. The gate compares
+the base and HEAD endpoint trees, rather than a merge-base three-dot range, so
+rollback and force-push events cannot collapse into an empty diff.
+
+**Reviewed non-impacting modifications.** This optional configuration is for
+files whose content cannot describe product or implementation state, such as a
+dependency update schedule. Each entry is one exact repo-relative regular tracked file
+and a non-empty reason:
+
+```json
+{
+  "handoffImpact": {
+    "nonImpactingModifiedFiles": [
+      {
+        "file": ".github/dependabot.yml",
+        "reason": "Dependency update scheduling does not describe product or implementation state."
+      }
+    ]
+  }
+}
+```
+
+The runtime parser fails closed even when schema validation is not installed.
+It rejects malformed types, empty reasons, absolute or traversal paths, glob
+or metacharacter paths, directories, untracked paths, symlinks, gitlinks,
+`.ai/handoff/**`,
+`aahp.config.json`, duplicates, and prefix-like ambiguity. An absent section
+preserves the original all-files-impacting behavior.
 
 **Verify-only.** The gate never regenerates `MANIFEST.json`. Regeneration stays a
 separate `/handoff` step. The gate only detects drift and tells you to run it.
@@ -799,6 +836,21 @@ a different way, by publishing the shapes it is known to miss (Section 8.7).
 check` gate list, and it exits 0 whatever it finds. The non-enforcement is structural
 rather than a default that could drift back. Gates keep binary pass/fail; a rule that
 cannot be sound does not become one.
+
+### ADR-018: Layer 2 exceptions are exact, reviewed, M-only, and CI is base-anchored
+**Why it recurs:** a blanket actor or directory exemption is easy to add when a
+maintenance-only change makes handoff regeneration feel noisy, and a CI checkout can
+silently compare HEAD with HEAD when it guesses its own base. Either shortcut turns a
+required green check into a statement about work it never examined. **Decision:** every
+outside file remains handoff-impacting unless `aahp.config.json` names that exact regular tracked
+file with a non-empty review reason. Only git status `M` can use the exception; every
+other status and every mixed change still requires the handoff pair. CI never guesses:
+the workflow supplies an event base, and a missing, zero, invalid, unreadable, HEAD-equal,
+or undiffable base fails closed. The endpoint trees are compared directly so a rollback
+or force-push cannot select HEAD as its own merge base. Layer 1 runs for every actor.
+**Consequence:** narrow
+maintenance changes avoid unrelated handoff churn without creating an identity bypass,
+path-pattern bypass, or vacuous required check.
 
 ---
 
@@ -1410,7 +1462,9 @@ adding an `aahp.config.json` (see `schema/aahp-config.schema.json` and
 pins capability numbers across surfaces, `forbiddenPatterns` denylists text (for example the
 em-dash ban), `docSync` keeps duplicated value-sets in step, `docLinks` checks internal
 Markdown links, and `generate` drives an optional LOG release-journal plus a
-`NEXT_ACTIONS.md` current-version freshness gate. Two selection keys tune the surface:
+`NEXT_ACTIONS.md` current-version freshness gate. `handoffImpact` carries the reviewed,
+exact-file, M-only Layer 2 classifications described in Section 2.8. Two selection keys
+tune the surface:
 `check` (`only`/`skip`) chooses which gates `aahp check` runs, and `pinnedDep`
 (`name`/`location`/`allowRange`) opts the `doctor` pinned-dep gate in (absent, it is a clean
 skip). `acceptanceCriteria` (`include`/`manifest`) supplies the input paths for the

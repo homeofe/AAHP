@@ -61,6 +61,23 @@
 //   2  the gate could not evaluate (no workflows, unreadable engines, no YAML
 //      parser). Never 0: "I could not look" must not read as "I looked and it
 //      was fine".
+//
+// DELIBERATELY NOT IN bin/aahp.js CHECK_GATES
+// ---------------------------------------------------------------------------
+// The gates in CHECK_GATES run against an arbitrary CONSUMER project via
+// `aahp check`. This one is not portable in that position yet, and adding it
+// there would break consumers rather than protect them:
+//
+//   - Not every consumer is an npm package. elvatis-defense is Python; it has no
+//     package.json engines.node at all, so this gate would exit 2 on every run.
+//   - The `yaml` parser it needs is a devDependency of THIS package, so it is
+//     absent from a consumer install.
+//
+// It is wired into `npm run check` instead, which is what the required
+// lint-and-validate job executes, and tests/runtime-support.bats asserts that
+// wiring so the gate cannot quietly stop being invoked. Making it consumer-facing
+// is a real option, but it needs an applicability predicate and a shipped parser
+// first - do not simply append it to CHECK_GATES.
 
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";

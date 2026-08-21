@@ -44,8 +44,13 @@
 //   - "every pinned runtime satisfies engines.node": set any job back to '20'
 //     while engines stays '>=22', or widen engines to '>=18' while CI stays on 22.
 //   - "the published floor is not end-of-life": set engines.node to '>=20'.
-//   - "the release path is not older than the build path": put publish on an
-//     older major than the rest, which is the shape described above.
+//   - "the release path only uses runtimes the build path proved": point the
+//     publish job at a major no build or test job runs. Note this is a MEMBERSHIP
+//     test, not "release >= lowest build". The ordering version could never fire
+//     here - the lowest build pin IS the floor, so beating it also trips the
+//     floor check - and a predicate that cannot fire on its own is decoration.
+//     The mutation proof caught that; the membership form fires in both
+//     directions, for a release pinned below OR above the tested set.
 //   - "no pin is unevaluatable": replace a literal with `node-version-file:` or a
 //     non-matrix `${{ }}` expression. A gate that silently drops what it cannot
 //     parse reports a clean repo it never read, so an unreadable pin FAILS.
@@ -284,21 +289,36 @@ if (floor < SUPPORTED_FLOOR) {
   );
 }
 
-// --- 4. The release path is not older than the build path.
-const lowestOf = (predicate) =>
-  pins
-    .filter((p) => predicate(p.job))
-    .flatMap((p) => p.majors)
-    .sort((a, b) => a - b)[0];
+// --- 4. The release path only runs on runtimes the build path actually proved.
+//
+// This started as "release major >= lowest build major" and that version was
+// DEAD ON ARRIVAL here: the lowest build pin is the floor itself, so the only way
+// to get a lower release pin was to drop it below the floor - which check 2
+// already catches. The predicate could never fire on its own, which is the same
+// defect as a gate that cannot go red. The mutation proof is what surfaced it.
+//
+// The invariant that actually matters is MEMBERSHIP, not ordering: the runtime
+// that publishes must be one some build or test job really ran. That fires
+// independently in both directions - a release pinned BELOW the tested set and a
+// release pinned ABOVE it are both untested release paths.
+const majorsOf = (predicate) =>
+  new Set(pins.filter((p) => predicate(p.job)).flatMap((p) => p.majors));
 
-const buildLow = lowestOf((j) => !RELEASE_JOB.test(j));
-const releaseLow = lowestOf((j) => RELEASE_JOB.test(j));
-if (buildLow !== undefined && releaseLow !== undefined && releaseLow < buildLow) {
-  failures.push(
-    `the release path runs on Node ${releaseLow} while the build path runs on ${buildLow}. ` +
-      `That is the shape that silently breaks releases: every check passes on the newer ` +
-      `runtime and the publish step dies on the older one.`,
-  );
+const buildMajors = majorsOf((j) => !RELEASE_JOB.test(j));
+const releaseMajors = majorsOf((j) => RELEASE_JOB.test(j));
+const buildList = [...buildMajors].sort((a, b) => a - b);
+
+if (buildMajors.size > 0) {
+  for (const major of [...releaseMajors].sort((a, b) => a - b)) {
+    if (!buildMajors.has(major)) {
+      failures.push(
+        `the release path runs on Node ${major}, which no build or test job exercises ` +
+          `(they run ${buildList.join(", ")}). A release then happens on a runtime nothing ` +
+          `proved the package works on: every check passes and the publish step is the ` +
+          `first thing to ever touch that runtime.`,
+      );
+    }
+  }
 }
 
 if (failures.length > 0) {

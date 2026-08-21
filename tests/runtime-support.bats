@@ -187,11 +187,12 @@ EOF
     [[ "$output" == *"vacuously true"* ]]
 }
 
-# ─── Mutation: the release path older than the build path ──────────────────
+# ─── Mutation: releasing on a runtime nothing tested ───────────────────────
 
-@test "a release path older than the build path is a failure" {
+@test "a release runtime that no build job exercises is a failure" {
     # Every pin here satisfies engines and the matrix is intact, so this can only
-    # be caught by the build-vs-release comparison.
+    # be caught by the build-vs-release MEMBERSHIP test. Node 22 clears the floor,
+    # so the floor check provably is not what turns this red.
     write_pkg ">=22"
     mkdir -p "$(wf_dir)"
     cat > "$(wf_dir)/ci.yml" <<'EOF'
@@ -217,7 +218,20 @@ EOF
 
     run node "$GATE" "$TEST_TMPDIR"
     [ "$status" -eq 1 ]
-    [[ "$output" == *"release path runs on Node 22 while the build path runs on 24"* ]]
+    [[ "$output" == *"release path runs on Node 22, which no build or test job exercises"* ]]
+}
+
+@test "a release runtime NEWER than anything tested is also a failure" {
+    # The mirror image, and the case an ordering comparison ("release major >=
+    # lowest build major") cannot see at all: publishing on 26 while CI only ever
+    # ran 22 and 24 makes the publish step the first thing to touch that runtime.
+    write_pkg ">=22"
+    write_good_workflow
+    sed -i "s/node-version: '24'/node-version: '26'/" "$(wf_dir)/ci.yml"
+
+    run node "$GATE" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"release path runs on Node 26, which no build or test job exercises"* ]]
 }
 
 # ─── Mutation: pins the gate cannot read must FAIL, never be skipped ────────

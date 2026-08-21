@@ -76,7 +76,60 @@ esac
 
 # ─── Detect project metadata ─────────────────────────────────
 
-PROJECT_NAME=$(basename "$(cd "$PROJECT_ROOT" && pwd)")
+# The project name must come from the repository's IDENTITY, never from the
+# directory the generator happens to run in. Agents work in `git worktree`
+# checkouts whose directory is named after the BRANCH, and CI unpacks into a
+# workdir named after the job, so a cwd-derived name silently rewrites
+# "project" to something like "myrepo-some-branch" and that lands on main.
+# It is invisible unless somebody re-reads the file after regenerating.
+# Resolution order, strongest evidence first:
+#
+#   1. the "project" already on record in MANIFEST.json (applied further down,
+#      once that file has been read) - a name a human set always wins;
+#   2. the git remote's repository name - stable across worktrees, temp dirs,
+#      CI workdirs and tarballs, and available without node;
+#   3. the directory basename - only for a genuinely new manifest in a repo
+#      with no remote, which is the original behaviour.
+
+# A recorded name is usable if it is non-empty and is not the placeholder that
+# `aahp init` copies in from templates/MANIFEST.json. "[PROJECT]" on record
+# means nobody ever substituted a name, so it must not suppress steps 2 and 3.
+aahp_project_name_usable() {
+    case "$1" in
+        ''|'[PROJECT]') return 1 ;;
+        *) return 0 ;;
+    esac
+}
+
+# Repository name from the remote URL. Handles https, scp-style
+# (host:org/repo), ssh:// and local-path remotes, with or without a .git suffix
+# or a trailing slash. Only the last path segment is kept, so any credentials
+# embedded in the URL are discarded with the rest of it and cannot reach
+# MANIFEST.json. The result must still look like a repository name; anything
+# else is rejected rather than interpolated into the JSON written below.
+aahp_project_from_remote() {
+    local root="$1" remote url name
+    if git -C "$root" remote get-url origin >/dev/null 2>&1; then
+        remote=origin
+    else
+        remote=$(git -C "$root" remote 2>/dev/null | head -n 1)
+    fi
+    [ -n "$remote" ] || return 1
+    url=$(git -C "$root" remote get-url "$remote" 2>/dev/null) || return 1
+    name="${url%/}"       # drop a trailing slash
+    name="${name##*/}"    # keep the last path segment
+    name="${name##*:}"    # scp-style remote with no slash after the colon
+    name="${name%.git}"   # drop the .git suffix
+    case "$name" in
+        ''|*[!A-Za-z0-9._-]*) return 1 ;;
+    esac
+    printf '%s' "$name"
+}
+
+PROJECT_ABS=$(cd "$PROJECT_ROOT" && pwd)
+if ! PROJECT_NAME=$(aahp_project_from_remote "$PROJECT_ABS"); then
+    PROJECT_NAME=$(basename "$PROJECT_ABS")
+fi
 COMMIT=$(cd "$PROJECT_ROOT" && git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
@@ -187,12 +240,14 @@ if [ -f "$HANDOFF_DIR/MANIFEST.json" ]; then
             if [ -n "$EXISTING_CRR" ]; then
                 CROSS_REPO_REF="$EXISTING_CRR"
             fi
-            if [ -n "$EXISTING_PROJECT" ]; then
+            if aahp_project_name_usable "$EXISTING_PROJECT"; then
                 # Preserve the project name already on record instead of
-                # re-deriving it from the directory basename: regenerating
-                # inside a differently-named checkout (a temp dir, a CI
-                # workdir, a tarball) must not overwrite a consumer's real
-                # project name with that checkout's basename.
+                # re-deriving it: regenerating inside a differently-named
+                # checkout (a worktree, a temp dir, a CI workdir, a tarball)
+                # must not overwrite a consumer's real project name. An
+                # unsubstituted "[PROJECT]" placeholder is not a name that
+                # anybody chose, so it falls through to the remote-derived
+                # value resolved above instead of being carried forward.
                 PROJECT_NAME="$EXISTING_PROJECT"
             fi
         else
@@ -204,6 +259,14 @@ if [ -f "$HANDOFF_DIR/MANIFEST.json" ]; then
 fi
 
 # ─── Write MANIFEST.json ─────────────────────────────────────
+
+# Escape the project name the same way the quick context is escaped above. The
+# remote-derived name is already restricted to safe characters, but a preserved
+# name and a directory basename are not: an unescaped quote or backslash in
+# either would emit a MANIFEST.json that no longer parses, which then fails the
+# integrity layer for a reason that points nowhere near the real cause.
+PROJECT_NAME=${PROJECT_NAME//\\/\\\\}
+PROJECT_NAME=${PROJECT_NAME//\"/\\\"}
 
 {
     cat <<MANIFEST

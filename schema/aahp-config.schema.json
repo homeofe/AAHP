@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/homeofe/AAHP/schema/aahp-config.schema.json",
   "title": "AAHP Config",
-  "description": "Optional aahp.config.json consumed by the config-driven AAHP release gates (version-sync, changelog, claims, generator) and by aahp doctor. Every section is optional; an absent file or section makes the corresponding gate a no-op.",
+  "description": "Optional aahp.config.json consumed by the config-driven AAHP release gates, aahp doctor, and the verify gate's reviewed handoff-impact classifier. Every section is optional; absent configuration preserves each command's default behavior.",
   "type": "object",
   "properties": {
     "$schema": {
@@ -243,6 +243,52 @@
         "manifest": {
           "type": "string",
           "description": "Path to the task registry that supplies task status (default .ai/handoff/MANIFEST.json), relative to the project root and required to resolve inside it. A value that escapes the root is reported as manifest-outside-root and is never opened. Absent, the done-state rule is skipped rather than guessed."
+        }
+      },
+      "additionalProperties": false
+    },
+    "handoffImpact": {
+      "type": "object",
+      "description": "Reviewed exact-file exceptions for the Layer 2 content-drift gate. Only a modification (git status M) of a listed regular tracked file is non-impacting; additions, deletions, renames, copies, type changes, and mixed source changes remain impacting.",
+      "required": [
+        "nonImpactingModifiedFiles"
+      ],
+      "properties": {
+        "nonImpactingModifiedFiles": {
+          "type": "array",
+          "description": "Exact repo-relative regular tracked files whose content-only modification does not change handoff state. Runtime validation rejects duplicates and prefix-like ambiguity and rejects directories, symlinks, and gitlinks.",
+          "items": {
+            "type": "object",
+            "required": [
+              "file",
+              "reason"
+            ],
+            "properties": {
+              "file": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9._@+ -]+(?:/[A-Za-z0-9._@+ -]+)*$",
+                "not": {
+                  "anyOf": [
+                    { "pattern": "^aahp\\.config\\.json$" },
+                    { "pattern": "^\\.ai/handoff(?:/|$)" },
+                    { "pattern": "(?:^|/)\\.{1,2}(?:/|$)" }
+                  ]
+                },
+                "description": "Exact repo-relative regular tracked file. Forward slashes only; no absolute paths, traversal, glob syntax, directories, symlinks, gitlinks, handoff files, or aahp.config.json."
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "[\\p{L}\\p{N}]",
+                "not": {
+                  "pattern": "[\\p{Cc}\\p{Cf}]"
+                },
+                "description": "Review rationale explaining why modifying this file cannot stale handoff state. It must contain a Unicode letter or number and cannot contain control or invisible format characters."
+              }
+            },
+            "additionalProperties": false
+          }
         }
       },
       "additionalProperties": false

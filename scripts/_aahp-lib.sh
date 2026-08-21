@@ -184,6 +184,217 @@ out.flush()
 ' "$manifest" || return 1
 }
 
+# Read and validate the reviewed Layer 2 exception list from aahp.config.json.
+# Echoes one TAB-separated "<file>\t<reason>" line per exact file entry.
+#
+# The parser deliberately validates the complete handoffImpact shape here,
+# rather than trusting an optional external schema command. verify-handoff.sh
+# is propagated into repositories that may have only Node or Python available,
+# and a required CI gate must fail closed on malformed configuration.
+#
+# Paths use a conservative, cross-platform repo-relative grammar. This keeps
+# every entry literal and reviewable: no pathspec magic, globbing, traversal,
+# control characters, or platform-dependent separators can enter the git
+# classifier. The caller separately proves each returned path is a tracked
+# file, not a directory.
+#
+# Exit codes:
+#   0 = config absent, section absent, or section valid
+#   1 = config unreadable, malformed, or invalid
+#   2 = no JSON interpreter available (neither node nor python)
+aahp_non_impacting_modified_files() {
+    local config="$1"
+    if [ ! -e "$config" ] && [ ! -L "$config" ]; then
+        return 0
+    fi
+    if [ ! -f "$config" ] || [ ! -r "$config" ]; then
+        echo "aahp.config.json is not a readable regular file" >&2
+        return 1
+    fi
+
+    if command -v node &>/dev/null; then
+        # Single quotes are intentional: the embedded JavaScript contains
+        # template literals whose ${...} expressions belong to Node, not bash.
+        # shellcheck disable=SC2016
+        node -e '
+            const fs = require("fs");
+            const fail = (message) => { throw new Error(message); };
+            const text = fs.readFileSync(process.argv[1], "utf8");
+            const cfg = JSON.parse(text);
+
+            // JSON.parse silently keeps the last duplicate object key. That is
+            // unsafe for a reviewed policy file: the key a reviewer sees first
+            // may not be the value the gate enforces. The input is known-valid
+            // JSON at this point, so a small recursive scanner can reject every
+            // duplicate key without becoming a second permissive parser.
+            let cursor = 0;
+            const whitespace = () => { while (/\s/.test(text[cursor] || "")) cursor += 1; };
+            const stringToken = () => {
+              const start = cursor;
+              cursor += 1;
+              while (cursor < text.length) {
+                if (text[cursor] === "\\") { cursor += 2; continue; }
+                if (text[cursor] === "\"") { cursor += 1; return JSON.parse(text.slice(start, cursor)); }
+                cursor += 1;
+              }
+              fail("unterminated JSON string");
+            };
+            const value = () => {
+              whitespace();
+              if (text[cursor] === "{") return object();
+              if (text[cursor] === "[") {
+                cursor += 1; whitespace();
+                if (text[cursor] === "]") { cursor += 1; return; }
+                while (true) {
+                  value(); whitespace();
+                  if (text[cursor] === "]") { cursor += 1; return; }
+                  cursor += 1;
+                }
+              }
+              if (text[cursor] === "\"") { stringToken(); return; }
+              while (cursor < text.length && !/[\s,}\]]/.test(text[cursor])) cursor += 1;
+            };
+            const object = () => {
+              cursor += 1; whitespace();
+              const keys = new Set();
+              if (text[cursor] === "}") { cursor += 1; return; }
+              while (true) {
+                const key = stringToken();
+                if (keys.has(key)) fail(`duplicate JSON object key: ${key}`);
+                keys.add(key);
+                whitespace(); cursor += 1; value(); whitespace();
+                if (text[cursor] === "}") { cursor += 1; return; }
+                cursor += 1; whitespace();
+              }
+            };
+            value();
+            if (!cfg || typeof cfg !== "object" || Array.isArray(cfg)) {
+              fail("top level must be an object");
+            }
+            if (!Object.prototype.hasOwnProperty.call(cfg, "handoffImpact")) process.exit(0);
+            const impact = cfg.handoffImpact;
+            if (!impact || typeof impact !== "object" || Array.isArray(impact)) {
+              fail("handoffImpact must be an object");
+            }
+            const impactKeys = Object.keys(impact);
+            if (impactKeys.some((key) => key !== "nonImpactingModifiedFiles")) {
+              fail("handoffImpact contains an unknown property");
+            }
+            const entries = impact.nonImpactingModifiedFiles;
+            if (!Array.isArray(entries)) {
+              fail("handoffImpact.nonImpactingModifiedFiles must be an array");
+            }
+            const seen = [];
+            for (let index = 0; index < entries.length; index += 1) {
+              const entry = entries[index];
+              const label = `handoffImpact.nonImpactingModifiedFiles[${index}]`;
+              if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+                fail(`${label} must be an object`);
+              }
+              const keys = Object.keys(entry);
+              if (keys.length !== 2 || !keys.includes("file") || !keys.includes("reason")) {
+                fail(`${label} must contain exactly file and reason`);
+              }
+              const file = entry.file;
+              const reason = entry.reason;
+              if (typeof file !== "string" || file.length === 0 || file.trim() !== file) {
+                fail(`${label}.file must be a non-empty, trimmed string`);
+              }
+              if (typeof reason !== "string" || !/[\p{L}\p{N}]/u.test(reason) || /[\p{Cc}\p{Cf}]/u.test(reason)) {
+                fail(`${label}.reason must contain a letter or number and no control or format characters`);
+              }
+              if (/^[\\/]/.test(file) || /^[A-Za-z]:/.test(file) || file.includes("\\")) {
+                fail(`${label}.file must be repo-relative and use forward slashes`);
+              }
+              if (!/^[A-Za-z0-9._@+ -]+(?:\/[A-Za-z0-9._@+ -]+)*$/.test(file)) {
+                fail(`${label}.file contains a glob or unsupported metacharacter`);
+              }
+              const parts = file.split("/");
+              if (parts.some((part) => part === "." || part === "..")) {
+                fail(`${label}.file must not contain dot or traversal segments`);
+              }
+              const folded = file.toLowerCase();
+              if (folded === "aahp.config.json" || folded === ".ai/handoff" || folded.startsWith(".ai/handoff/")) {
+                fail(`${label}.file cannot classify the config or handoff state as non-impacting`);
+              }
+              if (seen.some((prior) => prior === folded || prior.startsWith(folded) || folded.startsWith(prior))) {
+                fail(`${label}.file duplicates or ambiguously prefixes another entry`);
+              }
+              seen.push(folded);
+              process.stdout.write(file + "\t" + reason.trim() + "\n");
+            }
+        ' "$config" || return 1
+        return 0
+    fi
+
+    local py
+    py=$(aahp_python_cmd)
+    [ -n "$py" ] || return 2
+    "$py" -c '
+import json, re, sys, unicodedata
+
+def fail(message):
+    raise ValueError(message)
+
+def no_duplicate_keys(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            fail("duplicate JSON object key: " + key)
+        result[key] = value
+    return result
+
+with open(sys.argv[1], encoding="utf-8") as handle:
+    cfg = json.load(
+        handle,
+        object_pairs_hook=no_duplicate_keys,
+        parse_constant=lambda value: fail("non-standard JSON constant: " + value),
+    )
+if not isinstance(cfg, dict):
+    fail("top level must be an object")
+if "handoffImpact" not in cfg:
+    raise SystemExit(0)
+impact = cfg["handoffImpact"]
+if not isinstance(impact, dict):
+    fail("handoffImpact must be an object")
+if any(key != "nonImpactingModifiedFiles" for key in impact):
+    fail("handoffImpact contains an unknown property")
+entries = impact.get("nonImpactingModifiedFiles")
+if not isinstance(entries, list):
+    fail("handoffImpact.nonImpactingModifiedFiles must be an array")
+seen = []
+for index, entry in enumerate(entries):
+    label = "handoffImpact.nonImpactingModifiedFiles[%d]" % index
+    if not isinstance(entry, dict):
+        fail(label + " must be an object")
+    if set(entry) != {"file", "reason"}:
+        fail(label + " must contain exactly file and reason")
+    file = entry["file"]
+    reason = entry["reason"]
+    if not isinstance(file, str) or not file or file.strip() != file:
+        fail(label + ".file must be a non-empty, trimmed string")
+    if (
+        not isinstance(reason, str)
+        or not any(char.isalnum() for char in reason)
+        or any(unicodedata.category(char) in ("Cc", "Cf") for char in reason)
+    ):
+        fail(label + ".reason must contain a letter or number and no control or format characters")
+    if file.startswith(("/", "\\")) or re.match(r"^[A-Za-z]:", file) or "\\" in file:
+        fail(label + ".file must be repo-relative and use forward slashes")
+    if not re.fullmatch(r"[A-Za-z0-9._@+ -]+(?:/[A-Za-z0-9._@+ -]+)*", file):
+        fail(label + ".file contains a glob or unsupported metacharacter")
+    if any(part in (".", "..") for part in file.split("/")):
+        fail(label + ".file must not contain dot or traversal segments")
+    folded = file.lower()
+    if folded == "aahp.config.json" or folded == ".ai/handoff" or folded.startswith(".ai/handoff/"):
+        fail(label + ".file cannot classify the config or handoff state as non-impacting")
+    if any(prior == folded or prior.startswith(folded) or folded.startswith(prior) for prior in seen):
+        fail(label + ".file duplicates or ambiguously prefixes another entry")
+    seen.append(folded)
+    sys.stdout.buffer.write((file + "\t" + reason.strip() + "\n").encode("utf-8"))
+' "$config" || return 1
+}
+
 # Report expired "verified" trust rows from a TRUST.md file.
 # Trust tables are Markdown with a header row that includes "Status" and
 # "Expires" columns. We locate those columns from the header, then for each

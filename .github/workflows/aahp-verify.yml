@@ -1,25 +1,26 @@
 # AAHP Verify - the intended REQUIRED status check for the handoff gate.
 #
 # Runs `aahp verify --level ci`, which executes all 4 layers with NO escape
-# hatch (AAHP_SKIP_VERIFY is ignored at --level ci). This is the off-machine,
-# non-bypassable backstop behind the local pre-commit / pre-push hooks:
+# hatch (AAHP_SKIP_VERIFY is ignored at --level ci). This is the off-machine
+# backstop behind the local pre-commit / pre-push hooks:
 #   Layer 1: MANIFEST checksum integrity
 #   Layer 2: content-drift gate (code changed => STATUS.md + MANIFEST.json must change)
 #   Layer 3: commit-pointer freshness
 #   Layer 4: TRUST-TTL expiry (advisory)
 #
-# Dependabot exemption: a pure dependency bump introduces no handoff-state change,
-# so the AAHP handoff gate does not apply to it. The job stays a REQUIRED check but
-# no-ops to success when the change originates from dependabot[bot] - on both the PR
-# (github.actor) and the resulting push to main (head_commit.author). Security and
-# build remain gated by the supply-chain-guard and CodeQL checks, which still run.
+# The workflow always runs Layer 1, regardless of actor. Layer 2 receives the
+# event's explicit base commit so pull requests compare against their base and
+# pushes compare against the pre-push commit instead of HEAD against itself.
 #
-# NOTE: GitHub Actions is currently OFF org-wide (cost sweep). This workflow is
-# committed anyway so it activates automatically when Actions is re-enabled.
-# Once Actions is on, mark this job as a REQUIRED status check in branch
-# protection so the gate cannot be bypassed by skipping local hooks.
+# Mark this job as a REQUIRED status check, and require trusted review for
+# changes to this workflow and the gate/parser it executes. A pull_request
+# workflow runs the proposed branch, so the status alone is self-authorizing
+# unless repository rules protect those evaluator paths.
 
 name: AAHP Verify
+
+permissions:
+  contents: read
 
 on:
   push:
@@ -27,42 +28,38 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      base:
+        description: Exact base commit SHA for the Layer 2 diff
+        required: true
+        type: string
 
 jobs:
   aahp-verify:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Dependabot exemption (handoff gate not applicable)
-        if: ${{ github.actor == 'dependabot[bot]' || github.event.head_commit.author.username == 'dependabot[bot]' }}
-        run: |
-          echo "Dependabot change detected: the AAHP handoff gate does not apply."
-          echo "A pure dependency bump introduces no handoff-state change."
-          echo "Security and build remain gated by the supply-chain-guard and CodeQL checks."
-
       - name: Checkout code
-        if: ${{ github.actor != 'dependabot[bot]' && github.event.head_commit.author.username != 'dependabot[bot]' }}
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # Full history so the content-drift gate can diff against the base.
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Set up Node.js
-        if: ${{ github.actor != 'dependabot[bot]' && github.event.head_commit.author.username != 'dependabot[bot]' }}
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '20'
 
       - name: Set up Python 3
-        if: ${{ github.actor != 'dependabot[bot]' && github.event.head_commit.author.username != 'dependabot[bot]' }}
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c # v6.0.0
         with:
           python-version: '3.x'
 
       - name: Run aahp verify (CI level, no escape hatch)
-        if: ${{ github.actor != 'dependabot[bot]' && github.event.head_commit.author.username != 'dependabot[bot]' }}
         run: bash scripts/verify-handoff.sh . --level ci
+        env:
+          AAHP_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before || inputs.base }}
 
       - name: Run aahp doctor (conformance record)
-        if: ${{ github.actor != 'dependabot[bot]' && github.event.head_commit.author.username != 'dependabot[bot]' }}
         run: node bin/aahp.js doctor . --json

@@ -340,30 +340,76 @@ up to 4 layers:
    unparseable manifest, an index that lists no files, or a missing checksum
    tool. `lint-handoff.sh` still runs for the checks this layer does not cover
    (injection, secrets, PII, stale lock) and its non-zero exit still blocks.
-2. **Content-drift gate (the key check)** - if the change set touches any source
-   file OUTSIDE `.ai/handoff/`, it MUST also include `STATUS.md` AND a regenerated
-   `MANIFEST.json`. Otherwise it HARD-FAILS with:
-   `Code changed but handoff state did not. Run /handoff.`
+2. **Content-drift gate (the key check)** - if the change set touches any
+   handoff-impacting file OUTSIDE `.ai/handoff/`, it MUST also include
+   `STATUS.md` AND a regenerated `MANIFEST.json`. Otherwise it HARD-FAILS with:
+   `Handoff-impacting files changed but handoff state did not. Run /handoff.`
+   Every outside file is impacting by default. A repository may classify an
+   exact regular tracked file as non-impacting under `handoffImpact` in a regular
+   tracked `aahp.config.json`, but only a content-only modification (`M`) whose
+   Git file mode is unchanged uses that reviewed exception. Additions, deletions,
+   renames, copies, type changes, config edits,
+   handoff edits, and any mixed source change remain impacting. The gate logs
+   every applied classification with its required review reason.
 3. **Commit-pointer freshness** - `MANIFEST.last_session.commit` vs HEAD.
 4. **TRUST-TTL expiry** - reports expired `verified` rows (advisory).
 
 ```bash
 ./scripts/verify-handoff.sh [path] --level precommit   # fast: layers 1-2
 ./scripts/verify-handoff.sh [path] --level prepush      # full: layers 1-4
-./scripts/verify-handoff.sh [path] --level ci           # full, no escape hatch
+./scripts/verify-handoff.sh [path] --level ci --base SHA # full, explicit diff base
 ```
 
 **Wiring.** `scripts/install-hooks.sh` installs a git `pre-commit` hook (fast:
 checksum + drift gate) and a `pre-push` hook (full verify + TTL). A CI workflow
 (`.github/workflows/aahp-verify.yml`) runs `aahp verify --level ci` as the
-intended REQUIRED status check, the non-bypassable off-machine backstop.
+intended REQUIRED off-machine status check. `AAHP_SKIP_VERIFY` cannot disable that
+CI-level invocation. However, the supplied `pull_request` workflow and vendored gate
+execute from the proposed branch, so the check is not an independent trust boundary by
+itself. Repository rules must require trusted review for changes to the workflow,
+`verify-handoff.sh`, `_aahp-lib.sh`, and the scripts they execute (or an operator must
+provide a default-branch evaluator). v3.10.0 does not ship that repository-specific
+review/ruleset configuration. The
+workflow passes the pull request base SHA on pull requests and the event's
+`before` SHA on pushes. At `--level ci`, a missing, all-zero, unreadable,
+invalid, or HEAD-equal base and every failed git diff are blocking failures.
+`AAHP_BASE_SHA` is the environment equivalent of `--base`. The gate compares
+the base and HEAD endpoint trees, rather than a merge-base three-dot range, so
+rollback and force-push events cannot collapse into an empty diff.
+
+**Reviewed non-impacting modifications.** This optional configuration is for
+files whose content cannot describe product or implementation state, such as a
+dependency update schedule. Each entry is one exact repo-relative regular tracked file
+and a review reason containing a Unicode letter or number:
+
+```json
+{
+  "handoffImpact": {
+    "nonImpactingModifiedFiles": [
+      {
+        "file": ".github/dependabot.yml",
+        "reason": "Dependency update scheduling does not describe product or implementation state."
+      }
+    ]
+  }
+}
+```
+
+The runtime parser fails closed even when schema validation is not installed.
+It rejects malformed types and non-standard constants, empty or invisible reasons,
+control and format characters, absolute or traversal paths, glob or metacharacter paths,
+directories, untracked paths, symlinks, gitlinks, mode changes,
+`.ai/handoff/**`,
+`aahp.config.json`, duplicates, and prefix-like ambiguity. An absent section
+preserves the original all-files-impacting behavior.
 
 **Verify-only.** The gate never regenerates `MANIFEST.json`. Regeneration stays a
 separate `/handoff` step. The gate only detects drift and tells you to run it.
 
-**Escape hatch.** `AAHP_SKIP_VERIFY=1` skips LOCAL verification only. It is
-caught by the required CI check (which ignores the hatch), so do NOT use it to
-bypass CI. Never use `git commit/push --no-verify`.
+**Escape hatch.** `AAHP_SKIP_VERIFY=1` skips LOCAL verification only. The CI-level
+invocation ignores the hatch. This prevents the environment-variable bypass, but the
+required-check evaluator paths still need the trusted-review boundary described above.
+Never use `git commit/push --no-verify`.
 
 See `scripts/ROLLOUT.md` for the propagation plan across consumer repos.
 
@@ -713,8 +759,8 @@ release-journal generator is an opt-in consumer capability that must not target 
 ### ADR-005: the PII allowlist is PII-only and never a verify bypass
 **Why it recurs:** an agent extending the allowlist could broaden it into a general
 bypass. **Decision:** the allowlist is exact-match, expiring, reviewed, and suppresses
-only the matching PII finding; secret detection and every other verify layer stay
-non-bypassable. (Backed by regression tests.)
+only the matching PII finding; secret detection and every other verify layer remain
+unaffected by the allowlist. (Backed by regression tests.)
 
 ### ADR-006: TRUST-TTL lives in TRUST.md, not MANIFEST.json
 **Why it recurs:** `MANIFEST.json` looks like the "obvious" home for structured TTL
@@ -724,8 +770,9 @@ human-auditable trust record in one human-readable file.
 ### ADR-007: gate severities are fixed (drift blocks, TTL warns, escape hatch is local-only)
 **Why it recurs:** each severity is a knob an agent could flip while "tuning" the gate.
 **Decision:** the content-drift gate hard-fails; TRUST-TTL is advisory (warn); and
-`AAHP_SKIP_VERIFY` is honored locally but ignored at `--level ci`, so the required check
-can never be bypassed.
+`AAHP_SKIP_VERIFY` is honored locally but ignored at `--level ci`, so that environment
+variable cannot skip the required invocation. The pull-request evaluator paths still
+need trusted-review protection as described in Section 2.8.
 
 ### ADR-008: aahp_version is independent of the npm version
 **Why it recurs:** at release time an agent may reflexively bump `aahp_version` to match
@@ -758,7 +805,8 @@ gate runner whose exit code drives CI. The shared gates are intentional, not red
 **Why it recurs:** wiring a hook to one hard-coded path is the quick way. **Decision:**
 the hooks run `scripts/verify-handoff.sh` when it is vendored, else the installed `aahp`
 CLI via `npx --no-install`, and skip when neither resolves. The local hook is a
-convenience; the required CI check is the non-bypassable authority.
+convenience; the required CI check is the off-machine authority after its evaluator
+paths receive the trusted-review protection described in Section 2.8.
 
 ### ADR-014: enumerating gates scan git-tracked files and fail loud off-tree
 **Why it recurs:** a plain filesystem walk looks simpler than shelling out to git.
@@ -799,6 +847,22 @@ a different way, by publishing the shapes it is known to miss (Section 8.7).
 check` gate list, and it exits 0 whatever it finds. The non-enforcement is structural
 rather than a default that could drift back. Gates keep binary pass/fail; a rule that
 cannot be sound does not become one.
+
+### ADR-018: Layer 2 exceptions are exact, reviewed, M-only, and CI is base-anchored
+**Why it recurs:** a blanket actor or directory exemption is easy to add when a
+maintenance-only change makes handoff regeneration feel noisy, and a CI checkout can
+silently compare HEAD with HEAD when it guesses its own base. Either shortcut turns a
+required green check into a statement about work it never examined. **Decision:** every
+outside file remains handoff-impacting unless a regular tracked `aahp.config.json` names that
+exact regular tracked file with a review reason containing a visible letter or number. Only a
+content-only git status `M` whose old and new regular-file modes are identical can use the exception; every
+other status and every mixed change still requires the handoff pair. CI never guesses:
+the workflow supplies an event base, and a missing, zero, invalid, unreadable, HEAD-equal,
+or undiffable base fails closed. The endpoint trees are compared directly so a rollback
+or force-push cannot select HEAD as its own merge base. Layer 1 runs for every actor.
+**Consequence:** narrow
+maintenance changes avoid unrelated handoff churn without creating an identity bypass,
+path-pattern bypass, or vacuous required check.
 
 ---
 
@@ -1264,8 +1328,8 @@ your-project/
       grounding-auditor.md  # the Phase 4.5 auditor persona
 ```
 
-- **Hooks.** `scripts/install-hooks.sh` (shipped by AAHP) installs the pre-commit and pre-push hooks; the harness runs it once at setup. The hooks resolve the vendored `scripts/verify-handoff.sh` first, fall back to the installed `aahp` CLI via `npx --no-install` when it is absent, and skip when neither resolves (the required CI check is the non-bypassable backstop). See Section 2.8.
-- **CI.** Copy `.github/workflows/aahp-verify.yml`; it runs `aahp verify --level ci` (no escape hatch) and should be a required status check. For governance (changelog, version sync, forbidden patterns, doc links) copy the portable `.github/workflows/aahp-govern.yml` beside it, or let `aahp init --gates` scaffold it; it runs `aahp check` through the pinned devDependency via `npx` and is verify-only.
+- **Hooks.** `scripts/install-hooks.sh` (shipped by AAHP) installs the pre-commit and pre-push hooks; the harness runs it once at setup. The hooks resolve the vendored `scripts/verify-handoff.sh` first, fall back to the installed `aahp` CLI via `npx --no-install` when it is absent, and skip when neither resolves (the required CI check is the off-machine backstop once its evaluator paths are protected). See Section 2.8.
+- **CI.** Copy `.github/workflows/aahp-verify.yml`; it runs `aahp verify --level ci` (no escape hatch) and should be a required status check. Also require trusted review for the workflow and its vendored gate/parser paths, because a `pull_request` workflow otherwise evaluates code from the proposed branch. For governance (changelog, version sync, forbidden patterns, doc links) copy the portable `.github/workflows/aahp-govern.yml` beside it, or let `aahp init --gates` scaffold it; it runs `aahp check` through the pinned devDependency via `npx` and is verify-only.
 - **Referencing scripts.** Harness commands invoke AAHP by the vendored script path (`bash scripts/verify-handoff.sh . --level prepush`) or the CLI (`npx aahp verify`). They never reimplement the checks.
 
 ### 9.3 Minimal harness bootstrap
@@ -1410,7 +1474,9 @@ adding an `aahp.config.json` (see `schema/aahp-config.schema.json` and
 pins capability numbers across surfaces, `forbiddenPatterns` denylists text (for example the
 em-dash ban), `docSync` keeps duplicated value-sets in step, `docLinks` checks internal
 Markdown links, and `generate` drives an optional LOG release-journal plus a
-`NEXT_ACTIONS.md` current-version freshness gate. Two selection keys tune the surface:
+`NEXT_ACTIONS.md` current-version freshness gate. `handoffImpact` carries the reviewed,
+exact-file, M-only Layer 2 classifications described in Section 2.8. Two selection keys
+tune the surface:
 `check` (`only`/`skip`) chooses which gates `aahp check` runs, and `pinnedDep`
 (`name`/`location`/`allowRange`) opts the `doctor` pinned-dep gate in (absent, it is a clean
 skip). `acceptanceCriteria` (`include`/`manifest`) supplies the input paths for the

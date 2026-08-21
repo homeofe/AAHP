@@ -20,7 +20,12 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          # The floor engines.node publishes. runtime-matrix below exercises
+          # the rest of the published range; this job is the required check,
+          # so its name must stay literal - a matrix here would rename it to
+          # "lint-and-validate (22)" and the required context would never
+          # report again, blocking every pull request.
+          node-version: '22'
 
       - name: Set up Python 3
         uses: actions/setup-python@v5
@@ -66,9 +71,49 @@ jobs:
       - name: Run bats tests
         run: npm test
 
+  runtime-matrix:
+    # Exercise the WHOLE range engines.node publishes, not just its floor.
+    # scripts/check-runtime-support.mjs binds this matrix directly: emptying
+    # it or cutting it to one entry turns that gate red, because the standalone
+    # pins in the other jobs would otherwise keep a global pin list populated
+    # and hide the loss of coverage.
+    #
+    # Only the Node-sensitive surface runs here. shellcheck, the Python
+    # validators and ajv do not vary by Node major, so lint-and-validate keeps
+    # them and this job does not repeat them.
+    name: Runtime matrix
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [22, 24]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Set up Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+      - name: Set up Python 3
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - name: Install dependencies
+        run: npm ci
+      - name: Syntax-check Node gates
+        run: |
+          for f in scripts/*.mjs; do node --check "$f"; done
+      - name: Assert the runtime relation holds on this runtime too
+        run: npm run check:runtime-support
+      - name: Run aahp doctor (conformance)
+        run: npm run doctor
+      - name: Run bats tests
+        run: npm test
+
   publish:
     name: Publish to npm
-    needs: lint-and-validate
+    # Both gates, so a release cannot ship past a red runtime matrix.
+    needs: [lint-and-validate, runtime-matrix]
     runs-on: ubuntu-latest
     if: (startsWith(github.ref, 'refs/tags/v') && contains(github.ref, '.')) || github.event_name == 'workflow_dispatch'
     permissions:

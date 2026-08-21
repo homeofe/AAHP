@@ -3,76 +3,76 @@
   "project": "AAHP",
   "last_session": {
     "agent": "cli-tool",
-    "session_id": "cli-1787338022",
-    "timestamp": "2026-08-21T18:47:02Z",
-    "commit": "fed5b9f",
-    "phase": "fix",
+    "session_id": "cli-1787345973",
+    "timestamp": "2026-08-21T20:59:34Z",
+    "commit": "0425fc6",
+    "phase": "implementation",
     "duration_minutes": 0
   },
   "files": {
     "STATUS.md": {
-      "checksum": "sha256:07955e8d1a3d0c2160e4b785fd629fe707ba1d3e9d93d5f0d91e68028d5e247d",
-      "updated": "2026-08-21T18:47:02Z",
-      "lines": 87,
+      "checksum": "sha256:662d490d552f39fc65e3ce58d41d700ff26c24e25b0845c5141613702b791726",
+      "updated": "2026-08-21T20:59:05Z",
+      "lines": 102,
       "summary": "AAHP **v3.10.0** (npm `@elvatis_com/aahp`) is prepared on a review branch. It has not"
     },
     "NEXT_ACTIONS.md": {
       "checksum": "sha256:efdc6ef8664faf9ce5120fa797b702d2353bd4c3205c62e5ba651a465326103d",
-      "updated": "2026-08-21T18:31:32Z",
+      "updated": "2026-08-21T20:29:58Z",
       "lines": 239,
       "summary": "Current version: **v3.10.0**"
     },
     "LOG.md": {
       "checksum": "sha256:b6296369cedefd0c52a00e8ed2662ad839e238e8162d93c0fda76547e30c0bce",
-      "updated": "2026-08-21T18:31:32Z",
+      "updated": "2026-08-21T20:29:58Z",
       "lines": 250,
       "summary": "**Agent:** claude-opus-5"
     },
     "LOG-ARCHIVE.md": {
       "checksum": "sha256:952cebfc3ba42ba60c913defd9ca292d122a4151230b53e59b9201fd0dac5933",
-      "updated": "2026-08-21T18:31:32Z",
+      "updated": "2026-08-21T20:29:58Z",
       "lines": 159,
       "summary": "**Agent:** Claude Opus 4.6"
     },
     "LOG-ARCHIVE.index.json": {
       "checksum": "sha256:5cb8447453139052e528f8dfc67d88f3d5e74bb40e5fc1672aa55ca30980de98",
-      "updated": "2026-08-21T18:31:32Z",
+      "updated": "2026-08-21T20:29:58Z",
       "lines": 29,
       "summary": "{"
     },
     "DASHBOARD.md": {
       "checksum": "sha256:e96e392db8dab2e9719e542dfa2a10c240d0be16ac6721298c460a22985cbdea",
-      "updated": "2026-08-21T18:31:32Z",
+      "updated": "2026-08-21T20:29:58Z",
       "lines": 96,
       "summary": "| Name | Path | Build | Tests | Status | Notes |"
     },
     "TRUST.md": {
       "checksum": "sha256:91f124fe10a934779ef1d7442dd54af6656bbc03c4b1cde13a9d4cac9ab248e6",
-      "updated": "2026-08-21T18:31:32Z",
+      "updated": "2026-08-21T20:29:58Z",
       "lines": 93,
       "summary": "| Level | Meaning |"
     },
     "CONVENTIONS.md": {
       "checksum": "sha256:1c0150404d22c6e15e39139e8b2c991b0167ba1e095f579efafb85555dfe0d88",
-      "updated": "2026-08-21T18:31:32Z",
+      "updated": "2026-08-21T20:29:58Z",
       "lines": 93,
       "summary": "The project motto (Asimov's Three Laws) and the **do no damage** principle live once, in README (## Our Motto: The Three Laws). Agents must never take"
     },
     "WORKFLOW.md": {
       "checksum": "sha256:ef005f24e399791abb986b3a76403295c33ad3b28bb9b7dc777d1d0528b31151",
-      "updated": "2026-08-21T18:31:32Z",
+      "updated": "2026-08-21T20:29:58Z",
       "lines": 156,
       "summary": "| Agent | Model | Role | Responsibility |"
     },
     "GROUNDING.md": {
       "checksum": "sha256:7ef8cece585dc5defb4285175b9ba560d5469675df553d4ce28ec9e7aec24343",
-      "updated": "2026-08-21T18:31:32Z",
+      "updated": "2026-08-21T20:29:58Z",
       "lines": 209,
       "summary": "This register EXTENDS existing AAHP machinery; it does not fork or replace it. It"
     },
     "pii-allowlist.json": {
       "checksum": "sha256:7c1051f6e2bc3943b7c1dbe4da229694455681b8875a346c99279e555edb733f",
-      "updated": "2026-08-21T18:31:32Z",
+      "updated": "2026-08-21T20:29:58Z",
       "lines": 4,
       "summary": "{"
     }
@@ -80,8 +80,8 @@
   "quick_context": "AAHP **v3.10.0** (npm `@elvatis_com/aahp`) is prepared on a review branch. It has not Current version: **v3.10.0** ",
   "token_budget": {
     "manifest_only": 85,
-    "manifest_plus_core": 3560,
-    "full_read": 13630
+    "manifest_plus_core": 4110,
+    "full_read": 14180
   }
   ,"next_task_id": 18
   ,"tasks": {"T-006":{"title":"Publish npm package","status":"done","priority":"medium","depends_on":[],"created":"2026-06-28T10:10:21.975Z","notes":"**AAHP Task:** `T-006`  \n**Status:** blocked  \n**Priority:** medium  \n\n\n\n\n---\n*Auto-created from AAHP manifest · project: AAHP*","github_issue":18,"github_repo":"homeofe/AAHP","completed":"2026-07-14T00:00:00Z"},"T-014":{"title":"Add CLI integration tests for bin/aahp.js [high]","status":"done","priority":"high","depends_on":[],"created":"2026-06-28T10:10:21.975Z","notes":"**AAHP Task:** `T-014`  \n**Status:** ready  \n**Priority:** high  \n\n\n\n\n---\n*Auto-created from AAHP manifest · project: AAHP*","github_issue":14,"github_repo":"homeofe/AAHP","completed":"2026-07-14T00:00:00Z"},"T-015":{"title":"Add `aahp status` quick-look command [medium]","status":"done","priority":"medium","depends_on":[],"created":"2026-06-28T10:10:21.978Z","github_issue":22,"github_repo":"homeofe/AAHP","completed":"2026-07-14T00:00:00Z"},"T-016":{"title":"Add `aahp archive` command for LOG.md rotation [medium]","status":"done","priority":"medium","depends_on":[],"created":"2026-06-28T10:10:21.979Z","github_issue":23,"github_repo":"homeofe/AAHP","completed":"2026-07-14T00:00:00Z"},"T-017":{"title":"Add project-level CLAUDE.md [low]","status":"done","priority":"low","depends_on":[],"created":"2026-06-28T10:10:21.979Z","github_issue":24,"github_repo":"homeofe/AAHP","completed":"2026-07-14T00:00:00Z"}}

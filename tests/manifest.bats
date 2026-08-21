@@ -349,27 +349,48 @@ _detect_python() {
     # the warning lives inside the `command -v node` guard. Before the remote
     # fallback existed, the name then became the directory basename with no
     # diagnostic at all. git alone is enough to get it right.
-    # Drop only the directory node lives in, rather than building a shim
-    # directory: a shim needs copies or symlinks of bash and git, which is not
-    # portable to Windows, and a test that can only ever skip proves nothing.
-    node_dir="$(dirname "$(command -v node)")"
-    stripped_path="$(printf '%s' "$PATH" | tr ':' '\n' | grep -vxF "$node_dir" | paste -sd: -)"
+    # Drop EVERY PATH entry that holds a node executable, rather than building
+    # a shim directory of symlinked binaries. A shim needs copies of bash and
+    # git, which is not portable to Windows, and a test that can only ever
+    # `skip` proves nothing. Dropping only the first such entry is not enough
+    # either: a CI runner commonly has two node installs (a system one and a
+    # toolcache one), and stripping one leaves the branch untested while the
+    # test still reports on it.
+    stripped_path=""
+    saved_ifs="$IFS"
+    set -f
+    IFS=':'
+    for entry in $PATH; do
+        if [ -z "$entry" ]; then continue; fi
+        if [ -x "$entry/node" ] || [ -x "$entry/node.exe" ]; then continue; fi
+        stripped_path="${stripped_path}${stripped_path:+:}$entry"
+    done
+    IFS="$saved_ifs"
+    set +f
 
-    # Guard the isolation itself. If node were still reachable, or bash/git
-    # were not, this test would report green without exercising the path it
-    # names. Fail rather than skip: on every platform this suite runs on,
-    # node is installed somewhere other than the directory holding bash.
-    PATH="$stripped_path" command -v git >/dev/null 2>&1
-    PATH="$stripped_path" command -v bash >/dev/null 2>&1
-    ! PATH="$stripped_path" command -v node >/dev/null 2>&1
+    # Assert the CONSEQUENCE of the isolation, not its configuration: node must
+    # actually fail to EXECUTE under this PATH, and git and bash must actually
+    # run. `env` performs a real execvp, so unlike `command -v` it cannot be
+    # satisfied by a shell hash-table entry or by builtin lookup order. Failing
+    # here beats skipping: a test that cannot fire is indistinguishable from a
+    # passing one.
+    run env PATH="$stripped_path" node --version
+    [ "$status" -ne 0 ]
+    run env PATH="$stripped_path" git --version
+    [ "$status" -eq 0 ]
+    run env PATH="$stripped_path" bash -c 'exit 7'
+    [ "$status" -eq 7 ]
 
     dir_name="$(basename "$TEST_TMPDIR")"
     run env PATH="$stripped_path" bash "$SCRIPTS_DIR/aahp-manifest.sh" "$TEST_TMPDIR" --quiet
     [ "$status" -eq 0 ]
 
-    manifest_content=$(cat "$TEST_TMPDIR/.ai/handoff/MANIFEST.json")
-    [[ "$manifest_content" == *'"project": "aahp-consumer"'* ]]
-    [[ "$manifest_content" != *"\"project\": \"$dir_name\""* ]]
+    # Read the value back explicitly so a regression reports the name that was
+    # actually written instead of only that a glob did not match.
+    run sed -n 's/.*"project": "\([^"]*\)".*/\1/p' "$TEST_TMPDIR/.ai/handoff/MANIFEST.json"
+    [ "$status" -eq 0 ]
+    [ "$output" = "aahp-consumer" ]
+    [ "$output" != "$dir_name" ]
 }
 
 # ─── File indexing ───────────────────────────────────────────

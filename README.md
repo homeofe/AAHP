@@ -371,7 +371,24 @@ itself. Repository rules must require trusted review for changes to the workflow
 provide a default-branch evaluator). v3.10.0 does not ship that repository-specific
 review/ruleset configuration. The
 workflow passes the pull request base SHA on pull requests and the event's
-`before` SHA on pushes. At `--level ci`, a missing, all-zero, unreadable,
+`before` SHA on pushes. A `workflow_dispatch` run carries neither, so that
+trigger MUST also declare a required `base` input and the step MUST fall back
+to it; the shipped workflow does both, and a copy that drops either half turns
+every manual run into a blocking failure:
+
+```yaml
+on:
+  workflow_dispatch:
+    inputs:
+      base:
+        description: Exact base commit SHA for the Layer 2 diff
+        required: true
+        type: string
+# ...
+        env:
+          AAHP_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before || inputs.base }}
+```
+ At `--level ci`, a missing, all-zero, unreadable,
 invalid, or HEAD-equal base and every failed git diff are blocking failures.
 `AAHP_BASE_SHA` is the environment equivalent of `--base`. The gate compares
 the base and HEAD endpoint trees, rather than a merge-base three-dot range, so

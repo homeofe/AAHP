@@ -230,8 +230,12 @@ _detect_python() {
     create_status_md
     create_next_actions_md
     create_log_md
-    # No existing MANIFEST.json: this is a first-ever generation, so the
-    # project name must come from the directory basename.
+    # No existing MANIFEST.json AND no git remote: nothing else carries the
+    # repository's identity, so the directory basename is the only source left
+    # and the original behaviour must be preserved. The precondition is
+    # asserted, otherwise a remote appearing in the fixture later would make
+    # this test pass for the wrong reason.
+    [ -z "$(git -C "$TEST_TMPDIR" remote)" ]
 
     run bash "$SCRIPTS_DIR/aahp-manifest.sh" "$TEST_TMPDIR" --quiet
     [ "$status" -eq 0 ]
@@ -239,6 +243,154 @@ _detect_python() {
     manifest_content=$(cat "$TEST_TMPDIR/.ai/handoff/MANIFEST.json")
     expected_name="$(basename "$TEST_TMPDIR")"
     [[ "$manifest_content" == *"\"project\": \"$expected_name\""* ]]
+}
+
+# ─── Project name comes from repository identity, not from cwd ───
+#
+# Every agent in this estate works in a `git worktree` whose directory is named
+# after the BRANCH, and CI unpacks into a workdir named after the job. A
+# cwd-derived project name therefore rewrites MANIFEST.json's "project" to the
+# checkout's name on every regeneration, and the rewrite is invisible unless
+# somebody re-reads the file afterwards. Two such values reached consumer main
+# branches before this was fixed. Each test below runs the generator from a
+# directory whose name is NOT the repository name.
+
+@test "derives project name from the git remote, not the directory it runs in" {
+    create_status_md
+    create_next_actions_md
+    create_log_md
+    # First generation (no MANIFEST.json), so the recorded-name path cannot be
+    # what rescues this: the remote is the only thing naming the repository.
+    git -C "$TEST_TMPDIR" remote add origin https://github.com/homeofe/aahp-consumer.git
+
+    run bash "$SCRIPTS_DIR/aahp-manifest.sh" "$TEST_TMPDIR" --quiet
+    [ "$status" -eq 0 ]
+
+    # Guard: the directory really is named something else, so the assertions
+    # below discriminate instead of being accidentally true.
+    dir_name="$(basename "$TEST_TMPDIR")"
+    [ "$dir_name" != "aahp-consumer" ]
+
+    manifest_content=$(cat "$TEST_TMPDIR/.ai/handoff/MANIFEST.json")
+    [[ "$manifest_content" == *'"project": "aahp-consumer"'* ]]
+    [[ "$manifest_content" != *"\"project\": \"$dir_name\""* ]]
+}
+
+@test "derives project name from an scp-style remote URL" {
+    create_status_md
+    create_next_actions_md
+    create_log_md
+    git -C "$TEST_TMPDIR" remote add origin git@github.com:homeofe/aahp-consumer.git
+
+    run bash "$SCRIPTS_DIR/aahp-manifest.sh" "$TEST_TMPDIR" --quiet
+    [ "$status" -eq 0 ]
+
+    dir_name="$(basename "$TEST_TMPDIR")"
+    [ "$dir_name" != "aahp-consumer" ]
+
+    manifest_content=$(cat "$TEST_TMPDIR/.ai/handoff/MANIFEST.json")
+    [[ "$manifest_content" == *'"project": "aahp-consumer"'* ]]
+    [[ "$manifest_content" != *"\"project\": \"$dir_name\""* ]]
+}
+
+@test "an unsubstituted [PROJECT] placeholder does not survive regeneration" {
+    create_status_md
+    create_next_actions_md
+    create_log_md
+    create_manifest_json
+    git -C "$TEST_TMPDIR" remote add origin https://github.com/homeofe/aahp-consumer.git
+
+    # `aahp init` copies templates/MANIFEST.json in with "[PROJECT]" and tells
+    # the adopter to replace it. Until they do, that string is not a name
+    # anybody chose, so it must not outrank the repository's real identity.
+    manifest="$TEST_TMPDIR/.ai/handoff/MANIFEST.json"
+    sed 's/"project": "TestProject"/"project": "[PROJECT]"/' "$manifest" > "$manifest.tmp"
+    mv "$manifest.tmp" "$manifest"
+    # Guard the substitution: had it silently done nothing, the assertion below
+    # would pass via the ordinary preserve path and prove nothing.
+    grep -q '"project": "\[PROJECT\]"' "$manifest"
+
+    run bash "$SCRIPTS_DIR/aahp-manifest.sh" "$TEST_TMPDIR" --quiet
+    [ "$status" -eq 0 ]
+
+    manifest_content=$(cat "$manifest")
+    [[ "$manifest_content" == *'"project": "aahp-consumer"'* ]]
+    [[ "$manifest_content" != *'"project": "[PROJECT]"'* ]]
+}
+
+@test "a recorded project name outranks the git remote" {
+    create_status_md
+    create_next_actions_md
+    create_log_md
+    create_manifest_json
+    # A consumer whose handoff project name deliberately differs from the
+    # repository name must keep it. The remote is a fallback for when nothing
+    # is on record, never an override of a name a human set.
+    git -C "$TEST_TMPDIR" remote add origin https://github.com/homeofe/some-other-repo.git
+
+    run bash "$SCRIPTS_DIR/aahp-manifest.sh" "$TEST_TMPDIR" --quiet
+    [ "$status" -eq 0 ]
+
+    manifest_content=$(cat "$TEST_TMPDIR/.ai/handoff/MANIFEST.json")
+    [[ "$manifest_content" == *'"project": "TestProject"'* ]]
+    [[ "$manifest_content" != *'"project": "some-other-repo"'* ]]
+}
+
+@test "project name survives regeneration when node is unavailable" {
+    create_status_md
+    create_next_actions_md
+    create_log_md
+    create_manifest_json
+    git -C "$TEST_TMPDIR" remote add origin https://github.com/homeofe/aahp-consumer.git
+
+    # Reading the recorded name needs node to parse MANIFEST.json. Where node
+    # is missing (a stripped hook PATH, a slim CI image) that whole block is
+    # skipped SILENTLY - not even the "could not read" warning prints, because
+    # the warning lives inside the `command -v node` guard. Before the remote
+    # fallback existed, the name then became the directory basename with no
+    # diagnostic at all. git alone is enough to get it right.
+    # Drop EVERY PATH entry that holds a node executable, rather than building
+    # a shim directory of symlinked binaries. A shim needs copies of bash and
+    # git, which is not portable to Windows, and a test that can only ever
+    # `skip` proves nothing. Dropping only the first such entry is not enough
+    # either: a CI runner commonly has two node installs (a system one and a
+    # toolcache one), and stripping one leaves the branch untested while the
+    # test still reports on it.
+    stripped_path=""
+    saved_ifs="$IFS"
+    set -f
+    IFS=':'
+    for entry in $PATH; do
+        if [ -z "$entry" ]; then continue; fi
+        if [ -x "$entry/node" ] || [ -x "$entry/node.exe" ]; then continue; fi
+        stripped_path="${stripped_path}${stripped_path:+:}$entry"
+    done
+    IFS="$saved_ifs"
+    set +f
+
+    # Assert the CONSEQUENCE of the isolation, not its configuration: node must
+    # actually fail to EXECUTE under this PATH, and git and bash must actually
+    # run. `env` performs a real execvp, so unlike `command -v` it cannot be
+    # satisfied by a shell hash-table entry or by builtin lookup order. Failing
+    # here beats skipping: a test that cannot fire is indistinguishable from a
+    # passing one.
+    run env PATH="$stripped_path" node --version
+    [ "$status" -ne 0 ]
+    run env PATH="$stripped_path" git --version
+    [ "$status" -eq 0 ]
+    run env PATH="$stripped_path" bash -c 'exit 7'
+    [ "$status" -eq 7 ]
+
+    dir_name="$(basename "$TEST_TMPDIR")"
+    run env PATH="$stripped_path" bash "$SCRIPTS_DIR/aahp-manifest.sh" "$TEST_TMPDIR" --quiet
+    [ "$status" -eq 0 ]
+
+    # Read the value back explicitly so a regression reports the name that was
+    # actually written instead of only that a glob did not match.
+    run sed -n 's/.*"project": "\([^"]*\)".*/\1/p' "$TEST_TMPDIR/.ai/handoff/MANIFEST.json"
+    [ "$status" -eq 0 ]
+    [ "$output" = "aahp-consumer" ]
+    [ "$output" != "$dir_name" ]
 }
 
 # ─── File indexing ───────────────────────────────────────────

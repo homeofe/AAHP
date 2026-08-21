@@ -11,6 +11,26 @@ independently of the npm version).
 
 ## [Unreleased]
 
+### Fixed
+- `MANIFEST.json`'s `project` no longer takes the name of the directory the generator
+  ran in. It resolves the repository's identity instead: the name already on record in
+  `MANIFEST.json` first, then the git remote's repository name, and the directory
+  basename only for a genuinely new manifest in a repository with no remote. A
+  `git worktree` checkout is named after the branch and a CI workdir after the job, so
+  the old behaviour rewrote `project` to that name on every regeneration, silently,
+  unless somebody re-read the file afterwards. Two such names reached consumer main
+  branches.
+- An unsubstituted `[PROJECT]` placeholder, which `aahp init` copies in from
+  `templates/MANIFEST.json`, is no longer carried forward as though it were a chosen
+  name. It falls through to the remote-derived name.
+- The remote-derived name needs only `git`, so the project name is now correct where
+  `node` is absent (a stripped hook `PATH`, a slim CI image). That path previously fell
+  back to the directory basename with no diagnostic, because the warning about failing
+  to read the existing manifest sits inside the `command -v node` guard.
+- The `project` value is escaped for JSON on write, as the quick context already was, so
+  a quote or backslash in a preserved name or a directory basename cannot emit a
+  `MANIFEST.json` that no longer parses.
+
 ## [3.10.0] - 2026-08-20
 **Fail-closed Layer 2 base selection and reviewed exact-file impact classification**
 

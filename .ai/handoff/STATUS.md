@@ -1,6 +1,6 @@
 # AAHP: Current State of the Nation
 
-> Last updated: 2026-08-21 by codex
+> Last updated: 2026-08-21 by claude (manifest project-name fix)
 > Commit: (review branch, pending commit)
 >
 > **Rule:** This file is rewritten (not appended) at the end of every session.
@@ -59,6 +59,7 @@ remains verify-only and never regenerates handoff state.
 | CLI | `bin/aahp.js` | Changed | verify help documents `--base SHA` |
 | Specification | `README.md` | Changed | Section 2.8 and ADR-018 define the contract |
 | Rollout | `scripts/ROLLOUT.md` | Changed | consumer propagation and mutation checks documented |
+| Manifest generator | `scripts/aahp-manifest.sh` | Changed | `project` resolves from repository identity (recorded name, then git remote), not from the directory it runs in |
 | Release surfaces | `package*.json`, `CHANGELOG.md` | Changed | v3.10.0 prepared, workflow included in npm artifact, not released |
 <!-- /SECTION: components -->
 
@@ -74,6 +75,7 @@ remains verify-only and never regenerates handoff state.
 | Evaluator path protection | HIGH | The supplied `pull_request` workflow executes proposed workflow and gate code. A consumer must require trusted review for evaluator paths or supply a default-branch evaluator; v3.10.0 cannot configure repository rules. |
 | Delete-both-sides Layer 1 hole | MEDIUM | Pre-existing: removing a canonical handoff file and its index entry still needs a required-set protocol decision. |
 | Windows CI runner | MEDIUM | Pre-existing: Git Bash behavior is locally focused-tested, but CI remains Linux-only. |
+| Consumer manifests already rewritten | MEDIUM | The generator no longer writes a checkout's directory name into `project`, but repositories whose committed `MANIFEST.json` already carries such a name keep it, because a recorded name is preserved by design. Those values need correcting in the consumer repositories. |
 <!-- /SECTION: what_is_missing -->
 
 ---

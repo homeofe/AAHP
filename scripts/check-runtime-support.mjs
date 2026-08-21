@@ -1,0 +1,320 @@
+#!/usr/bin/env node
+// check-runtime-support.mjs - The runtimes CI exercises and the runtimes the
+// package CLAIMS to support must be the same set, and the floor of that set must
+// still be receiving security patches.
+//
+// WHY THIS GATE EXISTS
+// ---------------------------------------------------------------------------
+// Measured 2026-08-21. AAHP published `engines.node: ">=18"` while Node 18 had
+// been end-of-life since 2025-04-30, and validated on Node 20, end-of-life since
+// 2026-04-30. Every repository in the estate consumes this package and inherits
+// that support claim, and the workflow this package PROPAGATES to consumers
+// (.github/workflows/aahp-verify.yml) pinned the same dead runtime, so the claim
+// spread on install. Nothing in CI could ever have gone red about it: the pins
+// were internally consistent, just uniformly dead.
+//
+// The same class of defect broke a release elsewhere in the estate on the same
+// day: a publish job ran `npm install -g npm@latest` on Node 20, npm 12 had
+// dropped Node 20, and the step that exists to make publishing possible was the
+// step that refused. Build was green on a newer runtime; publish died on the old
+// one; every check passed and nothing shipped.
+//
+// WHY THIS IS A RELATION AND NOT A LIST OF DEAD VERSIONS
+// ---------------------------------------------------------------------------
+// A hardcoded list of forbidden versions is correct on the day it is written and
+// wrong every day after. The durable half is a RELATION - every runtime CI
+// exercises must satisfy the range the package publishes - because both sides
+// then move together or this gate goes red. Exactly ONE dated fact is kept, in
+// SUPPORTED_FLOOR below, with the date it was measured next to it.
+//
+// WHAT EACH CHECK GUARDS, AND THE MUTATION THAT TURNS IT RED
+// ---------------------------------------------------------------------------
+//   - "the matrix still exercises more than one runtime": empty
+//     strategy.matrix.node-version, or cut it to a single entry. Every other
+//     check here is vacuously true over an empty pin list, so this one comes
+//     first.
+//
+//     THE TRAP THIS SHAPE AVOIDS, recorded because a sibling gate in this estate
+//     fell into it the same week: its vacuity guard asserted that the GLOBAL pin
+//     list was non-empty. Emptying the matrix left it GREEN, because the
+//     standalone `node-version:` pins in the other jobs kept the global list
+//     populated on their own. The multi-runtime coverage vanished and nothing
+//     went red. So this binds the MATRIX ITSELF, not the union it contributes to.
+//
+//   - "every pinned runtime satisfies engines.node": set any job back to '20'
+//     while engines stays '>=22', or widen engines to '>=18' while CI stays on 22.
+//   - "the published floor is not end-of-life": set engines.node to '>=20'.
+//   - "the release path is not older than the build path": put publish on an
+//     older major than the rest, which is the shape described above.
+//   - "no pin is unevaluatable": replace a literal with `node-version-file:` or a
+//     non-matrix `${{ }}` expression. A gate that silently drops what it cannot
+//     parse reports a clean repo it never read, so an unreadable pin FAILS.
+//
+// EXIT CODES
+//   0  every relation holds
+//   1  a relation is violated - a real finding
+//   2  the gate could not evaluate (no workflows, unreadable engines, no YAML
+//      parser). Never 0: "I could not look" must not read as "I looked and it
+//      was fine".
+
+import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { join } from "node:path";
+import { resolveRoot, loadPkg } from "./aahp-config.mjs";
+
+// The oldest Node major still receiving security patches.
+//
+// Measured 2026-08-21: 18.x EOL 2025-04-30, 20.x EOL 2026-04-30, 22.x Active LTS
+// until 2027-04, 24.x Active LTS. When 22 reaches end of life this constant is
+// the ONE thing to change, and this gate going red is the reminder to change it.
+const SUPPORTED_FLOOR = 22;
+
+// Jobs that publish or tag, as opposed to jobs that build and test.
+const RELEASE_JOB = /^(publish|release|version-guard)$/;
+
+const root = resolveRoot();
+
+function bail(code, lines) {
+  console.error("");
+  for (const line of lines) console.error(`  ${line}`);
+  console.error("");
+  process.exit(code);
+}
+
+let YAML;
+try {
+  YAML = await import("yaml");
+} catch {
+  bail(2, [
+    "Runtime support: no YAML parser available.",
+    "This gate parses .github/workflows/*.yml with the `yaml` devDependency",
+    "rather than matching text, because a regex over YAML silently misreads",
+    "block scalars, anchors and quoting - and would then report a clean repo",
+    "it never actually read.",
+    "",
+    "Fix: run `npm ci` (or `npm install`) so devDependencies are present.",
+  ]);
+}
+
+let pkg;
+try {
+  pkg = loadPkg(root);
+} catch (err) {
+  bail(2, [`Runtime support: ${err.message}`]);
+}
+
+// ---------------------------------------------------------------------------
+// The support claim the package publishes.
+// ---------------------------------------------------------------------------
+function enginesFloor() {
+  const range = pkg?.engines?.node;
+  if (typeof range !== "string") {
+    bail(2, [
+      "Runtime support: package.json declares no engines.node.",
+      "Without it the package makes no support claim at all, and this gate has",
+      "nothing to compare the CI pins against.",
+      "",
+      `Fix: add "engines": { "node": ">=${SUPPORTED_FLOOR}" } to package.json.`,
+    ]);
+  }
+  const m = /^>=\s*v?(\d+)/.exec(range.trim());
+  if (!m) {
+    bail(2, [
+      `Runtime support: engines.node is ${JSON.stringify(range)}, which this gate`,
+      "cannot read as a floor. It understands '>=N' only.",
+      "",
+      "Fix: use a '>=N' range, or teach this gate the richer syntax. Do not",
+      "loosen the gate to skip what it cannot parse - that is how a support",
+      "claim rots unobserved.",
+    ]);
+  }
+  return Number(m[1]);
+}
+
+// ---------------------------------------------------------------------------
+// Every Node major any workflow asks for, and where it came from.
+// ---------------------------------------------------------------------------
+const workflowsDir = join(root, ".github", "workflows");
+
+function workflowFiles() {
+  if (!existsSync(workflowsDir)) {
+    bail(2, [
+      `Runtime support: no workflow directory at ${workflowsDir}.`,
+      "This gate asserts a relation between CI pins and the published support",
+      "claim. With no workflows there are no pins, so the relation is untested",
+      "rather than satisfied.",
+    ]);
+  }
+  const files = readdirSync(workflowsDir).filter((f) => /\.ya?ml$/.test(f)).sort();
+  if (files.length === 0) {
+    bail(2, [`Runtime support: ${workflowsDir} contains no workflow files.`]);
+  }
+  return files;
+}
+
+function majorOf(value, where) {
+  const m = /^v?(\d+)/.exec(String(value).trim());
+  if (!m) {
+    bail(1, [
+      `Runtime support: ${where} pins node-version to ${JSON.stringify(String(value))},`,
+      "which does not begin with a Node major.",
+    ]);
+  }
+  return Number(m[1]);
+}
+
+function parseWorkflow(file) {
+  const text = readFileSync(join(workflowsDir, file), "utf8");
+  try {
+    return YAML.parse(text) ?? {};
+  } catch (err) {
+    bail(2, [
+      `Runtime support: ${file} is not valid YAML (${err.message}).`,
+      "The gate refuses to guess at a file it cannot parse.",
+    ]);
+  }
+}
+
+// Pins contributed by a job's strategy matrix, kept SEPARATE from the step pins
+// on purpose - see the trap recorded in the header. The union of the two cannot
+// answer "did the matrix survive", which is the question the vacuity guard asks.
+function matrixMajors(job, where) {
+  const matrix = job?.strategy?.matrix?.["node-version"];
+  if (!Array.isArray(matrix)) return [];
+  return matrix.map((v) => majorOf(v, `${where} matrix`));
+}
+
+function stepMajors(job, where) {
+  const majors = [];
+  for (const step of Array.isArray(job?.steps) ? job.steps : []) {
+    const w = step?.with;
+    if (!w || typeof w !== "object") continue;
+
+    if (w["node-version-file"] !== undefined) {
+      bail(1, [
+        `Runtime support: ${where} selects its runtime with node-version-file`,
+        `(${JSON.stringify(String(w["node-version-file"]))}), which this gate cannot`,
+        "evaluate. An unreadable pin must fail rather than be skipped, because a",
+        "gate that drops what it cannot parse reports a repo it never read.",
+        "",
+        "Fix: pin a literal major here, or teach this gate to resolve the file.",
+      ]);
+    }
+
+    const raw = w["node-version"];
+    if (raw === undefined || raw === null) continue;
+    const text = String(raw);
+
+    // A matrix reference is already accounted for by matrixMajors().
+    if (/\$\{\{\s*matrix\./.test(text)) continue;
+
+    if (text.includes("${{")) {
+      bail(1, [
+        `Runtime support: ${where} pins node-version to an expression this gate`,
+        `cannot evaluate (${text}).`,
+        "",
+        "Fix: use a literal major, or a matrix reference.",
+      ]);
+    }
+    majors.push(majorOf(text, `${where} step`));
+  }
+  return majors;
+}
+
+const pins = [];
+const allMatrixMajors = [];
+
+for (const file of workflowFiles()) {
+  const doc = parseWorkflow(file);
+  const jobs = doc?.jobs;
+  if (!jobs || typeof jobs !== "object") continue;
+  for (const [jobName, job] of Object.entries(jobs)) {
+    const where = `${file}:${jobName}`;
+    const fromMatrix = matrixMajors(job, where);
+    const fromSteps = stepMajors(job, where);
+    allMatrixMajors.push(...fromMatrix);
+    const majors = [...fromMatrix, ...fromSteps];
+    if (majors.length > 0) pins.push({ file, job: jobName, majors });
+  }
+}
+
+const floor = enginesFloor();
+const failures = [];
+
+// --- 1. Vacuity guards, first, because everything below is vacuously true over
+// --- an empty pin list.
+if (pins.length === 0) {
+  bail(1, [
+    "Runtime support: no node-version pin found in any workflow.",
+    "Every other check in this gate is vacuously true over an empty list, so",
+    "this means the gate is asserting nothing at all.",
+  ]);
+}
+
+// Bind the MATRIX, not the union it feeds. Emptying the matrix while standalone
+// step pins remain is the exact mutation that left a sibling gate green.
+if (allMatrixMajors.length < 2) {
+  failures.push(
+    `the build matrix exercises ${allMatrixMajors.length} runtime(s) ` +
+      `(${allMatrixMajors.join(", ") || "none"}), but engines.node publishes a RANGE (>=${floor}). ` +
+      `A package that claims a range and tests one point of it is asserting compatibility ` +
+      `it never checked. Emptying or single-valuing strategy.matrix.node-version must not be silent.`,
+  );
+}
+
+// --- 2. Every runtime CI exercises satisfies the published range.
+for (const { file, job, majors } of pins) {
+  for (const major of majors) {
+    if (major < floor) {
+      failures.push(
+        `${file}:${job} runs on Node ${major}, below the engines.node floor of ${floor}. ` +
+          `CI would prove the package works on a runtime it does not claim to support, ` +
+          `or on one that tooling has already dropped.`,
+      );
+    }
+  }
+}
+
+// --- 3. The published floor is a runtime that still gets security patches.
+if (floor < SUPPORTED_FLOOR) {
+  failures.push(
+    `engines.node claims support from Node ${floor}, but the oldest runtime still receiving ` +
+      `security patches is ${SUPPORTED_FLOOR} (measured 2026-08-21). Every repository in the ` +
+      `estate consumes this package and inherits this claim, so publishing support for an ` +
+      `unpatched runtime advertises it fleet-wide.`,
+  );
+}
+
+// --- 4. The release path is not older than the build path.
+const lowestOf = (predicate) =>
+  pins
+    .filter((p) => predicate(p.job))
+    .flatMap((p) => p.majors)
+    .sort((a, b) => a - b)[0];
+
+const buildLow = lowestOf((j) => !RELEASE_JOB.test(j));
+const releaseLow = lowestOf((j) => RELEASE_JOB.test(j));
+if (buildLow !== undefined && releaseLow !== undefined && releaseLow < buildLow) {
+  failures.push(
+    `the release path runs on Node ${releaseLow} while the build path runs on ${buildLow}. ` +
+      `That is the shape that silently breaks releases: every check passes on the newer ` +
+      `runtime and the publish step dies on the older one.`,
+  );
+}
+
+if (failures.length > 0) {
+  console.error("\n  Runtime support check failed.\n");
+  for (const f of failures) console.error(`  - ${f}\n`);
+  console.error(
+    "  The runtimes CI exercises and the runtimes package.json publishes must be\n" +
+      "  the same set, and its floor must still be supported upstream.\n",
+  );
+  process.exit(1);
+}
+
+const summary = pins
+  .map(({ file, job, majors }) => `${file}:${job} -> ${[...new Set(majors)].sort((a, b) => a - b).join(", ")}`)
+  .join("\n    ");
+console.log(
+  `Runtime support OK: engines.node >=${floor} (supported floor ${SUPPORTED_FLOOR}), ` +
+    `matrix exercises ${[...new Set(allMatrixMajors)].sort((a, b) => a - b).join(" and ")}.\n    ${summary}`,
+);

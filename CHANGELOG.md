@@ -11,6 +11,34 @@ independently of the npm version).
 
 ## [Unreleased]
 
+### Added
+- `npm run check:runtime-support` asserts that the runtimes CI exercises and the
+  runtimes `engines.node` publishes are the same set, and that the floor of that set
+  still receives security patches. It is a RELATION rather than a list of dead
+  versions, so it cannot rot: both sides move together or the gate goes red. Exactly
+  one dated constant is kept (`SUPPORTED_FLOOR`, measured 2026-08-21). Pins it cannot
+  evaluate - a non-matrix `${{ }}` expression, or `node-version-file` - fail rather
+  than being skipped, and a state it cannot classify at all exits 2 rather than 0, so
+  "I could not look" never reads as "I looked and it was fine".
+- A `runtime-matrix` CI job exercises the whole published range (Node 22 and 24), not
+  only its floor. The gate binds that matrix directly: emptying it or cutting it to a
+  single entry is red even though the standalone pins in the other jobs would keep a
+  global pin list populated.
+
+### Changed
+- `engines.node` is now `>=22`, was `>=18`. Node 18 reached end of life on 2025-04-30
+  and Node 20 on 2026-04-30, so the package publicly claimed support for a runtime it
+  could not have security-patched, and every repository in the estate inherited that
+  claim on install. Consumers still running Node 18 or 20 will now see an engine
+  warning, which is the intended signal.
+- CI validates on Node 22 instead of Node 20, in `ci.yml`, `aahp-manifest.yml` and the
+  `aahp-verify.yml` reference workflow that `propagate.sh` installs into consumers. The
+  publish job stays on Node 24, and the gate now enforces that the release path is
+  never older than the build path.
+- `yaml` is added as a devDependency (zero transitive dependencies) so the new gate
+  PARSES the workflow files. Matching YAML with a regex misreads quoting and block
+  scalars, and would report a clean repository it never actually read.
+
 ### Fixed
 - `MANIFEST.json`'s `project` no longer takes the name of the directory the generator
   ran in. It resolves the repository's identity instead: the name already on record in

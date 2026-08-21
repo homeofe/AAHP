@@ -1,6 +1,6 @@
 # AAHP: Current State of the Nation
 
-> Last updated: 2026-08-21 by claude (manifest project-name fix)
+> Last updated: 2026-08-21 by claude (runtime support: engines >=22, CI on 22/24)
 > Commit: (review branch, pending commit)
 >
 > **Rule:** This file is rewritten (not appended) at the end of every session.
@@ -24,6 +24,14 @@ been tagged, published, or merged. The release changes Layer 2 in two bounded wa
 The actor-wide dependency-bot workflow bypass is removed. Layer 1 now runs for every
 actor. The package now includes the workflow that `propagate.sh` installs. The gate
 remains verify-only and never regenerates handoff state.
+
+Separately, the published RUNTIME SUPPORT CLAIM is corrected. `engines.node` was
+`>=18` (end of life 2025-04-30) while CI validated on Node 20 (end of life
+2026-04-30), and the `aahp-verify.yml` that `propagate.sh` installs carried the same
+dead pin, so every consumer inherited the claim on install. Nothing could go red
+about it: the pins were internally consistent, just uniformly dead. `engines.node` is
+now `>=22`, CI validates on 22 and 24, and `check:runtime-support` asserts the
+RELATION between the two so neither side can rot alone.
 <!-- /SECTION: summary -->
 
 ---
@@ -39,7 +47,8 @@ remains verify-only and never regenerates handoff state.
 | `tests/verify.bats` | FOCUSED PASS | 22/22 under Git Bash with explicit CI bases |
 | schema validation | FOCUSED PASS | example and repository config both validate against the updated schema |
 | shell syntax | FOCUSED PASS | changed shell scripts parse under Git Bash |
-| `npm run check` | PASS | changelog, version sync, claims, forbidden patterns, schema/doc sync, doc links, and handoff freshness |
+| `npm run check` | PASS | changelog, version sync, claims, forbidden patterns, schema/doc sync, doc links, runtime support, and handoff freshness |
+| `tests/runtime-support.bats` | FOCUSED PASS | 16/16; the relation holds on this repo and each of nine mutations turns it red, including the emptied-matrix trap |
 | shellcheck | LINUX PASS | replacement head `c332a23` reached the full Bats step after shellcheck |
 | hosted Linux suite | REPLACEMENT REQUIRED | `c332a23` passed 361/362; the CI mode fixture let `git add` restore mode 100644 on Linux, so it now reasserts 100755 before its content-plus-mode commit |
 | full Bats suite | CI | deliberately not run on Windows; Linux CI is authoritative |
@@ -60,7 +69,9 @@ remains verify-only and never regenerates handoff state.
 | Specification | `README.md` | Changed | Section 2.8 and ADR-018 define the contract |
 | Rollout | `scripts/ROLLOUT.md` | Changed | consumer propagation and mutation checks documented |
 | Manifest generator | `scripts/aahp-manifest.sh` | Changed | `project` resolves from repository identity (recorded name, then git remote), not from the directory it runs in |
-| Release surfaces | `package*.json`, `CHANGELOG.md` | Changed | v3.10.0 prepared, workflow included in npm artifact, not released |
+| Runtime-support gate | `scripts/check-runtime-support.mjs` | New | relation between CI pins and `engines.node`; one dated constant; exits 2 when it cannot evaluate |
+| Runtime matrix | `.github/workflows/ci.yml` | Changed | new `runtime-matrix` job on Node 22 and 24; `lint-and-validate` deliberately left unmatrixed so the required check keeps its literal name |
+| Release surfaces | `package*.json`, `CHANGELOG.md` | Changed | v3.10.0 prepared, workflow included in npm artifact, not released; `engines.node` now `>=22`, `yaml` added as a devDependency |
 <!-- /SECTION: components -->
 
 ---
@@ -75,6 +86,9 @@ remains verify-only and never regenerates handoff state.
 | Evaluator path protection | HIGH | The supplied `pull_request` workflow executes proposed workflow and gate code. A consumer must require trusted review for evaluator paths or supply a default-branch evaluator; v3.10.0 cannot configure repository rules. |
 | Delete-both-sides Layer 1 hole | MEDIUM | Pre-existing: removing a canonical handoff file and its index entry still needs a required-set protocol decision. |
 | Windows CI runner | MEDIUM | Pre-existing: Git Bash behavior is locally focused-tested, but CI remains Linux-only. |
+| `runtime-matrix` not a required check | HIGH | The new job reports `Runtime matrix (22)` and `Runtime matrix (24)`. Until an owner adds them to branch protection they can go red without blocking a merge. The relation gate itself runs inside the required `lint-and-validate`, so the claim is still enforced. |
+| SemVer call for `engines.node` | NORMAL | Narrowing `>=18` to `>=22` is a support-surface reduction. Whether it ships inside 3.10.0 or forces 4.0.0 is an owner decision, not one this branch takes. |
+| `aahp-verify` skipped wholesale in five consumers | HIGH | Consumer-side wiring, NOT this reference workflow: `elvatis-security-platform`, `elvatis-intelligence`, `elvatis-defense`, `elvatis-client-portal` and `elvatis-sso` gate their checkout AND every gate step on `IS_DEPENDABOT != 'true'`, so a required check reports success having checked out nothing. Fixed already in `atlas`, `elvatis-trust` and `elvatis-awareness`. Only the owning repositories can correct it. |
 | Consumer manifests already rewritten | MEDIUM | The generator no longer writes a checkout's directory name into `project`, but repositories whose committed `MANIFEST.json` already carries such a name keep it, because a recorded name is preserved by design. Those values need correcting in the consumer repositories. |
 <!-- /SECTION: what_is_missing -->
 

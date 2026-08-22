@@ -68,8 +68,8 @@
 // `aahp check`. This one is not portable in that position yet, and adding it
 // there would break consumers rather than protect them:
 //
-//   - Not every consumer is an npm package. elvatis-defense is Python; it has no
-//     package.json engines.node at all, so this gate would exit 2 on every run.
+//   - Not every consumer is an npm package. At least one is a Python project with
+//     no package.json engines.node at all, so this gate would exit 2 on every run.
 //   - The `yaml` parser it needs is a devDependency of THIS package, so it is
 //     absent from a consumer install.
 //

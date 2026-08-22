@@ -80,6 +80,18 @@ independently of the npm version).
 - The `project` value is escaped for JSON on write, as the quick context already was, so
   a quote or backslash in a preserved name or a directory basename cannot emit a
   `MANIFEST.json` that no longer parses.
+- Committed handoff state and one gate comment no longer name private repositories. This
+  repository is public and ships to npm, so naming consumer repositories here published
+  a list of them to anyone reading the repository or the package. The `What is Missing`
+  row keeps every measurement it carried (six consumers report `bypassable`, three
+  report `enforced`, and one of the six is only partly corrected) and now states those
+  counts without identities. `.ai/handoff/` is outside the `files` list, so the row
+  itself never reached the npm tarball, but `scripts/` is inside it, so the comment in
+  `check-runtime-support.mjs` would have shipped on the next publish.
+- A `no-private-repo-names` forbidden-pattern rule keeps such names out. The same names
+  had already been removed once, from the propagation playbook, and returned in a later
+  change because nothing gated them. The rule matches on shape rather than on a list, so
+  the gate does not itself have to enumerate the repositories it protects.
 
 ## [3.10.0] - 2026-08-20
 **Fail-closed Layer 2 base selection and reviewed exact-file impact classification**

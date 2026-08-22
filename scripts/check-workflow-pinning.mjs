@@ -111,7 +111,11 @@ const INSTALL_VERBS = new Set(["install", "i", "in", "ins", "inst", "insta", "in
 const GLOBAL_FLAGS = /^(?:-g|--global|--location=global)$/;
 
 // An exact version: no caret, tilde, range, tag, URL or git ref.
-const EXACT_VERSION = /^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)*$/;
+// At most ONE prerelease run and at most ONE build run, deliberately: a
+// repeated group whose character class also contains its own delimiter is
+// exponentially ambiguous, and package.json is attacker-supplied on a fork
+// pull request. Reported by CodeQL js/redos against the earlier form.
+const EXACT_VERSION = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.]+)?$/;
 
 const root = resolveRoot();
 

@@ -229,6 +229,20 @@ EOF
     [[ "$output" == *"Declare an exact version"* ]]
 }
 
+@test "an exact version carrying a prerelease and build suffix is accepted" {
+    # Guards the shape of the version regex, which was rewritten after CodeQL
+    # reported js/redos against the first form. A repeated group whose character
+    # class also contains its own delimiter is exponentially ambiguous, and
+    # package.json is attacker-supplied on a fork pull request. The rewrite must
+    # not have narrowed what counts as an exact version.
+    write_pkg '"fx-tool": "1.2.3-beta.1+build.5"'
+    write_lock '"version": "1.2.3-beta.1+build.5", "resolved": "https://registry.npmjs.org/fx-tool/-/fx-tool-1.2.3.tgz", "integrity": "sha512-deadbeef"'
+    write_good_workflow
+
+    run node "$GATE" "$TEST_TMPDIR"
+    [ "$status" -eq 0 ]
+}
+
 # ─── Rule D: the lockfile pins every direct dependency by hash ──────────────
 
 @test "a lockfile entry without an integrity hash is red" {

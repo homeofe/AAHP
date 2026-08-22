@@ -182,6 +182,13 @@ independently of the npm version).
   they only ever ran in the one job that happened to have installed it and
   reported "# skip ajv-cli not installed" everywhere else while the check stayed
   green. Declaring the package means `npm ci` installs it and the tests execute.
+- The version regex in the new gate is not exponentially ambiguous. Its first form
+  repeated a group whose character class also contained the group's own delimiter,
+  which CodeQL reported as `js/redos`. Measured on the input shape it named,
+  `9.9.9+` followed by repeated `--`: 22 repetitions, a 51-character string, took
+  11.8 seconds under the old form and 0.004 ms under the replacement. The input is
+  a `package.json` version specifier, which is attacker-supplied on a fork pull
+  request. What counts as an exact version is unchanged.
 
 ## [3.10.0] - 2026-08-20
 **Fail-closed Layer 2 base selection and reviewed exact-file impact classification**

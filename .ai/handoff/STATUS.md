@@ -120,7 +120,7 @@ workflows that only ever ran here did not, because nothing made them.
 | `tests/verify-workflow.bats` | FOCUSED PASS | 21/21; both directions, the two fail-closed shapes that must NOT be findings, plus parser parity against a real YAML parser on 16 workflow files |
 | `npm run check` | PASS | changelog, version sync, claims, forbidden patterns, schema/doc sync, doc links, runtime support, workflow pinning, and handoff freshness |
 | `tests/runtime-support.bats` | FOCUSED PASS | 16/16; the relation holds on this repo and each of nine mutations turns it red, including the emptied-matrix trap |
-| `tests/workflow-pinning.bats` | FOCUSED PASS | 18/18; every rule holds on this repository and each way of breaking one turns the gate red at the exact documented exit code, 1 for a finding and 2 for a state it cannot evaluate |
+| `tests/workflow-pinning.bats` | FOCUSED PASS | 19/19; every rule holds on this repository and each way of breaking one turns the gate red at the exact documented exit code, 1 for a finding and 2 for a state it cannot evaluate |
 | shellcheck | LINUX PASS | replacement head `c332a23` reached the full Bats step after shellcheck |
 | hosted Linux suite | REPLACEMENT REQUIRED | `c332a23` passed 361/362; the CI mode fixture let `git add` restore mode 100644 on Linux, so it now reasserts 100755 before its content-plus-mode commit |
 | `tests/doctor.bats` (3 new tests) | FOCUSED PASS | the three content-drift tests pass under Git Bash; two were mutated red and restored green. The other 16 tests in the file were not run on Windows; Linux CI is authoritative |

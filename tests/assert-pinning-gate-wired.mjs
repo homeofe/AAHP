@@ -41,7 +41,7 @@ if (!pkg.scripts?.check?.includes("check:workflow-pinning")) {
 
 // The packages the required lint-and-validate and aahp-manifest checks execute.
 const EXECUTED_IN_REQUIRED_CHECKS = ["ajv-cli", "ajv-formats"];
-const EXACT = /^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)*$/;
+const EXACT = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.]+)?$/;
 
 for (const name of EXECUTED_IN_REQUIRED_CHECKS) {
   const spec = pkg.devDependencies?.[name] ?? pkg.dependencies?.[name];

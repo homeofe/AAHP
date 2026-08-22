@@ -157,7 +157,7 @@ independently of the npm version).
   checksum-clean and the injection check is the only thing that can fail, and it asserts
   on the output. A negative control proves the same harness exits 0 on benign content.
   All ten patterns are now covered, each asserted BY NAME, so a typo in any one of them
-  turns exactly that test red and says which; five of the ten had no coverage at all.
+  turns exactly that test red and says which; six of the ten had no coverage at all.
 
 ### Security
 - The two required status checks that validate `MANIFEST.json` no longer download

@@ -281,3 +281,65 @@ EOF
     [ "$status" -eq 1 ]
     [[ "$output" == *"job 'analyze' no longer declares 'security-events: write'"* ]]
 }
+
+# ─── The shape gate is handed a ROOT, so it must survive a partial one ───
+#
+# tests/assert-repo-ci-shape.mjs takes the root to assert as argv[1]. `npm test`
+# passes this repository, which holds every workflow the gate records. Other
+# callers pass a copy that holds only what THEY need - the release-authorization
+# fixtures in tests/runtime-support.bats copy package.json and ci.yml and nothing
+# else - and an unguarded readFileSync on a workflow such a copy does not have
+# throws ENOENT: node exits 1 with a stack trace and not one of the gate's own
+# findings is printed. A caller asserting exit 0 sees a failure that is not
+# there; a caller asserting exit 1 sees the right code for the wrong reason and
+# no message at all. Both are worse than either true answer.
+#
+# So the reads are guarded, and the four tests below fix the behaviour in both
+# directions: what the root does not contain is NAMED and not asserted, and
+# everything the gate can see but cannot trust is a failure with an exact code.
+
+@test "a root with only package.json and ci.yml is green, and says what it did not assert" {
+    # This is exactly the fixture shape the release-authorization tests build.
+    # Before the reads were guarded this exited 1 with an ENOENT stack trace.
+    mkdir -p "$TEST_TMPDIR/.github/workflows"
+    cp "$AAHP_ROOT/package.json" "$TEST_TMPDIR/package.json"
+    cp "$AAHP_ROOT/.github/workflows/ci.yml" "$TEST_TMPDIR/.github/workflows/ci.yml"
+    [ ! -f "$TEST_TMPDIR/.github/workflows/codeql.yml" ]
+
+    run node "$SHAPE_GATE" "$TEST_TMPDIR"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"repo CI shape OK"* ]]
+    # Not asserted is SAID, so a root that cannot answer for an elevation never
+    # passes over it in silence.
+    [[ "$output" == *"not asserted here: codeql.yml"* ]]
+    [[ "$output" != *"ENOENT"* ]]
+}
+
+@test "a recorded workflow that is present and unparseable is a failure, never a skip" {
+    mkdir -p "$TEST_TMPDIR/.github/workflows"
+    cp "$AAHP_ROOT/package.json" "$TEST_TMPDIR/package.json"
+    cp "$AAHP_ROOT/.github/workflows/ci.yml" "$TEST_TMPDIR/.github/workflows/ci.yml"
+    printf 'jobs:\n  analyze:\n   permissions:\n  - [unclosed\n' \
+        > "$TEST_TMPDIR/.github/workflows/codeql.yml"
+
+    run node "$SHAPE_GATE" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"codeql.yml is not valid YAML"* ]]
+    [[ "$output" == *"cannot be asserted"* ]]
+}
+
+@test "a root with no ci.yml is a stated failure, not a stack trace" {
+    cp "$AAHP_ROOT/package.json" "$TEST_TMPDIR/package.json"
+
+    run node "$SHAPE_GATE" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"ci.yml is not present"* ]]
+    [[ "$output" != *"ENOENT"* ]]
+}
+
+@test "a root with no package.json is a stated failure, not a stack trace" {
+    run node "$SHAPE_GATE" "$TEST_TMPDIR/nowhere"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"package.json is not present"* ]]
+    [[ "$output" != *"ENOENT"* ]]
+}

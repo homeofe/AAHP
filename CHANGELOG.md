@@ -58,12 +58,17 @@ independently of the npm version).
   needs the checkout credential live in `CHECKOUT_CREDENTIAL_EXEMPTIONS` inside the
   gate, are reviewed as a code change, and print their reason on every run; the list is
   empty, and that is measured rather than assumed, since no workflow here runs
-  `git push`, `git commit`, `git fetch`, `git pull` or `git remote`. See ADR-019.
+  `git push`, `git commit`, `git fetch`, `git pull` or `git remote`. See ADR-020.
 - `tests/assert-repo-ci-shape.mjs` additionally pins the three job-level elevations by
   name. A job-level `permissions:` REPLACES the top-level block rather than merging with
   it, so once `ci.yml` and `codeql.yml` gained a top-level `contents: read`, deleting a
   job block as redundant would silently strip an elevation whose failure would only
-  surface on a release tag.
+  surface on a release tag. That gate takes the root to assert as an argument, and it no
+  longer reads any file unguarded: a recorded workflow the given root does not contain is
+  named on stderr as NOT asserted, and a workflow that is present but unreadable,
+  unparseable or empty is a failure. Previously an absent workflow threw `ENOENT`, so the
+  process exited 1 with a stack trace and none of the gate's own findings - the right
+  exit code for the wrong reason, and no message to tell the two apart.
 
 ### Changed
 - `engines.node` is now `>=22`, was `>=18`. Node 18 reached end of life on 2025-04-30

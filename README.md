@@ -934,7 +934,7 @@ or force-push cannot select HEAD as its own merge base. Layer 1 runs for every a
 maintenance changes avoid unrelated handoff churn without creating an identity bypass,
 path-pattern bypass, or vacuous required check.
 
-### ADR-019: anything AAHP runs or ships declares its permissions and refuses the persisted checkout credential
+### ADR-020: anything AAHP runs or ships declares its permissions and refuses the persisted checkout credential
 **Why it recurs:** a new workflow is copied from an existing one, and the existing one
 never had a `permissions:` block or `persist-credentials: false`, so neither does the
 copy. Nothing is red, because a missing block is not a syntax error; it is an
@@ -957,6 +957,13 @@ the top of the file, and the three job-level elevations this repository depends 
 (`publish` `id-token: write`, `release` `contents: write`, `analyze`
 `security-events: write`) are pinned by name in `tests/assert-repo-ci-shape.mjs`,
 because a job-level block REPLACES the top-level one rather than merging with it.
+That gate takes the root to assert as an argument, and not every caller passes a whole
+repository, so it states on every run which recorded elevations the given root does not
+contain and therefore did not assert. It never infers an answer from a file it could not
+open: an absent workflow is named as not asserted, and a workflow that is present but
+unreadable, unparseable or empty is a failure. What it must not do is throw, because a
+thrown `ENOENT` exits 1 with a stack trace and none of the gate's own findings, which a
+caller reads as a defect that is not there.
 The block must be a MAPPING: the string forms `permissions: read-all` and
 `permissions: write-all` are rejected at both levels, because they look like a
 declaration while setting every scope at once, which is the opposite of the reason to
@@ -1447,7 +1454,7 @@ your-project/
   Both shipped workflows declare their own `permissions:` (`contents: read`) and set
   `persist-credentials: false` on the checkout, so neither inherits your repository's
   `default_workflow_permissions` and neither leaves the job's `GITHUB_TOKEN` in
-  `.git/config` where later steps can read it (ADR-019). If you scaffolded
+  `.git/config` where later steps can read it (ADR-020). If you scaffolded
   `aahp-govern.yml` before AAHP declared those two things, `aahp init --gates` will
   NOT replace your copy: it skips a workflow that already exists. Re-run it with
   `--force`, or add the two lines by hand.

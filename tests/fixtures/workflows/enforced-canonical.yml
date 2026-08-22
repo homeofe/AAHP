@@ -1,0 +1,25 @@
+# Fixture: the canonical shape propagate.sh installs. Nothing can skip the gate.
+# Expected verdict: enforced.
+name: AAHP Verify
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  aahp-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Run aahp verify (CI level, no escape hatch)
+        run: bash scripts/verify-handoff.sh . --level ci
+
+      - name: Run aahp doctor (conformance record)
+        run: node bin/aahp.js doctor . --json

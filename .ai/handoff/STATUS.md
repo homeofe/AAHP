@@ -1,6 +1,6 @@
 # AAHP: Current State of the Nation
 
-> Last updated: 2026-08-21 by claude (runtime support: engines >=22, CI on 22/24)
+> Last updated: 2026-08-22 by claude (verify-workflow gate: can the workflow that runs the gate skip it?)
 > Commit: (review branch, pending commit)
 >
 > **Rule:** This file is rewritten (not appended) at the end of every session.
@@ -32,6 +32,20 @@ dead pin, so every consumer inherited the claim on install. Nothing could go red
 about it: the pins were internally consistent, just uniformly dead. `engines.node` is
 now `>=22`, CI validates on 22 and 24, and `check:runtime-support` asserts the
 RELATION between the two so neither side can rot alone.
+
+On top of that, `aahp doctor` gains a **`verify-workflow`** gate: it audits the
+consumer's own `.github/workflows/` and reports whether the workflow that hosts the
+AAHP gate can SKIP it. A job-level or step-level `if:` around the gate leaves a
+required status check that keeps its name and reports success having evaluated
+nothing, so branch protection is satisfied by a verdict nobody produced, and Layer 1
+MANIFEST checksum integrity goes missing along with the Layer 2 drift gate. AAHP
+could not see this from inside itself: the workflow it ships is unconditional and
+`propagate.sh` copies it verbatim, so the weakening only ever exists downstream. The
+canonical workflow's last step runs `aahp doctor`, so a consumer that has weakened
+its gate now reports it on its own pull requests. It is asserted as a CONSEQUENCE
+("there exists an event on which this workflow concludes success without having run
+the gate at `--level ci`"), it fails closed on a shape it cannot classify, and it was
+measured against every consumer of this protocol before shipping.
 <!-- /SECTION: summary -->
 
 ---
@@ -47,6 +61,7 @@ RELATION between the two so neither side can rot alone.
 | `tests/verify.bats` | FOCUSED PASS | 22/22 under Git Bash with explicit CI bases |
 | schema validation | FOCUSED PASS | example and repository config both validate against the updated schema |
 | shell syntax | FOCUSED PASS | changed shell scripts parse under Git Bash |
+| `tests/verify-workflow.bats` | FOCUSED PASS | 20/20; both directions, plus parser parity against a real YAML parser on 15 workflow files |
 | `npm run check` | PASS | changelog, version sync, claims, forbidden patterns, schema/doc sync, doc links, runtime support, and handoff freshness |
 | `tests/runtime-support.bats` | FOCUSED PASS | 16/16; the relation holds on this repo and each of nine mutations turns it red, including the emptied-matrix trap |
 | shellcheck | LINUX PASS | replacement head `c332a23` reached the full Bats step after shellcheck |
@@ -71,6 +86,7 @@ RELATION between the two so neither side can rot alone.
 | Manifest generator | `scripts/aahp-manifest.sh` | Changed | `project` resolves from repository identity (recorded name, then git remote), not from the directory it runs in |
 | Runtime-support gate | `scripts/check-runtime-support.mjs` | New | relation between CI pins and `engines.node`; one dated constant; exits 2 when it cannot evaluate |
 | Runtime matrix | `.github/workflows/ci.yml` | Changed | new `runtime-matrix` job on Node 22 and 24; `lint-and-validate` deliberately left unmatrixed so the required check keeps its literal name |
+| verify-workflow gate | `scripts/check-verify-workflow.mjs` | New | audits the consumer's workflows for a gate that can skip itself; zero runtime dependencies, so it carries its own block-YAML reader, held against a real parser by `tests/assert-workflow-parser-parity.mjs` |
 | Release surfaces | `package*.json`, `CHANGELOG.md` | Changed | v3.10.0 prepared, workflow included in npm artifact, not released; `engines.node` now `>=22`, `yaml` added as a devDependency |
 <!-- /SECTION: components -->
 
@@ -88,8 +104,8 @@ RELATION between the two so neither side can rot alone.
 | Windows CI runner | MEDIUM | Pre-existing: Git Bash behavior is locally focused-tested, but CI remains Linux-only. |
 | `runtime-matrix` not a required check | HIGH | The new job reports `Runtime matrix (22)` and `Runtime matrix (24)`. Until an owner adds them to branch protection they can go red without blocking a merge. The relation gate itself runs inside the required `lint-and-validate`, so the claim is still enforced. |
 | SemVer call for `engines.node` | NORMAL | Narrowing `>=18` to `>=22` is a support-surface reduction. Whether it ships inside 3.10.0 or forces 4.0.0 is an owner decision, not one this branch takes. |
-| `aahp-verify` skipped wholesale in five consumers | HIGH | ORIGINATED HERE. `458dbbd` (2026-06-30) added the Dependabot exemption to this repository's own reference workflow, gating Checkout and every gate step; it shipped that way in v3.6.0 and propagated. `#65` removed it here on 2026-08-21. Five consumers still run the old shape and report success having checked out nothing, so Layer 1 never runs either: `elvatis-security-platform`, `elvatis-intelligence`, `elvatis-defense`, `elvatis-client-portal`, `elvatis-sso`. Corrected already in `atlas`, `elvatis-trust`, `elvatis-awareness`. Only the owning repositories can re-propagate. |
-| No drift check between a consumer's propagated workflow and the installed package | HIGH | `aahp doctor` verifies the PINNED VERSION (`pinned-dep`) but never that `.github/workflows/aahp-verify.yml` on disk matches the one in the installed package, so a consumer can pin 3.10.0 and still run the v3.6.0 workflow. That is exactly how the five above went unnoticed. A drift gate must tolerate deliberate divergence (`elvatis-trust` legitimately customised its Dependabot path), so it needs a designed predicate, not a byte-compare. |
+| `aahp-verify` can skip itself in six consumers | HIGH | ORIGINATED HERE. `458dbbd` (2026-06-30) added the dependency-bot exemption to this repository's own reference workflow, gating Checkout and every gate step; it shipped that way in v3.6.0 and propagated. `#65` removed it here on 2026-08-21. MEASURED 2026-08-22 with the new `verify-workflow` gate, against every consumer: six report `bypassable`, three report `enforced`. Five report success having checked out nothing, so Layer 1 never runs either: `elvatis-security-platform`, `elvatis-intelligence`, `elvatis-defense`, `elvatis-client-portal`, `elvatis-sso`. A sixth, `elvatis-trust`, was previously recorded here as corrected and is only PARTLY so: its checkout is unconditional and a bot change does get a Layer 1 run, but `--level ci` is still gated on the author, so the same required check name means all four layers for one author and Layer 1 for another. Fully corrected in `atlas` and `elvatis-awareness`. Only the owning repositories can re-propagate; this branch cannot fix any of them. |
+| No drift check between a consumer's propagated workflow and the installed package | PARTLY CLOSED | `aahp doctor` still never compares `.github/workflows/aahp-verify.yml` on disk against the one in the installed package, so a consumer can pin 3.10.0 and run the v3.6.0 workflow. The designed predicate this row asked for now exists for the case that matters: `verify-workflow` asks whether the hosting workflow can skip the gate, which tolerates deliberate divergence (a consumer may restructure the file freely) while catching the divergence that voids the check. General byte-level drift, for example an older action pin or a dropped `fetch-depth: 0`, is still unmeasured. |
 | Consumer manifests already rewritten | MEDIUM | The generator no longer writes a checkout's directory name into `project`, but repositories whose committed `MANIFEST.json` already carries such a name keep it, because a recorded name is preserved by design. Those values need correcting in the consumer repositories. |
 <!-- /SECTION: what_is_missing -->
 

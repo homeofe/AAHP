@@ -1,0 +1,29 @@
+# Fixture: the shape measured in live consumers. The required check keeps its
+# name and its green tick, and on a bot-authored change every gate step is
+# skipped, so the job succeeds having evaluated nothing.
+# Expected verdict: bypassable (ci-step-conditional).
+name: AAHP Verify
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  aahp-verify:
+    runs-on: ubuntu-latest
+    env:
+      IS_BOT: ${{ github.event.pull_request.user.login == 'dependabot[bot]' }}
+    steps:
+      - name: Announce the exemption
+        if: ${{ env.IS_BOT == 'true' }}
+        run: echo 'bot change, so the handoff gate does not apply.'
+
+      - name: Checkout code
+        if: ${{ env.IS_BOT != 'true' }}
+        uses: actions/checkout@v5
+
+      - name: Run aahp verify (CI level, no escape hatch)
+        if: ${{ env.IS_BOT != 'true' }}
+        run: bash scripts/verify-handoff.sh . --level ci

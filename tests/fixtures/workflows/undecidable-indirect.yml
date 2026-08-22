@@ -1,0 +1,18 @@
+# Fixture: the workflow is clearly the AAHP verify workflow, but it reaches the
+# gate through an action this reader cannot follow. Whether the gate can be
+# skipped is then undecided, and undecided must not be reported as clean.
+# Expected verdict: unclassifiable.
+name: AAHP Verify
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  aahp-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+      - name: Run the handoff gate
+        uses: ./.github/actions/run-aahp-gate

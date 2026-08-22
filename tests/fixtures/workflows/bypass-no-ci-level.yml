@@ -1,0 +1,18 @@
+# Fixture: the gate runs, but not at --level ci. Every other level honours
+# AAHP_SKIP_VERIFY=1, so the off-machine backstop has an environment-variable
+# bypass that a workflow-level `env:` can set.
+# Expected verdict: bypassable (no-ci-level).
+name: AAHP Verify
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  aahp-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+      - name: Run aahp verify
+        run: bash scripts/verify-handoff.sh . --level full

@@ -539,19 +539,72 @@ aahp doctor --json       # only the JSON record, on stdout
 aahp doctor --governance # governance-only record; skip the 3 handoff gates (alias --no-handoff)
 ```
 
-It checks six gates: the handoff file set matches `AAHP_HANDOFF_FILES` (indexed
+It checks seven gates: the handoff file set matches `AAHP_HANDOFF_FILES` (indexed
 files present, no strays); `MANIFEST.json` conforms to the schema; `GROUNDING.md`
 is present and `TRUST.md` carries a Provenance column; `@elvatis_com/aahp` is
 pinned to an exact version in `devDependencies` (`self` for this repo); the
-`CHANGELOG.md` matches the Keep a Changelog grammar; and the version is in sync
-across configured sites. The record:
+`CHANGELOG.md` matches the Keep a Changelog grammar; the version is in sync
+across configured sites; and the workflow that runs the AAHP gate cannot skip it
+(`verify-workflow`, below). The record:
 
 ```json
 { "schemaVersion": 1, "repo": "homeofe/AAHP", "aahpVersion": "3.6.0",
   "gates": { "handoff-set": "pass", "manifest-schema": "pass", "grounding": "pass",
-             "pinned-dep": "self", "changelog-format": "pass", "version-sync": "pass" },
+             "pinned-dep": "self", "changelog-format": "pass", "version-sync": "pass",
+             "verify-workflow": "pass" },
   "checkedAt": "2026-07-18T00:00:00Z" }
 ```
+
+#### The `verify-workflow` gate: can the workflow that runs the gate skip it?
+
+Every other gate asks whether the repository is in a good state. This one asks
+whether the required check that ENFORCES that state can be made to report success
+without running, which no amount of repository state can reveal.
+
+`aahp-verify.yml` is meant to be a required status check. Wrap the job in an `if:`,
+or wrap the gate step inside it, and the check keeps its name, keeps being required,
+and keeps reporting success while it evaluates nothing. Branch protection is then
+satisfied by a verdict nobody produced. This is not only the Layer 2 drift gate
+going missing: Layer 1 MANIFEST checksum integrity is skipped with it.
+
+The defect cannot be seen from inside AAHP. The workflow AAHP ships is
+unconditional and `propagate.sh` copies it verbatim, so the weakening only ever
+exists in the consumer's copy. `aahp doctor` therefore audits the consumer's own
+`.github/workflows/`, and because the canonical workflow's last step runs
+`aahp doctor`, a repository that has weakened its gate now says so on its own
+pull requests.
+
+What is asserted is the CONSEQUENCE, "there exists an event on which this workflow
+concludes success without having run the gate at `--level ci`", not the file's
+shape. The findings:
+
+| Finding | The state it can reach |
+|---------|------------------------|
+| `job-conditional` | the hosting job carries an `if:`; when it is false the job is skipped and the required check is satisfied having run nothing |
+| `job-soft-failing` | the job sets `continue-on-error`, so it reports success when the gate fails |
+| `ci-step-conditional` | no step runs the gate at `--level ci` unconditionally, so on some events the job succeeds having verified nothing |
+| `ci-step-soft-failing` | the gate runs unconditionally and its result is discarded |
+| `no-ci-level` | the gate never runs at `--level ci`, so `AAHP_SKIP_VERIFY=1` is honoured and a workflow-level `env:` can set it |
+
+A repository whose workflows never run the gate reports `skip`: there is no CI
+backstop to weaken. A workflow that clearly hosts the gate but whose shape cannot
+be decided (the gate reached through a composite action, or a file that will not
+parse) reports `fail`, because undecided is not clean. Two shapes are deliberately
+NOT findings, because they fail closed rather than green: an `if:` on the checkout
+step alone (the gate then runs against an empty workspace and exits non-zero), and
+`paths:` filters that stop the workflow triggering (a required check that never
+reports leaves the pull request pending).
+
+If a class of change genuinely does not need the handoff gate, put that exemption
+INSIDE the gate, keyed on the change, where it is visible and testable. Do not put
+it around the step, keyed on who pushed it.
+
+AAHP ships no runtime dependencies, so this gate carries a small block-YAML reader
+rather than importing a parser. A hand-written parser that quietly disagrees with
+real YAML would be the worst possible engine for a security gate, so
+`tests/assert-workflow-parser-parity.mjs` compares it against a real YAML parser on
+every workflow in this repository and every fixture, on exactly the fields the
+audit reads and on the resulting findings.
 
 **`aahp check`** is the pass/fail counterpart to that record. Where `doctor` emits a
 conformance snapshot, `check` runs the config-driven governance gates as one aggregate

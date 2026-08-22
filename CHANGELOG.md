@@ -12,6 +12,28 @@ independently of the npm version).
 ## [Unreleased]
 
 ### Added
+- `aahp doctor` gains a `verify-workflow` gate that answers, from inside a consumer,
+  whether the workflow hosting the AAHP gate can skip it. Wrapping the `aahp-verify`
+  job in an `if:`, or wrapping the gate step inside it, leaves a REQUIRED status check
+  that keeps its name and reports success having evaluated nothing: Layer 1 MANIFEST
+  checksum integrity is skipped along with the Layer 2 drift gate, and branch
+  protection is satisfied by a verdict nobody produced. AAHP could not see this
+  before, because the workflow it ships and `propagate.sh` copies is unconditional,
+  so the weakening only ever exists in the consumer's copy. Since the canonical
+  workflow's last step runs `aahp doctor`, a repository that has weakened its gate
+  now reports it on its own pull requests.
+  What is asserted is the consequence ("there exists an event on which this workflow
+  concludes success without having run the gate at `--level ci`"), not the file's
+  shape. Five findings cover it: `job-conditional`, `job-soft-failing`,
+  `ci-step-conditional`, `ci-step-soft-failing` and `no-ci-level`. A repository whose
+  workflows never run the gate reports `skip`; one whose workflow hosts the gate but
+  cannot be classified reports `fail`, because undecided is not clean. Two shapes are
+  deliberately not findings because they fail CLOSED, not green: an `if:` on the
+  checkout step alone, and `paths:` filters that stop the workflow triggering.
+  The gate ships no YAML dependency, because AAHP has no runtime dependencies, so
+  `tests/assert-workflow-parser-parity.mjs` holds its block-YAML reader against a real
+  parser on every workflow and fixture in this repository, on the fields the audit
+  reads and on the resulting findings.
 - `npm run check:runtime-support` asserts that the runtimes CI exercises and the
   runtimes `engines.node` publishes are the same set, and that the floor of that set
   still receives security patches. It is a RELATION rather than a list of dead

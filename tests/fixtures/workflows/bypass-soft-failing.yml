@@ -1,0 +1,17 @@
+# Fixture: the gate runs unconditionally and its result is thrown away.
+# Expected verdict: bypassable (ci-step-soft-failing).
+name: AAHP Verify
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  aahp-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+      - name: Run aahp verify (CI level, no escape hatch)
+        continue-on-error: true
+        run: bash scripts/verify-handoff.sh . --level ci

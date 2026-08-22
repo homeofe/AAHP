@@ -1,0 +1,45 @@
+# Fixture: a consumer with no vendored script runs the published CLI by exact
+# version. Regression guard: an earlier draft of the invocation pattern matched
+# `aahp verify` but NOT `aahp@3.10.0 verify`, and so reported two live consumers
+# as undecidable instead of naming their bypass. The tricky YAML below (folded
+# scalar with a more-indented line, a literal block containing a `#`, a quoted
+# key holding a colon, flow sequences, an explicit `continue-on-error: false`)
+# is here on purpose: it is the reader's hard case, and the parity test compares
+# it against a real YAML parser.
+# Expected verdict: enforced.
+name: AAHP Verify
+
+on:
+  push:
+    branches: [main, release]
+  pull_request:
+    branches: [main]
+
+jobs:
+  aahp-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: 'Report the level: ci, and nothing weaker'
+        run: |
+          # A comment containing a colon: and a # hash, inside a literal block.
+          echo "level: ci"
+
+      - name: Run aahp verify (CI level, no escape hatch)
+        continue-on-error: false
+        run: npx -y @scope_example/aahp@3.10.0 verify . --level ci
+        env:
+          AAHP_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+
+  advisory:
+    runs-on: ubuntu-latest
+    if: >
+      github.event_name == 'pull_request'
+        && github.event.pull_request.draft == false
+    steps:
+      - name: Something unrelated that may be skipped
+        run: echo 'this job does not host the gate, so its condition is nobody business'

@@ -88,10 +88,19 @@ independently of the npm version).
   counts without identities. `.ai/handoff/` is outside the `files` list, so the row
   itself never reached the npm tarball, but `scripts/` is inside it, so the comment in
   `check-runtime-support.mjs` would have shipped on the next publish.
-- A `no-private-repo-names` forbidden-pattern rule keeps such names out. The same names
-  had already been removed once, from the propagation playbook, and returned in a later
-  change because nothing gated them. The rule matches on shape rather than on a list, so
-  the gate does not itself have to enumerate the repositories it protects.
+- A `no-private-repo-names` forbidden-pattern rule keeps most such names out. The same
+  names had already been removed once, from the propagation playbook, and returned in a
+  later change because nothing gated them. The rule matches on shape rather than on a
+  list, so the gate does not itself have to enumerate the repositories it protects - but
+  the shape it matches is one naming prefix, and that covers seven of the eight consumer
+  identities the row was built from, not all eight. The eighth is a bare product word
+  carrying no shared prefix, and nothing in its shape separates it from ordinary prose.
+  Measured on this branch: a tracked file reintroducing that eighth name leaves the gate
+  reporting `Forbidden patterns OK: 2 rule(s), no matches.` and exiting 0, while the same
+  file carrying a prefixed name exits 1. It was removed from the row by hand and stays
+  out by review, not by the gate. Adding it to the rule is not the fix, because the rule
+  lives in a tracked config file in this public repository and would then publish the one
+  identity this change exists to withhold.
 
 ## [3.10.0] - 2026-08-20
 **Fail-closed Layer 2 base selection and reviewed exact-file impact classification**

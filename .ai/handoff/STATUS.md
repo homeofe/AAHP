@@ -126,6 +126,9 @@ workflows that only ever ran here did not, because nothing made them.
 | `tests/doctor.bats` (3 new tests) | FOCUSED PASS | the three content-drift tests pass under Git Bash; two were mutated red and restored green. The other 16 tests in the file were not run on Windows; Linux CI is authoritative |
 | full Bats suite | CI | deliberately not run on Windows; Linux CI is authoritative |
 | `tests/runtime-support.bats` (release authorization) | FOCUSED PASS | 8/8 added; the untouched repository shape is green, six one-line mutations of the REAL `ci.yml` each turn it red at exit 1 (including a publish job with no `if:` at all), and a reformat of the same expression stays green |
+| `tests/cli.bats` injection block | FOCUSED PASS | 3/3; the CLI injection test now asserts the detector fired, on a checksum-clean tree, and covers all ten patterns by name. Emptying `INJECTION_PATTERNS` turns it red; the previous test reported ok under that same mutation |
+| injection mutation proof | RE-VERIFIED | independently re-run. Under `INJECTION_PATTERNS=()`, one bats process reports `ok` for the pre-fix test body and `not ok` for the replacement, exit 1; restored, both `ok`, exit 0. With only the check 4 checksum comparison disarmed the replacement still passes, so its status comes from the injection check and not from the setup |
+| injection pattern coverage count | CORRECTED | six of ten patterns were uncovered before this branch, not five. The safety-override entry, sixth in `INJECTION_PATTERNS`, was missed by counting bare substrings: `tests/lint.bats` contains the bare word `override` in a line the pattern itself does not match. This row deliberately does not quote the pattern, because writing it here makes the linter flag this file, which is the detector working |
 <!-- /SECTION: build_health -->
 
 ---

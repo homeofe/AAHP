@@ -72,16 +72,23 @@ behaviour changes: whether the `workflow_dispatch` operand should exist at all i
 owner's decision and is recorded as open, with its options, in ADR-019.
 `aahp doctor` also stops letting a green `handoff-set` line read as an integrity
 verdict. That gate compares the file SET and the INDEX and hashes nothing, which is
-the documented split: ADR-011 gives checksum integrity to `aahp verify` Layer 1,
-which compares it directly and also runs `aahp lint`, which compares it too. Its pass reason said only "N indexed files
-present, no strays", so a reader who had not read the ADR could take a green line for
-an integrity verdict. It now adds "(content not compared; aahp verify Layer 1 owns
-checksum integrity)", the same honest-summary treatment `scripts/lint-handoff.sh`
-received in 3.8.x. No gate changed behaviour, no exit code moved, and the `--json`
-record carries gate statuses and no reasons, so it is unchanged. README now names the
-one configuration where the split has consequences for an adopter: `verify-workflow`
-reporting `skip` while the handoff gates are evaluated means no automated gate in
-that repository compares a handoff checksum.
+the documented split: ADR-011 makes `aahp verify` the owner of handoff drift, and
+Layer 1 hashes each indexed file itself. Layer 1 also runs `aahp lint`, which
+compares them again, but only under a Python interpreter and exiting 0 when there is
+none, so lint is not a substitute for the gate. The pass reason said only "N indexed
+files present, no strays", so a reader who had not read the ADR could take a green
+line for an integrity verdict. It now adds "(content not compared; aahp verify
+Layer 1 owns checksum integrity)", the same honest-summary treatment
+`scripts/lint-handoff.sh` received in 3.9.0 (the CHANGELOG records it under 3.8.3,
+a version number that was never published). No gate changed behaviour and no exit
+code moved. The LIMIT is now stated in the source comment, in the README and in the
+CHANGELOG rather than only in the pull request: only the default human-readable
+`doctor` output carries the new reason, while `--json`, `--quiet` and `--governance`
+do not, and those three are the invocations consumers wire into CI and hooks, so the
+`schemaVersion: 1` record a dashboard ingests says exactly what it said before.
+README also names the one configuration where the split has consequences for an
+adopter: `verify-workflow` reporting `skip` while the handoff gates are evaluated
+means no automated gate in that repository compares a handoff checksum.
 <!-- /SECTION: summary -->
 
 ---

@@ -613,14 +613,30 @@ audit reads and on the resulting findings.
 compares `MANIFEST.json` against the schema, which rejects a MALFORMED checksum
 but says nothing about a well-formed one that no longer matches the bytes.
 Comparing recorded checksums against file content belongs to `aahp verify`
-Layer 1, and to `aahp lint`, which Layer 1 also runs (ADR-011). The
-`handoff-set` pass reason therefore names the boundary instead of leaving a green
-line to imply integrity:
+Layer 1, which ADR-011 makes the owner of handoff drift. Layer 1 hashes each
+indexed file itself and additionally runs `aahp lint`, which compares them
+again. Do not substitute `aahp lint` for that gate: its comparison runs only
+under a Python interpreter, and with none on `PATH` it prints that MANIFEST
+integrity was NOT verified and still exits 0, so it reports nothing on a
+drifted tree. Layer 1 fails outright when no interpreter is available. The
+`handoff-set` pass reason therefore names the boundary instead of leaving a
+green line to imply integrity:
 
 ```text
-  PASS     handoff-set: 3 indexed files present, no strays (content not compared;
-           aahp verify Layer 1 owns checksum integrity)
+  PASS     handoff-set: 3 indexed files present, no strays (content not compared; aahp verify Layer 1 owns checksum integrity)
 ```
+
+That reason is emitted on one line, and only by the DEFAULT human-readable
+output. That is the limit of this wording, and it is deliberate:
+`aahp doctor --json` carries gate statuses and no reasons,
+`aahp doctor --quiet` prints nothing for a passing gate, and
+`aahp doctor --governance` marks the gate `skip` without evaluating it. Those
+three are the invocations wired into `.github/workflows/aahp-verify.yml`,
+`assets/governance/aahp-govern.yml` and `scripts/hooks/pre-push`, so a
+repository that treats the `schemaVersion: 1` record as its handoff-integrity
+signal reads exactly what it read before. Holding that record byte-identical is
+a compatibility choice for dashboards that already ingest it; changing it would
+be a `schemaVersion` decision.
 
 One configuration deserves an explicit warning. When `verify-workflow` reports
 `skip`, meaning no workflow in the repository runs the AAHP verify gate, and the
@@ -629,11 +645,11 @@ compares a handoff checksum. `aahp doctor` exits 0, `aahp check` exits 0, and a
 handoff file edited outside the protocol is invisible to both. The record is
 accurate about what it measured and it is not an integrity signal. Fix it by
 adopting `.github/workflows/aahp-verify.yml`, which runs `aahp verify --level ci`
-before `aahp doctor` in the same job, or by running `aahp verify` (or `aahp lint`,
-which compares the same checksums) some other way.
+before `aahp doctor` in the same job, or by running `aahp verify` some other
+way.
 
-In this repository, and in every consumer using the propagated workflow, that
-ordering is already in place: a checksum drift fails the job at the verify step
+In this repository, and in any repository whose `aahp-verify.yml` matches the
+shipped one, that ordering is already in place: a checksum drift fails the job at the verify step
 and the `doctor` step never runs, so a green record cannot mask the drift.
 
 **`aahp check`** is the pass/fail counterpart to that record. Where `doctor` emits a

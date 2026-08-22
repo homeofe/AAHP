@@ -565,12 +565,29 @@ function runGate(scriptName, targetPath) {
 // This gate hashes nothing. It answers three questions: is every indexed file
 // on disk, is every canonical file on disk also in files{}, and is anything
 // untracked lying next to them. Whether the bytes still match the recorded
-// checksum is `aahp verify` Layer 1's question, by ADR-011: Layer 1 compares
-// them itself and also runs scripts/lint-handoff.sh, which compares them again.
+// checksum is `aahp verify` Layer 1's question. ADR-011 assigns handoff drift
+// to `aahp verify`; the comparison itself lives in scripts/verify-handoff.sh,
+// which hashes each indexed file against its recorded checksum and additionally
+// runs scripts/lint-handoff.sh, which compares them again. lint is NOT a
+// substitute for Layer 1: its comparison runs only under a Python interpreter,
+// and with none on PATH lint reports that MANIFEST integrity was NOT verified
+// and still exits 0. Layer 1 fails outright when no interpreter is available.
 // Neither `aahp doctor` nor `aahp check` compares content, so neither can
 // observe drift. The pass reason below says so out loud rather than leaving a
 // green line to imply otherwise, the same way scripts/lint-handoff.sh reports a
 // clean run whose MANIFEST integrity it could not verify.
+//
+// LIMIT OF THIS WORDING, deliberate, and the thing to know before relying on
+// it: only the DEFAULT human-readable `aahp doctor` output carries the reason.
+// `--json` carries gate statuses and no reasons, `--quiet` prints nothing for a
+// passing gate, and `--governance` marks this gate `skip` without evaluating
+// it. Those three are the invocations wired into CI and hooks
+// (.github/workflows/aahp-verify.yml, assets/governance/aahp-govern.yml,
+// scripts/hooks/pre-push), so a repository that reads the schemaVersion 1
+// record as a handoff-integrity signal is told exactly what it was told before.
+// Holding that record byte-identical is a compatibility choice for dashboards
+// that already ingest it; changing it is a schemaVersion decision, not taken
+// here.
 //
 // The one configuration where that matters to an adopter: when the
 // `verify-workflow` gate reports `skip` (no workflow in this repository runs

@@ -1,5 +1,19 @@
 name: AAHP Manifest
 
+# `contents: read` is the whole grant this workflow needs: it reads the checkout
+# and runs local scripts. Declared rather than inherited, because the inherited
+# value is a repository SETTING (default_workflow_permissions) that can widen
+# every job in this file with no diff here to review.
+#
+# The checkout below sets `persist-credentials: false` for the matching reason:
+# actions/checkout defaults it to true, which writes the job's GITHUB_TOKEN into
+# .git/config where every later step in the job can read it. Nothing here uses
+# git credentials.
+#
+# tests/assert-workflow-hardening.mjs keeps both true.
+permissions:
+  contents: read
+
 on:
   push:
     branches: [main]
@@ -13,6 +27,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false  # see the header
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:

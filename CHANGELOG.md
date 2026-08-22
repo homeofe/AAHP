@@ -47,6 +47,24 @@ independently of the npm version).
   single entry is red even though the standalone pins in the other jobs would keep a
   global pin list populated.
 
+- `tests/assert-workflow-hardening.mjs` asserts both properties over
+  `.github/workflows/` **and** `assets/governance/`, so a workflow added without them is
+  a red required check rather than a note in a review. It runs under `npm test`, which
+  the required `lint-and-validate` job executes, so it has teeth on every pull request
+  with no new CI wiring. It exits 2 rather than 0 on anything it cannot decide: a
+  `${{ }}` expression it cannot evaluate, a job delegating to a reusable workflow whose
+  steps are not visible, or a scan root that is missing or empty. Scanning zero files is
+  reported, never treated as finding nothing wrong. Exemptions for a job that genuinely
+  needs the checkout credential live in `CHECKOUT_CREDENTIAL_EXEMPTIONS` inside the
+  gate, are reviewed as a code change, and print their reason on every run; the list is
+  empty, and that is measured rather than assumed, since no workflow here runs
+  `git push`, `git commit`, `git fetch`, `git pull` or `git remote`. See ADR-019.
+- `tests/assert-repo-ci-shape.mjs` additionally pins the three job-level elevations by
+  name. A job-level `permissions:` REPLACES the top-level block rather than merging with
+  it, so once `ci.yml` and `codeql.yml` gained a top-level `contents: read`, deleting a
+  job block as redundant would silently strip an elevation whose failure would only
+  surface on a release tag.
+
 ### Changed
 - `engines.node` is now `>=22`, was `>=18`. Node 18 reached end of life on 2025-04-30
   and Node 20 on 2026-04-30, so the package publicly claimed support for a runtime it
@@ -101,6 +119,37 @@ independently of the npm version).
   out by review, not by the gate. Adding it to the rule is not the fix, because the rule
   lives in a tracked config file in this public repository and would then publish the one
   identity this change exists to withhold.
+
+### Security
+- The portable governance workflow AAHP ships, `assets/governance/aahp-govern.yml`, now
+  declares `permissions: contents: read` and sets `persist-credentials: false` on its
+  checkout. This is the change with reach beyond this repository: `aahp init --gates`
+  copies that file into a consumer repository and `npm pack` puts it in the published
+  tarball, so until now every adopter received a workflow that inherited whatever
+  `default_workflow_permissions` their repository was set to and left the job's
+  `GITHUB_TOKEN` in `.git/config` for every later step to read, including everything
+  `npm ci` and `aahp` execute. AAHP cannot see an adopter's repository visibility, their
+  default, or an organization default that grants `write`, so the workflow now states
+  what it needs instead of inheriting it. The header explains both lines in place.
+  **Adopters who already scaffolded the file keep their old copy:** `aahp init --gates`
+  skips a workflow that already exists. Re-run it with `--force`, or add the two lines
+  by hand, to pick this up.
+- The six repository workflows that had no top-level `permissions:` block now declare
+  `contents: read` (`aahp-archive.yml`, `aahp-lint.yml`, `aahp-manifest.yml`,
+  `aahp-pii-allowlist.yml`, `ci.yml`, `codeql.yml`), and all nine remaining
+  `actions/checkout` steps set `persist-credentials: false`. The job-level elevations
+  are unchanged and still override the top-level block: `publish` keeps
+  `id-token: write` for OIDC trusted publishing, `release` keeps `contents: write` for
+  `gh release create`, and the CodeQL `analyze` job keeps `security-events: write` for
+  its SARIF upload.
+  Stated plainly, because the change should not be read as fixing an exploitable defect
+  in this repository: it is not. This repository is public, its
+  `default_workflow_permissions` is `read`, every job runs on a throwaway hosted runner,
+  and the owner is a user account with no organization layer, so a read-only token in a
+  public repository's workspace grants nothing an anonymous clone does not. The value is
+  that a declared block cannot be widened by a settings change with no diff to review,
+  and that it is measurably narrower even today: an inheriting job here is granted
+  `Packages: read` on top of `Contents` and `Metadata`, and a declaring job is not.
 
 ## [3.10.0] - 2026-08-20
 **Fail-closed Layer 2 base selection and reviewed exact-file impact classification**

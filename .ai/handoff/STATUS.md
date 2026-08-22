@@ -1,6 +1,6 @@
 # AAHP: Current State of the Nation
 
-> Last updated: 2026-08-22 by claude (verify-workflow gate: can the workflow that runs the gate skip it?)
+> Last updated: 2026-08-22 by claude (workflow hardening: declared permissions + no persisted checkout credential, in CI and in the shipped template)
 > Commit: (review branch, pending commit)
 >
 > **Rule:** This file is rewritten (not appended) at the end of every session.
@@ -66,6 +66,7 @@ measured against every consumer of this protocol before shipping.
 | `tests/runtime-support.bats` | FOCUSED PASS | 16/16; the relation holds on this repo and each of nine mutations turns it red, including the emptied-matrix trap |
 | shellcheck | LINUX PASS | replacement head `c332a23` reached the full Bats step after shellcheck |
 | hosted Linux suite | REPLACEMENT REQUIRED | `c332a23` passed 361/362; the CI mode fixture let `git add` restore mode 100644 on Linux, so it now reasserts 100755 before its content-plus-mode commit |
+| `tests/workflow-hardening.bats` | FOCUSED PASS | run under Git Bash filtered to the two load-bearing assertions (the repository's own workflows and its shipped template), green before the mutation and red after deleting the `permissions:` block from `assets/governance/aahp-govern.yml`. The file's thirteen fixture expectations were additionally exercised in-process against the gate's `audit()`, all thirteen returning the exact expected exit code (1 for a real problem, 2 for a state the gate cannot decide). The full 21-test file is left to Linux CI, which is authoritative here: a Windows box running many suites at once takes hours per pass. |
 | full Bats suite | CI | deliberately not run on Windows; Linux CI is authoritative |
 <!-- /SECTION: build_health -->
 
@@ -87,6 +88,9 @@ measured against every consumer of this protocol before shipping.
 | Runtime-support gate | `scripts/check-runtime-support.mjs` | New | relation between CI pins and `engines.node`; one dated constant; exits 2 when it cannot evaluate |
 | Runtime matrix | `.github/workflows/ci.yml` | Changed | new `runtime-matrix` job on Node 22 and 24; `lint-and-validate` deliberately left unmatrixed so the required check keeps its literal name |
 | verify-workflow gate | `scripts/check-verify-workflow.mjs` | New | audits the consumer's workflows for a gate that can skip itself; zero runtime dependencies, so it carries its own block-YAML reader, held against a real parser by `tests/assert-workflow-parser-parity.mjs` |
+| Workflow-hardening gate | `tests/assert-workflow-hardening.mjs` | New | every document under `.github/workflows/` AND `assets/governance/` must declare a top-level `permissions:` mapping and set `persist-credentials: false` on every checkout; scanning zero files exits 2, never 0 |
+| Shipped governance template | `assets/governance/aahp-govern.yml` | Changed | declares `contents: read` and refuses the persisted checkout credential; this is the only file in the change with reach beyond this repository |
+| Repository workflows | `.github/workflows/*.yml` | Changed | six gained a top-level `contents: read`; all nine remaining checkouts set `persist-credentials: false`; the three job-level elevations are unchanged and now pinned by name in `tests/assert-repo-ci-shape.mjs` |
 | Release surfaces | `package*.json`, `CHANGELOG.md` | Changed | v3.10.0 prepared, workflow included in npm artifact, not released; `engines.node` now `>=22`, `yaml` added as a devDependency |
 <!-- /SECTION: components -->
 
@@ -106,6 +110,10 @@ measured against every consumer of this protocol before shipping.
 | SemVer call for `engines.node` | NORMAL | Narrowing `>=18` to `>=22` is a support-surface reduction. Whether it ships inside 3.10.0 or forces 4.0.0 is an owner decision, not one this branch takes. |
 | `aahp-verify` can skip itself in six consumers | HIGH | ORIGINATED HERE. `458dbbd` (2026-06-30) added the dependency-bot exemption to this repository's own reference workflow, gating Checkout and every gate step; it shipped that way in v3.6.0 and propagated. `#65` removed it here on 2026-08-21. MEASURED 2026-08-22 with the new `verify-workflow` gate, against every consumer: six report `bypassable`, three report `enforced`. Five of the six report success having checked out nothing, so Layer 1 never runs either. The sixth was previously recorded here as corrected and is only PARTLY so: its checkout is unconditional and a bot change does get a Layer 1 run, but `--level ci` is still gated on the author, so the same required check name means all four layers for one author and Layer 1 for another. Only the owning repositories can re-propagate; this branch cannot fix any of them. Consumer identities are tracked privately and deliberately not recorded in this public repository. |
 | No drift check between a consumer's propagated workflow and the installed package | PARTLY CLOSED | `aahp doctor` still never compares `.github/workflows/aahp-verify.yml` on disk against the one in the installed package, so a consumer can pin 3.10.0 and run the v3.6.0 workflow. The designed predicate this row asked for now exists for the case that matters: `verify-workflow` asks whether the hosting workflow can skip the gate, which tolerates deliberate divergence (a consumer may restructure the file freely) while catching the divergence that voids the check. General byte-level drift, for example an older action pin or a dropped `fetch-depth: 0`, is still unmeasured. |
+| Adopters keep an unhardened `aahp-govern.yml` | MEDIUM | OWNER DECISION. `aahp init --gates` skips a workflow that already exists (`bin/aahp.js`), so a repository that scaffolded the governance workflow before this change keeps the copy with no `permissions:` block and a persisted checkout credential, and will keep it forever unless somebody re-runs with `--force`. The CHANGELOG says so, which reaches people who read release notes and nobody else. Options: (a) leave it as a release note, (b) have `aahp doctor` report a scaffolded `aahp-govern.yml` that lacks either property, so an adopter sees it on their own pull requests, (c) make `init --gates` upgrade this specific file in place. (b) is the one that matches how `verify-workflow` already reports a weakened gate from inside the consumer. Not taken here: it changes `doctor`'s output contract, which is a separate decision from hardening the file. |
+| `persist-credentials: false` on the release path unproven in a real tag run | NORMAL | OWNER CONFIRMATION. The evidence that the change is behaviour-preserving is direct: no workflow in this repository runs `git push`, `git commit`, `git fetch`, `git pull` or `git remote`, none uses a credential-writing action, and the only `secrets.` reference passes `GITHUB_TOKEN` to `gh release create` as an environment variable, which does not read `.git/config`. The `publish` job authenticates to npm by OIDC, which is delivered through environment variables and is unaffected by checkout options. But `publish` and `release` only ever run on a version tag, so no pull-request CI run exercises them. Confirm on the first tag build after this merges. |
+| Mutable action tags and `sha_pinning_required` | NORMAL | Out of scope here and deliberately not bundled: nine of the eleven `actions/checkout` references use the mutable `@v4` tag rather than an immutable SHA, and the repository setting `sha_pinning_required` is `false`. Same class of exposure as this change, different fix, tracked at https://github.com/homeofe/AAHP/issues/68 and https://github.com/homeofe/AAHP/issues/71. |
+| npm lifecycle scripts in CI | NORMAL | Not addressed by this change and should not be read as closed by it: `npm ci` in `ci.yml` runs without `--ignore-scripts`, so lifecycle scripts from the whole dependency tree execute in the same job as the checkout. Removing the persisted credential removes what those scripts could have read from `.git/config`; it does not stop them running. The shipped template already uses `npm ci --ignore-scripts`. |
 | Consumer manifests already rewritten | MEDIUM | The generator no longer writes a checkout's directory name into `project`, but repositories whose committed `MANIFEST.json` already carries such a name keep it, because a recorded name is preserved by design. Those values need correcting in the consumer repositories. |
 <!-- /SECTION: what_is_missing -->
 
@@ -116,3 +124,10 @@ measured against every consumer of this protocol before shipping.
 1. Regenerate `MANIFEST.json` and run the focused repository gates.
 2. Push the review pull request replacement head and let hosted Linux CI run the full suite and shellcheck.
 3. Do not tag, publish, or merge from this session.
+4. Decide the three owner questions in "What is Missing" above: how adopters holding an
+   unhardened `aahp-govern.yml` are reached, confirmation of the release-path checkout
+   change on the first tag build, and whether the mutable action tags are taken next.
+5. The hardened `assets/governance/aahp-govern.yml` reaches adopters only when a version
+   is published. Nothing in this change bumps the version, because the release ceremony
+   is a separate, authorized step in this repository and several changes share the
+   `[Unreleased]` block.

@@ -148,6 +148,16 @@ independently of the npm version).
   out by review, not by the gate. Adding it to the rule is not the fix, because the rule
   lives in a tracked config file in this public repository and would then publish the one
   identity this change exists to withhold.
+- The only CLI-level test of the prompt-injection detector no longer passes with the
+  detector switched off. It appended an injection line to an indexed handoff file and
+  asserted nothing but a non-zero exit; appending to an indexed file breaks its checksum,
+  which is a different one of the seven lint checks and produces that same exit code, so
+  the assertion was satisfied by the setup's side effect. Emptying `INJECTION_PATTERNS`
+  left it reporting ok. It now regenerates `MANIFEST.json` after writing, so the tree is
+  checksum-clean and the injection check is the only thing that can fail, and it asserts
+  on the output. A negative control proves the same harness exits 0 on benign content.
+  All ten patterns are now covered, each asserted BY NAME, so a typo in any one of them
+  turns exactly that test red and says which; five of the ten had no coverage at all.
 
 ### Security
 - The two required status checks that validate `MANIFEST.json` no longer download

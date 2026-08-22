@@ -141,8 +141,13 @@ independently of the npm version).
   by hand, to pick this up.
 - The six repository workflows that had no top-level `permissions:` block now declare
   `contents: read` (`aahp-archive.yml`, `aahp-lint.yml`, `aahp-manifest.yml`,
-  `aahp-pii-allowlist.yml`, `ci.yml`, `codeql.yml`), and all nine remaining
-  `actions/checkout` steps set `persist-credentials: false`. The job-level elevations
+  `aahp-pii-allowlist.yml`, `ci.yml`, `codeql.yml`), and ten more `actions/checkout`
+  steps set `persist-credentials: false`: the nine in `.github/workflows/` plus the one
+  in `assets/governance/aahp-govern.yml`, the template this package ships to consumers.
+  Nine is the `.github/workflows`-only figure and leaves out that template, which is the
+  file in this change with reach beyond this repository. Counted across both locations
+  the repository holds eleven checkout steps; exactly one, in `aahp-verify.yml`, already
+  set the flag, so after this change all eleven set it. The job-level elevations
   are unchanged and still override the top-level block: `publish` keeps
   `id-token: write` for OIDC trusted publishing, `release` keeps `contents: write` for
   `gh release create`, and the CodeQL `analyze` job keeps `security-events: write` for

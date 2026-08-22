@@ -14,7 +14,7 @@ the changed entries, which no driver can do.
 
 # AAHP: Current State of the Nation
 
-> Last updated: 2026-08-22 by claude (verify-workflow gate: can the workflow that runs the gate skip it?)
+> Last updated: 2026-08-22 by claude (doctor says what it did not compare; verify-workflow gate)
 > Commit: (review branch, pending commit)
 >
 > **Rule:** This file is rewritten (not appended) at the end of every session.
@@ -70,6 +70,25 @@ written once and both jobs must use exactly it; every additional top-level `||`
 operand on the publish condition must appear in a literal recorded list. No workflow
 behaviour changes: whether the `workflow_dispatch` operand should exist at all is the
 owner's decision and is recorded as open, with its options, in ADR-019.
+`aahp doctor` also stops letting a green `handoff-set` line read as an integrity
+verdict. That gate compares the file SET and the INDEX and hashes nothing, which is
+the documented split: ADR-011 makes `aahp verify` the owner of handoff drift, and
+Layer 1 hashes each indexed file itself. Layer 1 also runs `aahp lint`, which
+compares them again, but only under a Python interpreter and exiting 0 when there is
+none, so lint is not a substitute for the gate. The pass reason said only "N indexed
+files present, no strays", so a reader who had not read the ADR could take a green
+line for an integrity verdict. It now adds "(content not compared; aahp verify
+Layer 1 owns checksum integrity)", the same honest-summary treatment
+`scripts/lint-handoff.sh` received in 3.9.0 (the CHANGELOG records it under 3.8.3,
+a version number that was never published). No gate changed behaviour and no exit
+code moved. The LIMIT is now stated in the source comment, in the README and in the
+CHANGELOG rather than only in the pull request: only the default human-readable
+`doctor` output carries the new reason, while `--json`, `--quiet` and `--governance`
+do not, and those three are the invocations consumers wire into CI and hooks, so the
+`schemaVersion: 1` record a dashboard ingests says exactly what it said before.
+README also names the one configuration where the split has consequences for an
+adopter: `verify-workflow` reporting `skip` while the handoff gates are evaluated
+means no automated gate in that repository compares a handoff checksum.
 <!-- /SECTION: summary -->
 
 ---
@@ -90,6 +109,7 @@ owner's decision and is recorded as open, with its options, in ADR-019.
 | `tests/runtime-support.bats` | FOCUSED PASS | 16/16; the relation holds on this repo and each of nine mutations turns it red, including the emptied-matrix trap |
 | shellcheck | LINUX PASS | replacement head `c332a23` reached the full Bats step after shellcheck |
 | hosted Linux suite | REPLACEMENT REQUIRED | `c332a23` passed 361/362; the CI mode fixture let `git add` restore mode 100644 on Linux, so it now reasserts 100755 before its content-plus-mode commit |
+| `tests/doctor.bats` (3 new tests) | FOCUSED PASS | the three content-drift tests pass under Git Bash; two were mutated red and restored green. The other 16 tests in the file were not run on Windows; Linux CI is authoritative |
 | full Bats suite | CI | deliberately not run on Windows; Linux CI is authoritative |
 | `tests/runtime-support.bats` (release authorization) | FOCUSED PASS | 8/8 added; the untouched repository shape is green, six one-line mutations of the REAL `ci.yml` each turn it red at exit 1 (including a publish job with no `if:` at all), and a reformat of the same expression stays green |
 <!-- /SECTION: build_health -->
@@ -106,6 +126,8 @@ owner's decision and is recorded as open, with its options, in ADR-019.
 | Required workflow | `.github/workflows/aahp-verify.yml` | Changed | no actor bypass; explicit base; read-only token; immutable action pins; evaluator-path trust boundary documented |
 | Config schema/example | `schema/aahp-config.schema.json`, `aahp.config.example.json` | Changed | additive `handoffImpact` contract |
 | CLI | `bin/aahp.js` | Changed | verify help documents `--base SHA` |
+| Conformance gate | `bin/aahp.js` (`gateHandoffSet`) | Changed | pass reason names the content check it does not run, and a header comment states the ADR-011 boundary; behaviour, gate statuses and the JSON record are unchanged |
+| Scaffolded governance workflow | `assets/governance/aahp-govern.yml` | Changed | header now states that it runs no handoff-integrity gate and that a repository keeping `.ai/handoff/` needs `aahp-verify.yml` beside it; comment only |
 | Specification | `README.md` | Changed | Section 2.8 and ADR-018 define the contract |
 | Rollout | `scripts/ROLLOUT.md` | Changed | consumer propagation and mutation checks documented |
 | Manifest generator | `scripts/aahp-manifest.sh` | Changed | `project` resolves from repository identity (recorded name, then git remote), not from the directory it runs in |

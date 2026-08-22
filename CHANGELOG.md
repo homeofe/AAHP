@@ -60,6 +60,41 @@ independently of the npm version).
   global pin list populated.
 
 ### Changed
+- `aahp doctor`'s `handoff-set` gate now names the check it did not run. Its pass
+  reason reads `N indexed files present, no strays (content not compared; aahp
+  verify Layer 1 owns checksum integrity)`. The gate's behaviour is unchanged, and
+  deliberately so: it compares the file SET and the INDEX, while comparing a
+  recorded checksum against the bytes on disk belongs to `aahp verify` Layer 1,
+  which ADR-011 makes the owner of handoff drift. What was missing is the
+  honest-summary treatment `scripts/lint-handoff.sh` received in 3.9.0 (the
+  `[3.8.3]` entry below describes it; 3.8.2 and 3.8.3 were never published, and
+  3.9.0 is the first release that carries it), where a clean run that could not
+  establish integrity stopped printing "All checks passed". Without it, a green
+  `handoff-set` line reads as an integrity verdict to anyone who has not read the
+  ADR. The new wording reaches ONE surface, and that limit is deliberate: the
+  `--json` record carries gate statuses only and no reasons, `--quiet` prints
+  nothing for a passing gate, and `--governance` skips the gate without
+  evaluating it. A repository that ingests the `schemaVersion: 1` record is
+  therefore told exactly what it was told before, which is the compatibility
+  choice this entry is making rather than an omission.
+- README now states the one configuration in which that split has consequences for
+  an adopter: when `verify-workflow` reports `skip`, meaning no workflow in the
+  repository runs the AAHP verify gate, and the handoff gates are still evaluated,
+  then no automated gate in that repository compares a handoff checksum, and a
+  green conformance record is not an integrity signal. Repositories using the shipped
+  `aahp-verify.yml` are unaffected: it runs `aahp verify --level ci` before
+  `aahp doctor` in the same job, so a drift fails the job before `doctor` runs.
+  The README no longer offers `aahp lint` as an equivalent remedy: lint's
+  checksum comparison runs only under a Python interpreter and exits 0 when
+  there is none, so it can pass silently on a drifted tree where Layer 1 fails.
+- `assets/governance/aahp-govern.yml`, the workflow `aahp init --gates` scaffolds
+  into consumers, now says in its own header that it runs no handoff-integrity gate,
+  that neither of its own steps stands in for one (`aahp check` has no file-set or
+  index gate, and its `aahp doctor --governance` step skips the handoff gates
+  without evaluating them), that `aahp lint` cannot stand in for one in a workflow
+  that sets up Node and not Python, and that a repository which also keeps
+  `.ai/handoff/` needs `aahp-verify.yml` beside it. Comment only; the workflow
+  itself is unchanged.
 - `engines.node` is now `>=22`, was `>=18`. Node 18 reached end of life on 2025-04-30
   and Node 20 on 2026-04-30, so the package publicly claimed support for a runtime it
   could not have security-patched, and every repository in the estate inherited that

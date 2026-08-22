@@ -559,6 +559,43 @@ function runGate(scriptName, targetPath) {
   return spawnSync(process.execPath, [join(PACKAGE_ROOT, 'scripts', scriptName), targetPath], { encoding: 'utf8' })
 }
 
+// ---------------------------------------------------------------------------
+// handoff-set gate - the file SET and the INDEX, never the file CONTENT.
+//
+// This gate hashes nothing. It answers three questions: is every indexed file
+// on disk, is every canonical file on disk also in files{}, and is anything
+// untracked lying next to them. Whether the bytes still match the recorded
+// checksum is `aahp verify` Layer 1's question. ADR-011 assigns handoff drift
+// to `aahp verify`; the comparison itself lives in scripts/verify-handoff.sh,
+// which hashes each indexed file against its recorded checksum and additionally
+// runs scripts/lint-handoff.sh, which compares them again. lint is NOT a
+// substitute for Layer 1: its comparison runs only under a Python interpreter,
+// and with none on PATH lint reports that MANIFEST integrity was NOT verified
+// and still exits 0. Layer 1 fails outright when no interpreter is available.
+// Neither `aahp doctor` nor `aahp check` compares content, so neither can
+// observe drift. The pass reason below says so out loud rather than leaving a
+// green line to imply otherwise, the same way scripts/lint-handoff.sh reports a
+// clean run whose MANIFEST integrity it could not verify.
+//
+// LIMIT OF THIS WORDING, deliberate, and the thing to know before relying on
+// it: only the DEFAULT human-readable `aahp doctor` output carries the reason.
+// `--json` carries gate statuses and no reasons, `--quiet` prints nothing for a
+// passing gate, and `--governance` marks this gate `skip` without evaluating
+// it. Those three are the invocations wired into CI and hooks
+// (.github/workflows/aahp-verify.yml, assets/governance/aahp-govern.yml,
+// scripts/hooks/pre-push), so a repository that reads the schemaVersion 1
+// record as a handoff-integrity signal is told exactly what it was told before.
+// Holding that record byte-identical is a compatibility choice for dashboards
+// that already ingest it; changing it is a schemaVersion decision, not taken
+// here.
+//
+// The one configuration where that matters to an adopter: when the
+// `verify-workflow` gate reports `skip` (no workflow in this repository runs
+// the AAHP verify gate) and the handoff gates are still evaluated, NO automated
+// gate in that repository compares a handoff checksum. The record is green and honest
+// about what it measured, and it is not a statement about handoff integrity.
+// Adopt .github/workflows/aahp-verify.yml, which runs `aahp verify --level ci`
+// before `aahp doctor` in the same job, or run `aahp verify` some other way.
 function gateHandoffSet(handoffDir) {
   const manifestPath = join(handoffDir, 'MANIFEST.json')
   if (!existsSync(manifestPath)) return { status: 'fail', reason: 'MANIFEST.json not found' }
@@ -587,7 +624,14 @@ function gateHandoffSet(handoffDir) {
   }
   const strays = entries.filter((f) => /\.(md|json)$/.test(f) && f !== 'MANIFEST.json' && !canonical.has(f))
   if (strays.length) return { status: 'fail', reason: `untracked stray handoff file(s): ${strays.join(', ')}` }
-  return { status: 'pass', reason: `${Object.keys(files).length} indexed files present, no strays` }
+  // Name what was NOT compared. A bare "no strays" reads as an integrity
+  // verdict to anyone who has not read ADR-011; this gate never hashed a byte.
+  return {
+    status: 'pass',
+    reason:
+      `${Object.keys(files).length} indexed files present, no strays` +
+      ' (content not compared; aahp verify Layer 1 owns checksum integrity)'
+  }
 }
 
 function gateManifestSchema(handoffDir) {

@@ -27,6 +27,7 @@ import { dirname, join, resolve } from 'node:path'
 import { existsSync, mkdirSync, copyFileSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { spawn, spawnSync } from 'node:child_process'
 import { resolveBash, toBashPath } from '../scripts/aahp-config.mjs'
+import { audit as auditVerifyWorkflow } from '../scripts/check-verify-workflow.mjs'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -688,6 +689,46 @@ function gateVersionSync(targetPath, config) {
   return { status: 'fail', reason: firstLine(r.stderr || r.stdout) }
 }
 
+// ---------------------------------------------------------------------------
+// verify-workflow gate - "can the workflow that runs me skip me?"
+//
+// Every other gate here asks whether the repository is in a good state. This one
+// asks whether the CHECK THAT ENFORCES that state can be made to report success
+// without running, which no amount of repository state can reveal. A consumer
+// that wraps the AAHP verify job (or the gate step inside it) in an `if:` keeps
+// the required check's name and its green tick while it evaluates nothing: Layer
+// 1 MANIFEST checksum integrity is skipped along with the Layer 2 drift gate.
+//
+// It cannot be caught inside AAHP, because the workflow AAHP ships and
+// propagate.sh copies is unconditional. It only exists in the consumer's copy,
+// so only a check running inside the consumer can see it. That is why it lives
+// in `doctor`: the canonical workflow's last step runs `aahp doctor`, so a
+// consumer that has weakened the gate now says so on its own pull requests.
+//
+// A repository with no such workflow SKIPs (nothing to weaken). A workflow that
+// hosts the gate but cannot be classified FAILs, because undecided is not clean.
+function gateVerifyWorkflow(targetPath) {
+  let result
+  try {
+    result = auditVerifyWorkflow(targetPath)
+  } catch (err) {
+    return { status: 'fail', reason: `could not audit the verify workflow: ${err.message}` }
+  }
+  if (result.verdict === 'absent') {
+    return { status: 'skip', reason: 'no workflow here runs the AAHP verify gate' }
+  }
+  if (result.verdict === 'enforced') {
+    const where = result.hosts.map((h) => `${h.file}:${h.job}`).join(', ')
+    return { status: 'pass', reason: `the gate runs unconditionally at --level ci (${where})` }
+  }
+  if (result.verdict === 'unclassifiable') {
+    return { status: 'fail', reason: `undecidable verify workflow: ${result.unclassifiable[0]}` }
+  }
+  const first = result.findings[0]
+  const more = result.findings.length > 1 ? ` (+${result.findings.length - 1} more)` : ''
+  return { status: 'fail', reason: `the gate can be skipped [${first.id}] ${first.detail}${more}` }
+}
+
 function cmdDoctor(targetPath, flags) {
   const jsonOnly = flags.includes('--json')
   const quiet = flags.includes('--quiet')
@@ -706,6 +747,9 @@ function cmdDoctor(targetPath, flags) {
     'pinned-dep': gatePinnedDep(targetPath, pkg, config),
     'changelog-format': gateChangelogFormat(targetPath, config),
     'version-sync': gateVersionSync(targetPath, config),
+    // Evaluated in governance mode too: a repo can adopt the CI backstop
+    // without adopting the handoff files, and weakening it matters either way.
+    'verify-workflow': gateVerifyWorkflow(targetPath),
   }
 
   const gates = {}

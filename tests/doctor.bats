@@ -59,7 +59,7 @@ EOF
       process.stdin.on("data", (d) => (s += d)).on("end", () => {
         const r = JSON.parse(s);
         if (r.schemaVersion !== 1) process.exit(2);
-        const keys = ["handoff-set","manifest-schema","grounding","pinned-dep","changelog-format","version-sync"];
+        const keys = ["handoff-set","manifest-schema","grounding","pinned-dep","changelog-format","version-sync","verify-workflow"];
         for (const k of keys) if (!(k in r.gates)) process.exit(3);
         if (typeof r.checkedAt !== "string") process.exit(4);
         if (typeof r.aahpVersion !== "string") process.exit(5);
@@ -224,7 +224,7 @@ EOF
     ' "$gov" "$nh"
 }
 
-@test "doctor --governance --json emits mode:governance with all six gate keys and the 3 handoff gates skip" {
+@test "doctor --governance --json emits mode:governance with all seven gate keys and the 3 handoff gates skip" {
     scaffold_conformant
     rm -rf "$TEST_TMPDIR/.ai"
     run node "$AAHP" doctor "$TEST_TMPDIR" --governance --json
@@ -234,7 +234,7 @@ EOF
       process.stdin.on("data", (d) => (s += d)).on("end", () => {
         const r = JSON.parse(s);
         if (r.mode !== "governance") process.exit(2);
-        const keys = ["handoff-set","manifest-schema","grounding","pinned-dep","changelog-format","version-sync"];
+        const keys = ["handoff-set","manifest-schema","grounding","pinned-dep","changelog-format","version-sync","verify-workflow"];
         for (const k of keys) if (!(k in r.gates)) process.exit(3);
         for (const k of ["handoff-set", "manifest-schema", "grounding"]) {
           if (r.gates[k] !== "skip") process.exit(4);

@@ -1,0 +1,38 @@
+# Fixture: the two shapes that are deliberately NOT findings, because both fail
+# CLOSED rather than green.
+#
+#   `paths:` filters - the workflow does not trigger at all on a change that
+#   matches nothing, so a required check never reports and the pull request sits
+#   pending. That blocks a merge; it does not wave one through.
+#
+#   an `if:` on the CHECKOUT step alone - the gate step still runs, against an
+#   empty workspace, and exits non-zero because `.ai/handoff` is not there.
+#
+# Documented behaviour with no test is how the defect this gate exists for got
+# in, so the exemption is pinned here rather than only described in the README.
+# Expected verdict: enforced.
+name: AAHP Verify
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - '.ai/handoff/**'
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'docs/**'
+
+jobs:
+  aahp-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        if: ${{ github.actor != 'dependabot[bot]' }}
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Run aahp verify (CI level, no escape hatch)
+        run: bash scripts/verify-handoff.sh . --level ci

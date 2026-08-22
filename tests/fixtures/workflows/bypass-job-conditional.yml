@@ -1,0 +1,20 @@
+# Fixture: the whole job is conditional. The check is still required and still
+# named, and a skipped job satisfies branch protection.
+# Expected verdict: bypassable (job-conditional).
+name: AAHP Verify
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  aahp-verify:
+    runs-on: ubuntu-latest
+    if: >
+      github.event.pull_request.user.login != 'dependabot[bot]'
+        && github.event.pull_request.draft == false
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+      - name: Run aahp verify (CI level, no escape hatch)
+        run: bash scripts/verify-handoff.sh . --level ci

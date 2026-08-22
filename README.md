@@ -202,12 +202,22 @@ The exit code is therefore safe to wire into a hook or a CI job. `aahp verify`
 Layer 1 computes its integrity verdicts itself, so blocking never depends on
 that exit code either.
 
-To use AJV for strict schema validation in CI, install it separately:
+To use AJV for strict schema validation in CI, declare it as an exact
+devDependency and run it from your lockfile rather than from the registry:
 
 ```bash
-# Optional: strict AJV validation in CI
-npx ajv validate -s schema/aahp-manifest.schema.json -d .ai/handoff/MANIFEST.json
+# once, and commit the resulting package-lock.json
+npm i -D -E ajv-cli ajv-formats
+
+# in CI
+npm ci --ignore-scripts
+npx --no-install ajv-cli validate --spec=draft2020 -c ajv-formats \
+  -s schema/aahp-manifest.schema.json -d .ai/handoff/MANIFEST.json
 ```
+
+`--no-install` is what makes the pin load-bearing. Without it `npx` falls back to
+fetching from the registry whenever the local resolution misses, so the version
+that executes is whatever the registry serves at that moment.
 
 If the manifest doesn't conform, the pipeline rejects the commit. This prevents malformed handoffs from entering the repo.
 

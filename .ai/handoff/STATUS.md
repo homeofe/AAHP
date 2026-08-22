@@ -89,6 +89,19 @@ do not, and those three are the invocations consumers wire into CI and hooks, so
 README also names the one configuration where the split has consequences for an
 adopter: `verify-workflow` reporting `skip` while the handoff gates are evaluated
 means no automated gate in that repository compares a handoff checksum.
+Separately, the two required status checks that validate `MANIFEST.json` no longer
+download and execute unpinned third-party code. `lint-and-validate` and
+`aahp-manifest` ran `npm install --no-save ajv-cli ajv-formats` and executed the
+result on the next line, on every push and every pull request, so 27 packages
+arrived with nothing in this repository constraining any of them and one
+compromised release anywhere in that closure was arbitrary code execution inside
+the checks whose verdict certifies a change. Both packages are now exact
+devDependencies locked by integrity hash, both jobs install that closure with
+`npm ci`, and both invoke the tool with `npx --no-install`. The root cause was not
+the forgotten pin: the workflow template this package ships to consumers
+(`assets/governance/aahp-govern.yml`) has always used the correct form, and the
+workflows that only ever ran here did not, because nothing made them.
+`check:workflow-pinning` is that something.
 <!-- /SECTION: summary -->
 
 ---
@@ -105,8 +118,9 @@ means no automated gate in that repository compares a handoff checksum.
 | schema validation | FOCUSED PASS | example and repository config both validate against the updated schema |
 | shell syntax | FOCUSED PASS | changed shell scripts parse under Git Bash |
 | `tests/verify-workflow.bats` | FOCUSED PASS | 21/21; both directions, the two fail-closed shapes that must NOT be findings, plus parser parity against a real YAML parser on 16 workflow files |
-| `npm run check` | PASS | changelog, version sync, claims, forbidden patterns, schema/doc sync, doc links, runtime support, and handoff freshness |
+| `npm run check` | PASS | changelog, version sync, claims, forbidden patterns, schema/doc sync, doc links, runtime support, workflow pinning, and handoff freshness |
 | `tests/runtime-support.bats` | FOCUSED PASS | 16/16; the relation holds on this repo and each of nine mutations turns it red, including the emptied-matrix trap |
+| `tests/workflow-pinning.bats` | FOCUSED PASS | 19/19; every rule holds on this repository and each way of breaking one turns the gate red at the exact documented exit code, 1 for a finding and 2 for a state it cannot evaluate |
 | shellcheck | LINUX PASS | replacement head `c332a23` reached the full Bats step after shellcheck |
 | hosted Linux suite | REPLACEMENT REQUIRED | `c332a23` passed 361/362; the CI mode fixture let `git add` restore mode 100644 on Linux, so it now reasserts 100755 before its content-plus-mode commit |
 | `tests/doctor.bats` (3 new tests) | FOCUSED PASS | the three content-drift tests pass under Git Bash; two were mutated red and restored green. The other 16 tests in the file were not run on Windows; Linux CI is authoritative |
@@ -136,6 +150,9 @@ means no automated gate in that repository compares a handoff checksum.
 | verify-workflow gate | `scripts/check-verify-workflow.mjs` | New | audits the consumer's workflows for a gate that can skip itself; zero runtime dependencies, so it carries its own block-YAML reader, held against a real parser by `tests/assert-workflow-parser-parity.mjs` |
 | Release surfaces | `package*.json`, `CHANGELOG.md` | Changed | v3.10.0 prepared, workflow included in npm artifact, not released; `engines.node` now `>=22`, `yaml` added as a devDependency |
 | Repo-shape assertion | `tests/assert-repo-ci-shape.mjs` | Changed | third assertion: `publish` and `release` share ONE release definition, and every publish operand beyond it is recorded literally; reads the parsed condition, runs inside the required `lint-and-validate` |
+| Workflow-pinning gate | `scripts/check-workflow-pinning.mjs` | New | no project-level `npm install` in a workflow, every `npx` carries `--no-install`, every package a workflow executes is declared here at an exact version, every direct dependency is locked with `resolved` and `integrity`; exits 2 on a state it cannot evaluate |
+| Schema validation steps | `.github/workflows/ci.yml`, `.github/workflows/aahp-manifest.yml` | Changed | install the locked closure and run `ajv-cli` with `npx --no-install` instead of installing two undeclared packages from the registry on every run |
+| Release surfaces | `package*.json`, `CHANGELOG.md` | Changed | v3.10.0 prepared, workflow included in npm artifact, not released; `engines.node` now `>=22`, `yaml` added as a devDependency, `ajv-cli` 5.0.0 and `ajv-formats` 3.0.1 pinned exactly |
 <!-- /SECTION: components -->
 
 ---
@@ -154,6 +171,9 @@ means no automated gate in that repository compares a handoff checksum.
 | SemVer call for `engines.node` | NORMAL | Narrowing `>=18` to `>=22` is a support-surface reduction. Whether it ships inside 3.10.0 or forces 4.0.0 is an owner decision, not one this branch takes. |
 | `aahp-verify` can skip itself in six consumers | HIGH | ORIGINATED HERE. `458dbbd` (2026-06-30) added the dependency-bot exemption to this repository's own reference workflow, gating Checkout and every gate step; it shipped that way in v3.6.0 and propagated. `#65` removed it here on 2026-08-21. MEASURED 2026-08-22 with the new `verify-workflow` gate, against every consumer: six report `bypassable`, three report `enforced`. Five of the six report success having checked out nothing, so Layer 1 never runs either. The sixth was previously recorded here as corrected and is only PARTLY so: its checkout is unconditional and a bot change does get a Layer 1 run, but `--level ci` is still gated on the author, so the same required check name means all four layers for one author and Layer 1 for another. Only the owning repositories can re-propagate; this branch cannot fix any of them. Consumer identities are tracked privately and deliberately not recorded in this public repository. |
 | No drift check between a consumer's propagated workflow and the installed package | PARTLY CLOSED | `aahp doctor` still never compares `.github/workflows/aahp-verify.yml` on disk against the one in the installed package, so a consumer can pin 3.10.0 and run the v3.6.0 workflow. The designed predicate this row asked for now exists for the case that matters: `verify-workflow` asks whether the hosting workflow can skip the gate, which tolerates deliberate divergence (a consumer may restructure the file freely) while catching the divergence that voids the check. General byte-level drift, for example an older action pin or a dropped `fetch-depth: 0`, is still unmeasured. |
+| `npm install -g npm@latest` in the publish job | HIGH | Left in place deliberately. It is the only unpinned install inside the job that holds `id-token: write` immediately before `npm publish --provenance`, and it is a different risk class from the `ajv` path: the supplier is the package manager itself. The open question is whether the step should be DELETED rather than pinned, because its comment asserts that OIDC trusted publishing needs npm >= 12 while the pinned Node 24 line already ships npm 11.12.1, and that assertion is unverified. Owner decision, tracked at https://github.com/homeofe/AAHP/issues/68. The pinning gate names this exclusion in its header rather than hiding it in an exemption list. |
+| No dependency-scanning workflow | HIGH | No workflow here performs a dependency or supply-chain scan, and `.github/dependabot.yml` has no `github-actions` ecosystem entry. Which scanner to adopt, and whether to make it a seventh required status check, is an owner decision: adding a required context blocks every pull request until the check reports at least once. Tracked at https://github.com/homeofe/AAHP/issues/68. |
+| `ajv-cli` depends on `fast-json-patch` 2.2.1 | MEDIUM | GHSA-8gh8-hqwg-xf34, prototype pollution, fixed in 3.1.1. `ajv-cli` 5.0.0 requires `^2.0.0`, so the advisory cannot be resolved without an `overrides` entry that crosses a major version of a transitive dependency. This exposure is not new: the same closure was already being downloaded and executed on every CI run. Declaring the packages is what made it visible to `npm audit` and to Dependabot. |
 | Consumer manifests already rewritten | MEDIUM | The generator no longer writes a checkout's directory name into `project`, but repositories whose committed `MANIFEST.json` already carries such a name keep it, because a recorded name is preserved by design. Those values need correcting in the consumer repositories. |
 | Manual publish path on the `ci.yml` `publish` job | NORMAL | OPEN OWNER DECISION, deliberately not taken here. The publish condition still accepts `workflow_dispatch`, which constrains no ref, so a manual run publishes from whichever ref it started on with no tag and no GitHub Release. Options A, B and C, and what each one requires, are in ADR-019. The condition is now pinned, so adopting any of them is a visible two-part edit rather than a silent one. |
 <!-- /SECTION: what_is_missing -->

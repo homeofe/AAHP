@@ -54,9 +54,13 @@ jobs:
         run: bash scripts/lint-handoff.sh .
 
       - name: Validate MANIFEST.json against schema
-        run: |
-          npm install --no-save ajv-cli ajv-formats
-          npx ajv-cli validate --spec=draft2020 -c ajv-formats -s schema/aahp-manifest.schema.json -d .ai/handoff/MANIFEST.json
+        # ajv-cli and ajv-formats are exact devDependencies, so the `npm ci`
+        # step above already installed the locked closure and there is nothing
+        # left to fetch here. `--no-install` is the load-bearing half: without
+        # it npx falls back to the registry whenever the local resolution
+        # misses, and the pin upstream buys nothing.
+        # scripts/check-workflow-pinning.mjs keeps this shape.
+        run: npx --no-install ajv-cli validate --spec=draft2020 -c ajv-formats -s schema/aahp-manifest.schema.json -d .ai/handoff/MANIFEST.json
 
       - name: Syntax-check Node gates
         run: |

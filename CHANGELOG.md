@@ -149,6 +149,58 @@ independently of the npm version).
   lives in a tracked config file in this public repository and would then publish the one
   identity this change exists to withhold.
 
+### Security
+- The two required status checks that validate `MANIFEST.json` no longer download
+  and execute unpinned third-party code. `lint-and-validate` and `aahp-manifest`
+  ran `npm install --no-save ajv-cli ajv-formats` and executed the result on the
+  next line, on every push and every pull request. `--no-save` guarantees the
+  resolution is never written to `package-lock.json`, so 27 packages arrived with
+  nothing in the repository constraining any of them, and one compromised release
+  anywhere in that closure was arbitrary code execution inside the checks whose
+  verdict certifies a change. `ajv-cli` (5.0.0) and `ajv-formats` (3.0.1) are now
+  exact devDependencies locked by integrity hash, both jobs install that locked
+  closure with `npm ci`, and both invoke the tool with `npx --no-install`. The
+  `--no-install` is the load-bearing half: without it npx falls back to the
+  registry whenever the local resolution misses, and the pin buys nothing.
+- `npm run check:workflow-pinning` is why it stays that way. The root cause was
+  not a forgotten pin, it was that pinning here was a hand-applied convention:
+  the workflow template this package ships to consumers
+  (`assets/governance/aahp-govern.yml`) has always used `npm ci --ignore-scripts`
+  followed by `npx --no-install`, and the workflows that only ever ran here did
+  not, because nothing made them. The gate asserts four properties over every
+  workflow in `.github/workflows` and every template in `assets/governance`: no
+  project-level `npm install`, every `npx` carries `--no-install`, every package a
+  workflow executes is declared here at an exact version, and every direct
+  dependency carries both `resolved` and `integrity` in the lockfile. A state it
+  cannot evaluate exits 2 rather than 0, so "I could not look" never reads as
+  "I looked and it was fine". Deliberately out of scope and named rather than
+  quietly exempted: `npm install -g` in the publish job, a different risk class
+  with an owner decision still open on it, tracked at
+  https://github.com/homeofe/AAHP/issues/68.
+- Three schema tests stop failing open. The two in `tests/handoff-impact.bats` and
+  the one in `tests/init-gates.bats` skip when `ajv-cli` cannot be resolved, so
+  they only ever ran in the one job that happened to have installed it and
+  reported "# skip ajv-cli not installed" everywhere else while the check stayed
+  green. Declaring the package means `npm ci` installs it and the tests execute.
+- The version regex in the new gate is not exponentially ambiguous. Its first form
+  repeated a group whose character class also contained the group's own delimiter,
+  which CodeQL reported as `js/redos`. Measured on the input shape it named,
+  `9.9.9+` followed by repeated `--`: 22 repetitions, a 51-character string, took
+  11.8 seconds under the old form and 0.004 ms under the replacement. The input is
+  a `package.json` version specifier, which is attacker-supplied on a fork pull
+  request. What counts as an exact version did narrow, in exactly one place: the
+  replacement's build class is `[0-9A-Za-z.]`, which drops the `-` the prerelease
+  class still allows, so a SemVer-legal version whose build metadata contains a
+  hyphen is now reported as a range. Measured old form against new,
+  `1.0.0+21AF26D3----117B344092BD` (the SemVer specification's own example),
+  `1.2.3+build-5`, `1.2.3-alpha+a-b`, `1.2.3-x+y-z` and `0.0.4+-` all went from
+  accepted to rejected. The narrowing runs fail-closed - nothing unpinned became
+  acceptable, a legal pin became unacceptable - and it is unreachable for the two
+  packages this gate governs, both pinned without build metadata. It is still a
+  false positive, and the finding it prints ("Declare an exact version") misnames
+  the cause, so if it is ever hit the fix is to put the hyphen back in the build
+  class, which stays linear because `+` cannot appear inside it.
+
 ## [3.10.0] - 2026-08-20
 **Fail-closed Layer 2 base selection and reviewed exact-file impact classification**
 

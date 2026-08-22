@@ -61,7 +61,7 @@ measured against every consumer of this protocol before shipping.
 | `tests/verify.bats` | FOCUSED PASS | 22/22 under Git Bash with explicit CI bases |
 | schema validation | FOCUSED PASS | example and repository config both validate against the updated schema |
 | shell syntax | FOCUSED PASS | changed shell scripts parse under Git Bash |
-| `tests/verify-workflow.bats` | FOCUSED PASS | 20/20; both directions, plus parser parity against a real YAML parser on 15 workflow files |
+| `tests/verify-workflow.bats` | FOCUSED PASS | 21/21; both directions, the two fail-closed shapes that must NOT be findings, plus parser parity against a real YAML parser on 16 workflow files |
 | `npm run check` | PASS | changelog, version sync, claims, forbidden patterns, schema/doc sync, doc links, runtime support, and handoff freshness |
 | `tests/runtime-support.bats` | FOCUSED PASS | 16/16; the relation holds on this repo and each of nine mutations turns it red, including the emptied-matrix trap |
 | shellcheck | LINUX PASS | replacement head `c332a23` reached the full Bats step after shellcheck |

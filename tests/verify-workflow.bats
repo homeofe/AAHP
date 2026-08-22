@@ -56,6 +56,19 @@ install_workflow() {
     [ "$status" -eq 0 ]
 }
 
+@test "enforced: paths filters and a checkout-only if: are NOT findings" {
+    # Both fail CLOSED, so neither can produce a green tick over an unrun gate:
+    # a `paths:` filter leaves a required check pending (the pull request is
+    # blocked), and skipping only the checkout leaves the gate running against an
+    # empty workspace, where it exits non-zero. Pinned as a test because a
+    # documented-but-untested exemption is how the original defect got in.
+    install_workflow enforced-fails-closed-shapes.yml
+    run node "$GATE" "$TEST_TMPDIR" --json
+    [ "$status" -eq 0 ]
+    [[ "$output" == *'"verdict": "enforced"'* ]]
+    [[ "$output" != *"job-conditional"* ]]
+}
+
 # ─── bypassable: each way the check can go green having run nothing ──────────
 
 @test "bypassable: a step-level if: on the gate step is reported, exit 1" {

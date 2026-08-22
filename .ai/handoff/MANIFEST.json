@@ -3,16 +3,16 @@
   "project": "AAHP",
   "last_session": {
     "agent": "cli-tool",
-    "session_id": "cli-1787359604",
-    "timestamp": "2026-08-22T00:46:44Z",
-    "commit": "3c4e9c5",
+    "session_id": "cli-1787361192",
+    "timestamp": "2026-08-22T01:13:12Z",
+    "commit": "d0ab343",
     "phase": "fix",
     "duration_minutes": 0
   },
   "files": {
     "STATUS.md": {
-      "checksum": "sha256:7bdec2aa7f37cb4c00212d9599245f28a439d2882ee422ffdc98d1c056b793e6",
-      "updated": "2026-08-22T00:46:38Z",
+      "checksum": "sha256:2674083db546cda4f1398ac733678948cff0b54bf3ebcfbe63d49ff36420b8fb",
+      "updated": "2026-08-22T01:13:12Z",
       "lines": 118,
       "summary": "AAHP **v3.10.0** (npm `@elvatis_com/aahp`) is prepared on a review branch. It has not"
     },
@@ -80,8 +80,8 @@
   "quick_context": "AAHP **v3.10.0** (npm `@elvatis_com/aahp`) is prepared on a review branch. It has not Current version: **v3.10.0** ",
   "token_budget": {
     "manifest_only": 85,
-    "manifest_plus_core": 4540,
-    "full_read": 14610
+    "manifest_plus_core": 4552,
+    "full_read": 14622
   }
   ,"next_task_id": 18
   ,"tasks": {"T-006":{"title":"Publish npm package","status":"done","priority":"medium","depends_on":[],"created":"2026-06-28T10:10:21.975Z","notes":"**AAHP Task:** `T-006`  \n**Status:** blocked  \n**Priority:** medium  \n\n\n\n\n---\n*Auto-created from AAHP manifest · project: AAHP*","github_issue":18,"github_repo":"homeofe/AAHP","completed":"2026-07-14T00:00:00Z"},"T-014":{"title":"Add CLI integration tests for bin/aahp.js [high]","status":"done","priority":"high","depends_on":[],"created":"2026-06-28T10:10:21.975Z","notes":"**AAHP Task:** `T-014`  \n**Status:** ready  \n**Priority:** high  \n\n\n\n\n---\n*Auto-created from AAHP manifest · project: AAHP*","github_issue":14,"github_repo":"homeofe/AAHP","completed":"2026-07-14T00:00:00Z"},"T-015":{"title":"Add `aahp status` quick-look command [medium]","status":"done","priority":"medium","depends_on":[],"created":"2026-06-28T10:10:21.978Z","github_issue":22,"github_repo":"homeofe/AAHP","completed":"2026-07-14T00:00:00Z"},"T-016":{"title":"Add `aahp archive` command for LOG.md rotation [medium]","status":"done","priority":"medium","depends_on":[],"created":"2026-06-28T10:10:21.979Z","github_issue":23,"github_repo":"homeofe/AAHP","completed":"2026-07-14T00:00:00Z"},"T-017":{"title":"Add project-level CLAUDE.md [low]","status":"done","priority":"low","depends_on":[],"created":"2026-06-28T10:10:21.979Z","github_issue":24,"github_repo":"homeofe/AAHP","completed":"2026-07-14T00:00:00Z"}}

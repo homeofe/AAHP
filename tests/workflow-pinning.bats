@@ -233,8 +233,18 @@ EOF
     # Guards the shape of the version regex, which was rewritten after CodeQL
     # reported js/redos against the first form. A repeated group whose character
     # class also contains its own delimiter is exponentially ambiguous, and
-    # package.json is attacker-supplied on a fork pull request. The rewrite must
-    # not have narrowed what counts as an exact version.
+    # package.json is attacker-supplied on a fork pull request.
+    #
+    # The rewrite DID narrow what counts as an exact version, and this test
+    # cannot see it. The new build class is `[0-9A-Za-z.]`, which drops the `-`
+    # the prerelease class still allows, so build metadata containing a hyphen -
+    # `1.0.0+21AF26D3----117B344092BD`, the SemVer specification's own example -
+    # is now reported as a range. The fixture below carries `+build.5`, no
+    # hyphen, so it is green under both forms and proves only that a prerelease
+    # and a dot-separated build survive. The narrowing is fail-closed and
+    # unreachable for the two packages this gate governs; if it is ever hit, put
+    # the hyphen back in the build class (still linear, `+` cannot appear inside
+    # it) and add the hyphen case here.
     write_pkg '"fx-tool": "1.2.3-beta.1+build.5"'
     write_lock '"version": "1.2.3-beta.1+build.5", "resolved": "https://registry.npmjs.org/fx-tool/-/fx-tool-1.2.3.tgz", "integrity": "sha512-deadbeef"'
     write_good_workflow

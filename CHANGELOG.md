@@ -188,7 +188,18 @@ independently of the npm version).
   `9.9.9+` followed by repeated `--`: 22 repetitions, a 51-character string, took
   11.8 seconds under the old form and 0.004 ms under the replacement. The input is
   a `package.json` version specifier, which is attacker-supplied on a fork pull
-  request. What counts as an exact version is unchanged.
+  request. What counts as an exact version did narrow, in exactly one place: the
+  replacement's build class is `[0-9A-Za-z.]`, which drops the `-` the prerelease
+  class still allows, so a SemVer-legal version whose build metadata contains a
+  hyphen is now reported as a range. Measured old form against new,
+  `1.0.0+21AF26D3----117B344092BD` (the SemVer specification's own example),
+  `1.2.3+build-5`, `1.2.3-alpha+a-b`, `1.2.3-x+y-z` and `0.0.4+-` all went from
+  accepted to rejected. The narrowing runs fail-closed - nothing unpinned became
+  acceptable, a legal pin became unacceptable - and it is unreachable for the two
+  packages this gate governs, both pinned without build metadata. It is still a
+  false positive, and the finding it prints ("Declare an exact version") misnames
+  the cause, so if it is ever hit the fix is to put the hyphen back in the build
+  class, which stays linear because `+` cannot appear inside it.
 
 ## [3.10.0] - 2026-08-20
 **Fail-closed Layer 2 base selection and reviewed exact-file impact classification**

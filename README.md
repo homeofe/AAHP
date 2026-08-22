@@ -934,6 +934,35 @@ or force-push cannot select HEAD as its own merge base. Layer 1 runs for every a
 maintenance changes avoid unrelated handoff churn without creating an identity bypass,
 path-pattern bypass, or vacuous required check.
 
+### ADR-019: one release definition, and publish authorization is machine-asserted
+**Why it recurs:** `.github/workflows/ci.yml` has two release-critical jobs: `publish`,
+which runs `npm publish --access public --provenance` with `id-token: write`, and
+`release`, which creates the GitHub Release for the same ref. Each carried its own
+hand-written `if:`, so the two answered "is this a release?" differently and the looser
+of the two was the one wired to the public registry. Nothing in the repository read
+either condition, so the disagreement was invisible, and any later edit to publish
+authorization would have been equally silent.
+**Decision:** the release definition `startsWith(github.ref, 'refs/tags/v') &&
+contains(github.ref, '.')` is written ONCE, as `RELEASE_REF_CONDITION` in
+`tests/assert-repo-ci-shape.mjs`. Both jobs must use exactly it, and every additional
+top-level `||` operand on the publish condition must appear in
+`PUBLISH_CONDITIONS_BEYOND_RELEASE` in the same file. The assertion reads the PARSED
+condition rather than a substring of the workflow, so reformatting changes no verdict,
+and it runs inside the required `lint-and-validate` check, so an unrecorded change to
+publish authorization cannot merge. A job with no `if:` at all is a failure rather than
+a pass: it would run on every event the workflow accepts.
+**Deliberately still open:** whether the `workflow_dispatch` operand on the publish
+condition should exist at all. It permits a publish from any ref, producing no tag and
+no GitHub Release, for a principal who can already push a release tag; none of this
+workflow's 147 runs, measured 2026-08-22, was a manual dispatch. Three options, all
+defensible: (A) delete the operand, leaving the two conditions identical; (B) keep a
+manual path but require a release tag ref on it as well, and put the job behind an
+`environment:` that carries at least one required reviewer, since an environment with no
+protection rule adds a label and no control; (C) keep it and record what compensates for
+it. Adopting any of them means editing the workflow and the recorded list together, and
+the assertion is what forces the pair. Tracked at
+https://github.com/homeofe/AAHP/issues/69.
+
 ---
 
 *The v2-proposal questions below were resolved earlier and are retained for detail.*

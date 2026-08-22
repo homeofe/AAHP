@@ -263,3 +263,51 @@ EOF
       });
     '
 }
+
+# --- Handoff content drift: the boundary doctor does NOT cross (issue 72) -----
+#
+# `gateHandoffSet` compares the file SET and the INDEX and hashes nothing.
+# Comparing a recorded checksum against the bytes on disk is `aahp verify`
+# Layer 1's job, by ADR-011. These three tests hold that boundary from both
+# sides: doctor stays green AND says what it did not compare, and the drift the
+# other two rely on is proved to be real drift.
+
+# Conformant fixture, then STATUS.md content changed WITHOUT regenerating
+# MANIFEST.json. Byte length and line count are preserved on purpose, so the
+# content hash is the only thing that differs from the recorded entry and no
+# other gate has a second reason to notice.
+scaffold_drifted_handoff() {
+    scaffold_conformant
+    local h="$TEST_TMPDIR/.ai/handoff"
+    printf '# STATUS\n\nrecorded body aaaa\n' > "$h/STATUS.md"
+    create_manifest_json "$h"
+    printf '# STATUS\n\ndrifted body bbbbb\n' > "$h/STATUS.md"
+}
+
+@test "doctor: the handoff-set pass reason names the content check it did not run" {
+    scaffold_drifted_handoff
+    run node "$AAHP" doctor "$TEST_TMPDIR"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"no strays (content not compared; aahp verify Layer 1 owns checksum integrity)"* ]]
+}
+
+@test "doctor --json: handoff-set stays pass on content drift (ADR-011 boundary, not scope creep)" {
+    scaffold_drifted_handoff
+    run node "$AAHP" doctor "$TEST_TMPDIR" --json
+    [ "$status" -eq 0 ]
+    echo "$output" | node -e '
+      let s = "";
+      process.stdin.on("data", (d) => (s += d)).on("end", () => {
+        const r = JSON.parse(s);
+        if (r.gates["handoff-set"] !== "pass") process.exit(2);
+        if (r.gates["manifest-schema"] !== "pass") process.exit(3);
+      });
+    '
+}
+
+@test "doctor drift fixture: aahp verify DOES see the drift (guard for the two tests above)" {
+    scaffold_drifted_handoff
+    run bash "$SCRIPTS_DIR/verify-handoff.sh" "$TEST_TMPDIR" --level precommit
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Checksum mismatch: STATUS.md"* ]]
+}

@@ -6,6 +6,14 @@
 # so there are no vendored script paths to maintain. Verify-only: it never
 # mutates the repository, and it honors no skip or bypass environment variable.
 #
+# This workflow runs NO handoff-integrity gate. `aahp check` and `aahp doctor`
+# compare the handoff file set and the index; comparing a recorded checksum
+# against the bytes on disk belongs to `aahp verify` Layer 1 and to `aahp lint`,
+# by ADR-011. If this repository also keeps `.ai/handoff/`, add
+# `.github/workflows/aahp-verify.yml` beside this file and make it a required
+# status check. Without it no gate here compares a handoff checksum, and a green
+# conformance record is a statement about conformance, not integrity.
+#
 # Prerequisites in the consumer repo:
 #   - @elvatis_com/aahp pinned as an exact devDependency (npm i -D -E @elvatis_com/aahp)
 #   - a committed package-lock.json (npm ci needs it)

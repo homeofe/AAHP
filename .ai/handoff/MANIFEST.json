@@ -11,10 +11,10 @@
   },
   "files": {
     "STATUS.md": {
-      "checksum": "sha256:d35aa54e0d175c52e6d90eb32cb660328cfc7c5b2d48ae7093ad06585e2097a1",
-      "updated": "2026-08-22T21:32:06Z",
-      "lines": 145,
-      "summary": "AAHP **v3.10.0** (npm `@elvatis_com/aahp`) is prepared on a review branch. It has not"
+      "checksum": "sha256:e1720b4b08e47ded8b03ff229f10f0f9416190fa2b902c2491876bfddc18dd52",
+      "updated": "2026-08-22T22:37:52Z",
+      "lines": 160,
+      "summary": "`.ai/handoff/STATUS.md` is prepend-only, so two branches almost always differ by"
     },
     "NEXT_ACTIONS.md": {
       "checksum": "sha256:efdc6ef8664faf9ce5120fa797b702d2353bd4c3205c62e5ba651a465326103d",
@@ -80,8 +80,8 @@
   "quick_context": "AAHP **v3.10.0** (npm `@elvatis_com/aahp`) is prepared on a review branch. It has not Current version: **v3.10.0** ",
   "token_budget": {
     "manifest_only": 85,
-    "manifest_plus_core": 4922,
-    "full_read": 14992
+    "manifest_plus_core": 5423,
+    "full_read": 15493
   },
   "next_task_id": 18,
   "tasks": {

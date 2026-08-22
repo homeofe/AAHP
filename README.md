@@ -540,12 +540,12 @@ aahp doctor --governance # governance-only record; skip the 3 handoff gates (ali
 ```
 
 It checks seven gates: the handoff file set matches `AAHP_HANDOFF_FILES` (indexed
-files present, no strays); `MANIFEST.json` conforms to the schema; `GROUNDING.md`
-is present and `TRUST.md` carries a Provenance column; `@elvatis_com/aahp` is
-pinned to an exact version in `devDependencies` (`self` for this repo); the
-`CHANGELOG.md` matches the Keep a Changelog grammar; the version is in sync
-across configured sites; and the workflow that runs the AAHP gate cannot skip it
-(`verify-workflow`, below). The record:
+files present, no strays, file content not compared); `MANIFEST.json` conforms to
+the schema; `GROUNDING.md` is present and `TRUST.md` carries a Provenance column;
+`@elvatis_com/aahp` is pinned to an exact version in `devDependencies` (`self` for
+this repo); the `CHANGELOG.md` matches the Keep a Changelog grammar; the version
+is in sync across configured sites; and the workflow that runs the AAHP gate
+cannot skip it (`verify-workflow`, below). The record:
 
 ```json
 { "schemaVersion": 1, "repo": "homeofe/AAHP", "aahpVersion": "3.6.0",
@@ -605,6 +605,36 @@ real YAML would be the worst possible engine for a security gate, so
 `tests/assert-workflow-parser-parity.mjs` compares it against a real YAML parser on
 every workflow in this repository and every fixture, on exactly the fields the
 audit reads and on the resulting findings.
+
+#### What `doctor` does not check: handoff file content
+
+`doctor` never hashes a handoff file, and neither does `aahp check`. The
+`handoff-set` gate compares the file SET and the INDEX. `manifest-schema`
+compares `MANIFEST.json` against the schema, which rejects a MALFORMED checksum
+but says nothing about a well-formed one that no longer matches the bytes.
+Comparing recorded checksums against file content belongs to `aahp verify`
+Layer 1, and to `aahp lint`, which Layer 1 also runs (ADR-011). The
+`handoff-set` pass reason therefore names the boundary instead of leaving a green
+line to imply integrity:
+
+```text
+  PASS     handoff-set: 3 indexed files present, no strays (content not compared;
+           aahp verify Layer 1 owns checksum integrity)
+```
+
+One configuration deserves an explicit warning. When `verify-workflow` reports
+`skip`, meaning no workflow in the repository runs the AAHP verify gate, and the
+handoff gates are still evaluated, then no automated gate in that repository
+compares a handoff checksum. `aahp doctor` exits 0, `aahp check` exits 0, and a
+handoff file edited outside the protocol is invisible to both. The record is
+accurate about what it measured and it is not an integrity signal. Fix it by
+adopting `.github/workflows/aahp-verify.yml`, which runs `aahp verify --level ci`
+before `aahp doctor` in the same job, or by running `aahp verify` (or `aahp lint`,
+which compares the same checksums) some other way.
+
+In this repository, and in every consumer using the propagated workflow, that
+ordering is already in place: a checksum drift fails the job at the verify step
+and the `doctor` step never runs, so a green record cannot mask the drift.
 
 **`aahp check`** is the pass/fail counterpart to that record. Where `doctor` emits a
 conformance snapshot, `check` runs the config-driven governance gates as one aggregate

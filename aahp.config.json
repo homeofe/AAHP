@@ -17,6 +17,11 @@
       "id": "em-dash",
       "pattern": "\\u2014",
       "message": "em dash (U+2014) is banned; use a hyphen (see CONSTITUTION.md)"
+    },
+    {
+      "id": "no-private-repo-names",
+      "pattern": "\\belvatis-[a-z0-9-]+",
+      "message": "this repository is PUBLIC and ships to npm; naming a private repository here publishes the estate's repository inventory. Describe a consumer by role or by count instead. See ADR/CONSTITUTION on what may be recorded in public handoff state."
     }
   ],
   "docSync": [

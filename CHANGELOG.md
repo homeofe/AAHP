@@ -12,6 +12,18 @@ independently of the npm version).
 ## [Unreleased]
 
 ### Added
+- `tests/assert-repo-ci-shape.mjs` asserts release authorization in `ci.yml`. The
+  `publish` job (npm, `id-token: write`) and the `release` job (the GitHub Release) each
+  carried a hand-written `if:`; the two disagreed about what counts as a release, and
+  nothing in this repository read either one, so the disagreement was invisible and a
+  later edit to publish authorization would have been equally silent. The release
+  definition is now written once and both jobs must use exactly it, and every additional
+  top-level `||` operand on the publish condition must appear in a literal recorded list.
+  The assertion reads the PARSED condition rather than a substring, so reformatting the
+  workflow changes no verdict, and a job with no `if:` at all is a failure rather than a
+  pass. It runs inside the required `lint-and-validate` check. No workflow behaviour
+  changes here: whether the `workflow_dispatch` operand should exist at all is the
+  owner's call and is recorded as open, with its options, in ADR-019.
 - `aahp doctor` gains a `verify-workflow` gate that answers, from inside a consumer,
   whether the workflow hosting the AAHP gate can skip it. Wrapping the `aahp-verify`
   job in an `if:`, or wrapping the gate step inside it, leaves a REQUIRED status check

@@ -46,6 +46,16 @@ its gate now reports it on its own pull requests. It is asserted as a CONSEQUENC
 ("there exists an event on which this workflow concludes success without having run
 the gate at `--level ci`"), it fails closed on a shape it cannot classify, and it was
 measured against every consumer of this protocol before shipping.
+
+Release authorization in `ci.yml` is now asserted. The `publish` job (npm,
+`id-token: write`) and the `release` job (the GitHub Release) each carried a
+hand-written `if:`, the two disagreed about what counts as a release, and nothing in
+this repository read either one, so the drift was invisible and any later edit to
+publish authorization would have been equally silent. The release definition is now
+written once and both jobs must use exactly it; every additional top-level `||`
+operand on the publish condition must appear in a literal recorded list. No workflow
+behaviour changes: whether the `workflow_dispatch` operand should exist at all is the
+owner's decision and is recorded as open, with its options, in ADR-019.
 <!-- /SECTION: summary -->
 
 ---
@@ -67,6 +77,7 @@ measured against every consumer of this protocol before shipping.
 | shellcheck | LINUX PASS | replacement head `c332a23` reached the full Bats step after shellcheck |
 | hosted Linux suite | REPLACEMENT REQUIRED | `c332a23` passed 361/362; the CI mode fixture let `git add` restore mode 100644 on Linux, so it now reasserts 100755 before its content-plus-mode commit |
 | full Bats suite | CI | deliberately not run on Windows; Linux CI is authoritative |
+| `tests/runtime-support.bats` (release authorization) | FOCUSED PASS | 8/8 added; the untouched repository shape is green, six one-line mutations of the REAL `ci.yml` each turn it red at exit 1 (including a publish job with no `if:` at all), and a reformat of the same expression stays green |
 <!-- /SECTION: build_health -->
 
 ---
@@ -88,6 +99,7 @@ measured against every consumer of this protocol before shipping.
 | Runtime matrix | `.github/workflows/ci.yml` | Changed | new `runtime-matrix` job on Node 22 and 24; `lint-and-validate` deliberately left unmatrixed so the required check keeps its literal name |
 | verify-workflow gate | `scripts/check-verify-workflow.mjs` | New | audits the consumer's workflows for a gate that can skip itself; zero runtime dependencies, so it carries its own block-YAML reader, held against a real parser by `tests/assert-workflow-parser-parity.mjs` |
 | Release surfaces | `package*.json`, `CHANGELOG.md` | Changed | v3.10.0 prepared, workflow included in npm artifact, not released; `engines.node` now `>=22`, `yaml` added as a devDependency |
+| Repo-shape assertion | `tests/assert-repo-ci-shape.mjs` | Changed | third assertion: `publish` and `release` share ONE release definition, and every publish operand beyond it is recorded literally; reads the parsed condition, runs inside the required `lint-and-validate` |
 <!-- /SECTION: components -->
 
 ---
@@ -107,6 +119,7 @@ measured against every consumer of this protocol before shipping.
 | `aahp-verify` can skip itself in six consumers | HIGH | ORIGINATED HERE. `458dbbd` (2026-06-30) added the dependency-bot exemption to this repository's own reference workflow, gating Checkout and every gate step; it shipped that way in v3.6.0 and propagated. `#65` removed it here on 2026-08-21. MEASURED 2026-08-22 with the new `verify-workflow` gate, against every consumer: six report `bypassable`, three report `enforced`. Five of the six report success having checked out nothing, so Layer 1 never runs either. The sixth was previously recorded here as corrected and is only PARTLY so: its checkout is unconditional and a bot change does get a Layer 1 run, but `--level ci` is still gated on the author, so the same required check name means all four layers for one author and Layer 1 for another. Only the owning repositories can re-propagate; this branch cannot fix any of them. Consumer identities are tracked privately and deliberately not recorded in this public repository. |
 | No drift check between a consumer's propagated workflow and the installed package | PARTLY CLOSED | `aahp doctor` still never compares `.github/workflows/aahp-verify.yml` on disk against the one in the installed package, so a consumer can pin 3.10.0 and run the v3.6.0 workflow. The designed predicate this row asked for now exists for the case that matters: `verify-workflow` asks whether the hosting workflow can skip the gate, which tolerates deliberate divergence (a consumer may restructure the file freely) while catching the divergence that voids the check. General byte-level drift, for example an older action pin or a dropped `fetch-depth: 0`, is still unmeasured. |
 | Consumer manifests already rewritten | MEDIUM | The generator no longer writes a checkout's directory name into `project`, but repositories whose committed `MANIFEST.json` already carries such a name keep it, because a recorded name is preserved by design. Those values need correcting in the consumer repositories. |
+| Manual publish path on the `ci.yml` `publish` job | NORMAL | OPEN OWNER DECISION, deliberately not taken here. The publish condition still accepts `workflow_dispatch`, which constrains no ref, so a manual run publishes from whichever ref it started on with no tag and no GitHub Release. Options A, B and C, and what each one requires, are in ADR-019. The condition is now pinned, so adopting any of them is a visible two-part edit rather than a silent one. |
 <!-- /SECTION: what_is_missing -->
 
 ---

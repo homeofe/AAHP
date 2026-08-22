@@ -303,3 +303,137 @@ EOF
     [ "$status" -eq 0 ]
     [[ "$output" == *"repo CI shape OK"* ]]
 }
+
+# ─── Release authorization: one definition of a release, nothing beyond it that
+# ─── is not recorded (https://github.com/homeofe/AAHP/issues/69) ──────────────
+#
+# The third assertion in tests/assert-repo-ci-shape.mjs is the only thing in this
+# repository that reads either release-critical job condition. It is worth exactly
+# as much as its ability to go red, so every test below mutates ONE line of a copy
+# of the REAL ci.yml and asserts the exact exit code. The control test proves the
+# untouched copy is green, so a red result can only be caused by the mutation.
+
+# Copy the real repository shape (package.json and ci.yml) into TEST_TMPDIR. The
+# assertion takes a root as argv[1], so it runs against the copy without the
+# mutations ever touching the working tree.
+copy_repo_shape() {
+    mkdir -p "$(wf_dir)"
+    cp "$AAHP_ROOT/package.json" "$TEST_TMPDIR/package.json"
+    cp "$AAHP_ROOT/.github/workflows/ci.yml" "$(wf_dir)/ci.yml"
+}
+
+# Replace the `if:` line of job $1 in the fixture ci.yml with $2; an empty $2
+# deletes the line. awk rather than `sed -i` on purpose: these conditions contain
+# `&&`, and a bare `&` in a sed replacement means "the whole match", so the sed
+# form would silently write something other than what the test says it writes.
+# Exits non-zero when the job has no `if:` line, so a mutation that quietly
+# applied to nothing cannot pass as a green test. The job header is compared with
+# any trailing CR removed: ci.yml is not covered by .gitattributes, so a Windows
+# checkout has CRLF endings and a byte comparison would silently match nothing.
+set_job_if() {
+    local job="$1" repl="$2" file
+    file="$(wf_dir)/ci.yml"
+    awk -v job="$job" -v repl="$repl" '
+        /^  [A-Za-z_][A-Za-z0-9_-]*:[[:space:]]*$/ {
+            hdr = $0
+            sub(/\r$/, "", hdr)
+            injob = (hdr == "  " job ":")
+        }
+        {
+            if (injob && !done && $0 ~ /^    if:/) {
+                done = 1
+                if (repl != "") print repl
+                next
+            }
+            print
+        }
+        END { if (!done) exit 3 }
+    ' "$file" > "$file.new" || { rm -f "$file.new"; return 3; }
+    mv "$file.new" "$file"
+}
+
+@test "release authorization: the untouched repository shape is green" {
+    copy_repo_shape
+
+    run node "$AAHP_ROOT/tests/assert-repo-ci-shape.mjs" "$TEST_TMPDIR"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"repo CI shape OK"* ]]
+}
+
+@test "release authorization: a publish job with no if: at all is red" {
+    # The mutation that a test matching an expected string would sail past. A
+    # publish job with no condition runs on every event ci.yml accepts, which is
+    # strictly worse than any condition it could carry.
+    copy_repo_shape
+    set_job_if publish ""
+
+    run node "$AAHP_ROOT/tests/assert-repo-ci-shape.mjs" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"jobs.publish has no \`if:\` condition"* ]]
+}
+
+@test "release authorization: changing only the release job's condition is red" {
+    # The two jobs must share ONE definition of a release. Moving one of them is
+    # the drift this assertion exists to catch, so it has to be red even though
+    # the publish condition is untouched and still matches its record.
+    copy_repo_shape
+    set_job_if release "    if: startsWith(github.ref, 'refs/tags/')"
+
+    run node "$AAHP_ROOT/tests/assert-repo-ci-shape.mjs" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"jobs.release.if is not the recorded release definition"* ]]
+}
+
+@test "release authorization: an unrecorded operand on the publish condition is red" {
+    copy_repo_shape
+    set_job_if publish "    if: (startsWith(github.ref, 'refs/tags/v') && contains(github.ref, '.')) || github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'"
+
+    run node "$AAHP_ROOT/tests/assert-repo-ci-shape.mjs" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"has not recorded: github.ref == 'refs/heads/main'"* ]]
+}
+
+@test "release authorization: removing a recorded operand is red until the record is updated" {
+    # Tightening the condition is not a defect, but leaving the record claiming a
+    # permission the workflow no longer grants is. Adopting that option is a
+    # two-line edit the failure message names.
+    copy_repo_shape
+    set_job_if publish "    if: startsWith(github.ref, 'refs/tags/v') && contains(github.ref, '.')"
+
+    run node "$AAHP_ROOT/tests/assert-repo-ci-shape.mjs" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"no longer carries a recorded condition: github.event_name == 'workflow_dispatch'"* ]]
+}
+
+@test "release authorization: an AND-shaped publish condition is red, not silently accepted" {
+    # Requiring a tag ref on the dispatch path too is one of the options open in
+    # ADR-019. It is a policy change, so it must be recorded rather than absorbed.
+    copy_repo_shape
+    set_job_if publish "    if: (startsWith(github.ref, 'refs/tags/v') && contains(github.ref, '.')) && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')"
+
+    run node "$AAHP_ROOT/tests/assert-repo-ci-shape.mjs" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"does not carry the shared release definition exactly once"* ]]
+}
+
+@test "release authorization: reformatting the condition does not change the verdict" {
+    # Proves the assertion reads the PARSED condition rather than a substring of
+    # the file: redundant parentheses and extra spaces are the same expression, so
+    # they must stay green, or the gate would be a formatting rule wearing a
+    # security rule's clothes.
+    copy_repo_shape
+    set_job_if publish "    if: ((  startsWith(github.ref, 'refs/tags/v')   &&   contains(github.ref, '.')  ))   ||   github.event_name == 'workflow_dispatch'"
+
+    run node "$AAHP_ROOT/tests/assert-repo-ci-shape.mjs" "$TEST_TMPDIR"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"repo CI shape OK"* ]]
+}
+
+@test "release authorization: a publish condition that cannot be read is red, never a skip" {
+    copy_repo_shape
+    set_job_if publish "    if: \"(startsWith(github.ref, 'refs/tags/v') && contains(github.ref, '.') || github.event_name == 'workflow_dispatch'\""
+
+    run node "$AAHP_ROOT/tests/assert-repo-ci-shape.mjs" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"jobs.publish.if could not be read"* ]]
+}

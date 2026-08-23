@@ -81,9 +81,13 @@ jobs:
         run: bash scripts/lint-handoff.sh .
 
       - name: Validate MANIFEST.json against schema
-        run: |
-          npm install --no-save ajv-cli ajv-formats
-          npx ajv-cli validate --spec=draft2020 -c ajv-formats -s schema/aahp-manifest.schema.json -d .ai/handoff/MANIFEST.json
+        # ajv-cli and ajv-formats are exact devDependencies, so the `npm ci`
+        # step above already installed the locked closure and there is nothing
+        # left to fetch here. `--no-install` is the load-bearing half: without
+        # it npx falls back to the registry whenever the local resolution
+        # misses, and the pin upstream buys nothing.
+        # scripts/check-workflow-pinning.mjs keeps this shape.
+        run: npx --no-install ajv-cli validate --spec=draft2020 -c ajv-formats -s schema/aahp-manifest.schema.json -d .ai/handoff/MANIFEST.json
 
       - name: Syntax-check Node gates
         run: |
@@ -144,6 +148,21 @@ jobs:
     # Both gates, so a release cannot ship past a red runtime matrix.
     needs: [lint-and-validate, runtime-matrix]
     runs-on: ubuntu-latest
+    # Release authorization. This condition has two top-level operands and they
+    # are different kinds of thing.
+    #
+    # The first is the shared definition of "this ref is a release". It is
+    # byte-identical to the `release` job's condition below, and
+    # tests/assert-repo-ci-shape.mjs holds the two together, so they cannot
+    # drift apart unnoticed the way they did before.
+    #
+    # The second is a standing permission to publish on something that is not a
+    # release: a manual run publishes from whichever ref it was started on, with
+    # no tag and no GitHub Release. Whether that path should exist at all is an
+    # OPEN owner decision, recorded with its options in ADR-019 in README.md and
+    # tracked at https://github.com/homeofe/AAHP/issues/69. Until it is settled,
+    # the same assertion pins this condition exactly as written, so any edit to
+    # it must update the record in the same commit.
     if: (startsWith(github.ref, 'refs/tags/v') && contains(github.ref, '.')) || github.event_name == 'workflow_dispatch'
     permissions:
       contents: read
@@ -171,6 +190,8 @@ jobs:
     name: Create GitHub Release
     needs: publish
     runs-on: ubuntu-latest
+    # The shared release definition, byte-identical to the first operand of the
+    # publish condition above. Asserted by tests/assert-repo-ci-shape.mjs.
     if: startsWith(github.ref, 'refs/tags/v') && contains(github.ref, '.')
     permissions:
       contents: write

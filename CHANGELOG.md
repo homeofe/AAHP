@@ -12,6 +12,18 @@ independently of the npm version).
 ## [Unreleased]
 
 ### Added
+- `tests/assert-repo-ci-shape.mjs` asserts release authorization in `ci.yml`. The
+  `publish` job (npm, `id-token: write`) and the `release` job (the GitHub Release) each
+  carried a hand-written `if:`; the two disagreed about what counts as a release, and
+  nothing in this repository read either one, so the disagreement was invisible and a
+  later edit to publish authorization would have been equally silent. The release
+  definition is now written once and both jobs must use exactly it, and every additional
+  top-level `||` operand on the publish condition must appear in a literal recorded list.
+  The assertion reads the PARSED condition rather than a substring, so reformatting the
+  workflow changes no verdict, and a job with no `if:` at all is a failure rather than a
+  pass. It runs inside the required `lint-and-validate` check. No workflow behaviour
+  changes here: whether the `workflow_dispatch` operand should exist at all is the
+  owner's call and is recorded as open, with its options, in ADR-019.
 - `aahp doctor` gains a `verify-workflow` gate that answers, from inside a consumer,
   whether the workflow hosting the AAHP gate can skip it. Wrapping the `aahp-verify`
   job in an `if:`, or wrapping the gate step inside it, leaves a REQUIRED status check
@@ -71,6 +83,41 @@ independently of the npm version).
   exit code for the wrong reason, and no message to tell the two apart.
 
 ### Changed
+- `aahp doctor`'s `handoff-set` gate now names the check it did not run. Its pass
+  reason reads `N indexed files present, no strays (content not compared; aahp
+  verify Layer 1 owns checksum integrity)`. The gate's behaviour is unchanged, and
+  deliberately so: it compares the file SET and the INDEX, while comparing a
+  recorded checksum against the bytes on disk belongs to `aahp verify` Layer 1,
+  which ADR-011 makes the owner of handoff drift. What was missing is the
+  honest-summary treatment `scripts/lint-handoff.sh` received in 3.9.0 (the
+  `[3.8.3]` entry below describes it; 3.8.2 and 3.8.3 were never published, and
+  3.9.0 is the first release that carries it), where a clean run that could not
+  establish integrity stopped printing "All checks passed". Without it, a green
+  `handoff-set` line reads as an integrity verdict to anyone who has not read the
+  ADR. The new wording reaches ONE surface, and that limit is deliberate: the
+  `--json` record carries gate statuses only and no reasons, `--quiet` prints
+  nothing for a passing gate, and `--governance` skips the gate without
+  evaluating it. A repository that ingests the `schemaVersion: 1` record is
+  therefore told exactly what it was told before, which is the compatibility
+  choice this entry is making rather than an omission.
+- README now states the one configuration in which that split has consequences for
+  an adopter: when `verify-workflow` reports `skip`, meaning no workflow in the
+  repository runs the AAHP verify gate, and the handoff gates are still evaluated,
+  then no automated gate in that repository compares a handoff checksum, and a
+  green conformance record is not an integrity signal. Repositories using the shipped
+  `aahp-verify.yml` are unaffected: it runs `aahp verify --level ci` before
+  `aahp doctor` in the same job, so a drift fails the job before `doctor` runs.
+  The README no longer offers `aahp lint` as an equivalent remedy: lint's
+  checksum comparison runs only under a Python interpreter and exits 0 when
+  there is none, so it can pass silently on a drifted tree where Layer 1 fails.
+- `assets/governance/aahp-govern.yml`, the workflow `aahp init --gates` scaffolds
+  into consumers, now says in its own header that it runs no handoff-integrity gate,
+  that neither of its own steps stands in for one (`aahp check` has no file-set or
+  index gate, and its `aahp doctor --governance` step skips the handoff gates
+  without evaluating them), that `aahp lint` cannot stand in for one in a workflow
+  that sets up Node and not Python, and that a repository which also keeps
+  `.ai/handoff/` needs `aahp-verify.yml` beside it. Comment only; the workflow
+  itself is unchanged.
 - `engines.node` is now `>=22`, was `>=18`. Node 18 reached end of life on 2025-04-30
   and Node 20 on 2026-04-30, so the package publicly claimed support for a runtime it
   could not have security-patched, and every repository in the estate inherited that
@@ -124,6 +171,68 @@ independently of the npm version).
   out by review, not by the gate. Adding it to the rule is not the fix, because the rule
   lives in a tracked config file in this public repository and would then publish the one
   identity this change exists to withhold.
+- The only CLI-level test of the prompt-injection detector no longer passes with the
+  detector switched off. It appended an injection line to an indexed handoff file and
+  asserted nothing but a non-zero exit; appending to an indexed file breaks its checksum,
+  which is a different one of the seven lint checks and produces that same exit code, so
+  the assertion was satisfied by the setup's side effect. Emptying `INJECTION_PATTERNS`
+  left it reporting ok. It now regenerates `MANIFEST.json` after writing, so the tree is
+  checksum-clean and the injection check is the only thing that can fail, and it asserts
+  on the output. A negative control proves the same harness exits 0 on benign content.
+  All ten patterns are now covered, each asserted BY NAME, so a typo in any one of them
+  turns exactly that test red and says which; six of the ten had no coverage at all.
+
+### Security
+- The two required status checks that validate `MANIFEST.json` no longer download
+  and execute unpinned third-party code. `lint-and-validate` and `aahp-manifest`
+  ran `npm install --no-save ajv-cli ajv-formats` and executed the result on the
+  next line, on every push and every pull request. `--no-save` guarantees the
+  resolution is never written to `package-lock.json`, so 27 packages arrived with
+  nothing in the repository constraining any of them, and one compromised release
+  anywhere in that closure was arbitrary code execution inside the checks whose
+  verdict certifies a change. `ajv-cli` (5.0.0) and `ajv-formats` (3.0.1) are now
+  exact devDependencies locked by integrity hash, both jobs install that locked
+  closure with `npm ci`, and both invoke the tool with `npx --no-install`. The
+  `--no-install` is the load-bearing half: without it npx falls back to the
+  registry whenever the local resolution misses, and the pin buys nothing.
+- `npm run check:workflow-pinning` is why it stays that way. The root cause was
+  not a forgotten pin, it was that pinning here was a hand-applied convention:
+  the workflow template this package ships to consumers
+  (`assets/governance/aahp-govern.yml`) has always used `npm ci --ignore-scripts`
+  followed by `npx --no-install`, and the workflows that only ever ran here did
+  not, because nothing made them. The gate asserts four properties over every
+  workflow in `.github/workflows` and every template in `assets/governance`: no
+  project-level `npm install`, every `npx` carries `--no-install`, every package a
+  workflow executes is declared here at an exact version, and every direct
+  dependency carries both `resolved` and `integrity` in the lockfile. A state it
+  cannot evaluate exits 2 rather than 0, so "I could not look" never reads as
+  "I looked and it was fine". Deliberately out of scope and named rather than
+  quietly exempted: `npm install -g` in the publish job, a different risk class
+  with an owner decision still open on it, tracked at
+  https://github.com/homeofe/AAHP/issues/68.
+- Three schema tests stop failing open. The two in `tests/handoff-impact.bats` and
+  the one in `tests/init-gates.bats` skip when `ajv-cli` cannot be resolved, so
+  they only ever ran in the one job that happened to have installed it and
+  reported "# skip ajv-cli not installed" everywhere else while the check stayed
+  green. Declaring the package means `npm ci` installs it and the tests execute.
+- The version regex in the new gate is not exponentially ambiguous. Its first form
+  repeated a group whose character class also contained the group's own delimiter,
+  which CodeQL reported as `js/redos`. Measured on the input shape it named,
+  `9.9.9+` followed by repeated `--`: 22 repetitions, a 51-character string, took
+  11.8 seconds under the old form and 0.004 ms under the replacement. The input is
+  a `package.json` version specifier, which is attacker-supplied on a fork pull
+  request. What counts as an exact version did narrow, in exactly one place: the
+  replacement's build class is `[0-9A-Za-z.]`, which drops the `-` the prerelease
+  class still allows, so a SemVer-legal version whose build metadata contains a
+  hyphen is now reported as a range. Measured old form against new,
+  `1.0.0+21AF26D3----117B344092BD` (the SemVer specification's own example),
+  `1.2.3+build-5`, `1.2.3-alpha+a-b`, `1.2.3-x+y-z` and `0.0.4+-` all went from
+  accepted to rejected. The narrowing runs fail-closed - nothing unpinned became
+  acceptable, a legal pin became unacceptable - and it is unreachable for the two
+  packages this gate governs, both pinned without build metadata. It is still a
+  false positive, and the finding it prints ("Declare an exact version") misnames
+  the cause, so if it is ever hit the fix is to put the hyphen back in the build
+  class, which stays linear because `+` cannot appear inside it.
 
 ### Security
 - The portable governance workflow AAHP ships, `assets/governance/aahp-govern.yml`, now

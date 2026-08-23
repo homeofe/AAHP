@@ -1,6 +1,20 @@
+## 2026-08-23 - declare merge=union for the handoff append-log
+
+`.ai/handoff/STATUS.md` is prepend-only, so two branches almost always differ by
+one block and nothing else. Eight sibling repositories in this estate already
+declare `merge=union` for it; this one did not, and the two that lacked it are
+exactly the two where twenty-two rebases on 2026-08-23 each resolved this file by
+hand.
+
+It does not stop a pull request going CONFLICTING - GitHub does not honour merge
+drivers server-side, measured 2026-07-31 - so this removes the hand resolution,
+not the merge. `MANIFEST.json` is deliberately left without a driver: it is
+generated state, and the correct resolution is to take main's copy and recompute
+the changed entries, which no driver can do.
+
 # AAHP: Current State of the Nation
 
-> Last updated: 2026-08-22 by claude (workflow hardening: declared permissions + no persisted checkout credential, in CI and in the shipped template)
+> Last updated: 2026-08-23 by claude (workflow hardening: declared permissions + no persisted checkout credential, in CI and in the shipped template; reconciled with main, which had meanwhile taken the doctor content check, the verify-workflow gate and the release-authorization assertions)
 > Commit: (review branch, pending commit)
 >
 > **Rule:** This file is rewritten (not appended) at the end of every session.
@@ -46,6 +60,48 @@ its gate now reports it on its own pull requests. It is asserted as a CONSEQUENC
 ("there exists an event on which this workflow concludes success without having run
 the gate at `--level ci`"), it fails closed on a shape it cannot classify, and it was
 measured against every consumer of this protocol before shipping.
+
+Release authorization in `ci.yml` is now asserted. The `publish` job (npm,
+`id-token: write`) and the `release` job (the GitHub Release) each carried a
+hand-written `if:`, the two disagreed about what counts as a release, and nothing in
+this repository read either one, so the drift was invisible and any later edit to
+publish authorization would have been equally silent. The release definition is now
+written once and both jobs must use exactly it; every additional top-level `||`
+operand on the publish condition must appear in a literal recorded list. No workflow
+behaviour changes: whether the `workflow_dispatch` operand should exist at all is the
+owner's decision and is recorded as open, with its options, in ADR-019.
+`aahp doctor` also stops letting a green `handoff-set` line read as an integrity
+verdict. That gate compares the file SET and the INDEX and hashes nothing, which is
+the documented split: ADR-011 makes `aahp verify` the owner of handoff drift, and
+Layer 1 hashes each indexed file itself. Layer 1 also runs `aahp lint`, which
+compares them again, but only under a Python interpreter and exiting 0 when there is
+none, so lint is not a substitute for the gate. The pass reason said only "N indexed
+files present, no strays", so a reader who had not read the ADR could take a green
+line for an integrity verdict. It now adds "(content not compared; aahp verify
+Layer 1 owns checksum integrity)", the same honest-summary treatment
+`scripts/lint-handoff.sh` received in 3.9.0 (the CHANGELOG records it under 3.8.3,
+a version number that was never published). No gate changed behaviour and no exit
+code moved. The LIMIT is now stated in the source comment, in the README and in the
+CHANGELOG rather than only in the pull request: only the default human-readable
+`doctor` output carries the new reason, while `--json`, `--quiet` and `--governance`
+do not, and those three are the invocations consumers wire into CI and hooks, so the
+`schemaVersion: 1` record a dashboard ingests says exactly what it said before.
+README also names the one configuration where the split has consequences for an
+adopter: `verify-workflow` reporting `skip` while the handoff gates are evaluated
+means no automated gate in that repository compares a handoff checksum.
+Separately, the two required status checks that validate `MANIFEST.json` no longer
+download and execute unpinned third-party code. `lint-and-validate` and
+`aahp-manifest` ran `npm install --no-save ajv-cli ajv-formats` and executed the
+result on the next line, on every push and every pull request, so 27 packages
+arrived with nothing in this repository constraining any of them and one
+compromised release anywhere in that closure was arbitrary code execution inside
+the checks whose verdict certifies a change. Both packages are now exact
+devDependencies locked by integrity hash, both jobs install that closure with
+`npm ci`, and both invoke the tool with `npx --no-install`. The root cause was not
+the forgotten pin: the workflow template this package ships to consumers
+(`assets/governance/aahp-govern.yml`) has always used the correct form, and the
+workflows that only ever ran here did not, because nothing made them.
+`check:workflow-pinning` is that something.
 <!-- /SECTION: summary -->
 
 ---
@@ -62,12 +118,19 @@ measured against every consumer of this protocol before shipping.
 | schema validation | FOCUSED PASS | example and repository config both validate against the updated schema |
 | shell syntax | FOCUSED PASS | changed shell scripts parse under Git Bash |
 | `tests/verify-workflow.bats` | FOCUSED PASS | 21/21; both directions, the two fail-closed shapes that must NOT be findings, plus parser parity against a real YAML parser on 16 workflow files |
-| `npm run check` | PASS | changelog, version sync, claims, forbidden patterns, schema/doc sync, doc links, runtime support, and handoff freshness |
+| `npm run check` | PASS | changelog, version sync, claims, forbidden patterns, schema/doc sync, doc links, runtime support, workflow pinning, and handoff freshness |
 | `tests/runtime-support.bats` | FOCUSED PASS | 16/16; the relation holds on this repo and each of nine mutations turns it red, including the emptied-matrix trap |
+| `tests/workflow-pinning.bats` | FOCUSED PASS | 19/19; every rule holds on this repository and each way of breaking one turns the gate red at the exact documented exit code, 1 for a finding and 2 for a state it cannot evaluate |
 | shellcheck | LINUX PASS | replacement head `c332a23` reached the full Bats step after shellcheck |
 | hosted Linux suite | REPLACEMENT REQUIRED | `c332a23` passed 361/362; the CI mode fixture let `git add` restore mode 100644 on Linux, so it now reasserts 100755 before its content-plus-mode commit |
+| `tests/doctor.bats` (3 new tests) | FOCUSED PASS | the three content-drift tests pass under Git Bash; two were mutated red and restored green. The other 16 tests in the file were not run on Windows; Linux CI is authoritative |
 | `tests/workflow-hardening.bats` | FOCUSED PASS | run under Git Bash filtered to the two load-bearing assertions (the repository's own workflows and its shipped template), green before the mutation and red after deleting the `permissions:` block from `assets/governance/aahp-govern.yml`. The file's thirteen fixture expectations were additionally exercised in-process against the gate's `audit()`, all thirteen returning the exact expected exit code (1 for a real problem, 2 for a state the gate cannot decide). The file holds **24** tests, not the 21 an earlier revision of this row claimed: it carried 20 when that row was written, and the four listed next were added afterwards. Those four were then run under Git Bash and are green, `1..4`, exit 0: they pin what `tests/assert-repo-ci-shape.mjs` does with a root that does not hold every workflow it records (green, and the elevation it could not check named on stderr) and with one that holds an unreadable, unparseable or missing file (exit 1 with a stated finding, never a thrown `ENOENT`). The rest of the file is left to Linux CI, which is authoritative here: a Windows box running many suites at once takes hours per pass. |
+| `tests/assert-repo-ci-shape.mjs` (reconciled) | FOCUSED PASS, BOTH DIRECTIONS | The authored reconciliation of the three-way divergence described in What is Missing. Baseline on the merged tree: 8/8 release-authorization tests in `tests/runtime-support.bats` and 7/7 elevation-and-guard tests in `tests/workflow-hardening.bats`, 15 across the two pull requests, all green. Each family was then mutated on the real workflow it guards, with the mutation verified on disk before anything was run and the untouched neighbours counted, so a mutation that failed to apply could not be reported as a proof. **A**: `jobs.release.if` in `ci.yml` changed to `startsWith(github.ref, 'refs/tags/')`. The gate emits exactly one finding, `jobs.release.if is not the recorded release definition`, `EXIT=1`; the two release-authorization tests that require exit 0 (1 and 7) go red, `BATS_EXIT=1`, and the permission tests are untouched. **B**: `security-events: write` deleted from the `analyze` job in `codeql.yml` - an anchored count, because the same string also appears in a comment on line 10, so the naive count reads 2 and 1 rather than 1 and 0. The gate emits exactly one finding, `job 'analyze' no longer declares 'security-events: write'`, `EXIT=1`; `the release-path elevations are still declared on this repository` goes red, `BATS_EXIT=1`, while all EIGHT release-authorization tests stay green, which is the cross-check that the two sections are independent and both live. Both files restored byte-identical by md5 to their pre-mutation backup, gate back to `repo CI shape OK` `EXIT=0`, and both families re-run green. The full suite is left to Linux CI, which is authoritative here. |
 | full Bats suite | CI | deliberately not run on Windows; Linux CI is authoritative |
+| `tests/runtime-support.bats` (release authorization) | FOCUSED PASS | 8/8 added; the untouched repository shape is green, six one-line mutations of the REAL `ci.yml` each turn it red at exit 1 (including a publish job with no `if:` at all), and a reformat of the same expression stays green |
+| `tests/cli.bats` injection block | FOCUSED PASS | 3/3; the CLI injection test now asserts the detector fired, on a checksum-clean tree, and covers all ten patterns by name. Emptying `INJECTION_PATTERNS` turns it red; the previous test reported ok under that same mutation |
+| injection mutation proof | RE-VERIFIED | independently re-run. Under `INJECTION_PATTERNS=()`, one bats process reports `ok` for the pre-fix test body and `not ok` for the replacement, exit 1; restored, both `ok`, exit 0. With only the check 4 checksum comparison disarmed the replacement still passes, so its status comes from the injection check and not from the setup |
+| injection pattern coverage count | CORRECTED | six of ten patterns were uncovered before this branch, not five. The safety-override entry, sixth in `INJECTION_PATTERNS`, was missed by counting bare substrings: `tests/lint.bats` contains the bare word `override` in a line the pattern itself does not match. This row deliberately does not quote the pattern, because writing it here makes the linter flag this file, which is the detector working |
 <!-- /SECTION: build_health -->
 
 ---
@@ -82,6 +145,8 @@ measured against every consumer of this protocol before shipping.
 | Required workflow | `.github/workflows/aahp-verify.yml` | Changed | no actor bypass; explicit base; read-only token; immutable action pins; evaluator-path trust boundary documented |
 | Config schema/example | `schema/aahp-config.schema.json`, `aahp.config.example.json` | Changed | additive `handoffImpact` contract |
 | CLI | `bin/aahp.js` | Changed | verify help documents `--base SHA` |
+| Conformance gate | `bin/aahp.js` (`gateHandoffSet`) | Changed | pass reason names the content check it does not run, and a header comment states the ADR-011 boundary; behaviour, gate statuses and the JSON record are unchanged |
+| Scaffolded governance workflow | `assets/governance/aahp-govern.yml` | Changed | header now states that it runs no handoff-integrity gate and that a repository keeping `.ai/handoff/` needs `aahp-verify.yml` beside it; comment only |
 | Specification | `README.md` | Changed | Section 2.8 and ADR-018 define the contract |
 | Rollout | `scripts/ROLLOUT.md` | Changed | consumer propagation and mutation checks documented |
 | Manifest generator | `scripts/aahp-manifest.sh` | Changed | `project` resolves from repository identity (recorded name, then git remote), not from the directory it runs in |
@@ -92,6 +157,10 @@ measured against every consumer of this protocol before shipping.
 | Shipped governance template | `assets/governance/aahp-govern.yml` | Changed | declares `contents: read` and refuses the persisted checkout credential; this is the only file in the change with reach beyond this repository |
 | Repository workflows | `.github/workflows/*.yml` | Changed | six gained a top-level `contents: read`; the nine remaining checkouts IN THIS DIRECTORY set `persist-credentials: false`, and the tenth this branch sets is in the shipped template, row above. Nine is the `.github/workflows`-only figure, never the repository total: measured 2026-08-22 there are eleven checkout steps across both locations, one of which (`aahp-verify.yml`) already set the flag, so all eleven set it after this change. The three job-level elevations are unchanged and now pinned by name in `tests/assert-repo-ci-shape.mjs` |
 | Release surfaces | `package*.json`, `CHANGELOG.md` | Changed | v3.10.0 prepared, workflow included in npm artifact, not released; `engines.node` now `>=22`, `yaml` added as a devDependency |
+| Repo-shape assertion | `tests/assert-repo-ci-shape.mjs` | Changed | third assertion: `publish` and `release` share ONE release definition, and every publish operand beyond it is recorded literally; reads the parsed condition, runs inside the required `lint-and-validate` |
+| Workflow-pinning gate | `scripts/check-workflow-pinning.mjs` | New | no project-level `npm install` in a workflow, every `npx` carries `--no-install`, every package a workflow executes is declared here at an exact version, every direct dependency is locked with `resolved` and `integrity`; exits 2 on a state it cannot evaluate |
+| Schema validation steps | `.github/workflows/ci.yml`, `.github/workflows/aahp-manifest.yml` | Changed | install the locked closure and run `ajv-cli` with `npx --no-install` instead of installing two undeclared packages from the registry on every run |
+| Release surfaces | `package*.json`, `CHANGELOG.md` | Changed | v3.10.0 prepared, workflow included in npm artifact, not released; `engines.node` now `>=22`, `yaml` added as a devDependency, `ajv-cli` 5.0.0 and `ajv-formats` 3.0.1 pinned exactly |
 <!-- /SECTION: components -->
 
 ---
@@ -110,12 +179,16 @@ measured against every consumer of this protocol before shipping.
 | SemVer call for `engines.node` | NORMAL | Narrowing `>=18` to `>=22` is a support-surface reduction. Whether it ships inside 3.10.0 or forces 4.0.0 is an owner decision, not one this branch takes. |
 | `aahp-verify` can skip itself in six consumers | HIGH | ORIGINATED HERE. `458dbbd` (2026-06-30) added the dependency-bot exemption to this repository's own reference workflow, gating Checkout and every gate step; it shipped that way in v3.6.0 and propagated. `#65` removed it here on 2026-08-21. MEASURED 2026-08-22 with the new `verify-workflow` gate, against every consumer: six report `bypassable`, three report `enforced`. Five of the six report success having checked out nothing, so Layer 1 never runs either. The sixth was previously recorded here as corrected and is only PARTLY so: its checkout is unconditional and a bot change does get a Layer 1 run, but `--level ci` is still gated on the author, so the same required check name means all four layers for one author and Layer 1 for another. Only the owning repositories can re-propagate; this branch cannot fix any of them. Consumer identities are tracked privately and deliberately not recorded in this public repository. |
 | No drift check between a consumer's propagated workflow and the installed package | PARTLY CLOSED | `aahp doctor` still never compares `.github/workflows/aahp-verify.yml` on disk against the one in the installed package, so a consumer can pin 3.10.0 and run the v3.6.0 workflow. The designed predicate this row asked for now exists for the case that matters: `verify-workflow` asks whether the hosting workflow can skip the gate, which tolerates deliberate divergence (a consumer may restructure the file freely) while catching the divergence that voids the check. General byte-level drift, for example an older action pin or a dropped `fetch-depth: 0`, is still unmeasured. |
+| `npm install -g npm@latest` in the publish job | HIGH | Left in place deliberately. It is the only unpinned install inside the job that holds `id-token: write` immediately before `npm publish --provenance`, and it is a different risk class from the `ajv` path: the supplier is the package manager itself. The open question is whether the step should be DELETED rather than pinned, because its comment asserts that OIDC trusted publishing needs npm >= 12 while the pinned Node 24 line already ships npm 11.12.1, and that assertion is unverified. Owner decision, tracked at https://github.com/homeofe/AAHP/issues/68. The pinning gate names this exclusion in its header rather than hiding it in an exemption list. |
+| No dependency-scanning workflow | HIGH | No workflow here performs a dependency or supply-chain scan, and `.github/dependabot.yml` has no `github-actions` ecosystem entry. Which scanner to adopt, and whether to make it a seventh required status check, is an owner decision: adding a required context blocks every pull request until the check reports at least once. Tracked at https://github.com/homeofe/AAHP/issues/68. |
+| `ajv-cli` depends on `fast-json-patch` 2.2.1 | MEDIUM | GHSA-8gh8-hqwg-xf34, prototype pollution, fixed in 3.1.1. `ajv-cli` 5.0.0 requires `^2.0.0`, so the advisory cannot be resolved without an `overrides` entry that crosses a major version of a transitive dependency. This exposure is not new: the same closure was already being downloaded and executed on every CI run. Declaring the packages is what made it visible to `npm audit` and to Dependabot. |
 | Adopters keep an unhardened `aahp-govern.yml` | MEDIUM | OWNER DECISION. `aahp init --gates` skips a workflow that already exists (`bin/aahp.js`), so a repository that scaffolded the governance workflow before this change keeps the copy with no `permissions:` block and a persisted checkout credential, and will keep it forever unless somebody re-runs with `--force`. The CHANGELOG says so, which reaches people who read release notes and nobody else. Options: (a) leave it as a release note, (b) have `aahp doctor` report a scaffolded `aahp-govern.yml` that lacks either property, so an adopter sees it on their own pull requests, (c) make `init --gates` upgrade this specific file in place. (b) is the one that matches how `verify-workflow` already reports a weakened gate from inside the consumer. Not taken here: it changes `doctor`'s output contract, which is a separate decision from hardening the file. |
 | `persist-credentials: false` on the release path unproven in a real tag run | NORMAL | OWNER CONFIRMATION. The evidence that the change is behaviour-preserving is direct: no workflow in this repository runs `git push`, `git commit`, `git fetch`, `git pull` or `git remote`, none uses a credential-writing action, and the only `secrets.` reference passes `GITHUB_TOKEN` to `gh release create` as an environment variable, which does not read `.git/config`. The `publish` job authenticates to npm by OIDC, which is delivered through environment variables and is unaffected by checkout options. But `publish` and `release` only ever run on a version tag, so no pull-request CI run exercises them. Confirm on the first tag build after this merges. |
 | Mutable action tags and `sha_pinning_required` | NORMAL | Out of scope here and deliberately not bundled: TEN of the eleven `actions/checkout` references use the mutable `@v4` tag rather than an immutable SHA, and the repository setting `sha_pinning_required` is `false`. Re-measured 2026-08-22 over `.github/workflows/*.yml` and `assets/governance/*.yml` together, exactly one reference is pinned to a 40-hex commit SHA, in `aahp-verify.yml`; the earlier figure of nine counted `.github/workflows/` only while stating a total of eleven that includes the shipped template, so it understated the exposure by one, and by the file that reaches consumers. Same class of exposure as this change, different fix, tracked at https://github.com/homeofe/AAHP/issues/68 and https://github.com/homeofe/AAHP/issues/71. |
 | npm lifecycle scripts in CI | NORMAL | Not addressed by this change and should not be read as closed by it: `npm ci` in `ci.yml` runs without `--ignore-scripts`, so lifecycle scripts from the whole dependency tree execute in the same job as the checkout. Removing the persisted credential removes what those scripts could have read from `.git/config`; it does not stop them running. The shipped template already uses `npm ci --ignore-scripts`. |
-| Merge order against https://github.com/homeofe/AAHP/pull/89 | HIGH | MEASURED. The two changes are each green on their own CI and jointly red, and neither pull request's CI can see it because each was tested against a base that lacked the other. Both edit `tests/assert-repo-ci-shape.mjs`; #89 adds fixture tests that run that gate against a root holding only `package.json` and `ci.yml`, and this change had it read `codeql.yml` unguarded, so on the merged tree the read threw `ENOENT` and all eight of #89's release-authorization tests were red - two on the exit code (expected 0, got 1) and six on the message, having got exit 1 from a stack trace instead of a finding. Fixed here by guarding every read; the merged tree now runs those eight green, and reverting the guard turns all eight red again. Both also claimed ADR-019, so this change moved to **ADR-020**, which is why the README jumps from 018 to 020 until #89 lands. **This branch must merge AFTER #89**, and whichever merges second resolves the three shared files by keeping both sides. |
+| Reconciliation with https://github.com/homeofe/AAHP/pull/89 | DISCHARGED ON THIS BRANCH | #89 merged 2026-08-22 as `20ab708`; `origin/main` is merged into this branch as of this commit. The two changes were each green on their own CI and jointly red, and neither pull request's CI could see it because each was tested against a base that lacked the other. The resolution was AUTHORED rather than merged, because no merge rule could have produced it: `tests/assert-repo-ci-shape.mjs` diverged THREE ways from a common 63-line ancestor - main grew the same region to 370 lines, this branch to 228, and neither side contained a single line of the other. Taking `theirs` would have deleted this branch's permission assertions; taking `ours` would have deleted a gate already merged on main and left #89's eight tests either red or, worse, green and vacuous. The file now carries BOTH sections on top of this branch's guarded reads: main's release-authorization section as section 3 (`RELEASE_REF_CONDITION`, 7 occurrences, matching main exactly) and this branch's job-permission section as section 4 (`REQUIRED_JOB_PERMISSIONS`, 2 occurrences, matching this branch exactly). The guards are what let #89's fixture root, which holds only `package.json` and `ci.yml`, stay green instead of throwing `ENOENT`. Both gate families were then proved non-vacuous by mutating the REAL workflows rather than the gate: see the build-health row. README carries ADR-019 and ADR-020 in order with no gap, so the numbering gap noted earlier is closed. |
 | Consumer manifests already rewritten | MEDIUM | The generator no longer writes a checkout's directory name into `project`, but repositories whose committed `MANIFEST.json` already carries such a name keep it, because a recorded name is preserved by design. Those values need correcting in the consumer repositories. |
+| Manual publish path on the `ci.yml` `publish` job | NORMAL | OPEN OWNER DECISION, deliberately not taken here. The publish condition still accepts `workflow_dispatch`, which constrains no ref, so a manual run publishes from whichever ref it started on with no tag and no GitHub Release. Options A, B and C, and what each one requires, are in ADR-019. The condition is now pinned, so adopting any of them is a visible two-part edit rather than a silent one. |
 <!-- /SECTION: what_is_missing -->
 
 ---

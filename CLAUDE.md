@@ -37,9 +37,11 @@ npx bats tests/migrate.bats
 # Lint handoff files
 bash scripts/lint-handoff.sh .
 
-# Schema validation (install deps first)
-npm install --no-save ajv-cli ajv-formats
-npx ajv-cli validate --spec=draft2020 -c ajv-formats \
+# Schema validation. ajv-cli and ajv-formats are pinned devDependencies, so
+# `npm ci` installs them from the lockfile and --no-install keeps npx off the
+# registry. scripts/check-workflow-pinning.mjs goes red if this drifts back.
+npm ci
+npx --no-install ajv-cli validate --spec=draft2020 -c ajv-formats \
   -s schema/aahp-manifest.schema.json \
   -d .ai/handoff/MANIFEST.json
 

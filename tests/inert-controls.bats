@@ -366,6 +366,59 @@ install_npx_spy() {
     [ "$status" -ne 0 ]
 }
 
+@test "82 nothing under bin/ names the UNSCOPED package, in code or in prose" {
+    # The test above concatenates three files, and all three are files COPIED
+    # into an adopter repository. That is why it missed the actual regression:
+    # `bin/aahp.js` is not copied anywhere, it is EXECUTED on the adopter's
+    # machine and prints instructions to them. It closed `aahp init --gates` with
+    # "3. Run: npm run govern (or: npx aahp check .)" and its --help printed
+    # eight more `npx aahp ...` lines - the unscoped name issue 82 is about, in
+    # the one file every adopter is guaranteed to run. `bin/` is in package.json
+    # `files`, so that text shipped.
+    #
+    # Two properties, and they are deliberately different from the test above:
+    #
+    #   - There, the rule is "no npx AT ALL", because those files are automated
+    #     code paths whose resolution must not depend on npx.
+    #   - Here, npx is legitimate - it is how a human runs a CLI they have not
+    #     installed - but ONLY under the scoped name this project owns. So the
+    #     rule is "no unscoped `npx aahp`".
+    #
+    # Comments are NOT stripped here, unlike the test above. bin/ has no reason
+    # to explain the npx hazard - that is README's job and the hooks' job - so
+    # the rule can be absolute, and an absolute rule needs no carve-out to argue
+    # about. The scoped name is derived from package.json so a rename cannot
+    # turn this into a test of a stale string.
+    scoped=$(node -e 'process.stdout.write(require(process.argv[1]).name)' "$AAHP_ROOT/package.json")
+    [ -n "$scoped" ]
+
+    files=$(git -C "$AAHP_ROOT" ls-files 'bin/*')
+    [ -n "$files" ]
+    cat_list=""
+    while read -r f; do
+        [ -n "$f" ] || continue
+        cat_list="$cat_list $AAHP_ROOT/$f"
+    done <<< "$files"
+    # shellcheck disable=SC2086
+    cat $cat_list > "$TEST_TMPDIR/bin-all.txt"
+    [ -s "$TEST_TMPDIR/bin-all.txt" ]
+
+    # Blank out every legitimate SCOPED mention, then any `npx` left that is
+    # followed by `aahp` is the unscoped one.
+    sed "s|npx -y $scoped|<SCOPED>|g; s|npx $scoped|<SCOPED>|g" \
+        "$TEST_TMPDIR/bin-all.txt" > "$TEST_TMPDIR/bin-scrubbed.txt"
+
+    # Control: the scrub must not have eaten the file, or this asserts nothing.
+    [ -s "$TEST_TMPDIR/bin-scrubbed.txt" ]
+
+    run grep -nE "npx[[:space:]]+(-[a-zA-Z-]+[[:space:]]+)*aahp" "$TEST_TMPDIR/bin-scrubbed.txt"
+    if [ "$status" -eq 0 ]; then
+        echo "bin/ still invokes the unscoped public name:"
+        echo "$output"
+        false
+    fi
+}
+
 @test "82 the shipped path matches package.json name + bin, so a rename cannot orphan it" {
     # `node ./node_modules/@elvatis_com/aahp/bin/aahp.js` is a hard-coded path in
     # files that ship. If the package name or the bin entry ever changes and this
@@ -438,14 +491,22 @@ install_npx_spy() {
     #
     # Anchors: the five `['\"]\?` quantifiers in SECRET_PATTERNS. Unescape any
     # one of them (back to `['\"]?`) and the corresponding line below survives.
+    #
+    # The values are realistic key-length secrets on purpose. The patterns carry
+    # a 16-alphanumeric floor (see the block comment in scripts/lint-handoff.sh),
+    # so a fixture using `API_KEY=abc123` would assert that the floor is absent -
+    # which is the false-positive defect, not the property this test is for. The
+    # segmented forms (`sk-proj-`, `github_pat_`) are here because the floor is
+    # deliberately satisfiable ANYWHERE in the value token rather than only at
+    # `=`; anchoring at `=` misses all three of them.
     create_full_handoff
     {
         printf '\n'
-        printf 'API_KEY=abc123def456\n'
-        printf 'X_SECRET=s3cretvalue\n'
-        printf 'GH_TOKEN=ghtokenvalue\n'
-        printf 'DB_PASSWORD=hunter2value\n'
-        printf 'DB_CREDENTIALS=hunter2abcdef\n'
+        printf 'API_KEY=AIzaSyD1234567890abcdefghijklmno\n'
+        printf 'X_SECRET=9f8e7d6c5b4a39281706fedcba5544332211\n'
+        printf 'GH_TOKEN=github_pat_11ABCDEFG0aBcDeFgHiJkLmNoPqRsTuVwXyZ\n'
+        printf 'DB_PASSWORD=s3cretP4ssw0rdValue123456\n'
+        printf 'DB_CREDENTIALS=aVeryLongCredentialValue1234\n'
     } >> "$TEST_TMPDIR/.ai/handoff/STATUS.md"
     create_manifest_json
 
@@ -458,6 +519,77 @@ install_npx_spy() {
             false
         }
     done
+}
+
+@test "80 prose that DESCRIBES a config key is not a secret finding" {
+    # The regression this exists for is a real one, not a hypothetical. Escaping
+    # the BRE quantifier without also applying the length floor made
+    # `_KEY=['\"]\?[a-zA-Z0-9]` live: a detector for the SHAPE of an assignment,
+    # any value, one character upwards. A consumer of this package went from
+    # `All checks passed` exit 0 to `1 violation(s) found` exit 1 on a single
+    # committed line - a handoff note DESCRIBING a security finding, which quoted
+    # the placeholder an .env.example used to ship. That repository's
+    # `aahp verify --level ci` gate is REQUIRED and branch-protected, so an
+    # upgrade alone would have turned a green protected branch red with nothing
+    # in the repository changed.
+    #
+    # Anchor: the `[-_.a-zA-Z0-9]*[a-zA-Z0-9]\{16,\}` floor in all five
+    # =assignment entries of SECRET_PATTERNS. Drop the floor from any one of them
+    # and the corresponding line below fires again.
+    #
+    # Both halves are asserted against the SAME fixture so that a green result
+    # cannot mean "the harness was dead": the identical file exits 0 with only
+    # prose in it and exits 1 the moment one real key-length secret is added.
+    create_full_handoff
+    {
+        printf '\n'
+        printf 'it as a bare `API_KEY=your-api-key-here` line with nothing said\n'
+        printf 'Set DB_PASSWORD=changeme before first boot, then rotate it.\n'
+        printf 'Use API_KEY=xxx as a placeholder in the example env file.\n'
+        printf 'The finding was that DB_PASSWORD=REDACTED shipped in the template.\n'
+        printf 'The env sample shipped DB_CREDENTIALS=user:pass in plain text.\n'
+        printf 'Their docs show SERVICE_TOKEN=abc123 which is only 6 characters.\n'
+    } >> "$TEST_TMPDIR/.ai/handoff/STATUS.md"
+    create_manifest_json
+
+    run bash "$AAHP_ROOT/scripts/lint-handoff.sh" "$TEST_TMPDIR"
+    [ "$status" -eq 0 ] || {
+        echo "prose describing configuration was reported as a secret:"
+        echo "$output"
+        false
+    }
+    [[ "$output" != *"Possible secret pattern"* ]]
+
+    # Same fixture, one real key-length secret added: the verdict must flip.
+    printf 'API_KEY=AIzaSyD1234567890abcdefghijklmno\n' >> "$TEST_TMPDIR/.ai/handoff/STATUS.md"
+    create_manifest_json
+    run bash "$AAHP_ROOT/scripts/lint-handoff.sh" "$TEST_TMPDIR"
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"Possible secret pattern"* ]]
+}
+
+@test "80 a secret finding names the line, and never echoes the matched text" {
+    # A finding that prints only a filename against a 4,000-line STATUS.md reads
+    # as arbitrary, and an arbitrary-looking gate gets switched off - which takes
+    # the nine prefix patterns down with it. It must print `path:line`.
+    #
+    # It must equally NOT print the matched text: if the finding is real, echoing
+    # it into a CI log republishes the secret somewhere with a different
+    # retention policy. Anchor: the `cut -d: -f1,2` in the SECRET_PATTERNS loop.
+    create_full_handoff
+    printf '\nAPI_KEY=AIzaSyD1234567890abcdefghijklmno\n' >> "$TEST_TMPDIR/.ai/handoff/STATUS.md"
+    create_manifest_json
+
+    run bash "$AAHP_ROOT/scripts/lint-handoff.sh" "$TEST_TMPDIR"
+    [ "$status" -ne 0 ]
+    # The location is present ...
+    [[ "$output" == *"STATUS.md:"* ]]
+    # ... and the secret value is not.
+    [[ "$output" != *"AIzaSyD1234567890abcdefghijklmno"* ]] || {
+        echo "the matched secret was echoed into the output:"
+        echo "$output"
+        false
+    }
 }
 
 @test "80 every *_SUFFIX= rule in the shipped template has an enforced counterpart" {
@@ -483,14 +615,59 @@ install_npx_spy() {
     fi
 }
 
-@test "80 the shipped template no longer claims CI validates it" {
-    # The exact false sentence. templates/.aiignore is what an adopter reads
-    # before deciding whether to write an internal hostname into a committed file.
-    run grep -niE "validated by ci|ci hook validates" "$AAHP_ROOT/templates/.aiignore"
-    [ "$status" -ne 0 ]
-    # ... and it must say the opposite, so the reader is not left to infer it.
-    run grep -c "NOT ENFORCED" "$AAHP_ROOT/templates/.aiignore"
-    [ "$status" -eq 0 ]
+@test "80 NO .aiignore copy claims CI validates it" {
+    # This test used to name `templates/.aiignore` and only that file. It passed
+    # while `.ai/handoff/.aiignore` - this project's own LIVE copy, and the file
+    # the new lint notice points at BY NAME - still carried the false sentence
+    # and still carried the withdrawn invitation, in the same commit that removed
+    # both from the template. Fixing one copy of a claim and testing only that
+    # copy is the same defect this whole suite is about.
+    #
+    # So the file list is DERIVED from git, never written down here: a third
+    # copy added tomorrow is covered without anyone remembering to add it.
+    copies=$(git -C "$AAHP_ROOT" ls-files '*.aiignore')
+    [ -n "$copies" ]
+    # More than one copy exists - if that ever stops being true the derivation
+    # has silently narrowed and this test would be asserting about one file again.
+    [ "$(printf '%s\n' "$copies" | grep -c .)" -ge 2 ]
+
+    bad=""
+    while read -r f; do
+        [ -n "$f" ] || continue
+        # The false claim, in either of the two spellings it shipped in.
+        if grep -qiE "validated by ci|ci hook validates" "$AAHP_ROOT/$f"; then
+            bad="$bad
+  $f: still claims CI validates it"
+        fi
+        # The invitation to put internal infrastructure behind an absent control.
+        if grep -qi "add your internal hostnames" "$AAHP_ROOT/$f"; then
+            bad="$bad
+  $f: still invites internal hostnames under an enforcement promise"
+        fi
+        # ... and each copy must say the opposite, so no reader has to infer it.
+        if ! grep -q "NOT ENFORCED" "$AAHP_ROOT/$f"; then
+            bad="$bad
+  $f: does not say NOT ENFORCED"
+        fi
+    done <<< "$copies"
+
+    if [ -n "$bad" ]; then
+        echo "aiignore copies still carrying a withdrawn claim:$bad"
+        false
+    fi
+}
+
+@test "80 the live .aiignore and the shipped template do not diverge" {
+    # The live copy IS an instance of the template - it is what `aahp init` would
+    # write here. Keeping them identical is what stops a correction landing in one
+    # and not the other, which is exactly how the false sentence survived. CR is
+    # stripped because the working tree is CRLF on Windows and LF on CI.
+    tr -d '\r' < "$AAHP_ROOT/templates/.aiignore" > "$TEST_TMPDIR/tpl.lf"
+    tr -d '\r' < "$AAHP_ROOT/.ai/handoff/.aiignore" > "$TEST_TMPDIR/live.lf"
+    if ! diff -u "$TEST_TMPDIR/tpl.lf" "$TEST_TMPDIR/live.lf"; then
+        echo "templates/.aiignore and .ai/handoff/.aiignore have diverged"
+        false
+    fi
 }
 
 # --- 84, the case in the issue title: a typo in a GATE ID -------------------

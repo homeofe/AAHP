@@ -1,6 +1,22 @@
-# .aiignore -AAHP v2 Safety Firewall
+# .aiignore -AAHP Safety Firewall (AGENT-FACING, NOT ENFORCED)
 # Patterns that must NEVER appear in handoff files.
-# Validated by CI hooks and agents before committing.
+#
+# READ THIS BEFORE YOU RELY ON IT.
+# No gate parses this file. Not `aahp lint`, not `aahp verify`, not `aahp check`,
+# not any shipped CI workflow. The header here used to assert that CI hooks
+# validate these patterns. That was false, and a pattern added below has
+# never been checked by anything. This file is a briefing for the agents that
+# write your handoff files, and it is only as good as their compliance.
+#
+# What IS enforced, and where the list actually lives:
+#   secrets    scripts/lint-handoff.sh, SECRET_PATTERNS (a fixed array)
+#   injection  scripts/lint-handoff.sh, check 1 (a fixed array)
+#   PII        scripts/lint-handoff.sh, check 3, plus .ai/handoff/pii-allowlist.json
+# Editing this file does not change any of those. `aahp lint` prints how many
+# patterns you have here that it is not applying.
+#
+# Do NOT put a secret, an internal hostname or an address range in a handoff file
+# on the strength of this file existing.
 
 # ============================================
 # Secrets & API Keys
@@ -52,7 +68,17 @@ jailbreak*
 # ============================================
 # Internal Infrastructure
 # ============================================
-# Add your internal hostnames, IPs, endpoints here
-# 10.0.0.*
-# 192.168.*
-# *.internal.company.com
+# There is no enforcement behind this section, so it is not a place to put an
+# internal hostname and stop worrying about it. Adding "10.0.0.*" here does not
+# make anything reject "10.0.0.5" in STATUS.md; that was measured and it is why
+# the invitation that used to stand here was removed.
+#
+# To keep internal infrastructure out of committed handoff files, do one of:
+#   - do not write it into the handoff files in the first place (the only
+#     control that works today);
+#   - add a `forbiddenPatterns` rule in aahp.config.json with an `include` of
+#     `.ai/handoff/*.md`. That IS enforced, by `aahp check`, and it fails the
+#     build. Note the rule text itself lands in a tracked file, so express a
+#     hostname as a pattern rather than as the literal string you are hiding.
+#   - add the pattern to SECRET_PATTERNS in your vendored scripts/lint-handoff.sh
+#     if you carry one.

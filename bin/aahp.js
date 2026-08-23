@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 
 // aahp -AI-to-AI Handoff Protocol CLI
-// Usage: npx aahp <command> [path] [options]
+// Usage: aahp <command> [path] [options]
+// (as `aahp` when installed; the unscoped public name `aahp` is not owned
+// by this project, so it must never be invoked by that unscoped name.)
 //
 // Commands:
 //   init [path]       Initialize .ai/handoff/ directory with AAHP templates
@@ -103,15 +105,17 @@ Global options:
   --help, -h        Show this help message
   --version, -v     Show version number
 
-Examples:
-  npx aahp init                    # Initialize in current directory
-  npx aahp init ./my-project       # Initialize in a specific project
-  npx aahp manifest --phase implementation --agent claude-sonnet
-  npx aahp lint ./my-project
-  npx aahp migrate
-  npx aahp migrate-grounding       # Add the Grounded Reflection Layer to an existing project
-  npx aahp verify --level ci      # CI gate (no escape hatch)
-  npx aahp archive --verify       # Verify LOG archive integrity
+Examples, shown as the installed binary. If it is not installed, the only safe
+spelling is the SCOPED package name: npx @elvatis_com/aahp <command>. The
+unscoped name aahp is owned by nobody, so never invoke that.
+  aahp init                    # Initialize in current directory
+  aahp init ./my-project       # Initialize in a specific project
+  aahp manifest --phase implementation --agent claude-sonnet
+  aahp lint ./my-project
+  aahp migrate
+  aahp migrate-grounding       # Add the Grounded Reflection Layer to an existing project
+  aahp verify --level ci      # CI gate (no escape hatch)
+  aahp archive --verify       # Verify LOG archive integrity
 `)
 }
 
@@ -351,7 +355,8 @@ function cmdInitGates(targetPath, flags) {
   console.log('Next steps:')
   console.log('  1. Pin aahp exactly: npm install --save-dev --save-exact @elvatis_com/aahp')
   console.log('  2. Tune aahp.config.json (docLinks.include; add versionSites once you keep a CHANGELOG).')
-  console.log('  3. Run: npm run govern   (or: npx aahp check .)')
+  console.log('  3. Run: npm run govern')
+  console.log('     (direct: node node_modules/@elvatis_com/aahp/bin/aahp.js check .)')
 }
 
 // ---------------------------------------------------------------------------

@@ -130,6 +130,40 @@ echo -e "${GREEN}[2/7]${NC} Checking for secrets and API keys..."
 # `_CREDENTIALS=` is in the list because templates/.aiignore ships it. The
 # shipped template and this enforced list must not disagree: a pattern listed in
 # the template but absent here is a rule an adopter believes is on and is not.
+#
+# THE "=assignment" PATTERNS CARRY THE SAME LENGTH FLOOR AS THE PREFIX ONES, and
+# for the same reason the comment at the top of this block gives. Escaping the
+# quantifier without also applying the floor produced a half-fixed pattern: the
+# first version of this fix read `_KEY=['\"]\?[a-zA-Z0-9]`, which matches a
+# `*_KEY=` assignment of ANY value, one character upwards. That is not a secret
+# detector, it is a detector for the SHAPE of a configuration line, and handoff
+# files are full of prose that describes configuration.
+#
+# Measured, before the floor was added, against the ten handoff directories in
+# this project's own consumer estate: one consumer went from `All checks passed`
+# exit 0 to `1 violation(s) found` exit 1 on a single committed line, and that
+# line was a note DESCRIBING a security finding - it quoted the placeholder
+# `API_KEY=your-api-key-here` from an .env.example the note was arguing against.
+# Its `aahp verify --level ci` gate is REQUIRED and branch-protected, so the
+# upgrade alone would have turned a green protected branch red with nothing in
+# that repository changed. On a twelve-line prose corpus the unfloored spelling
+# scored EIGHT false positives; with the floor it scores zero and still matches
+# all eight entries of a real-secret corpus. A control that fails ordinary use
+# gets switched off, and it takes the nine prefix patterns down with it.
+#
+# The floor is expressed as "somewhere in the value token there is an unbroken
+# run of 16+ alphanumerics", not "the value STARTS with such a run": modern
+# tokens are segmented (`sk-proj-...`, `github_pat_11...`, `rk_live_51...`) and
+# anchoring at `=` misses all three. Placeholder prose is word-shaped - hyphen
+# or underscore separated dictionary words, each far short of 16 - so the two
+# populations separate cleanly on exactly this property. `[-_.a-zA-Z0-9]*`
+# keeps `-` first in the bracket so BRE reads it as a literal.
+#
+# What this deliberately does NOT catch: a short real password such as
+# `DB_PASSWORD=hunter2`. Nothing distinguishes that from prose by inspection,
+# and guessing costs more than it buys here - a repository that wants it should
+# run a purpose-built entropy scanner. The nine prefixed patterns above are
+# unchanged and still block every well-known credential format.
 SECRET_PATTERNS=(
     "sk-[a-zA-Z0-9]\{16,\}"
     "ghp_[a-zA-Z0-9]\{16,\}"
@@ -140,16 +174,23 @@ SECRET_PATTERNS=(
     "AKIA[A-Z0-9]\{16,\}"
     "Bearer [a-zA-Z0-9]"
     "-----BEGIN.*PRIVATE KEY"
-    "_KEY=['\"]\?[a-zA-Z0-9]"
-    "_SECRET=['\"]\?[a-zA-Z0-9]"
-    "_TOKEN=['\"]\?[a-zA-Z0-9]"
-    "_PASSWORD=['\"]\?[a-zA-Z0-9]"
-    "_CREDENTIALS=['\"]\?[a-zA-Z0-9]"
+    "_KEY=['\"]\?[-_.a-zA-Z0-9]*[a-zA-Z0-9]\{16,\}"
+    "_SECRET=['\"]\?[-_.a-zA-Z0-9]*[a-zA-Z0-9]\{16,\}"
+    "_TOKEN=['\"]\?[-_.a-zA-Z0-9]*[a-zA-Z0-9]\{16,\}"
+    "_PASSWORD=['\"]\?[-_.a-zA-Z0-9]*[a-zA-Z0-9]\{16,\}"
+    "_CREDENTIALS=['\"]\?[-_.a-zA-Z0-9]*[a-zA-Z0-9]\{16,\}"
 )
 
 SECRET_FOUND=0
 for pattern in "${SECRET_PATTERNS[@]}"; do
-    MATCHES=$(grep -rnl "$pattern" "$HANDOFF_DIR" 2>/dev/null | grep -v '.aiignore' || true)
+    # `path:line`, never the matched text. A reader who goes red needs to reach
+    # the line to judge it - a bare filename against a 4,000-line STATUS.md is
+    # what makes a finding look arbitrary and gets the gate switched off. The
+    # matched text is deliberately NOT printed: if it really is a secret, echoing
+    # it into a CI log republishes it somewhere with a different retention
+    # policy. `cut` is safe here because HANDOFF_DIR is relative (the script
+    # cd'd into the project root above), so no Windows drive-letter colon.
+    MATCHES=$(grep -rn "$pattern" "$HANDOFF_DIR" 2>/dev/null | grep -v '.aiignore' | cut -d: -f1,2 || true)
     if [ -n "$MATCHES" ]; then
         echo -e "  ${RED}✗ Possible secret pattern '$pattern' found in:${NC}"
         echo "    $MATCHES"

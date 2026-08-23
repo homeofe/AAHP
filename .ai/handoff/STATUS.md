@@ -1,3 +1,94 @@
+## The live secret patterns turned a real consumer's protected branch red
+
+Escaping the BRE quantifier made five `=assignment` secret patterns live for the
+first time. Live and unfloored, `_KEY=['"]\?[a-zA-Z0-9]` matches a `*_KEY=`
+assignment of ANY value from one character up: a detector for the SHAPE of a
+configuration line, in files that are mostly prose ABOUT configuration.
+Reproduced against a real consumer checkout, whole-script exit code, not piped:
+  origin/main  -> "All checks passed."      exit 0
+  this branch  -> "1 violation(s) found."   exit 1
+One committed line caused it, and it was a handoff note DESCRIBING a security
+finding: it quoted the placeholder `API_KEY=your-api-key-here` from an
+.env.example the note was arguing against. That repository's
+`aahp verify --level ci` is a REQUIRED, branch-protected check, so the upgrade
+alone would have turned a green protected branch red with nothing of its own
+changed. This is the fleet-wide case: every consumer carries these gates.
+
+CHOSEN: narrow the patterns (option a), not opt-in-with-an-empty-default.
+Opt-in-empty would have disabled the NINE prefix patterns that do work and do
+block today, trading a false positive for a real regression, and a default that
+cannot fail is the exact disease this branch exists to cure. The floor is not a
+new heuristic either: the comment three lines above SECRET_PATTERNS has always
+stated it, for exactly this failure mode, and it was applied to nine of the
+fourteen patterns and missed on these five. Same defect class as the rest of the
+branch - a rule written down and not applied.
+
+Expressed as "an unbroken run of 16+ alphanumerics ANYWHERE in the value token",
+not "the value starts with one": modern tokens are segmented (`sk-proj-`,
+`github_pat_`, `rk_live_`) and anchoring at `=` misses all three. Placeholder
+prose is word-shaped, every segment far short of 16, so the two populations
+separate on precisely this property.
+MEASURED: real-secret corpus 8/8 matched, prose corpus 0/12 false positives
+(unfloored: 8/12 false positives). All eleven handoff directories available to
+measure: zero patterns fire, before and after, so no adopter changes state.
+Positive control on the real consumer content: unmodified -> 0 findings exit 0;
+same file plus four genuine secrets -> 4 findings exit 1.
+GIVEN UP DELIBERATELY: a short real password such as `DB_PASSWORD=hunter2`.
+Nothing separates that from prose by inspection; an entropy scanner is the right
+layer. A finding now prints `path:line` and never the matched text.
+
+## The prescribed remediation reached none of the affected repositories
+
+CHANGELOG told adopters to run `aahp init --gates --force`. That writes exactly
+one file, `.github/workflows/aahp-govern.yml`. SURVEYED, ten consuming
+repositories: ten have `aahp-verify.yml`, ZERO have `aahp-govern.yml`, and zero
+have vendored hooks under `scripts/hooks/` for `install-hooks.sh` to refresh.
+Running it would have added a second unreferenced workflow beside the one that
+gates the branch and left the vulnerable line in the file that runs. The
+vulnerable text lives in a hand-held `aahp-verify.yml` that AAHP does not
+generate and therefore cannot rewrite. CHANGELOG and README now say that
+plainly, with the per-shape manual edit, instead of naming a command that
+appears to fix it. Eight of the ten carry `npx --no-install aahp` (unscoped, the
+vulnerable spelling); two carry `npx -y @elvatis_com/aahp@<version>`, which is
+scoped and exact and needs no change.
+
+## The false sentence was fixed in the template and left in the live copy
+
+`templates/.aiignore` dropped "Validated by CI hooks and agents before
+committing" and the "add your internal hostnames" invitation; `.ai/handoff/
+.aiignore` kept BOTH, in the same commit - and that is the copy the new lint
+notice names. The live copy is now byte-identical to the template. The test that
+missed it named one path; it now DERIVES the copy list from `git ls-files
+'*.aiignore'`, so a third copy is covered without anyone remembering, and a
+second test fails if template and live copy ever diverge. NOT COVERED: copies
+already committed in adopter repositories. Nine of the ten still carry the false
+header; CHANGELOG says so and tells them to replace it.
+
+## Shipped code still told users to run the unscoped public name
+
+`bin/aahp.js` closed `aahp init --gates` with "(or: npx aahp check .)" and its
+`--help` printed eight more `npx aahp ...` lines. `bin/` is in package.json
+`files`, so that shipped to every adopter, naming the one unowned name issue 82
+is about. README had a tenth. All corrected.
+WHY THE EXISTING CONTROL MISSED THEM: it concatenates three files and all three
+are files COPIED into an adopter repo. `bin/aahp.js` is not copied, it is
+EXECUTED there and prints instructions. The new control covers `bin/`, with a
+deliberately different rule: npx is legitimate for a human running an
+uninstalled CLI, but only under the scoped name, so it bans the unscoped
+spelling rather than npx as such, and it does NOT strip comments because bin/
+has no reason to explain the npx hazard. Scoped name derived from package.json
+so a rename cannot leave it asserting a stale string.
+
+## Two ticked acceptance boxes cited test ordinals that did not match
+
+The box claimed the notice turns test 18 red and a quantifier turns test 20 red.
+Re-derived by running it: the notice turns test 20 red (18 stays green) and the
+quantifier turns test 22 red (20 stays green). A reviewer following that box
+mutates the code, watches a test the mutation cannot touch, sees green and
+concludes the coverage is real. Every ticked box on the pull request has been
+re-derived and the mutation table now names tests, never numbers them; the suite
+grew from 24 to 28 to 32 tests during this work and every ordinal shifted twice.
+
 ## The gate id itself was never validated, which is the case issue 84 puts in its title
 
 This branch validated the config document and still let the defect through by the

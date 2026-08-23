@@ -323,9 +323,33 @@ independently of the npm version).
   `node <root>/node_modules/@elvatis_com/aahp/bin/aahp.js`, a path that cannot reach the
   registry and cannot resolve to any name but the pinned one; when it is absent the
   workflow fails closed and the hooks skip, which is what `README` always said they did.
-  **Adopters must re-scaffold:** the vulnerable text is already copied into your
-  repository. Run `aahp init --gates --force` for the workflow and
-  `scripts/install-hooks.sh` for the hooks. Fixing the sources here does not fix a copy.
+  **Adopters: there is no single command that fixes this for you, and the instruction
+  this entry first carried did not reach a single repository.** It said to run
+  `aahp init --gates --force`. That command writes exactly one file,
+  `.github/workflows/aahp-govern.yml`. Measured across the ten repositories that consume
+  this package: ten have `.github/workflows/aahp-verify.yml` and **none** has
+  `aahp-govern.yml`. Running it there would have added a second, unreferenced workflow
+  beside the one that actually gates the branch, and left the vulnerable line untouched
+  in the file that runs. `scripts/install-hooks.sh` reaches as few: none of the ten has
+  vendored hooks under `scripts/hooks/`, so there is no installed copy for it to refresh.
+  What those repositories actually contain is a hand-held `aahp-verify.yml` that AAHP
+  does not generate, so AAHP cannot rewrite it. Fix it by editing that file yourself:
+
+  - If the step reads `npx --no-install aahp verify . --level ci` (eight of the ten),
+    it resolves the UNSCOPED name and is the vulnerable spelling. Replace `npx
+    --no-install aahp` with `node node_modules/@elvatis_com/aahp/bin/aahp.js`, keeping
+    the `npm ci` step that installs the exact-pinned devDependency ahead of it. Do the
+    same for the `doctor` step beside it.
+  - If the step reads `npx -y @elvatis_com/aahp@<version>` (two of the ten), it already
+    names the scoped package at an exact version, so it cannot resolve to the unowned
+    name and needs no change. It does fetch from the registry on every run by design;
+    that is a deliberate invocation, not the silent fallback this entry is about.
+  - If you have vendored hooks under `scripts/hooks/`, re-run `scripts/install-hooks.sh`.
+    If you have a scaffolded `aahp-govern.yml`, `aahp init --gates --force` refreshes it.
+    Neither applies to a repository that only consumes the published package.
+
+  Fixing the sources here does not fix a copy, and no `init` command can reach a file it
+  never wrote.
 - Four of the thirteen secret patterns `aahp lint` enforces matched nothing at all.
   `grep` runs in BRE mode, where the bare `?` in `['\"]?` is a LITERAL question mark
   rather than an optional-quantifier, so `_KEY=`, `_SECRET=`, `_TOKEN=` and `_PASSWORD=`
@@ -335,9 +359,38 @@ independently of the npm version).
   documented one comment above for the `\{16,\}` interval and was applied there.
   `_CREDENTIALS=` is added alongside them, because `templates/.aiignore` has always
   shipped `*_CREDENTIALS=*` with no counterpart in the enforced list.
+  **These five patterns carry the same length floor as the nine prefix patterns**, for
+  the reason the comment above them has always given. Escaping the quantifier alone
+  produced `_KEY=['\"]\?[a-zA-Z0-9]`, which matches a `*_KEY=` assignment of ANY value
+  from one character upwards - a detector for the SHAPE of a configuration line, not for
+  a secret, in files that are full of prose describing configuration. Measured against
+  the consumer estate before the floor was added: one repository went from
+  `All checks passed` exit 0 to `1 violation(s) found` exit 1 on a single committed line,
+  and that line was a handoff note DESCRIBING a security finding - it quoted the
+  placeholder `API_KEY=your-api-key-here` from an `.env.example` the note was arguing
+  against. That repository's `aahp verify --level ci` gate is required and
+  branch-protected, so upgrading alone would have turned a green protected branch red
+  with nothing in the repository changed. On a twelve-line prose corpus the unfloored
+  spelling scored eight false positives; with the floor it scores zero and still matches
+  all eight entries of a real-secret corpus, including the segmented modern formats
+  (`sk-proj-`, `github_pat_`, `rk_live_`) that a floor anchored at `=` would miss. Across
+  all eleven handoff directories available to measure, no pattern fires either before or
+  after, so no adopter changes state on upgrade. What the floor deliberately gives up is
+  a short real password such as `DB_PASSWORD=hunter2`: nothing distinguishes that from
+  prose by inspection, and a repository that needs it should run a purpose-built entropy
+  scanner. A secret finding now prints `path:line` rather than a bare filename, and never
+  echoes the matched text - a real secret must not be republished into a CI log.
 
 ### Changed
-- `.ai/handoff/.aiignore` no longer claims to be enforced, because it is not. No code in
+- `.ai/handoff/.aiignore` no longer claims to be enforced, because it is not. The
+  correction was first made in `templates/.aiignore` only, and the live copy in
+  `.ai/handoff/.aiignore` - this project's own instance, and the file the new lint notice
+  names - kept both the false sentence and the withdrawn invitation in the same commit
+  that removed them from the template. Both copies now carry the same text, a test
+  derives the file list from git rather than naming one path, and a second test fails if
+  the two ever diverge. If your repository was scaffolded before this release, your own
+  `.ai/handoff/.aiignore` still carries the false header; replace it with the current
+  `templates/.aiignore`, or at minimum delete the line claiming CI validates it. No code in
   this repository parses it; the single occurrence of the name in the enforcement path
   excludes the file from the scan. `README` section 2.6 said "CI hook validates that no
   handoff file contains these patterns" and `templates/.aiignore` said "Validated by CI

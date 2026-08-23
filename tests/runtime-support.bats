@@ -618,8 +618,11 @@ copy_repo_shape_with_readme() {
 
     run node "$AAHP_ROOT/tests/assert-repo-ci-shape.mjs" "$TEST_TMPDIR"
     [ "$status" -eq 1 ]
+    # One direction, not two. This asserted both, which worked while the recorded
+    # list was non-empty: replacing the ADR's operand line then left the ADR carrying
+    # one operand and the code recording another, so both halves fired. With the list
+    # empty only this half is reachable, and it is the half the test is named for.
     [[ "$output" == *"ADR-019 documents a publish condition this file no longer records"* ]]
-    [[ "$output" == *"ADR-019 does not document"* ]]
 }
 
 @test "publish record: an emptied operand block is red, not an empty set" {

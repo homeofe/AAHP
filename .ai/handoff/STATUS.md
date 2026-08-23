@@ -1,5 +1,10 @@
 ## Two jobs in one file disagreed about what a release is, and npm got the looser answer
 
+**One of the repaired tests asserted BOTH directions** of the ADR-versus-list comparison. That
+worked while the list was non-empty, because replacing the ADR’s operand line left
+the ADR carrying one operand and the code recording another, so both halves fired.
+With the list empty only one half is reachable, and it is the half the test is named
+for. The other assertion is removed rather than left as a second copy of the first.
 **CI found five tests this change had invalidated.** They copy this repository’s own shape and
 mutate it, so emptying the recorded operand list changed what each mutation meant.
 Three are re-aimed and keep their claims: the reformatting test now reformats the

@@ -603,10 +603,21 @@ install_npx_spy() {
     # The derivation itself must not be empty, or the test asserts nothing.
     [ -s "$TEST_TMPDIR/suffixes.txt" ]
 
+    # Scoped to the SECRET_PATTERNS array, not the whole file. The file also
+    # DISCUSSES these suffixes in a block comment, so searching everywhere let a
+    # sentence about a pattern stand in for the pattern: deleting the real entry
+    # left this test green. A class test that cannot detect its own class is the
+    # defect this suite exists to close.
+    sed -n '/^SECRET_PATTERNS=(/,/^)/p' "$AAHP_ROOT/scripts/lint-handoff.sh" \
+        | grep -v '^[[:space:]]*#' > "$TEST_TMPDIR/patterns.txt"
+    # The extraction must have found something, or every assertion below passes
+    # vacuously and a renamed array becomes a silent no-op.
+    [ -s "$TEST_TMPDIR/patterns.txt" ]
+
     missing=""
     while read -r suffix; do
         [ -n "$suffix" ] || continue
-        grep -q -- "_${suffix}=" "$AAHP_ROOT/scripts/lint-handoff.sh" || missing="$missing $suffix"
+        grep -q -- "_${suffix}=" "$TEST_TMPDIR/patterns.txt" || missing="$missing $suffix"
     done < "$TEST_TMPDIR/suffixes.txt"
 
     if [ -n "$missing" ]; then

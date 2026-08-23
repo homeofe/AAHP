@@ -1,3 +1,24 @@
+## The class test could not detect its own class, and the README described a workflow that changed
+
+The test "every *_SUFFIX= rule in the shipped template has an enforced
+counterpart" derived the expected set from the template, which is the right
+shape, then looked for each suffix ANYWHERE in scripts/lint-handoff.sh. The same
+commit added a block comment naming all five suffixes in prose, so a sentence
+about a pattern stood in for the pattern:
+  line 130 [COMMENT]  `_CREDENTIALS=` is in the list because ...
+  line 184 [CODE]     "_CREDENTIALS=['\"]?..."
+Deleting the code entry left the test green. A class test that cannot detect its
+own class is the defect this suite exists to close, inside the suite.
+Now scoped to the SECRET_PATTERNS array, with an assertion that the extraction
+found the array at all so a rename cannot turn the test into a silent no-op.
+Proved: with the code entry deleted and the COMMENT still present, the test goes
+red. That comment is what made the old version pass.
+Separately, four README statements still described the shipped governance
+workflow as npx-based after it was changed to invoke the CLI by path. Those are
+corrected. The other npx mentions in the README are prose ABOUT the npx defect
+and are left alone - they are accurate.
+VERIFIED ON LINUX, bats 1.10.0: inert-controls 34 passed, 0 failed.
+
 ## The length floor spared real credentials, and the count justifying it was wrong
 
 Two review findings on the secret patterns, both confirmed by measurement, plus

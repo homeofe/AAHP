@@ -984,8 +984,9 @@ exact-pin behavior, and a repo whose own package name matches still reports `sel
 
 ### ADR-016: aahp-govern.yml is portable, opt-in, and verify-only
 **Why it recurs:** copying vendored script paths into the workflow is the obvious wiring.
-**Decision:** `assets/governance/aahp-govern.yml` calls the `aahp` CLI via `npx` (no
-vendored paths), is opt-in, and never mutates the repo. `aahp-verify.yml` gates handoff
+**Decision:** `assets/governance/aahp-govern.yml` calls the `aahp` CLI by path, at
+`node ./node_modules/@elvatis_com/aahp/bin/aahp.js` (no vendored copy of the CLI
+itself), is opt-in, and never mutates the repo. `aahp-verify.yml` gates handoff
 state; `aahp-govern.yml` gates governance. Two workflows, two concerns.
 
 ### ADR-017: a heuristic over hand-written prose is a report, never a gate
@@ -1561,7 +1562,7 @@ your-project/
     pre-push              # -> scripts/verify-handoff.sh . --level prepush
   .github/workflows/
     aahp-verify.yml       # runs `aahp verify --level ci` as a required check (handoff)
-    aahp-govern.yml       # portable governance gate: `aahp check` via npx (governance)
+    aahp-govern.yml       # portable governance gate: `aahp check` by path (governance)
   .claude/
     CLAUDE.md             # harness system prompt (see 9.3)
     commands/
@@ -1759,7 +1760,7 @@ outside a git work tree, so run them in a checkout (in CI, `actions/checkout`).
 
 The fastest way to adopt all of this is `aahp init --gates`, which scaffolds a trimmed
 `aahp.config.json`, a `govern` npm script (`aahp check .`), and a portable
-`.github/workflows/aahp-govern.yml` (verify-only, `npx`-based, no vendored paths) without
+`.github/workflows/aahp-govern.yml` (verify-only, invoked by path, no vendored copy of the CLI) without
 touching `.ai/handoff/`.
 
 ---

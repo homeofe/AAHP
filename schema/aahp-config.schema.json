@@ -349,9 +349,15 @@
                 "pattern": "^[A-Za-z0-9._@+ -]+(?:/[A-Za-z0-9._@+ -]+)*$",
                 "not": {
                   "anyOf": [
-                    { "pattern": "^aahp\\.config\\.json$" },
-                    { "pattern": "^\\.ai/handoff(?:/|$)" },
-                    { "pattern": "(?:^|/)\\.{1,2}(?:/|$)" }
+                    {
+                      "pattern": "^aahp\\.config\\.json$"
+                    },
+                    {
+                      "pattern": "^\\.ai/handoff(?:/|$)"
+                    },
+                    {
+                      "pattern": "(?:^|/)\\.{1,2}(?:/|$)"
+                    }
                   ]
                 },
                 "description": "Exact repo-relative regular tracked file. Forward slashes only; no absolute paths, traversal, glob syntax, directories, symlinks, gitlinks, handoff files, or aahp.config.json."
@@ -413,6 +419,17 @@
         "allowRange": {
           "type": "boolean",
           "description": "If true, accept a semver range; default false requires an exact pin."
+        }
+      },
+      "additionalProperties": false
+    },
+    "trustTtl": {
+      "type": "object",
+      "description": "Opt-in enforcement for aahp verify Layer 4 (TRUST-TTL expiry). Absent or enforce:false: expired 'verified' rows warn and the run still passes, which is the historical behaviour. enforce:true: expired rows fail the run, and a register that cannot be classified fails as well, since an unreadable register is not a clean one.",
+      "properties": {
+        "enforce": {
+          "type": "boolean",
+          "description": "If true, expired 'verified' trust rows make aahp verify exit non-zero. Default false. Layer 4 does not run at precommit level, so this gates CI rather than local commits, and the pull request that refreshes TRUST.md carries the refreshed rows with it."
         }
       },
       "additionalProperties": false

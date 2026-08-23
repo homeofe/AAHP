@@ -15,11 +15,17 @@ load test_helper
 
 GATE="$SCRIPTS_DIR/check-doc-shape.mjs"
 
-# A tracked fixture repository. TEST_TMPDIR is already a git repo with one empty
-# commit (test_helper.bash), so tracked-ness here means `git add`.
+# A tracked fixture repository shaped like the real one at the point the defect
+# existed: assets/governance/aahp-govern.yml is the real governance workflow, and
+# .github/workflows/ holds aahp-verify.yml and NOT aahp-govern.yml. The .github
+# entry has to be tracked or the whole class is out of scope by the first filter,
+# and the tests that assert a finding would pass vacuously.
+# TEST_TMPDIR is already a git repo with one empty commit (test_helper.bash), so
+# tracked-ness here means `git add`.
 seed_repo() {
-    mkdir -p "$TEST_TMPDIR/assets/governance" "$TEST_TMPDIR/scripts"
+    mkdir -p "$TEST_TMPDIR/assets/governance" "$TEST_TMPDIR/scripts" "$TEST_TMPDIR/.github/workflows"
     echo "name: govern" > "$TEST_TMPDIR/assets/governance/aahp-govern.yml"
+    echo "name: verify" > "$TEST_TMPDIR/.github/workflows/aahp-verify.yml"
     echo "echo hi" > "$TEST_TMPDIR/scripts/real-script.sh"
     git -C "$TEST_TMPDIR" add -A
 }
@@ -189,7 +195,10 @@ EOF
     [[ "$output" == *"dead exception"* ]]
 }
 
-@test "doc-shape: an exception with no occurrences count is refused" {
+@test "doc-shape: an exception with no occurrences count is refused by the schema, at exit 2" {
+    # occurrences is required in schema/aahp-config.schema.json, so this is caught
+    # before the gate runs a single assertion. Exit 2, because nothing was
+    # assessed - not exit 0, which is the failure mode this whole file is about.
     seed_repo
     mkreadme <<'EOF'
 # Fixture
@@ -201,8 +210,49 @@ EOF
                       "reason": "no count" } ] } }
 EOF
     run node "$GATE" "$TEST_TMPDIR"
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"occurrences"* ]]
+}
+
+@test "doc-shape: a whitespace-only reason is a finding" {
+    # The schema's minLength: 1 accepts a single space, so this is the runtime
+    # guard's own reachable case, not a duplicate of the schema. Anchor: the
+    # `reason.trim()` in the declared loop. Replace it with `entry.reason` and
+    # only this test goes red.
+    seed_repo
+    mkreadme <<'EOF'
+# Fixture
+Copy `.github/workflows/aahp-govern.yml`.
+EOF
+    mkconfig <<'EOF'
+{ "docPaths": { "include": ["README.md"],
+  "adopterPaths": [ { "path": ".github/workflows/aahp-govern.yml", "occurrences": 1,
+                      "reason": "   " } ] } }
+EOF
+    run node "$GATE" "$TEST_TMPDIR"
     [ "$status" -eq 1 ]
-    [[ "$output" == *"integer occurrences"* ]]
+    [[ "$output" == *"non-empty reason"* ]]
+}
+
+@test "doc-shape: the same path declared twice is a finding" {
+    # JSON Schema cannot express uniqueness over an object array by one key, so
+    # this is the runtime guard's second reachable case. Two entries means one
+    # reason is dead text, and a reader cannot tell which one is live.
+    seed_repo
+    mkreadme <<'EOF'
+# Fixture
+Copy `.github/workflows/aahp-govern.yml`.
+EOF
+    mkconfig <<'EOF'
+{ "docPaths": { "include": ["README.md"],
+  "adopterPaths": [ { "path": ".github/workflows/aahp-govern.yml", "occurrences": 1,
+                      "reason": "first reason" },
+                    { "path": ".github/workflows/aahp-govern.yml", "occurrences": 1,
+                      "reason": "second reason" } ] } }
+EOF
+    run node "$GATE" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"twice"* ]]
 }
 
 # ─── assertion 2: the required setup heading ────────────────────────────────

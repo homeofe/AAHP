@@ -27,6 +27,16 @@ the wrong sentence and the right ones use the same string. It exits 2 on anythin
 it could not assess. The README also gained an Installation and Quickstart
 section; every command in it was run against a throwaway repository first.
 
+Found by running the suite on Linux rather than by reading it: the doc-shape
+fixture repository did not track a .github/ entry, so four tests that assert a
+FINDING passed vacuously - the first filter put the whole class out of scope
+before any assertion ran. The fixture now carries .github/workflows/aahp-verify.yml
+and no aahp-govern.yml, which is the shape the real defect had. A fifth test
+claimed the runtime guard rejects a missing occurrences count; the schema rejects
+it first, at exit 2, so that test now asserts the path that actually executes and
+the runtime guard is tested on the case only it can catch (a reason that is
+present and blank).
+
 NOT covered: no gate anywhere checks whether an adopting repository's LOG entries
 carry provenance, and after ADR-021 none is intended to. check-doc-shape is
 repository-local, absent from CHECK_GATES, so no consumer inherits it, and it

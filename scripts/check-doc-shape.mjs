@@ -193,6 +193,12 @@ for (const entry of adopterPaths) {
   const path = entry && typeof entry.path === "string" ? entry.path : null;
   const reason = entry && typeof entry.reason === "string" ? entry.reason.trim() : "";
   const occurrences = entry && Number.isInteger(entry.occurrences) ? entry.occurrences : null;
+  // The schema is the first line here and it is strict: path, occurrences and
+  // reason are all required, and occurrences has a minimum of 1, so a config
+  // missing any of them never reaches this loop (loadConfig throws, and this
+  // gate exits 2). What the schema CANNOT express is a reason that is present
+  // and says nothing, because minLength: 1 accepts a single space. That case is
+  // this guard's own, and it is the one tests/doc-shape.bats exercises.
   if (!path || !reason || occurrences === null || occurrences < 1) {
     findings.push(
       `docPaths.adopterPaths entry ${JSON.stringify(entry)} needs a path, a non-empty reason and an ` +

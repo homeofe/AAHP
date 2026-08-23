@@ -12,6 +12,32 @@ independently of the npm version).
 ## [Unreleased]
 
 ### Added
+
+- An Installation and Quickstart section in `README.md`, above the architectural
+  material. There was no heading at any level matching install, quickstart, getting
+  started or setup anywhere in the document, and the single install command sat at 58%
+  depth under a heading about decisions. The five steps were each executed against a
+  throwaway repository before being written down, including the Layer 3 warning a first
+  run produces, so the section describes what the commands do rather than what they are
+  expected to do. Issue #74.
+- `scripts/check-doc-shape.mjs`, a repository-local gate: a backticked repo-relative
+  path in the configured documents has to resolve against the git index, and a required
+  heading has to exist before a named anchor. It is deliberately NOT part of
+  `aahp check`, so no consumer inherits it, and it is wired into the `check` chain the
+  required job runs. It is not a blanket rule over every backticked span: measured on
+  this README, 78 distinct path-shaped spans exist and 46 correctly name a file in an
+  ADOPTER's tree, so only spans whose first segment is a tracked top-level entry of this
+  repository are resolved. Exceptions are declared with an exact occurrence COUNT rather
+  than as an allowlist, because the defect and the correct uses are the same string in
+  different sentences: a path-level allowlist would have exempted the defect this gate
+  exists for. It exits 2 on anything it could not assess. ADR-022.
+- The five-field provenance block from Section 2.4 now ships in `templates/LOG.md` and
+  `templates/STATUS.md`. The templates carried one of the five, so a repository that
+  followed the shipped example produced entries that did not satisfy the section's own
+  rule. A `provenance-block` group in `aahp.config.json` binds the field list in
+  Section 2.4 to both templates through the existing `schema-doc-sync` gate, so dropping
+  a field from either side is red. Issue #86.
+
 - Every `uses:` in `.github/workflows/` and in the shipped
   `assets/governance/aahp-govern.yml` is pinned to a full 40-character commit SHA with
   the release in a trailing `# vX.Y.Z` comment, and `.github/dependabot.yml` declares a
@@ -104,6 +130,23 @@ independently of the npm version).
   exit code for the wrong reason, and no message to tell the two apart.
 
 ### Changed
+
+- README Section 2.4 no longer states a provenance MUST, and no longer states an audit
+  trail as a property of the protocol. Nothing enforced either: no gate reads the fields,
+  `MANIFEST.last_session` records one agent for the most recent session across the whole
+  handoff set rather than per entry, and a handoff set stripped of every provenance line
+  passes lint, `verify --level ci` and `doctor` at exit 0, reproduced on a throwaway
+  repository. Enforcement was measured before being rejected: across the nine consumer
+  repositories in this estate, `LOG.md` holds 100 entries and 8 carry all five fields, so
+  a retroactive MUST would redden 9 of 9 over history none of them can change, and this
+  repository's own LOG would fail it too. The section now states the conditional version,
+  which is what is true. ADR-021.
+- `README.md` names `assets/governance/aahp-govern.yml` as the source to copy for the
+  governance workflow. It named a `.github/workflows/` path that does not exist in this
+  repository and is not in the published package. Measured across the nine consumer
+  checkouts: 9 of 9 carry `.github/workflows/aahp-verify.yml`, so the neighbouring copy
+  instruction was right, and 0 of 9 carry an `aahp-govern.yml` at all. The two mentions
+  that correctly describe the DESTINATION are unchanged. Issue #74.
 - `aahp doctor`'s `handoff-set` gate now names the check it did not run. Its pass
   reason reads `N indexed files present, no strays (content not compared; aahp
   verify Layer 1 owns checksum integrity)`. The gate's behaviour is unchanged, and
@@ -152,7 +195,34 @@ independently of the npm version).
   PARSES the workflow files. Matching YAML with a regex misreads quoting and block
   scalars, and would report a clean repository it never actually read.
 
+- `.ai/handoff/.aiignore` no longer claims to be enforced, because it is not. The
+  correction was first made in `templates/.aiignore` only, and the live copy in
+  `.ai/handoff/.aiignore` - this project's own instance, and the file the new lint notice
+  names - kept both the false sentence and the withdrawn invitation in the same commit
+  that removed them from the template. Both copies now carry the same text, a test
+  derives the file list from git rather than naming one path, and a second test fails if
+  the two ever diverge. If your repository was scaffolded before this release, your own
+  `.ai/handoff/.aiignore` still carries the false header; replace it with the current
+  `templates/.aiignore`, or at minimum delete the line claiming CI validates it. No code in
+  this repository parses it; the single occurrence of the name in the enforcement path
+  excludes the file from the scan. `README` section 2.6 said "CI hook validates that no
+  handoff file contains these patterns" and `templates/.aiignore` said "Validated by CI
+  hooks and agents before committing". Measured: with `10.0.0.*` and
+  `*.internal.example.com` added to `.aiignore`, a committed `STATUS.md` line reading
+  `Deploy target: db.internal.example.com at 10.0.0.5` passes `lint-handoff.sh` and
+  `aahp verify --level ci`, both exit 0. The damage is the belief, so both claims are
+  withdrawn, the "add your internal hostnames, IPs, endpoints here" invitation is
+  replaced by the two mechanisms that ARE enforced, and `aahp lint` now prints, in check
+  2, how many `.aiignore` patterns it is not applying and by name. Whether the file
+  should become a real rule source is left as an owner decision rather than taken here:
+  enforcing an existing adopter's committed copy would newly fail their build on
+  patterns nobody chose, and the glob vocabulary cannot express what the enforced regexes
+  do - the template's `sk-*` has no length floor and matches the word "task-type" inside
+  AAHP's own shipped templates, so `aahp init` followed by enforcement is red on an
+  untouched repository.
+
 ### Fixed
+
 - The governance workflow `aahp init --gates` scaffolds into a consumer repository
   (`assets/governance/aahp-govern.yml`) no longer pins Node 20 - a runtime end-of-life since
   2026-04-30, and below the `engines.node: ">=22"` floor the package publishes. Every
@@ -226,6 +296,7 @@ independently of the npm version).
   turns exactly that test red and says which; six of the ten had no coverage at all.
 
 ### Security
+
 - The two required status checks that validate `MANIFEST.json` no longer download
   and execute unpinned third-party code. `lint-and-validate` and `aahp-manifest`
   ran `npm install --no-save ajv-cli ajv-formats` and executed the result on the
@@ -277,7 +348,6 @@ independently of the npm version).
   the cause, so if it is ever hit the fix is to put the hyphen back in the build
   class, which stays linear because `+` cannot appear inside it.
 
-### Security
 - The portable governance workflow AAHP ships, `assets/governance/aahp-govern.yml`, now
   declares `permissions: contents: read` and sets `persist-credentials: false` on its
   checkout. This is the change with reach beyond this repository: `aahp init --gates`
@@ -402,37 +472,11 @@ independently of the npm version).
   scanner. A secret finding now prints `path:line` rather than a bare filename, and never
   echoes the matched text - a real secret must not be republished into a CI log.
 
-### Changed
-- `.ai/handoff/.aiignore` no longer claims to be enforced, because it is not. The
-  correction was first made in `templates/.aiignore` only, and the live copy in
-  `.ai/handoff/.aiignore` - this project's own instance, and the file the new lint notice
-  names - kept both the false sentence and the withdrawn invitation in the same commit
-  that removed them from the template. Both copies now carry the same text, a test
-  derives the file list from git rather than naming one path, and a second test fails if
-  the two ever diverge. If your repository was scaffolded before this release, your own
-  `.ai/handoff/.aiignore` still carries the false header; replace it with the current
-  `templates/.aiignore`, or at minimum delete the line claiming CI validates it. No code in
-  this repository parses it; the single occurrence of the name in the enforcement path
-  excludes the file from the scan. `README` section 2.6 said "CI hook validates that no
-  handoff file contains these patterns" and `templates/.aiignore` said "Validated by CI
-  hooks and agents before committing". Measured: with `10.0.0.*` and
-  `*.internal.example.com` added to `.aiignore`, a committed `STATUS.md` line reading
-  `Deploy target: db.internal.example.com at 10.0.0.5` passes `lint-handoff.sh` and
-  `aahp verify --level ci`, both exit 0. The damage is the belief, so both claims are
-  withdrawn, the "add your internal hostnames, IPs, endpoints here" invitation is
-  replaced by the two mechanisms that ARE enforced, and `aahp lint` now prints, in check
-  2, how many `.aiignore` patterns it is not applying and by name. Whether the file
-  should become a real rule source is left as an owner decision rather than taken here:
-  enforcing an existing adopter's committed copy would newly fail their build on
-  patterns nobody chose, and the glob vocabulary cannot express what the enforced regexes
-  do - the template's `sk-*` has no length floor and matches the word "task-type" inside
-  AAHP's own shipped templates, so `aahp init` followed by enforcement is red on an
-  untouched repository.
-
 ## [3.10.0] - 2026-08-20
 **Fail-closed Layer 2 base selection and reviewed exact-file impact classification**
 
 ### Added
+
 - `handoffImpact.nonImpactingModifiedFiles` provides an optional, reviewed Layer 2
   classification for maintenance-only files. Each entry requires one exact
   repo-relative regular tracked `file` and a reviewable `reason` containing a visible
@@ -444,7 +488,22 @@ independently of the npm version).
   Layer 2 diff explicitly. The required workflow passes the pull request base SHA for a
   pull request, the event `before` SHA for a push, and a required input for a manual run.
 
+### Changed
+
+- The config schema, example, specification, architectural decision log, and rollout
+  guidance now define the exact-file M-only contract and explicit CI base requirement.
+- The required workflow declares read-only contents permission, disables persisted
+  checkout credentials, and pins every third-party action to an immutable commit.
+- Documentation now states the pull-request trust boundary explicitly: requiring the
+  status is not sufficient unless repository rules also require trusted review for the
+  workflow and the gate/parser paths it executes.
+- Propagation coverage proves the workflow and shared parser travel together.
+- The npm artifact now includes the canonical verify workflow consumed by
+  `scripts/propagate.sh`; packed-artifact coverage installs the tarball and proves the
+  propagated gate, parser, and workflow are byte-identical to the release sources.
+
 ### Fixed
+
 - `--level ci` no longer guesses a base or permits a vacuous HEAD-versus-HEAD diff.
   Missing, all-zero, malformed, unreadable, HEAD-equal bases and any git diff failure
   are blocking findings rather than empty change sets that can report green. The gate
@@ -462,23 +521,24 @@ independently of the npm version).
   cannot authorize an index change, and mode-only or content-plus-mode changes cannot use
   the content-only exception.
 
-### Changed
-- The config schema, example, specification, architectural decision log, and rollout
-  guidance now define the exact-file M-only contract and explicit CI base requirement.
-- The required workflow declares read-only contents permission, disables persisted
-  checkout credentials, and pins every third-party action to an immutable commit.
-- Documentation now states the pull-request trust boundary explicitly: requiring the
-  status is not sufficient unless repository rules also require trusted review for the
-  workflow and the gate/parser paths it executes.
-- Propagation coverage proves the workflow and shared parser travel together.
-- The npm artifact now includes the canonical verify workflow consumed by
-  `scripts/propagate.sh`; packed-artifact coverage installs the tarball and proves the
-  propagated gate, parser, and workflow are byte-identical to the release sources.
-
 ## [3.9.2] - 2026-08-05
 **Windows bash portability, one resolver; MANIFEST project-name preservation**
 
+### Changed
+
+- Bash interpreter resolution and Windows path conversion now have a single implementation,
+  `resolveBash()` and `toBashPath()` in `aahp-config.mjs`, used by both `bin/aahp.js` and
+  `scripts/aahp-dashboard.mjs`. `bin/aahp.js` previously carried its own
+  `findBashExecutable()`/`toBashScriptArg()` pair; the dashboard call site had neither, so
+  the same Windows defect had to be found a second time. The merged helper keeps what each
+  side got right: the relative-path and `/c/` MSYS strategies from the CLI, and the
+  `AAHP_BASH` override plus environment-driven candidate paths (including Git's `usr/bin`
+  layout and per-user `LOCALAPPDATA` installs) from the new one. `platform`, `env` and `cwd`
+  are injectable, so the win32 behaviour is asserted on the Linux CI runner
+  (`tests/bash-portability.bats`), and a test fails if a second copy is reintroduced.
+
 ### Fixed
+
 - `handoff-refresh` no longer fails on Windows when it regenerates `MANIFEST.json`.
   `aahp-dashboard.mjs` shelled out to a bare `bash` with native backslash paths, which
   breaks in two independent ways: bash consumes each backslash as an escape, and a bare
@@ -502,22 +562,19 @@ independently of the npm version).
   fields shifted into the wrong variables. The delimiter is now `\x1f` (Unit Separator),
   which is not IFS whitespace.
 
-### Changed
-- Bash interpreter resolution and Windows path conversion now have a single implementation,
-  `resolveBash()` and `toBashPath()` in `aahp-config.mjs`, used by both `bin/aahp.js` and
-  `scripts/aahp-dashboard.mjs`. `bin/aahp.js` previously carried its own
-  `findBashExecutable()`/`toBashScriptArg()` pair; the dashboard call site had neither, so
-  the same Windows defect had to be found a second time. The merged helper keeps what each
-  side got right: the relative-path and `/c/` MSYS strategies from the CLI, and the
-  `AAHP_BASH` override plus environment-driven candidate paths (including Git's `usr/bin`
-  layout and per-user `LOCALAPPDATA` installs) from the new one. `platform`, `env` and `cwd`
-  are injectable, so the win32 behaviour is asserted on the Linux CI runner
-  (`tests/bash-portability.bats`), and a test fails if a second copy is reintroduced.
-
 ## [3.9.1] - 2026-08-03
 **Doctor handoff-set matches Layer 1 on partial indexes; handoff hygiene**
 
+### Changed
+
+- Dogfooded handoff hygiene: STATUS.md rewritten to a current-state snapshot (no session
+  append log), WORKFLOW.md aligned with Phase 4.5 + MANIFEST task selection + harness-owned
+  model routing, NEXT_ACTIONS.md single Recently Completed section, TRUST.md re-verified.
+- Template `WORKFLOW.md` task-selection rules now point at MANIFEST.json as authority
+  (DASHBOARD is display-only), matching README Section 8.4.
+
 ### Fixed
+
 - `aahp doctor` `handoff-set` gate now fails when a canonical handoff file is present on
   disk but missing from `MANIFEST.json` `files{}` (partial index). Previously doctor could
   report PASS while `aahp verify` Layer 1 / `lint-handoff.sh` already failed the same state.
@@ -526,17 +583,11 @@ independently of the npm version).
   so regenerating a manifest no longer collapses every summary to `(no summary available)`
   on normal handoff files.
 
-### Changed
-- Dogfooded handoff hygiene: STATUS.md rewritten to a current-state snapshot (no session
-  append log), WORKFLOW.md aligned with Phase 4.5 + MANIFEST task selection + harness-owned
-  model routing, NEXT_ACTIONS.md single Recently Completed section, TRUST.md re-verified.
-- Template `WORKFLOW.md` task-selection rules now point at MANIFEST.json as authority
-  (DASHBOARD is display-only), matching README Section 8.4.
-
 ## [3.9.0] - 2026-07-26
 **Acceptance-criteria lifecycle, plus an advisory report that is deliberately not a gate**
 
 ### Added
+
 - Specification Section 8.7 defines the acceptance-criteria lifecycle: one canonical
   `Acceptance criteria` section per task, `- [ ]` while a criterion is unresolved, `- [x]`
   only on evidence, and, before a task becomes `done` or a linked issue closes, every
@@ -596,6 +647,7 @@ independently of the npm version).
   mode is not a sufficient safeguard.
 
 ### Changed
+
 - `aahp check` is untouched by this release. The acceptance-criteria detection is a
   standalone command, so the gate list, the `aahp check --json` record shape and its exit
   code are exactly what they were in 3.8.2: the same eight gate ids with the same statuses,
@@ -614,7 +666,16 @@ independently of the npm version).
   `T-001` as `done` while `templates/NEXT_ACTIONS.md` carried unchecked criteria for it.
   `T-001` is now `in_progress`, which is what the template document actually shows.
 
+### Removed
+
+- The `acceptanceCriteria.strict` config key, and with it every way to make an
+  acceptance-criteria finding fail a build. It never shipped in a release. An enforcing
+  option would be switched on somewhere, and then a document shape nobody anticipated
+  becomes a red build in a consumer repo, so the option does not exist rather than
+  defaulting to off. See ADR-017.
+
 ### Fixed
+
 - Criteria written as an ordered list (`1.`, `2)`) are recognized. They were invisible to
   every rule, so a task marked `done` with unresolved numbered criteria reported completely
   clean. Both list forms now count, and README Section 8.7 states which forms are criteria
@@ -640,16 +701,31 @@ independently of the npm version).
 - `package-lock.json` is regenerated so its root name and version match `package.json`
   (it had drifted to the pre-scope name at `3.5.0`).
 
-### Removed
-- The `acceptanceCriteria.strict` config key, and with it every way to make an
-  acceptance-criteria finding fail a build. It never shipped in a release. An enforcing
-  option would be switched on somewhere, and then a document shape nobody anticipated
-  becomes a red build in a consumer repo, so the option does not exist rather than
-  defaulting to off. See ADR-017.
-
 ## [3.8.3] - 2026-07-26
 
+### Changed
+
+- Consequence of the exit-code fix, worth knowing before upgrading: `aahp lint` now exits 1
+  on a repository that has run `aahp init` but not yet `aahp manifest`, because the
+  scaffolded manifest still carries the template placeholder `sha256:[hash]` for every
+  file. `aahp verify` has always refused that state, so no blocking verdict changes; only
+  lint stops disagreeing with what it prints. Run `aahp manifest` after `aahp init`.
+- `aahp verify` Layer 1 reaches BOTH integrity verdicts itself: it reads the file index out
+  of `MANIFEST.json` and hashes each indexed file, instead of inferring existence or a
+  mismatch from another script's output. Blocking no longer rests on string-matching
+  between two scripts, and it survives `lint-handoff.sh` being unavailable, changing its
+  wording, or dying before it prints anything. `lint-handoff.sh` still runs for the checks
+  Layer 1 does not cover, and its non-zero exit is still honoured.
+- `scripts/lint-handoff.sh` no longer ends with "All checks passed" when it skipped its
+  integrity check because no Python interpreter is available. That single case stays a
+  warning with exit 0 on purpose, since making it a violation would turn currently green
+  node-only environments red without catching anything `aahp verify` Layer 1 does not
+  already catch; the summary now says that MANIFEST integrity was not verified, and the
+  README documents the exception instead of claiming that every unverifiable state exits
+  1.
+
 ### Fixed
+
 - `aahp verify` Layer 1 now fails when `MANIFEST.json` indexes a file that is not present
   in the working tree. Deleting an indexed handoff file used to pass both `aahp lint` and
   `aahp verify --level ci` silently: the checksum comparison answers "does this file still
@@ -706,29 +782,18 @@ independently of the npm version).
   unreachable and the operator was sent to the wrong fix: regenerating the manifest baked
   the empty digest in, after which a broken toolchain reported a clean handoff set.
 
-### Changed
-- Consequence of the exit-code fix, worth knowing before upgrading: `aahp lint` now exits 1
-  on a repository that has run `aahp init` but not yet `aahp manifest`, because the
-  scaffolded manifest still carries the template placeholder `sha256:[hash]` for every
-  file. `aahp verify` has always refused that state, so no blocking verdict changes; only
-  lint stops disagreeing with what it prints. Run `aahp manifest` after `aahp init`.
-- `aahp verify` Layer 1 reaches BOTH integrity verdicts itself: it reads the file index out
-  of `MANIFEST.json` and hashes each indexed file, instead of inferring existence or a
-  mismatch from another script's output. Blocking no longer rests on string-matching
-  between two scripts, and it survives `lint-handoff.sh` being unavailable, changing its
-  wording, or dying before it prints anything. `lint-handoff.sh` still runs for the checks
-  Layer 1 does not cover, and its non-zero exit is still honoured.
-- `scripts/lint-handoff.sh` no longer ends with "All checks passed" when it skipped its
-  integrity check because no Python interpreter is available. That single case stays a
-  warning with exit 0 on purpose, since making it a violation would turn currently green
-  node-only environments red without catching anything `aahp verify` Layer 1 does not
-  already catch; the summary now says that MANIFEST integrity was not verified, and the
-  README documents the exception instead of claiming that every unverifiable state exits
-  1.
-
 ## [3.8.2] - 2026-07-25
 
+### Changed
+
+- Applicability of the version-derived gates is decided on the PRESENCE of a root
+  `package.json`, not on it parsing. A `package.json` that exists but is not valid JSON no
+  longer makes `changelog`, `changelog-format` and `version-sync` skip silently in
+  `aahp check`; the gates run and fail with the parse error, so a broken manifest is loud
+  rather than invisible.
+
 ### Fixed
+
 - Gate applicability on a project root with no `package.json` is now decided by a single
   predicate shared by `aahp doctor` and `aahp check`, so the two commands can no longer
   hold different opinions about the same repository. A polyglot root (for example a Python
@@ -746,26 +811,22 @@ independently of the npm version).
 - `aahp doctor` also skips `version-sync` and `pinned-dep` on a root with no
   `package.json`, for the same reason: neither gate has anything to check against.
 
-### Changed
-- Applicability of the version-derived gates is decided on the PRESENCE of a root
-  `package.json`, not on it parsing. A `package.json` that exists but is not valid JSON no
-  longer makes `changelog`, `changelog-format` and `version-sync` skip silently in
-  `aahp check`; the gates run and fail with the parse error, so a broken manifest is loud
-  rather than invisible.
-
 ## [3.8.1] - 2026-07-19
 
 ### Fixed
+
 - `scripts/aahp-manifest.sh` now passes the manifest path to its Node helpers as an
   argument (`process.argv[1]`) instead of interpolating `$HANDOFF_DIR` into the inline
   script. On Windows and MSYS checkouts the interpolated path was not readable by native
   Node, so the preservation helpers failed silently and `tasks`, `next_task_id`, and
   `cross_repo_ref` were dropped from MANIFEST.json on regeneration. Linux and CI were
   unaffected. Regeneration now preserves those optional fields on every platform.
+
 ## [3.8.0] - 2026-07-18
 **Portable Governance: one aggregate governance gate, a governance-only conformance record, and a drop-in CI workflow**
 
 ### Added
+
 - `aahp check [path]`: a consumer-facing governance aggregator that runs the
   config-driven gates (changelog, changelog-format, version-sync, claims,
   forbidden-patterns, schema-doc-sync, doc-links, handoff) as one run. Each gate reports
@@ -792,6 +853,7 @@ independently of the npm version).
   `aahp doctor --governance` coverage in Sections 2.11 and 9.2.
 
 ### Changed
+
 - Git hooks are de-vendored: they resolve `scripts/verify-handoff.sh` when it is vendored,
   else the installed `aahp` CLI via `npx --no-install`, and skip when neither resolves. The
   required CI check remains the off-machine authority (the evaluator-path trust boundary
@@ -805,6 +867,7 @@ independently of the npm version).
 **Anti-entropy: enforcement gates, a constitution, and an ADR log**
 
 ### Added
+
 - Three config-driven enforcement gates (a clean no-op without config), folded into
   `npm run check`: `check-forbidden-patterns.mjs` (bans configured regexes such as em
   dashes or model names in tracked files), `check-schema-doc-sync.mjs` (asserts an
@@ -818,6 +881,7 @@ independently of the npm version).
   `ADR-NNN` anchors and a LOG-to-ADR promotion rule.
 
 ### Changed
+
 - The ci.yml ShellCheck step uses a `git ls-files` glob instead of a hand-maintained
   list, so new scripts are covered automatically (`scripts/propagate.sh` had been
   missed).
@@ -827,7 +891,17 @@ independently of the npm version).
 ## [3.6.1] - 2026-07-18
 **Security: harden the claims floorCmd; fix shipped documentation drift**
 
+### Fixed
+
+- Documentation drift: README Section 4 now lists the full canonical handoff set
+  (adds `GROUNDING.md`, `pii-allowlist.json`, `LOG-ARCHIVE.index.json`); the
+  Section 7.1 command table adds `aahp doctor`; the Section 8.3 task-status enum
+  adds `cancelled`; and the phantom `stale` bucket (never in the schema) is
+  removed from `aahp status`.
+- Removed em dashes (U+2014) from the CONVENTIONS templates and CLAUDE.md.
+
 ### Security
+
 - `check-claims.mjs` now runs `floorCmd` as a repo-relative Node script via
   `execFileSync` (no shell), instead of `execSync` on an arbitrary config string.
   This closes a command-injection path from a PR-editable `aahp.config.json`
@@ -837,17 +911,10 @@ independently of the npm version).
 - Hardened `aahp status`: the task-status counter uses a null-prototype object so a
   crafted status like `toString` cannot match via the prototype chain.
 
-### Fixed
-- Documentation drift: README Section 4 now lists the full canonical handoff set
-  (adds `GROUNDING.md`, `pii-allowlist.json`, `LOG-ARCHIVE.index.json`); the
-  Section 7.1 command table adds `aahp doctor`; the Section 8.3 task-status enum
-  adds `cancelled`; and the phantom `stale` bucket (never in the schema) is
-  removed from `aahp status`.
-- Removed em dashes (U+2014) from the CONVENTIONS templates and CLAUDE.md.
-
 ## [3.6.0] - 2026-07-18
 
 ### Added
+
 - `aahp doctor`: a conformance self-check that emits a machine-readable JSON record
   (`schemaVersion: 1`) covering the handoff file set, MANIFEST schema conformance,
   GROUNDING/TRUST provenance, an exact-version dependency pin, changelog format, and
@@ -866,6 +933,7 @@ independently of the npm version).
   ceremony. A `Provenance` column was adopted in the dogfooded `.ai/handoff/TRUST.md`.
 
 ### Changed
+
 - `check-changelog-format.mjs` enforces the Keep a Changelog grammar (R1-R8, with
   `## [Unreleased]` optional); this CHANGELOG was normalized to conform (gave `3.1.0` a
   full ISO date and collapsed the `3.0.1-3.0.5` range into a single dated entry).
@@ -873,11 +941,13 @@ independently of the npm version).
 ## [3.5.0] - 2026-07-14
 
 ### Added
+
 - `documentation` pipeline phase, accepted by `aahp manifest --phase documentation`, the
   schema `last_session.phase` enum, the manifest generator, and the CLI help.
 - This CHANGELOG. The GitHub release job references it.
 
 ### Fixed
+
 - `aahp-manifest.sh` now preserves the optional `cross_repo_ref` field across
   regeneration (previously it was dropped), the same way it preserves `project`,
   `tasks`, and `next_task_id`.
@@ -885,6 +955,7 @@ independently of the npm version).
 ## [3.4.0] - 2026-07-14
 
 ### Added
+
 - README Section 9, Consuming Harness Integration: the harness-vs-AAHP boundary and
   decision matrix, a reference Claude Code `.claude/` layout, the minimal harness
   bootstrap, and grounding-audit integration.
@@ -898,6 +969,7 @@ independently of the npm version).
 ## [3.3.0] - 2026-07-13
 
 ### Added
+
 - Grounded Reflection Layer (Draft v0.1, README Section 2.10): an orthogonal provenance
   axis (`model_claim` to `human_confirmed`) recorded as a TRUST.md column, a
   `templates/GROUNDING.md` task-type anchor matrix scaffolded by `aahp init`, an optional
@@ -907,12 +979,14 @@ independently of the npm version).
 ## [3.2.1] - 2026-06-26
 
 ### Fixed
+
 - Follow-up fixes to the LOG archive flow and the verify gate. Last version published to
   npm before the 3.5.0 catch-up release.
 
 ## [3.2.0] - 2026-06-26
 
 ### Added
+
 - Canonical LOG archive flow: `LOG.md` keeps the 10 newest entries and older entries
   rotate into `LOG-ARCHIVE.md`; `LOG-ARCHIVE.index.json` records archived-entry hashes so
   `aahp archive --verify` detects truncation or tampering. Reusable per-check badge
@@ -921,6 +995,7 @@ independently of the npm version).
 ## [3.1.0] - 2026-06-26
 
 ### Added
+
 - Reviewed, exact-value, expiring PII email allowlist (`pii-allowlist.json`),
   MANIFEST-indexed so it cannot suppress secrets. Shipped to npm as part of the 3.2.0
   release.
@@ -928,12 +1003,14 @@ independently of the npm version).
 ## [3.0.5] - 2026-06-20
 
 ### Added
+
 - AAHP v3 (v3.0.1 through v3.0.5): stable task IDs (`T-001` and up), a machine-readable
   dependency graph in `MANIFEST.json`, the `aahp` CLI, the verify gate (`aahp verify`),
   checksum integrity, the prompt-injection and secrets/PII firewalls, and OIDC trusted
   publishing to npm.
 
 ### Changed
+
 - Relicensed to Apache-2.0 (earlier commits carried MIT, then CC BY 4.0, headers).
 
 [Unreleased]: https://github.com/homeofe/AAHP/compare/v3.10.0...HEAD
@@ -955,3 +1032,4 @@ independently of the npm version).
 [3.2.0]: https://github.com/homeofe/AAHP/releases/tag/v3.2.0
 [3.1.0]: https://github.com/homeofe/AAHP/compare/v3.0.5...v3.1.0
 [3.0.5]: https://github.com/homeofe/AAHP/releases/tag/v3.0.5
+

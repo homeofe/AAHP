@@ -85,7 +85,7 @@ AAHP commands come in two flavors: **Node-native** (like `init`) and **bash-dele
      ```
    - Update `printHelp()` to document the new command.
 
-3. **Add Bats tests** in `tests/yourcommand.bats` covering the happy path and error cases.
+3. **Add Bats tests** in `tests/<yourcommand>.bats` covering the happy path and error cases.
 
 4. **ShellCheck** the new script before committing.
 

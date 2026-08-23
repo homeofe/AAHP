@@ -11,9 +11,9 @@
   },
   "files": {
     "STATUS.md": {
-      "checksum": "sha256:cdf630cc96ba236d8f9386503580c0138d4e675603399ea9d00b4acaf2739507",
+      "checksum": "sha256:d33c1ade79eb27ee7a410c89d6d74011672c6659f0c8e326bbf4afe9f4683401",
       "updated": "2026-08-23T12:53:00Z",
-      "lines": 582,
+      "lines": 636,
       "summary": "22 of 25 action references under `.github/workflows/` ran on mutable major tags,"
     },
     "NEXT_ACTIONS.md": {

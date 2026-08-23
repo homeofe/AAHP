@@ -4,17 +4,17 @@
   "last_session": {
     "agent": "cli-tool",
     "session_id": "cli-1787489585",
-    "timestamp": "2026-08-23T16:01:08Z",
-    "commit": "3cdaa04",
+    "timestamp": "2026-08-23T17:01:38Z",
+    "commit": "bbf6482",
     "phase": "fix",
     "duration_minutes": 0
   },
   "files": {
     "STATUS.md": {
-      "checksum": "sha256:85c0b21822d2a5ba0d30c1d92e257a28bf7f7e46cfbb51386ff7369b8bd9c4c2",
-      "updated": "2026-08-23T16:01:08Z",
-      "lines": 1078,
-      "summary": "`check-conflict-markers` read `.ai/handoff/` and nothing else. Measured today,"
+      "checksum": "sha256:0cd8218a3280ebbdd3710f4031c6cc1fe065298055361397edb1251592e914db",
+      "updated": "2026-08-23T17:01:38Z",
+      "lines": 1125,
+      "summary": "#105 widened this gate from `.ai/handoff/` to `.ai/handoff/` plus ROOT-level"
     },
     "NEXT_ACTIONS.md": {
       "checksum": "sha256:efdc6ef8664faf9ce5120fa797b702d2353bd4c3205c62e5ba651a465326103d",

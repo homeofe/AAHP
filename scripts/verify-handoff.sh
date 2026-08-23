@@ -631,14 +631,29 @@ fi
 # register left alone over a long weekend would otherwise block every commit in
 # the repository, including the commit that re-verifies it.
 #
-# Turning this into a blocking finding - outright, or above a threshold such as
-# "more than half the verified rows are expired" - is an OWNER DECISION and is
-# deliberately not taken here, because it would fail repositories that changed
+# Turning this into a blocking finding for EVERY repository would fail ones that
+# changed
 # nothing. Measured 2026-08-23 across the nine consuming repositories in this
 # estate: two hold registers with 24 of 25 and 20 of 21 verified rows already
 # expired, so a blocking Layer 4 turns them red on their next commit for a file
-# none of their pull requests touch. Recorded at the issue that raised it, with
-# the three options and this measurement attached.
+# none of their pull requests touch. That measurement is why the DEFAULT below is
+# unchanged.
+#
+# OPT-IN ENFORCEMENT. `trustTtl.enforce` in aahp.config.json, on the same pattern
+# as pinnedDep. Absent or false, this block warns exactly as it always has and no
+# consumer changes behaviour. True, and expired rows increment FAILURES, so a
+# register that has quietly stopped meaning anything stops the pipeline.
+#
+# The objection that enforcement would block even the commit that re-verifies the
+# register does not apply to this shape. Layer 4 does not run at precommit, so no
+# local commit is blocked; and the pull request that refreshes TRUST.md carries
+# the refreshed rows, so CI reads a register that is already clean. It heals
+# through the ordinary route rather than deadlocking.
+#
+# Under enforcement, a register that cannot be CLASSIFIED fails as well. The
+# census below already refuses to call that state "no expired entries"; if it
+# were still a pass under enforcement, the gate could be switched off by breaking
+# the table instead of by editing the reviewed config.
 #
 # What forces re-verification today, named here so the advisory is not just an
 # absence: the expired rows are printed on every non-precommit run of this
@@ -657,9 +672,27 @@ if [ "$LEVEL" != "precommit" ]; then
     echo ""
     echo -e "${GREEN}[Layer 4]${NC} TRUST-TTL expiry (TRUST.md)"
 
+    # Read the switch before anything else, so a config this gate cannot read is
+    # reported as a failure rather than resolved to "not enforcing".
+    TRUST_ENFORCE=0
+    if TRUST_ENFORCE_OUT=$(aahp_trust_enforce "$PROJECT_ROOT/aahp.config.json" 2>&1); then
+        TRUST_ENFORCE=$(echo "$TRUST_ENFORCE_OUT" | tr -d '[:space:]')
+    else
+        TRUST_ENFORCE_RC=$?
+        if [ "$TRUST_ENFORCE_RC" -eq 2 ]; then
+            log_warn "trustTtl.enforce could not be read: $TRUST_ENFORCE_OUT"
+        else
+            log_fail "trustTtl.enforce could not be read: $TRUST_ENFORCE_OUT"
+        fi
+    fi
+
     TRUST_FILE="$HANDOFF_DIR/TRUST.md"
     if [ ! -f "$TRUST_FILE" ]; then
-        log_warn "TRUST.md not found. TTL was NOT evaluated."
+        if [ "$TRUST_ENFORCE" = "1" ]; then
+            log_fail "TRUST.md not found and trustTtl.enforce is on. TTL was NOT evaluated, which is not a pass."
+        else
+            log_warn "TRUST.md not found. TTL was NOT evaluated."
+        fi
     else
         TODAY=$(date -u +"%Y-%m-%d")
         TRUST_CENSUS=$(aahp_trust_census "$TRUST_FILE")
@@ -670,15 +703,27 @@ if [ "$LEVEL" != "precommit" ]; then
             # No row reached the expiry comparison. Reporting "no expired
             # entries" here would be a verdict over nothing.
             if [ "$TRUST_CANDIDATE" -eq 0 ]; then
-                log_warn "TRUST.md holds no trust table this reader recognises. TTL was NOT evaluated (this is not 'no expired entries')."
+                if [ "$TRUST_ENFORCE" = "1" ]; then
+                    log_fail "TRUST.md holds no trust table this reader recognises and trustTtl.enforce is on. TTL was NOT evaluated, which is not a pass."
+                else
+                    log_warn "TRUST.md holds no trust table this reader recognises. TTL was NOT evaluated (this is not 'no expired entries')."
+                fi
             else
-                log_warn "TRUST.md holds $TRUST_CANDIDATE trust row(s), but none could be classified as a dated 'verified' entry: a table needs BOTH a 'Status' and an 'Expires' column. TTL was NOT evaluated (this is not 'no expired entries')."
+                if [ "$TRUST_ENFORCE" = "1" ]; then
+                    log_fail "TRUST.md holds $TRUST_CANDIDATE trust row(s), but none could be classified as a dated 'verified' entry: a table needs BOTH a 'Status' and an 'Expires' column. trustTtl.enforce is on and TTL was NOT evaluated, which is not a pass."
+                else
+                    log_warn "TRUST.md holds $TRUST_CANDIDATE trust row(s), but none could be classified as a dated 'verified' entry: a table needs BOTH a 'Status' and an 'Expires' column. TTL was NOT evaluated (this is not 'no expired entries')."
+                fi
             fi
         elif [ -z "$EXPIRED" ]; then
             log_ok "No expired 'verified' trust entries ($TRUST_DECIDABLE checked)."
         else
             EXPIRED_COUNT=$(echo "$EXPIRED" | sed '/^$/d' | wc -l | tr -d ' ')
-            log_warn "$EXPIRED_COUNT of $TRUST_DECIDABLE 'verified' trust entr(ies) expired. Re-verify and reset TTL:"
+            if [ "$TRUST_ENFORCE" = "1" ]; then
+                log_fail "$EXPIRED_COUNT of $TRUST_DECIDABLE 'verified' trust entr(ies) expired and trustTtl.enforce is on. Re-verify and reset TTL:"
+            else
+                log_warn "$EXPIRED_COUNT of $TRUST_DECIDABLE 'verified' trust entr(ies) expired. Re-verify and reset TTL:"
+            fi
             echo "$EXPIRED" | sed '/^$/d' | sed 's/^/      - /' | head -20
         fi
     fi

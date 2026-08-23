@@ -435,3 +435,129 @@ EOF
     [[ "$output" == *"not found"* ]]
     rm -rf "$EMPTY"
 }
+
+# --- Layer 4 can fail, but only where a repository asked for it -------------
+#
+# Layer 4 had no branch that incremented FAILURES, so no number of expired rows
+# could change the exit code. Trust Decay is the mechanism by which a `verified`
+# claim stops counting as verified, and it could not stop anything: eight of this
+# repository's own ten verified rows sat expired, one by 16 days, all green.
+#
+# Making it blocking for everyone was measured as the wrong fix. Two of the nine
+# consuming repositories hold registers with 24 of 25 and 20 of 21 rows already
+# expired, so a blocking Layer 4 turns them red for a file their pull requests
+# never touch. Hence opt-in, and hence the pair of tests below: one proves it can
+# fail, the other proves the default did not move.
+
+@test "Layer 4: trustTtl.enforce makes an expired verified row BLOCKING" {
+    cat > "$TEST_TMPDIR/.ai/handoff/TRUST.md" <<'EOF'
+# Trust Register
+
+| Property | Status | Last Verified | Agent | TTL | Expires | Notes |
+|----------|--------|---------------|-------|-----|---------|-------|
+| Stale claim | verified | 2026-01-01 | tester | 7d | 2026-01-08 | should be expired |
+EOF
+    cat > "$TEST_TMPDIR/aahp.config.json" <<'EOF'
+{
+  "trustTtl": { "enforce": true }
+}
+EOF
+    bash "$SCRIPTS_DIR/aahp-manifest.sh" "$TEST_TMPDIR" --quiet --phase implementation
+    git -C "$TEST_TMPDIR" add -A
+    git -C "$TEST_TMPDIR" commit -q -m "trust"
+
+    run bash "$SCRIPTS_DIR/verify-handoff.sh" "$TEST_TMPDIR" --level full
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"trustTtl.enforce is on"* ]]
+    [[ "$output" == *"Stale claim"* ]]
+    # The reason must be the trust register, not some other layer that happens to
+    # be red in the same run. Without this the test would pass for any failure.
+    [[ "$output" == *"'verified' trust entr(ies) expired and trustTtl.enforce is on"* ]]
+}
+
+@test "Layer 4: with enforce false the SAME register only warns" {
+    # The other half. Without it, an implementation that ignores the config and
+    # always fails would pass the test above, and that implementation is exactly
+    # the one that turns two consuming repositories red on their next commit.
+    cat > "$TEST_TMPDIR/.ai/handoff/TRUST.md" <<'EOF'
+# Trust Register
+
+| Property | Status | Last Verified | Agent | TTL | Expires | Notes |
+|----------|--------|---------------|-------|-----|---------|-------|
+| Stale claim | verified | 2026-01-01 | tester | 7d | 2026-01-08 | should be expired |
+EOF
+    cat > "$TEST_TMPDIR/aahp.config.json" <<'EOF'
+{
+  "trustTtl": { "enforce": false }
+}
+EOF
+    bash "$SCRIPTS_DIR/aahp-manifest.sh" "$TEST_TMPDIR" --quiet --phase implementation
+    git -C "$TEST_TMPDIR" add -A
+    git -C "$TEST_TMPDIR" commit -q -m "trust"
+
+    run bash "$SCRIPTS_DIR/verify-handoff.sh" "$TEST_TMPDIR" --level full
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"'verified' trust entr(ies) expired"* ]]
+    [[ "$output" != *"trustTtl.enforce is on"* ]]
+}
+
+@test "Layer 4: under enforcement an UNREADABLE register fails, it is not clean" {
+    # Otherwise enforcement is switched off by breaking the table rather than by
+    # editing the reviewed config line, and the register that cannot be read is
+    # precisely the one nobody is maintaining.
+    cat > "$TEST_TMPDIR/.ai/handoff/TRUST.md" <<'EOF'
+# Trust Register
+
+| Property | Value | Verified | TTL | Expires |
+|----------|-------|----------|-----|---------|
+| Stale claim | yes | 2026-01-01 | 7d | 2026-01-08 |
+EOF
+    cat > "$TEST_TMPDIR/aahp.config.json" <<'EOF'
+{
+  "trustTtl": { "enforce": true }
+}
+EOF
+    bash "$SCRIPTS_DIR/aahp-manifest.sh" "$TEST_TMPDIR" --quiet --phase implementation
+    git -C "$TEST_TMPDIR" add -A
+    git -C "$TEST_TMPDIR" commit -q -m "trust"
+
+    run bash "$SCRIPTS_DIR/verify-handoff.sh" "$TEST_TMPDIR" --level full
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"TTL was NOT evaluated"* ]]
+    [[ "$output" != *"No expired 'verified' trust entries"* ]]
+}
+
+@test "Layer 4: an unparseable config fails rather than defaulting to not-enforcing" {
+    # Fail closed. A required gate must not read a broken policy file as
+    # permission to stop checking, or corrupting the config becomes the cheapest
+    # way to disable it.
+    cat > "$TEST_TMPDIR/aahp.config.json" <<'EOF'
+{ "trustTtl": { "enforce": true },
+EOF
+    bash "$SCRIPTS_DIR/aahp-manifest.sh" "$TEST_TMPDIR" --quiet --phase implementation
+    git -C "$TEST_TMPDIR" add -A
+    git -C "$TEST_TMPDIR" commit -q -m "config"
+
+    run bash "$SCRIPTS_DIR/verify-handoff.sh" "$TEST_TMPDIR" --level full
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"trustTtl.enforce could not be read"* ]]
+}
+
+@test "Layer 4: a duplicated trustTtl key is refused, not silently resolved" {
+    # Every JSON parser here keeps the LAST duplicate key, so a reviewer reading
+    # the first one can be looking at a value that never takes effect. The reader
+    # refuses the file instead of picking a winner.
+    cat > "$TEST_TMPDIR/aahp.config.json" <<'EOF'
+{
+  "trustTtl": { "enforce": true },
+  "trustTtl": { "enforce": false }
+}
+EOF
+    bash "$SCRIPTS_DIR/aahp-manifest.sh" "$TEST_TMPDIR" --quiet --phase implementation
+    git -C "$TEST_TMPDIR" add -A
+    git -C "$TEST_TMPDIR" commit -q -m "config"
+
+    run bash "$SCRIPTS_DIR/verify-handoff.sh" "$TEST_TMPDIR" --level full
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"could not be read"* ]]
+}

@@ -492,3 +492,71 @@ install_npx_spy() {
     run grep -c "NOT ENFORCED" "$AAHP_ROOT/templates/.aiignore"
     [ "$status" -eq 0 ]
 }
+
+# --- 84, the case in the issue title: a typo in a GATE ID -------------------
+#
+# `check.only` and `check.skip` were typed as bare strings with no enum, while
+# `pinnedDep.location` two sections away had one. So a gate id misspelled by one
+# letter matched no gate, every gate was deselected, and the run reported
+# `Governance OK: 0 gate(s) ran, no failures.` exit 0 with the violation still in
+# the tree. Both AJV and the hand validator called that config valid.
+#
+# The ids are checked against CHECK_GATES rather than against an enum in the
+# schema: a second copy of the list drifts the moment a gate is added, and drift
+# there restores the defect with nothing turning red.
+
+setup_gate_id_fixture() {
+  FIXDIR="$BATS_TEST_TMPDIR/gate-id"
+  mkdir -p "$FIXDIR"
+  cd "$FIXDIR" || return 1
+  git init -q .
+  git config user.email t@example.com
+  git config user.name t
+  printf '{"name":"fx","version":"1.0.0"}' > package.json
+  # A real U+2014, written by code point so this file needs none of its own.
+  printf 'a real em dash \u2014 right here\n' > DOC.md
+  git add -A && git commit -qm init
+}
+
+write_only_config() {
+  printf '{"forbiddenPatterns":[{"id":"em-dash","pattern":"\\u2014","message":"no em dash"}],"check":{"only":%s}}' \
+    "$1" > "$FIXDIR/aahp.config.json"
+}
+
+@test "84 control: the correctly spelled gate id catches the violation" {
+  setup_gate_id_fixture
+  write_only_config '["forbidden-patterns"]'
+  run node "$AAHP_ROOT/bin/aahp.js" check "$FIXDIR"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"Governance FAILED"* ]]
+}
+
+@test "84 an unknown gate id is refused, not silently treated as deselect-all" {
+  setup_gate_id_fixture
+  write_only_config '["forbidden-paterns"]'
+  run node "$AAHP_ROOT/bin/aahp.js" check "$FIXDIR"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"NOT EVALUATED"* ]]
+  [[ "$output" == *"forbidden-paterns"* ]]
+  # The distinction the defect erased: this must not read as a pass.
+  [[ "$output" != *"Governance OK"* ]]
+}
+
+@test "84 the refusal names the ids that DO exist, so the typo is fixable" {
+  setup_gate_id_fixture
+  write_only_config '["totally-made-up"]'
+  run node "$AAHP_ROOT/bin/aahp.js" check "$FIXDIR"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"Known gate ids"* ]]
+  [[ "$output" == *"forbidden-patterns"* ]]
+}
+
+@test "84 zero gates ran is reported as not evaluated, never as OK" {
+  setup_gate_id_fixture
+  write_only_config '[]'
+  run node "$AAHP_ROOT/bin/aahp.js" check "$FIXDIR"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"0 gate(s) ran"* ]]
+  [[ "$output" == *"not a pass"* ]]
+  [[ "$output" != *"Governance OK"* ]]
+}

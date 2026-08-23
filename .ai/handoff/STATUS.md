@@ -1,3 +1,29 @@
+## The gate id itself was never validated, which is the case issue 84 puts in its title
+
+This branch validated the config document and still let the defect through by the
+route the issue names. Measured on it before this commit:
+  check.only ["forbidden-patterns"] -> exit 1, the violation is caught
+  check.only ["forbidden-paterns"]  -> exit 0, "Governance OK: 0 gate(s) ran"
+  check.only ["totally-made-up"]    -> exit 0
+  check.only []                     -> exit 0
+In each of the last three the violation was still in the tree. `check.only` and
+`check.skip` items were typed as bare strings with no enum, while
+`pinnedDep.location` two sections away had one, and BOTH the new hand validator
+and AJV reported the typo config as valid.
+That falsified a sentence this branch ships in scripts/aahp-config.mjs: "Every
+gate reads its config through here, so validating here means no gate can be
+silently switched off by a typo."
+Ids are now checked against CHECK_GATES at the point of use, and zero gates ran
+no longer prints "Governance OK" - it reports NOT EVALUATED and exits 1, reusing
+the words this file already had for an unparseable config rather than inventing
+a second vocabulary for the same state.
+WHY NOT A SCHEMA ENUM: a copy of the gate ids in the schema is a second source
+that drifts the moment a gate is added, and drift there restores the defect with
+nothing turning red. The list that runs the gates cannot disagree with itself.
+VERIFIED ON LINUX, not on Windows: bats 1.10.0, 28/28 green. Mutation proof:
+restoring the unfixed bin/aahp.js turns tests 26, 27 and 28 red while the
+control at 25 stays green, BATS_EXIT=1.
+
 ## 2026-08-23 - three inert controls, one regression suite (#84, #82, #80)
 
 Three HIGH issues, one shape: a control that could not fail. Fixed together

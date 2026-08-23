@@ -994,6 +994,25 @@ function cmdCheck(targetPath, flags) {
   const only = Array.isArray(sel.only) ? sel.only : null
   const skip = Array.isArray(sel.skip) ? sel.skip : []
 
+  // A gate id that does not exist is a typo, and a typo here WAS the defect:
+  // check.only: ['forbidden-paterns'] deselected every gate, printed
+  // 'Governance OK: 0 gate(s) ran, no failures.' and exited 0 with the violation
+  // still in the tree. Validated against CHECK_GATES rather than against an enum
+  // in the schema on purpose: a second copy of the gate ids drifts the moment a
+  // gate is added, and drift here brings the defect back with nothing turning
+  // red. The list that runs the gates cannot disagree with itself.
+  const knownGateIds = CHECK_GATES.map((g) => g.id)
+  const unknownIds = [...(only || []), ...skip].filter((id) => !knownGateIds.includes(id))
+  if (unknownIds.length > 0) {
+    console.log('=========================================')
+    console.log(
+      `Governance NOT EVALUATED: aahp.config.json selects gate id(s) that do not exist: ${unknownIds.join(', ')}.`,
+    )
+    console.log(`Known gate ids: ${knownGateIds.join(', ')}.`)
+    console.log('No gate ran. This is not a pass.')
+    process.exit(1)
+  }
+
   const results = {}
   for (const gate of CHECK_GATES) {
     let status, reason
@@ -1049,10 +1068,16 @@ function cmdCheck(targetPath, flags) {
     if (!ok || !quiet) console.log(`  ${(labels[v.status] || v.status).padEnd(6)} ${k}: ${v.reason}`)
   }
   if (!quiet) console.log('=========================================')
+  const ranCount = Object.values(gates).filter((s) => s !== 'skip').length
+  if (failing.length === 0 && ranCount === 0) {
+    // Nothing was examined. 'No failures' is true here and useless: it is the
+    // same false green as an unparseable config, reached by a different route.
+    console.log('Governance NOT EVALUATED: 0 gate(s) ran. This is not a pass.')
+    process.exit(1)
+  }
   if (failing.length === 0) {
     if (!quiet) {
-      const ran = Object.values(gates).filter((s) => s !== 'skip').length
-      console.log(`Governance OK: ${ran} gate(s) ran, no failures.`)
+      console.log(`Governance OK: ${ranCount} gate(s) ran, no failures.`)
     }
   } else {
     console.log(`Governance FAILED: ${failing.map(([k]) => k).join(', ')}.`)

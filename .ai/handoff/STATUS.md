@@ -1,5 +1,13 @@
 ## Two jobs in one file disagreed about what a release is, and npm got the looser answer
 
+**A second lesson from the same merge.** Syncing this branch after another merge produced conflicts in
+MANIFEST.json AND CHANGELOG.md. Staging with `git add -A` committed the CHANGELOG
+markers, `git commit` exited 0, and `aahp verify` passed, because
+`check-conflict-markers` reads `.ai/handoff/` only. So a `<<<<<<< HEAD` reached a
+pushed branch of a PUBLIC repository, in the file that becomes the release notes, and
+every gate called it clean. Resolved by keeping BOTH sides, which is what an append-log
+of release notes requires. The gate’s narrow scope is a real gap and is being closed
+separately rather than folded into this change.
 `publish` runs `npm publish --access public --provenance` with `id-token: write`.
 Its condition was a disjunction, and the right operand,
 `github.event_name == 'workflow_dispatch'`, constrains no ref at all. The

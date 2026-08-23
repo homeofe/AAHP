@@ -1289,6 +1289,15 @@ path would have made this gate unable to fail on the defect it was written for.
 Each entry therefore pins the exact number of reviewed occurrences, and any other
 number is red in both directions: a new mention is what re-introducing the defect
 looks like, and a count that matches nothing is a dead exception.
+**Scope, chosen by measurement rather than by symmetry:** `docPaths.include` is
+the adopter-facing document set, which is the `docLinks` set MINUS
+`.ai/handoff/*.md`. Widening it to match `docLinks` exactly was tried first, and
+it does find real stale paths, so the exclusion is a cost rather than a free
+choice. It was excluded anyway because `.ai/handoff/STATUS.md` is an append-only
+log in which quoting a path that WAS wrong is frequently the point of the entry.
+A counted exception list over an append-log churns on every session and ends up
+switched off, which is the ADR-017 failure mode by a different route. Widening
+this needs a rule for the append-log first.
 **Consequence:** this gate is in the `check` chain that the required
 `lint-and-validate` job runs, and it is NOT in `CHECK_GATES`, so it is not part of
 `aahp check` and no consumer inherits it. It exits 2 on anything it could not

@@ -43,6 +43,16 @@ repository-local, absent from CHECK_GATES, so no consumer inherits it, and it
 still cannot see a path written without backticks or one whose first segment is
 not tracked here. Nothing here touches the nine consumer repositories.
 
+OPEN, found by this work and deliberately NOT fixed here. docPaths.include is the
+docLinks set minus .ai/handoff/*.md. Widening it to the full docLinks set was
+tried and is red: NEXT_ACTIONS.md names .github/workflows/publish.yml twice, and
+there is no such workflow in this repository - publish is a JOB inside ci.yml.
+Same defect class as issue #74, in the document that tells the next agent what to
+do. Left alone because handoff files collide across concurrent branches and this
+change set does not need them. The scope choice itself is recorded in ADR-022: an
+append-only STATUS.md quotes paths that WERE wrong on purpose, so a counted
+exception list over it churns every session and gets switched off.
+
 ## The class test could not detect its own class, and the README described a workflow that changed
 
 The test "every *_SUFFIX= rule in the shipped template has an enforced

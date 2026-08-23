@@ -10,6 +10,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join, resolve, relative, isAbsolute } from "node:path";
 import { execFileSync } from "node:child_process";
+import { validateConfigObject, formatConfigErrors } from "./aahp-schema.mjs";
 
 // Resolve the target project root: the first non-flag positional argument,
 // else the current working directory. Mirrors the [path] convention in the
@@ -39,17 +40,44 @@ export function loadPkg(root) {
 
 // Load aahp.config.json from the project root. Returns {} when absent so every
 // gate degrades to a clean no-op on a repo that ships no config - AAHP must keep
-// working for projects that never adopt one. Throws only on malformed JSON.
-export function loadConfig(root) {
+// working for projects that never adopt one.
+//
+// An ABSENT config and a MALFORMED config are not the same thing and must never
+// produce the same outcome. Absent is a clean no-op; malformed is an error. That
+// distinction is the whole fix for the class where `forbiddenPatterns` misspelled
+// as `forbiddenPaterns` made a failing gate report SKIP and the run report
+// `Governance OK`, exit 0: applicability is decided on the PRESENCE of a key, so
+// a typo is indistinguishable from an absent section unless something validates
+// the shape. Every gate reads its config through here, so validating here means
+// no gate can be silently switched off by a typo.
+//
+// `strict: false` opts OUT of schema validation for callers that must read the
+// file even when it is invalid (bin/aahp.js reports the errors itself, with the
+// gate list attached). It does NOT skip the JSON parse check.
+export function loadConfig(root, { strict = true } = {}) {
   const p = join(root, "aahp.config.json");
   if (!existsSync(p)) return {};
+  let parsed;
   try {
-    return JSON.parse(readFileSync(p, "utf8"));
+    parsed = JSON.parse(readFileSync(p, "utf8"));
   } catch (err) {
     const e = new Error(`aahp.config.json is not valid JSON: ${err.message}`);
     e.code = "AAHP_CONFIG_INVALID";
     throw e;
   }
+  if (strict) {
+    // validateConfigObject THROWS when the question could not be asked (schema
+    // absent, or the schema uses a keyword the validator does not implement).
+    // That throw is deliberate and must not be caught into a pass here.
+    const errors = validateConfigObject(parsed);
+    if (errors.length > 0) {
+      const e = new Error(formatConfigErrors(errors));
+      e.code = "AAHP_CONFIG_SCHEMA_INVALID";
+      e.errors = errors;
+      throw e;
+    }
+  }
+  return parsed;
 }
 
 // Standard AAHP handoff files, parsed from the canonical bash source of truth

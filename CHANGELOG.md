@@ -270,6 +270,69 @@ independently of the npm version).
   and that it is measurably narrower even today: an inheriting job here is granted
   `Packages: read` on top of `Contents` and `Metadata`, and a declaring job is not.
 
+- `aahp.config.json` is validated against `schema/aahp-config.schema.json` before any
+  gate is evaluated, by `aahp check`, by `aahp doctor` and by every gate that loads the
+  config directly. Nothing validated it before, and `gateApplies` decides whether a gate
+  runs from the PRESENCE of a config key, so a key misspelled by one letter was
+  indistinguishable from a section that was never written: `forbiddenPatterns` typed as
+  `forbiddenPaterns` turned a FAILING gate into `SKIP  not applicable here` and the run
+  into `Governance OK`, exit 0, with the violation still in the tree. An unparseable
+  config was worse - `readJsonSafe` returned null, the caller substituted `{}`, and all
+  eight gates skipped. This is the gate over the gates: while the config could be
+  malformed unnoticed, every gate it declares was optional in practice. An invalid
+  config is now an error that names the offending key and suggests the closest valid
+  one, no gate is evaluated, and the machine-readable record marks every gate
+  `unevaluated` rather than `skip`, so a dashboard can tell "asked, not applicable here"
+  from "never asked". The validator (`scripts/aahp-schema.mjs`) is dependency-free and
+  ships inside the package, per ADR-002; it THROWS on any schema keyword it does not
+  implement, so a partial validator can never report "valid" for a document it did not
+  fully examine. CI validates this repository's own config with AJV as well, so the two
+  implementations cross-check.
+- No code AAHP ships can fetch a package from the public registry as a fallback. The
+  portable governance workflow and both git hooks called `npx --no-install aahp`.
+  `npx` is `npm exec`, which has NO `--no-install` option and ignores the unknown flag
+  without a warning, so whenever the local resolution missed, that line resolved the
+  UNSCOPED name `aahp` against registry.npmjs.org and executed whatever came back - as
+  the repository's governance gate, and inside the pre-commit and pre-push hook of every
+  consumer that installed them. The published package is `@elvatis_com/aahp`; the
+  unscoped name is owned by nobody, so the fallback would not even have resolved to a
+  stale version of this project. It returns 404 today, which is why the behaviour was
+  correct BY ACCIDENT rather than by construction. All five call sites now invoke
+  `node <root>/node_modules/@elvatis_com/aahp/bin/aahp.js`, a path that cannot reach the
+  registry and cannot resolve to any name but the pinned one; when it is absent the
+  workflow fails closed and the hooks skip, which is what `README` always said they did.
+  **Adopters must re-scaffold:** the vulnerable text is already copied into your
+  repository. Run `aahp init --gates --force` for the workflow and
+  `scripts/install-hooks.sh` for the hooks. Fixing the sources here does not fix a copy.
+- Four of the thirteen secret patterns `aahp lint` enforces matched nothing at all.
+  `grep` runs in BRE mode, where the bare `?` in `['\"]?` is a LITERAL question mark
+  rather than an optional-quantifier, so `_KEY=`, `_SECRET=`, `_TOKEN=` and `_PASSWORD=`
+  required a quote followed by an actual `?` character. Measured on a fixture containing
+  `API_KEY=abc123`, `X_SECRET=...`, `GH_TOKEN=...` and `DB_PASSWORD=...`: zero matches
+  before, one to two each after escaping the quantifier. The same trap was already
+  documented one comment above for the `\{16,\}` interval and was applied there.
+  `_CREDENTIALS=` is added alongside them, because `templates/.aiignore` has always
+  shipped `*_CREDENTIALS=*` with no counterpart in the enforced list.
+
+### Changed
+- `.ai/handoff/.aiignore` no longer claims to be enforced, because it is not. No code in
+  this repository parses it; the single occurrence of the name in the enforcement path
+  excludes the file from the scan. `README` section 2.6 said "CI hook validates that no
+  handoff file contains these patterns" and `templates/.aiignore` said "Validated by CI
+  hooks and agents before committing". Measured: with `10.0.0.*` and
+  `*.internal.example.com` added to `.aiignore`, a committed `STATUS.md` line reading
+  `Deploy target: db.internal.example.com at 10.0.0.5` passes `lint-handoff.sh` and
+  `aahp verify --level ci`, both exit 0. The damage is the belief, so both claims are
+  withdrawn, the "add your internal hostnames, IPs, endpoints here" invitation is
+  replaced by the two mechanisms that ARE enforced, and `aahp lint` now prints, in check
+  2, how many `.aiignore` patterns it is not applying and by name. Whether the file
+  should become a real rule source is left as an owner decision rather than taken here:
+  enforcing an existing adopter's committed copy would newly fail their build on
+  patterns nobody chose, and the glob vocabulary cannot express what the enforced regexes
+  do - the template's `sk-*` has no length floor and matches the word "task-type" inside
+  AAHP's own shipped templates, so `aahp init` followed by enforcement is red on an
+  untouched repository.
+
 ## [3.10.0] - 2026-08-20
 **Fail-closed Layer 2 base selection and reviewed exact-file impact classification**
 

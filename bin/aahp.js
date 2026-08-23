@@ -27,6 +27,7 @@ import { dirname, join, resolve } from 'node:path'
 import { existsSync, mkdirSync, copyFileSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { spawn, spawnSync } from 'node:child_process'
 import { resolveBash, toBashPath } from '../scripts/aahp-config.mjs'
+import { validateConfigObject, formatConfigErrors } from '../scripts/aahp-schema.mjs'
 import { audit as auditVerifyWorkflow } from '../scripts/check-verify-workflow.mjs'
 
 const __filename = fileURLToPath(import.meta.url)
@@ -467,6 +468,59 @@ function readJsonSafe(path) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// The gate over the gates: aahp.config.json must match its own schema.
+//
+// `gateApplies` below decides whether a gate runs from the PRESENCE of a config
+// key. That makes a misspelled key indistinguishable from an absent section, and
+// an absent section is a clean `skip`. So `forbiddenPatterns` written as
+// `forbiddenPaterns` turned a FAILING gate into `Governance OK`, exit 0, with the
+// violation still in the tree. `readJsonSafe` made the unparseable case worse
+// still: it returned null, the caller substituted {}, and every gate skipped.
+//
+// This reads the config ONCE for check and doctor and reports three outcomes
+// that must never be collapsed into each other:
+//   absent   -> {} and no problem; an unconfigured repo is legitimately a no-op
+//   invalid  -> a problem; NO gate is evaluated and the command exits non-zero
+//   valid    -> the parsed config
+//
+// The `unevaluated` status the callers emit for every gate in the invalid case
+// is deliberately NOT `skip`: `skip` means "asked, not applicable here", and a
+// dashboard that cannot tell those apart is what let this go unnoticed.
+// ---------------------------------------------------------------------------
+function readConfigOrExplain(targetPath) {
+  const p = join(targetPath, 'aahp.config.json')
+  if (!existsSync(p)) return { config: {}, problem: null, errors: [] }
+  let parsed
+  try {
+    parsed = JSON.parse(readFileSync(p, 'utf8'))
+  } catch (err) {
+    return {
+      config: {},
+      problem: `aahp.config.json is not valid JSON: ${err.message}`,
+      // The parser's own message is carried into the record, not just the
+      // category: under --json this record is the ONLY output, so dropping it
+      // would leave a machine-readable "invalid" that nobody can act on.
+      errors: [{ path: '', message: `not valid JSON: ${err.message}` }],
+    }
+  }
+  try {
+    const errors = validateConfigObject(parsed)
+    if (errors.length === 0) return { config: parsed, problem: null, errors: [] }
+    return { config: parsed, problem: formatConfigErrors(errors), errors }
+  } catch (err) {
+    // The question could not be ASKED (schema absent from the installed
+    // package, or the schema uses a keyword the validator does not implement).
+    // Reporting that as a pass is the exact defect being fixed, so it is an
+    // error with its own wording.
+    return {
+      config: parsed,
+      problem: `aahp.config.json could not be validated: ${err.message}`,
+      errors: [{ path: '', message: `could not be validated: ${err.message}` }],
+    }
+  }
+}
+
 function firstLine(text) {
   return String(text || '')
     .split('\n')
@@ -781,7 +835,38 @@ function cmdDoctor(targetPath, flags) {
   const governance = flags.includes('--governance') || flags.includes('--no-handoff')
   const handoffDir = join(targetPath, '.ai', 'handoff')
   const pkg = readJsonSafe(join(targetPath, 'package.json')) || {}
-  const config = readJsonSafe(join(targetPath, 'aahp.config.json')) || {}
+  const { config, problem: configProblem, errors: configErrors } = readConfigOrExplain(targetPath)
+
+  // Same rule as `check`: a config that does not match its own schema is an
+  // error, and the record says which gates were never evaluated because of it.
+  if (configProblem) {
+    const gateIds = ['handoff-set', 'manifest-schema', 'grounding', 'pinned-dep', 'changelog-format', 'version-sync', 'verify-workflow']
+    const gates = {}
+    for (const id of gateIds) gates[id] = 'unevaluated'
+    const record = {
+      schemaVersion: 1,
+      ...(governance ? { mode: 'governance' } : {}),
+      repo: deriveRepo(targetPath, pkg),
+      aahpVersion: getVersion(),
+      config: { valid: false, errors: configErrors },
+      gates,
+      checkedAt: new Date().toISOString(),
+    }
+    if (jsonOnly) {
+      process.stdout.write(JSON.stringify(record, null, 2) + '\n')
+      process.exit(1)
+    }
+    if (!quiet) {
+      console.log(`\naahp doctor -conformance for ${record.repo} (aahp v${record.aahpVersion})`)
+      console.log('=========================================')
+    }
+    console.error(configProblem)
+    if (!quiet) console.log('=========================================')
+    console.log(
+      'Conformance NOT EVALUATED: aahp.config.json is invalid, so no gate ran. This is not a pass.',
+    )
+    process.exit(1)
+  }
 
   const handoffSkip = { status: 'skip', reason: 'governance mode: handoff gate not evaluated' }
   const results = {
@@ -872,7 +957,38 @@ function cmdCheck(targetPath, flags) {
   const jsonOnly = flags.includes('--json')
   const quiet = flags.includes('--quiet')
   const pkg = readJsonSafe(join(targetPath, 'package.json'))
-  const config = readJsonSafe(join(targetPath, 'aahp.config.json')) || {}
+  const { config, problem: configProblem, errors: configErrors } = readConfigOrExplain(targetPath)
+
+  // An invalid config is an ERROR, not a set of skips. Returning here means no
+  // gate is evaluated and the summary says so, which is a third outcome distinct
+  // from "every gate passed" and from "a gate failed".
+  if (configProblem) {
+    const gates = {}
+    for (const gate of CHECK_GATES) gates[gate.id] = 'unevaluated'
+    const record = {
+      schemaVersion: 1,
+      command: 'check',
+      repo: deriveRepo(targetPath, pkg || {}),
+      aahpVersion: getVersion(),
+      config: { valid: false, errors: configErrors },
+      gates,
+      checkedAt: new Date().toISOString(),
+    }
+    if (jsonOnly) {
+      process.stdout.write(JSON.stringify(record, null, 2) + '\n')
+      process.exit(1)
+    }
+    if (!quiet) {
+      console.log(`\naahp check - governance gates for ${record.repo} (aahp v${record.aahpVersion})`)
+      console.log('=========================================')
+    }
+    console.error(configProblem)
+    if (!quiet) console.log('=========================================')
+    console.log(
+      'Governance NOT EVALUATED: aahp.config.json is invalid, so no gate ran. This is not a pass.',
+    )
+    process.exit(1)
+  }
 
   const sel = (config && typeof config.check === 'object' && config.check) || {}
   const only = Array.isArray(sel.only) ? sel.only : null

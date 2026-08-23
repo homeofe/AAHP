@@ -19,14 +19,27 @@ REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || echo ".")"
 VERIFY="$REPO_ROOT/scripts/verify-handoff.sh"
 
 # Resolve the gate: prefer the vendored script (full AAHP checkout); otherwise
-# fall back to the installed aahp CLI (npm-install consumer). If neither is
-# available, skip. AAHP_SKIP_VERIFY=1 disables the CLI fallback locally (the
-# vendored script honours the same escape hatch internally).
+# fall back to the LOCALLY INSTALLED aahp package (npm-install consumer). If
+# neither is present, skip. AAHP_SKIP_VERIFY=1 disables the CLI fallback locally
+# (the vendored script honours the same escape hatch internally).
+#
+# The fallback is a filesystem test on an exact path, never `npx`. Earlier
+# versions of this hook guarded with `npx --no-install aahp --version`, with
+# stdout and stderr discarded. `npx` is `npm exec`, which has no `--no-install`
+# option and ignores it silently. So on a consumer with the hooks installed but
+# no local package, that guard made an outbound request to registry.npmjs.org
+# for the UNSCOPED name `aahp` on every commit. This project does not own that
+# name. It returned 404 and the hook fell through to the skip branch, so the
+# behaviour was correct BY ACCIDENT: whoever published that name would have had
+# their code executed in the pre-commit hook of every such repository. A `[ -f ]`
+# test cannot reach the network and cannot resolve any name but the scoped one.
+AAHP_CLI="$REPO_ROOT/node_modules/@elvatis_com/aahp/bin/aahp.js"
+
 if [ -f "$VERIFY" ] || [ -x "$VERIFY" ]; then
     bash "$VERIFY" "$REPO_ROOT" --level precommit
-elif [ "${AAHP_SKIP_VERIFY:-0}" != "1" ] && command -v npx >/dev/null 2>&1 && npx --no-install aahp --version >/dev/null 2>&1; then
-    npx --no-install aahp verify "$REPO_ROOT" --level precommit
+elif [ "${AAHP_SKIP_VERIFY:-0}" != "1" ] && [ -f "$AAHP_CLI" ] && command -v node >/dev/null 2>&1; then
+    node "$AAHP_CLI" verify "$REPO_ROOT" --level precommit
 else
-    echo "AAHP pre-commit: no verify-handoff.sh and no aahp CLI, skipping gate." >&2
+    echo "AAHP pre-commit: no verify-handoff.sh and no locally installed aahp package, skipping gate." >&2
     exit 0
 fi

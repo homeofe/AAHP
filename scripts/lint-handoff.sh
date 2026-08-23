@@ -117,6 +117,19 @@ echo -e "${GREEN}[2/7]${NC} Checking for secrets and API keys..."
 # ordinary characters (e.g. the "sk-to" inside "task-to-model"). Real keys
 # are far longer than 16 chars. Note: grep below runs in BRE mode, so the
 # interval must be escaped as \{16,\}.
+#
+# THE QUANTIFIER MUST BE ESCAPED. grep below runs in BRE, where a bare `?` is a
+# LITERAL question mark, not "optional". Every "=assignment" entry here used to
+# read `['\"]?`, which demanded a quote followed by an actual `?` character, so
+# `API_KEY=abc123`, `DB_PASSWORD=hunter2`, `GH_TOKEN=...` and `X_SECRET=...` in a
+# handoff file matched NOTHING. Measured: four of the thirteen shipped patterns
+# scored 0 on a fixture containing all four, and scored 1-2 each once the
+# quantifier was escaped. The same trap is already documented one comment up for
+# the `\{16,\}` interval; it was applied to the intervals and missed here.
+#
+# `_CREDENTIALS=` is in the list because templates/.aiignore ships it. The
+# shipped template and this enforced list must not disagree: a pattern listed in
+# the template but absent here is a rule an adopter believes is on and is not.
 SECRET_PATTERNS=(
     "sk-[a-zA-Z0-9]\{16,\}"
     "ghp_[a-zA-Z0-9]\{16,\}"
@@ -127,10 +140,11 @@ SECRET_PATTERNS=(
     "AKIA[A-Z0-9]\{16,\}"
     "Bearer [a-zA-Z0-9]"
     "-----BEGIN.*PRIVATE KEY"
-    "_KEY=['\"]?[a-zA-Z0-9]"
-    "_SECRET=['\"]?[a-zA-Z0-9]"
-    "_TOKEN=['\"]?[a-zA-Z0-9]"
-    "_PASSWORD=['\"]?[a-zA-Z0-9]"
+    "_KEY=['\"]\?[a-zA-Z0-9]"
+    "_SECRET=['\"]\?[a-zA-Z0-9]"
+    "_TOKEN=['\"]\?[a-zA-Z0-9]"
+    "_PASSWORD=['\"]\?[a-zA-Z0-9]"
+    "_CREDENTIALS=['\"]\?[a-zA-Z0-9]"
 )
 
 SECRET_FOUND=0
@@ -147,6 +161,34 @@ if [ "$SECRET_FOUND" -eq 0 ]; then
     echo -e "  ${GREEN}✓ No secrets detected.${NC}"
 else
     VIOLATIONS=$((VIOLATIONS + SECRET_FOUND))
+fi
+
+# --- .aiignore: say out loud that it is NOT a rule source --------------------
+#
+# `.ai/handoff/.aiignore` reads like a firewall an adopter can extend, and the
+# shipped template used to close with an invitation to add internal hostnames
+# and IP ranges. Nothing has ever parsed it. The list above is the entire
+# enforced set, and the `grep -v '.aiignore'` above only keeps the file from
+# matching its OWN patterns - it is not a rule reader.
+#
+# An adopter who adds `10.0.0.*` and `*.internal.example.com` here, commits an
+# internal hostname into STATUS.md and watches this script exit 0 concludes the
+# control ran and cleared them. It did not: it never looked. So when the file is
+# present and carries patterns, this prints what was NOT assessed, by name and
+# by count. Silence here is what made the promise credible.
+#
+# This is deliberately advisory: it does not change the exit code, because
+# turning every adopter's committed `.aiignore` into live rules overnight would
+# fail builds on patterns nobody chose (`sk-*` with no length floor matches the
+# word "task-type" in AAHP's own shipped templates). Whether to enforce the file
+# is tracked as an owner decision; see README Section 2.6.
+AIIGNORE_FILE="$HANDOFF_DIR/.aiignore"
+if [ -f "$AIIGNORE_FILE" ]; then
+    AIIGNORE_RULES=$(grep -c -v -e '^[[:space:]]*#' -e '^[[:space:]]*$' "$AIIGNORE_FILE" || true)
+    echo -e "  ${YELLOW}NOT ENFORCED: $AIIGNORE_FILE lists ${AIIGNORE_RULES} pattern(s); no gate reads them.${NC}"
+    echo "    The enforced set is the ${#SECRET_PATTERNS[@]} built-in secret patterns above, plus the"
+    echo "    injection patterns in check 1 and the PII patterns in check 3. A pattern you add"
+    echo "    to .aiignore is NOT checked by this script, by 'aahp verify', or by any CI gate."
 fi
 
 # --- Check 3: PII Patterns and Reviewed Allowlist ----------------

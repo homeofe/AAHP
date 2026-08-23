@@ -1,3 +1,63 @@
+## 2026-08-23 - three inert controls, one regression suite (#84, #82, #80)
+
+Three HIGH issues, one shape: a control that could not fail. Fixed together
+because a shared suite that proves each one CAN fail closes the class, where
+three tests proving each one currently passes would close nothing - every one of
+these passed on the day it shipped.
+
+All three reproduced first on `origin/main` at `b67b3cc`, each against a positive
+control proving the harness was live.
+
+- **#84** `aahp.config.json` was never validated against its own schema.
+  `gateApplies` decides applicability from the PRESENCE of a key, so
+  `forbiddenPaterns` read as an absent section and a FAILING gate reported
+  `Governance OK`, exit 0, over a live em-dash violation. A config that was not
+  even JSON was worse: `readJsonSafe` returned null, the caller substituted `{}`,
+  and all eight gates skipped. Now validated before any gate is evaluated, by
+  `check`, by `doctor`, and inside `loadConfig` so the direct `npm run check:*`
+  path is covered too. `scripts/aahp-schema.mjs` is dependency-free (ADR-002) and
+  throws on any schema keyword it does not implement, so it cannot report "valid"
+  for a document it did not fully examine. CI cross-checks with AJV.
+- **#82** `npx --no-install` does not prevent a registry fetch: `npx` is
+  `npm exec`, which has no such option and ignores it silently. Five shipped call
+  sites resolved the UNSCOPED, unowned name `aahp`. Replaced with an explicit path
+  into the scoped package. Measured today: `GET registry.npmjs.org/aahp` still
+  returns 404, so the old behaviour was still correct by accident, not by
+  construction.
+- **#80** `.ai/handoff/.aiignore` is read by nothing. Both claims that CI validates
+  it are withdrawn, and `aahp lint` now names how many patterns it is NOT applying.
+
+**What this did NOT do, and it is an owner decision, not an oversight.** The
+firewall was not made real. Making it live would newly fail adopters' builds on
+patterns they never chose: the glob vocabulary cannot express what the enforced
+regexes do, and the template's `sk-*` (no length floor) matches the word
+"task-type" inside AAHP's own shipped templates, so `aahp init` followed by
+enforcement is red on an untouched repository - measured, 3 lines in
+`GROUNDING.md`, `TRUST.md` and `WORKFLOW.md`. Recommendation in the pull request:
+enforce, but as a NEW opt-in section with an empty default, not by activating the
+copy every adopter already committed.
+
+**Found while fixing, same class, fixed here.** Four of the thirteen enforced
+secret patterns matched nothing: `grep` runs in BRE, where the bare `?` in
+`['\"]?` is a literal question mark. `_KEY=`, `_SECRET=`, `_TOKEN=` and
+`_PASSWORD=` scored zero on a fixture containing all four. Adding `_CREDENTIALS=`
+to that list without escaping the quantifier would have been an anchor that
+anchors nothing.
+
+**Still open after this.** The repository's OWN workflows keep
+`npx --no-install ajv-cli`, and `scripts/check-workflow-pinning.mjs` Rule B still
+requires that spelling while describing it as the load-bearing guard. That claim
+is now known to be false. It is left alone deliberately: issue #68 owns the
+repository's own workflows, and #82 is scoped to code that ships to consumers.
+Named in the pull request as not done.
+
+**Environment note for the next agent.** `tests/lint.bats` test 32 fails on this
+Windows machine on unmodified `origin/main` as well - it builds a fake interpreter
+directory and prepends it with `PATH="$fake:$PATH"`, and a `C:/...` path splits on
+the colon so the fake is never found. Verified against a clean baseline worktree
+before concluding it was not a regression. The same trap bit the new suite's npx
+spy and is handled there with `cygpath -u`.
+
 ## 2026-08-23 - declare merge=union for the handoff append-log
 
 `.ai/handoff/STATUS.md` is prepend-only, so two branches almost always differ by

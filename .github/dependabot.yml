@@ -38,4 +38,21 @@ updates:
     open-pull-requests-limit: 5
     labels:
       - "dependencies"
+    # Dependabot treats every SUB-PATH of an action repository as a separate
+    # dependency, so github/codeql-action/init, /autobuild and /analyze each get
+    # their own pull request. For this action that produces three changes that can
+    # never be merged one at a time: codeql-action refuses to run when its steps
+    # are not on the same version, so each single-path pull request fails with
+    # "Not all workflow steps that use github/codeql-action actions use the same
+    # version". Measured on #96, #98 and #99, all three correct and all three
+    # individually unmergeable. Grouping makes the next bump arrive as one commit.
+    #
+    # `scripts/check-workflow-pinning.mjs` rule G fails if any action used through
+    # more than one sub-path is left ungrouped, so deleting this block is red
+    # rather than silent - and it covers the next multi-path action too, not just
+    # this one.
+    groups:
+      codeql-action:
+        patterns:
+          - "github/codeql-action*"
 

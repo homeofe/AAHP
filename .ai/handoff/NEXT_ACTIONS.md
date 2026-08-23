@@ -7,7 +7,7 @@
 > `- [ ]` while unresolved, `- [x]` only on evidence; before a task is `done` every
 > criterion is checked, waived `(waived: rationale)`, or moved `(follow-up: ref)`.
 
-Current version: **v3.10.0**
+Current version: **v3.11.0**
 
 ---
 

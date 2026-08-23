@@ -4,20 +4,20 @@
   "last_session": {
     "agent": "cli-tool",
     "session_id": "cli-1787489585",
-    "timestamp": "2026-08-23T17:01:38Z",
-    "commit": "bbf6482",
-    "phase": "fix",
+    "timestamp": "2026-08-23T18:33:33Z",
+    "commit": "6e06588",
+    "phase": "review",
     "duration_minutes": 0
   },
   "files": {
     "STATUS.md": {
-      "checksum": "sha256:8c84eb016366ddf96254f07ac0285beb6fcd48ffc8bfb22e2dccee564a545f3b",
-      "updated": "2026-08-23T17:01:38Z",
-      "lines": 1182,
-      "summary": "#105 widened this gate from `.ai/handoff/` to `.ai/handoff/` plus ROOT-level"
+      "checksum": "sha256:ffcfd2ea6c088bfc5e963327e12f536a26db0918b5a2abe4ebbcfe7fa39496bf",
+      "updated": "2026-08-23T18:33:33Z",
+      "lines": 1319,
+      "summary": "Version 3.10.0 to 3.11.0. It is a MINOR by measurement rather than by preference:"
     },
     "NEXT_ACTIONS.md": {
-      "checksum": "sha256:06eede346c363c25415d9156b0c3ce9a7ed332e2ea3fd9534c0d0ec4e443efcf",
+      "checksum": "sha256:57e3a2f06dcbe9f6d942d903b1869a1ac6f70506758e8bd68a8d97a7aecc139c",
       "updated": "2026-08-23T12:23:55Z",
       "lines": 239,
       "summary": "Current version: **v3.10.0**"

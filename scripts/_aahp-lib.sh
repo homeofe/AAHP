@@ -435,12 +435,23 @@ aahp_trust_enforce() {
         echo "aahp.config.json mentions \"trustTtl\" $mentions times; a duplicate key would be resolved silently" >&2
         return 1
     fi
-    mentions=$(grep -c '"enforce"' "$config" 2>/dev/null || true)
-    if [ "${mentions:-0}" -gt 1 ]; then
-        echo "aahp.config.json mentions \"enforce\" $mentions times; a duplicate key would be resolved silently" >&2
-        return 1
-    fi
-
+    # There is NO textual duplicate check on `enforce`, and its absence is the
+    # finding rather than an omission. Two attempts, two misfires on VALID input:
+    # counting the key across the whole file refused a config the moment
+    # verifyWorkflow.enforce existed alongside trustTtl.enforce, and scoping it with
+    # `sed -n '/"trustTtl"/,/}/p'` refused a config whose trustTtl object is written
+    # on one line, because a sed range does not end on the line it starts.
+    #
+    # A guard that fires on valid configuration gets deleted wholesale, taking the
+    # risk it covered with it. Detecting a duplicate key properly means walking the
+    # raw JSON, which this helper's two interpreters would each need separately; that
+    # is worth doing and is not done here.
+    #
+    # WHAT IS STILL COVERED: the `"trustTtl"` count above. Two trustTtl objects is the
+    # shape that actually hides a value from a reviewer, and it is refused.
+    # WHAT IS NOT: `{ "trustTtl": { "enforce": true, "enforce": false } }` parses, and
+    # every parser here keeps the last key, so it reads as false. Schema validation in
+    # CI does not catch it either.
     local py
     if command -v node &>/dev/null; then
         # shellcheck disable=SC2016

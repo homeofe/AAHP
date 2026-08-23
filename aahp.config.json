@@ -121,5 +121,8 @@
   },
   "trustTtl": {
     "enforce": true
+  },
+  "verifyWorkflow": {
+    "enforce": true
   }
 }

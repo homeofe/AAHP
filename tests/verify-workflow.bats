@@ -172,13 +172,46 @@ install_workflow() {
     [[ "$output" == *'"verify-workflow": "pass"'* ]]
 }
 
-@test "doctor: FAILS the conformance record when the gate can be skipped" {
+# --- reported always, blocking only where a repository asked for it ----------
+#
+# This gate's finding is correct wherever it fires, and it fires on a deliberate,
+# documented configuration that no pull-request author can clear from their own
+# pull request. Measured before the default was chosen: `aahp doctor . --json`, the
+# exact command every consuming repository runs as a CI step, went from exit 0 under
+# the published 3.10.0 to exit 1 in 8 of 10 of them with nothing changed on their
+# side, and neither `--governance` nor `check: { only: [] }` could switch it off.
+#
+# So it reports by default and blocks on opt-in, the same shape trustTtl.enforce
+# uses. The two tests below are a pair on purpose: the first alone would also pass
+# for an implementation that ignores the config and fails everywhere, which is the
+# version that reds the fleet.
+
+@test "doctor: FAILS the conformance record when the gate can be skipped AND enforce is on" {
     install_workflow bypass-step-conditional.yml
+    cat > "$TEST_TMPDIR/aahp.config.json" <<'EOF'
+{
+  "verifyWorkflow": { "enforce": true }
+}
+EOF
     run node "$AAHP" doctor "$TEST_TMPDIR" --governance
     [ "$status" -eq 1 ]
     [[ "$output" == *"Conformance FAILED"* ]]
     [[ "$output" == *"verify-workflow"* ]]
 }
+
+@test "doctor: the SAME workflow is reported and not blocking without enforce" {
+    # The other half. Three assertions, because "not enforced" must stay
+    # distinguishable from "nothing found": the run passes, the token is
+    # `advisory` rather than `pass`, and the finding is still named.
+    install_workflow bypass-step-conditional.yml
+    run node "$AAHP" doctor "$TEST_TMPDIR" --governance --json
+    [ "$status" -eq 0 ]
+    [[ "$output" == *'"verify-workflow": "advisory"'* ]]
+    [[ "$output" != *'"verify-workflow": "pass"'* ]]
+    [[ "$output" == *"ci-step-conditional"* ]]
+    [[ "$output" == *"NOT ENFORCED"* ]]
+}
+
 
 @test "doctor: an undecidable verify workflow fails closed, it does not skip" {
     install_workflow undecidable-indirect.yml
@@ -286,8 +319,13 @@ install_govern_workflow() {
     [[ "$output" == *'"verdict": "governance-only"'* ]]
 }
 
-@test "govern: doctor FAILS the record when the governance gate can be skipped" {
+@test "govern: doctor FAILS the record when the governance gate can be skipped AND enforce is on" {
     install_govern_workflow govern-bypass-step-conditional.yml
+    cat > "$TEST_TMPDIR/aahp.config.json" <<'EOF'
+{
+  "verifyWorkflow": { "enforce": true }
+}
+EOF
     run node "$AAHP" doctor "$TEST_TMPDIR" --governance
     [ "$status" -eq 1 ]
     [[ "$output" == *"Conformance FAILED"* ]]

@@ -1,3 +1,140 @@
+## Cutting 3.11.0: a MINOR only because the one breaking edge was removed first
+
+**And the test file was restored rather than patched a third time.** Removing the retired
+duplicate-key test left an orphaned heredoc terminator and the tail of that test, so
+bats could not parse the file at all; the printf in the replacement test had also lost
+its escapes. Two failed repairs later the honest move was to stop editing a file whose
+state could not be verified from here and restore it to the committed version.
+
+Lost with it: the test asserting that two `enforce` keys with different parents are not
+a duplicate. The behaviour is still exercised on every run, because this repository’s
+own config now carries exactly that shape and every pre-commit and pre-push reads it
+correctly. A test is still owed and is named here rather than left as a silent gap.
+**Then it misfired a second time, on formatting, and was removed.** Scoping the count with
+`sed -n '/"trustTtl"/,/}/p'` refused a config whose trustTtl object is written on ONE
+line, because a sed range does not end on the line it starts: it ran on into the next
+section and counted that section’s `enforce` too. CI caught it; the local tree happened
+to have a multi-line object.
+
+Two attempts, two misfires on VALID input. The guard is removed rather than patched a
+third time, because one that fires on valid configuration gets deleted wholesale and
+takes the risk it covered with it. What survives is the whole-file `"trustTtl"` count,
+which refuses the shape that actually hides a value: two trustTtl objects. What is now
+explicitly NOT covered, and is written into the helper rather than left implicit, is a
+duplicate `enforce` INSIDE one trustTtl object; it parses, every parser here keeps the
+last key, and schema validation does not catch it either. Detecting it properly means
+walking the raw JSON in both interpreters, which is worth doing and is not done here.
+**The release commit was blocked by a guard I wrote two changes earlier.** The
+trustTtl duplicate-key guard counts `"enforce"` and refuses a config that mentions it
+more than once. Adding `verifyWorkflow.enforce` in this same release gave the file a
+second, legitimate `enforce` with a different parent, and the pre-push hook refused it:
+`mentions "enforce" 2 times; a duplicate key would be resolved silently`. The guard was
+documented as deliberately blunt when it was written, which does not make it right once a
+second section exists. A guard that rejects valid configuration gets deleted wholesale,
+and the risk it covered comes back with it. Scoped to the trustTtl object now; the
+section name is still counted whole-file, because two trustTtl objects is the shape that
+actually hides a value from its reviewer.
+Version 3.10.0 to 3.11.0. It is a MINOR by measurement rather than by preference:
+the release had exactly one change that turned consumers red without them
+changing anything, and that change now ships reporting-only by default. With the
+default, all ten adopter repositories are back to exit 0 on `aahp doctor --json`,
+the command every one of them runs as a CI step.
+
+`aahp_version` stays at 3.0. The file-format contract did not move this cycle, and
+ADR-008 says the two numbers are independent, so a tooling release does not drag
+the protocol version with it.
+
+THE CHANGELOG NEEDED MORE THAN A HEADING. Two statements in it were false, and a
+release body is public, indexed and cannot be repaired by a later commit:
+
+"the exit code is unchanged for all nine" was wrong twice. It is ten repositories,
+not nine, and the exit code was not unchanged: eight of them went from 0 to 1.
+The corrected sentence states the measurement and names the switch that returns
+them to 0.
+
+"same keys" was wrong: `gates` gains a verify-workflow key this release, and an
+`advisory` value token with it.
+
+The section also carried EIGHT headings for five categories, because entries were
+appended by different pull requests over weeks. Consolidated into Keep a Changelog
+order with every entry preserved verbatim, and the per-category counts asserted
+before and after so nothing could be lost in the move: Added 13, Changed 12,
+Removed 1, Fixed 10, Security 9.
+
+WHAT A RELEASE ACTUALLY TAKES HERE, since it was not written down anywhere: five
+files plus a tag. package.json and CHANGELOG.md carry the version and
+check-version-sync compares them (proved both directions: it exits 1 when only one
+of the two moves). Those two are handoff-impacting, so STATUS.md and MANIFEST.json
+must move with them, and NEXT_ACTIONS.md is regenerated. Then a tag.
+
+Nothing creates that tag. ci.yml only REACTS to `push: tags: v[0-9]+.[0-9]+.[0-9]+`,
+and both release jobs gate on the ref already being a tag. So the publish and the
+GitHub Release are automatic and the tag is not; without it nothing happens at all.
+
+NOT covered, and worth knowing before the tag goes up: nothing binds the tag to
+the reviewed commit, so a tag pushed from a stale checkout would publish that
+commit instead. And the tag pattern accepts no prerelease suffix, while
+changelog-grammar.mjs does, so an rc is not available as a de-risking step without
+a workflow change.
+
+## A correct gate that would have turned eight of ten consumers red on day one
+
+The new verify-workflow gate finds that a consumer wrapping the --level ci verify
+step in an `if:` keeps the required check green while evaluating nothing, Layer 1
+checksum integrity included. The finding is right. Measured against each adopter
+repository’s real origin/main, it is right in eight of ten.
+
+That is also the problem. `aahp doctor . --json` is the exact command every one of
+those repositories runs as a CI step, and it goes from exit 0 under the published
+3.10.0 to exit 1 under this tree with nothing changed on their side. The previous
+minor, 3.9.2 to 3.10.0, flipped nobody. There was no way to switch it off either:
+--governance still exited 1, and check with an empty only-list still exited 1.
+
+Nobody broke this by accident. The `if:` is a documented estate-wide response to
+Layer 2 hard-failing a pure dependency bump, and clearing it means editing
+workflow YAML in each repository, which no pull-request author can do from their
+own pull request. Nine of the ten would not even see the red on the bump, because
+the doctor step carries the same exemption; it would land on the next unrelated
+human pull request, for a file that pull request never touched. The tenth runs
+doctor unconditionally in a matrix job, so its own bump could not have merged.
+
+So the choice was never between reporting the finding and hiding it. It was
+between failing the fleet for a pre-existing deliberate configuration and
+reporting it without failing until a repository opts in. A gate that reds
+everyone on day one is the kind that gets switched off, and then it protects
+nobody.
+
+`verifyWorkflow.enforce`, absent or false by default, on the same pattern
+trustTtl.enforce uses in this release. Measured after: 10 of 10 adopters back to
+exit 0, with the finding reported as `advisory` in every one of them.
+
+`advisory` is a new token in `gates` rather than a reuse. `pass` would be a false
+green over a real finding, which is the class this repository exists to close.
+`skip` claims there was nothing of this kind to look at, which is untrue when the
+gate found something. It counts as EVALUATED, because the gate did examine the
+repository and did produce a verdict. Safe in practice because no adopter parses
+the record; all ten consume only the exit code.
+
+One deliberate inversion, stated because it contradicts the house rule: an
+unreadable config here fails OPEN, not closed. Everywhere else a broken policy
+file is a blocking finding. This gate is advisory by default, so failing closed on
+a malformed config would let a typo turn a non-blocking finding into a fleet
+outage. The finding is still reported either way, so the safer direction hides
+nothing.
+
+Also corrected here, from the same review: the bash fallback predicate in
+lint-handoff.sh did not match the node one, on three of six cases, while carrying
+a comment saying the two could not disagree. node trims the line before testing
+and the grep anchored to start of line, so an indented marker was caught by one
+and missed by the other; node uses startsWith, so eight angle brackets matched
+there and not here. Aligned to node’s predicate, because an indented conflict
+marker is still a conflict marker.
+
+NOT covered: the remediation the gate itself recommends, putting the Dependabot
+exemption INSIDE the gate keyed on the change rather than around the step keyed on
+who pushed it, does not exist in the shipped gate. Until it does, a repository
+that opts in has to choose between the exemption and the gate.
+
 ## The path gate read four documents and the link gate read thirteen
 
 `docLinks.include` covered `.ai/handoff/*.md`. `docPaths.include` did not. So

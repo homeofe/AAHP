@@ -847,7 +847,46 @@ function gateVerifyWorkflow(targetPath) {
   }
   const first = result.findings[0]
   const more = result.findings.length > 1 ? ` (+${result.findings.length - 1} more)` : ''
-  return { status: 'fail', reason: `the gate can be skipped [${first.id}] ${first.detail}${more}` }
+  const detail = `the gate can be skipped [${first.id}] ${first.detail}${more}`
+
+  // OPT-IN, on the pattern trustTtl.enforce establishes in this same release.
+  //
+  // Measured before choosing this: `aahp doctor . --json` is the exact command every
+  // consuming repository runs as a CI step, and this finding takes it from exit 0 to
+  // exit 1 in 8 of 10 of them with nothing changed on their side. There was no way
+  // to switch it off: --governance and `check: { only: [] }` both still exited 1.
+  //
+  // The finding is CORRECT in all eight, so it is still reported. What it must not do
+  // is red the fleet on day one for a deliberate, documented configuration that no
+  // pull-request author can clear from their own pull request. A gate that behaves
+  // that way gets switched off, and then it protects nobody.
+  if (!verifyWorkflowEnforced(targetPath)) {
+    return {
+      status: 'advisory',
+      reason:
+        `${detail} NOT ENFORCED: set verifyWorkflow.enforce in aahp.config.json to make ` +
+        'this a failing gate.',
+    }
+  }
+  return { status: 'fail', reason: detail }
+}
+
+// Absent config, absent section, or enforce:false all mean NOT enforced, so a
+// repository that has never heard of this setting keeps the exit code it had.
+//
+// The catch is a safety net, NOT a policy, and an earlier version of this comment
+// claimed otherwise. `doctor` already refuses an unreadable aahp.config.json before
+// any gate runs, marking all of them unevaluated, so an unparseable config never
+// reaches this function from the CLI. Returning false here only matters if some
+// future caller reaches it another way, and not-enforced is the right default for
+// a gate that is advisory by default.
+function verifyWorkflowEnforced(targetPath) {
+  try {
+    const raw = readFileSync(join(targetPath, 'aahp.config.json'), 'utf8')
+    return JSON.parse(raw)?.verifyWorkflow?.enforce === true
+  } catch {
+    return false
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -883,6 +922,11 @@ const OUTCOME = {
   NOT_APPLICABLE: 'not-applicable',
   DESELECTED: 'deselected',
   UNEVALUATED: 'unevaluated',
+  // Reported, not enforced. A real finding that does not change the exit code
+  // because the repository has not opted in. Deliberately NOT `pass`, which would
+  // be a false green over a finding, and not `skip`, which claims there was
+  // nothing of this kind to look at.
+  ADVISORY: 'advisory',
 }
 
 // A gate is EVALUATED when it examined this repository and produced a verdict
@@ -890,7 +934,16 @@ const OUTCOME = {
 // to the package that ships it. The three that do not count never looked at
 // anything - a precondition was absent, the operator deselected the gate, or
 // governance mode declined to run it.
-const EVALUATED_OUTCOMES = new Set([OUTCOME.PASS, OUTCOME.FAIL, OUTCOME.MISSING, OUTCOME.SELF])
+const EVALUATED_OUTCOMES = new Set([
+  OUTCOME.PASS,
+  OUTCOME.FAIL,
+  OUTCOME.MISSING,
+  OUTCOME.SELF,
+  // `advisory` is a verdict the gate produced about this repository, so it counts.
+  // Without it a repository whose only finding is advisory would report zero
+  // evaluated and be described as NOT EVALUATED, which is a different claim.
+  OUTCOME.ADVISORY,
+])
 
 function countEvaluated(outcomes) {
   return Object.values(outcomes).filter((o) => EVALUATED_OUTCOMES.has(o.outcome)).length

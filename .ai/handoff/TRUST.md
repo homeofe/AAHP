@@ -32,6 +32,22 @@ anchor matrix and README section 2.10 for the doctrine.
 
 ## Scripts & Tooling
 
+
+**TTL review, 2026-08-23.** Intervals in use: 3d on 1 row, 7d on 11, 30d on 7. The defect this
+register showed was not the length of any interval. Eleven rows were stamped on one day
+with the same interval, so they expired on one day, and a wall of identical warnings is
+the state in which a new one goes unread. That is how eight rows sat expired for over two
+weeks while the control printed them on every run.
+
+Intervals are therefore set per row against how fast the underlying fact can change, not
+as a house cadence. A fact that only moves when a tracked file moves gets 30d, because
+Layer 2 already fails any commit that moves such a file without moving handoff state, so
+the TTL is a backstop. A fact a gate recomputes on every run does not need a calendar at
+all: `Checksums match file contents` carries 3d and Layer 1 proves it continuously, so the
+short interval reads as a stronger claim than it is and the row stays `assumed`.
+
+`trustTtl.enforce` is on for this repository (ADR-024), so an expired `verified` row now
+fails CI rather than printing into the wall.
 | Property | Status | Provenance | Last Verified | Agent | TTL | Expires | Notes |
 |----------|--------|------------|---------------|-------|-----|---------|-------|
 | aahp-manifest.sh generates valid JSON | assumed | - | 2026-08-03 | grok-4.5 | 7d | 2026-08-10 | Downgraded 2026-08-23: TTL lapsed on 2026-08-10 and nothing re-ran it. `assumed` is what this register's own table calls an unverified claim; a fresh date would have been a verdict nobody produced |
@@ -52,7 +68,7 @@ anchor matrix and README section 2.10 for the doctrine.
 |----------|--------|------------|---------------|-------|-----|---------|-------|
 | aahp-manifest.schema.json valid JSON Schema | assumed | - | 2026-08-03 | grok-4.5 | 30d | 2026-09-02 | Stable; doctor manifest-schema structural check green |
 | Generated MANIFEST.json passes schema | assumed | - | 2026-08-03 | grok-4.5 | 7d | 2026-08-10 | Downgraded 2026-08-23: TTL lapsed on 2026-08-10 and nothing re-ran it. `assumed` is what this register's own table calls an unverified claim; a fresh date would have been a verdict nobody produced |
-| Checksums match file contents | assumed | - | 2026-08-03 | grok-4.5 | 3d | 2026-08-06 | Downgraded 2026-08-23: TTL lapsed on 2026-08-06 and nothing re-ran it. `assumed` is what this register's own table calls an unverified claim; a fresh date would have been a verdict nobody produced |
+| Checksums match file contents | assumed | - | 2026-08-03 | grok-4.5 | 3d | 2026-08-06 | Downgraded 2026-08-23: TTL lapsed and nothing re-ran it. Left `assumed` deliberately after the 2026-08-23 TTL review: Layer 1 recomputes this on EVERY run, so a calendar interval records nothing the gate is not already proving continuously, and a short interval here reads as a stronger claim than it is |
 | aahp-config.schema.json valid JSON Schema | assumed | - | 2026-08-03 | grok-4.5 | 30d | 2026-09-02 | Consumed by config-driven gates; check suite green |
 
 ---
@@ -61,7 +77,7 @@ anchor matrix and README section 2.10 for the doctrine.
 
 | Property | Status | Provenance | Last Verified | Agent | TTL | Expires | Notes |
 |----------|--------|------------|---------------|-------|-----|---------|-------|
-| All 12 templates present | verified | source_verified | 2026-08-03 | grok-4.5 | 30d | 2026-09-02 | 12 files in templates/ (incl .aiignore, GROUNDING.md) |
+| All 12 templates present | verified | source_verified | 2026-08-23 | cli-tool | 30d | 2026-09-22 | Re-verified 2026-08-23: templates/ holds exactly 12 entries (.aiignore, CONVENTIONS.md, DASHBOARD.md, GROUNDING.md, LOG-ARCHIVE.md, LOG.md, MANIFEST.json, NEXT_ACTIONS.md, STATUS.md, TRUST.md, WORKFLOW.md, pii-allowlist.json). 30d because this only moves when a tracked file moves, and Layer 2 already fails a commit that moves one without handoff state |
 | Templates match v2/v3 spec | assumed | - | 2026-08-03 | grok-4.5 | 30d | 2026-09-02 | WORKFLOW task-selection updated to MANIFEST authority this session |
 | .aiignore covers OWASP patterns | assumed | - | 2026-02-26 | Claude Opus 4.6 | 30d | 2026-09-02 | Comprehensive but not formally audited this session; TTL refreshed only for bookkeeping |
 
@@ -72,7 +88,7 @@ anchor matrix and README section 2.10 for the doctrine.
 | Property | Status | Provenance | Last Verified | Agent | TTL | Expires | Notes |
 |----------|--------|------------|---------------|-------|-----|---------|-------|
 | No secrets in source | assumed | - | 2026-08-03 | grok-4.5 | 7d | 2026-08-10 | Downgraded 2026-08-23: TTL lapsed on 2026-08-10 and nothing re-ran it. `assumed` is what this register's own table calls an unverified claim; a fresh date would have been a verdict nobody produced |
-| LICENSE matches declared license | verified | source_verified | 2026-08-03 | grok-4.5 | 30d | 2026-09-02 | Apache-2.0 in LICENSE, package.json, README |
+| LICENSE matches declared license | verified | source_verified | 2026-08-23 | cli-tool | 30d | 2026-09-22 | Re-verified 2026-08-23: package.json declares `"license": "Apache-2.0"` and LICENSE opens `Apache License / Version 2.0, January 2004`. 30d for the same reason as the row above |
 | README.md is single source of truth | assumed | - | 2026-08-03 | grok-4.5 | 7d | 2026-08-10 | Downgraded 2026-08-23: TTL lapsed on 2026-08-10 and nothing re-ran it. `assumed` is what this register's own table calls an unverified claim; a fresh date would have been a verdict nobody produced |
 
 ---

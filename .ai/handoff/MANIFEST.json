@@ -4,17 +4,17 @@
   "last_session": {
     "agent": "cli-tool",
     "session_id": "cli-1787489585",
-    "timestamp": "2026-08-23T15:10:13Z",
-    "commit": "87fa56e",
-    "phase": "fix",
+    "timestamp": "2026-08-23T15:52:40Z",
+    "commit": "4f18df5",
+    "phase": "review",
     "duration_minutes": 0
   },
   "files": {
     "STATUS.md": {
-      "checksum": "sha256:28f0527df1a16cf6e335380928aa4d61a5bc2f406cd1ea3bb2917ea9a68affe3",
-      "updated": "2026-08-23T15:15:12Z",
-      "lines": 1006,
-      "summary": "Layer 4 reads the trust register, finds expired `verified` rows and prints them."
+      "checksum": "sha256:7287c50ba0bf6277da0ca5aca5fbf5ba6ada5de919df9540ea47ad21053f59b7",
+      "updated": "2026-08-23T15:52:40Z",
+      "lines": 1041,
+      "summary": "#102 turned Layer 4 enforcement on for this repository with both remaining"
     },
     "NEXT_ACTIONS.md": {
       "checksum": "sha256:efdc6ef8664faf9ce5120fa797b702d2353bd4c3205c62e5ba651a465326103d",
@@ -47,9 +47,9 @@
       "summary": "| Name | Path | Build | Tests | Status | Notes |"
     },
     "TRUST.md": {
-      "checksum": "sha256:74c48ae40a79a8117c8f015784a904bc3f7897e00ecd7297f7f087942ee83997",
+      "checksum": "sha256:3f9a142b535864d3402a121cdb5127a6535c6615d763b7e739000179e572a4bc",
       "updated": "2026-08-23T12:23:55Z",
-      "lines": 93,
+      "lines": 109,
       "summary": "| Level | Meaning |"
     },
     "CONVENTIONS.md": {

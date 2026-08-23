@@ -154,23 +154,99 @@ function enginesFloor() {
 
 // ---------------------------------------------------------------------------
 // Every Node major any workflow asks for, and where it came from.
+//
+// SCOPE, and why it is two directories and not one
+//
+//   .github/workflows/  - what this repository RUNS. A pin below the floor
+//                         here means CI proves the package on a runtime the
+//                         package does not claim to support.
+//   assets/governance/  - what this repository SHIPS. `aahp init --gates`
+//                         copies aahp-govern.yml from here into a consumer
+//                         repository and `npm pack` puts it in the published
+//                         tarball, so a pin below the floor here is a support
+//                         claim that breaks on install, in repositories this
+//                         gate will never run in.
+//
+// Measured 2026-08-23: the shipped template pinned Node 20 while engines.node
+// said '>=22', and had done so while this gate ran green on every commit -
+// because the gate read one directory and the defect sat in the other. The
+// header above blames this exact class of defect on the file the package
+// propagates, and then scanned only the copy that propagates via propagate.sh.
+// The consumer-facing copy travels a second route (`aahp init --gates`) that
+// nothing here was looking at.
+//
+// Two sibling gates already hold the shipped template to the same bar as the
+// local workflows - tests/assert-workflow-hardening.mjs (SCAN_ROOTS) and
+// scripts/check-workflow-pinning.mjs (TEMPLATE_DIRS). This list is the third,
+// and the divergence is the reason to keep all three named together: a new
+// gate over workflows is wrong by default until it states which route it
+// covers.
+//
+// WHAT AN ABSENT ROOT MEANS, and why the two answers differ
+//
+// For .github/workflows absence is exit 2. This gate asserts a relation
+// between runtime pins and a support claim; with no workflows the relation is
+// UNTESTED, not satisfied, and "I could not look" must never read as "I looked
+// and it was fine".
+//
+// For assets/governance absence is not a finding at all, because the gate also
+// runs against roots that legitimately ship nothing - every fixture in
+// tests/runtime-support.bats is such a root, and so is any consumer project if
+// this gate ever becomes portable. A package that ships no template has no
+// template to get wrong.
+//
+// That asymmetry is a real hole: silently dropping the root by renaming or
+// deleting the directory would return this gate to the blindness described
+// above, and nothing would go red. It is closed on the OTHER side - the summary
+// below names every file actually scanned, and tests/runtime-support.bats
+// asserts that the real repository's shipped template appears in it. Coverage
+// is therefore proved by observation of the real tree, not assumed from a flag.
 // ---------------------------------------------------------------------------
-const workflowsDir = join(root, ".github", "workflows");
+const SCAN_ROOTS = [
+  {
+    dir: [".github", "workflows"],
+    label: ".github/workflows",
+    why: "what this repository runs",
+    required: true,
+    shipped: false,
+  },
+  {
+    dir: ["assets", "governance"],
+    label: "assets/governance",
+    why: "the workflow template `aahp init --gates` copies into consumer repositories",
+    required: false,
+    shipped: true,
+  },
+];
 
+// Returns { dir, file, label } for every YAML file under every scan root.
+// `label` is what findings name, so a message reads
+// `assets/governance/aahp-govern.yml:govern` rather than a bare filename - two
+// roots can hold files of the same name, and the route a file travels is the
+// whole point of scanning it.
 function workflowFiles() {
-  if (!existsSync(workflowsDir)) {
-    bail(2, [
-      `Runtime support: no workflow directory at ${workflowsDir}.`,
-      "This gate asserts a relation between CI pins and the published support",
-      "claim. With no workflows there are no pins, so the relation is untested",
-      "rather than satisfied.",
-    ]);
+  const found = [];
+  for (const scan of SCAN_ROOTS) {
+    const dir = join(root, ...scan.dir);
+    if (!existsSync(dir)) {
+      if (!scan.required) continue;
+      bail(2, [
+        `Runtime support: no workflow directory at ${dir}.`,
+        "This gate asserts a relation between CI pins and the published support",
+        "claim. With no workflows there are no pins, so the relation is untested",
+        "rather than satisfied.",
+      ]);
+    }
+    const files = readdirSync(dir).filter((f) => /\.ya?ml$/.test(f)).sort();
+    if (files.length === 0) {
+      if (!scan.required) continue;
+      bail(2, [`Runtime support: ${dir} contains no workflow files.`]);
+    }
+    for (const file of files) {
+      found.push({ dir, file, label: `${scan.label}/${file}`, shipped: scan.shipped });
+    }
   }
-  const files = readdirSync(workflowsDir).filter((f) => /\.ya?ml$/.test(f)).sort();
-  if (files.length === 0) {
-    bail(2, [`Runtime support: ${workflowsDir} contains no workflow files.`]);
-  }
-  return files;
+  return found;
 }
 
 function majorOf(value, where) {
@@ -184,13 +260,13 @@ function majorOf(value, where) {
   return Number(m[1]);
 }
 
-function parseWorkflow(file) {
-  const text = readFileSync(join(workflowsDir, file), "utf8");
+function parseWorkflow({ dir, file, label }) {
+  const text = readFileSync(join(dir, file), "utf8");
   try {
     return YAML.parse(text) ?? {};
   } catch (err) {
     bail(2, [
-      `Runtime support: ${file} is not valid YAML (${err.message}).`,
+      `Runtime support: ${label} is not valid YAML (${err.message}).`,
       "The gate refuses to guess at a file it cannot parse.",
     ]);
   }
@@ -245,17 +321,17 @@ function stepMajors(job, where) {
 const pins = [];
 const allMatrixMajors = [];
 
-for (const file of workflowFiles()) {
-  const doc = parseWorkflow(file);
+for (const entry of workflowFiles()) {
+  const doc = parseWorkflow(entry);
   const jobs = doc?.jobs;
   if (!jobs || typeof jobs !== "object") continue;
   for (const [jobName, job] of Object.entries(jobs)) {
-    const where = `${file}:${jobName}`;
+    const where = `${entry.label}:${jobName}`;
     const fromMatrix = matrixMajors(job, where);
     const fromSteps = stepMajors(job, where);
     allMatrixMajors.push(...fromMatrix);
     const majors = [...fromMatrix, ...fromSteps];
-    if (majors.length > 0) pins.push({ file, job: jobName, majors });
+    if (majors.length > 0) pins.push({ where, job: jobName, majors, shipped: entry.shipped });
   }
 }
 
@@ -283,14 +359,27 @@ if (allMatrixMajors.length < 2) {
   );
 }
 
-// --- 2. Every runtime CI exercises satisfies the published range.
-for (const { file, job, majors } of pins) {
+// --- 2. Every runtime a scanned workflow asks for satisfies the published range.
+//
+// The relation is the same for both scan roots; the CONSEQUENCE is not, so the
+// message is not. A local pin below the floor means this repository's own CI
+// vouches for a runtime the package disclaims. A shipped pin below the floor
+// means every adopter that scaffolds the template runs the published CLI below
+// its own engine floor - and npm reports that as EBADENGINE and keeps going, so
+// nothing in the adopter's CI turns red either.
+for (const { where, majors, shipped } of pins) {
   for (const major of majors) {
     if (major < floor) {
       failures.push(
-        `${file}:${job} runs on Node ${major}, below the engines.node floor of ${floor}. ` +
-          `CI would prove the package works on a runtime it does not claim to support, ` +
-          `or on one that tooling has already dropped.`,
+        shipped
+          ? `${where} scaffolds consumers onto Node ${major}, below the engines.node floor ` +
+            `of ${floor}. This file is copied into adopting repositories verbatim, so the ` +
+            `pin runs the published CLI under its own engine floor there. npm answers an ` +
+            `unmet engines range with EBADENGINE and continues, so the adopter's CI stays ` +
+            `green while running unsupported - the defect is invisible at both ends.`
+          : `${where} runs on Node ${major}, below the engines.node floor of ${floor}. ` +
+            `CI would prove the package works on a runtime it does not claim to support, ` +
+            `or on one that tooling has already dropped.`,
       );
     }
   }
@@ -318,8 +407,16 @@ if (floor < SUPPORTED_FLOOR) {
 // that publishes must be one some build or test job really ran. That fires
 // independently in both directions - a release pinned BELOW the tested set and a
 // release pinned ABOVE it are both untested release paths.
+// SHIPPED PINS ARE EXCLUDED HERE, and only here. Check 2 applies to every
+// pin the gate can see, because a runtime below the published floor is wrong
+// wherever it appears. Check 4 is different: it asks whether THIS
+// repository's release path runs on a runtime THIS repository's build path
+// proved. A job in assets/governance never runs here at all, so counting it
+// as a build job would let the shipped template vouch for a release runtime
+// nothing ever executed - the template would widen buildMajors and silence a
+// real finding. A gate scoped wider must not become a gate that asserts less.
 const majorsOf = (predicate) =>
-  new Set(pins.filter((p) => predicate(p.job)).flatMap((p) => p.majors));
+  new Set(pins.filter((p) => !p.shipped && predicate(p.job)).flatMap((p) => p.majors));
 
 const buildMajors = majorsOf((j) => !RELEASE_JOB.test(j));
 const releaseMajors = majorsOf((j) => RELEASE_JOB.test(j));
@@ -349,7 +446,7 @@ if (failures.length > 0) {
 }
 
 const summary = pins
-  .map(({ file, job, majors }) => `${file}:${job} -> ${[...new Set(majors)].sort((a, b) => a - b).join(", ")}`)
+  .map(({ where, majors }) => `${where} -> ${[...new Set(majors)].sort((a, b) => a - b).join(", ")}`)
   .join("\n    ");
 console.log(
   `Runtime support OK: engines.node >=${floor} (supported floor ${SUPPORTED_FLOOR}), ` +

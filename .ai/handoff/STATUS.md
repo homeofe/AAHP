@@ -1,3 +1,40 @@
+## A gate that could not see the file it was protecting
+
+`check-conflict-markers` read `.ai/handoff/` and nothing else. Measured today,
+in this repository: a sync merge conflicted in MANIFEST.json AND CHANGELOG.md,
+staging with `git add -A` committed the CHANGELOG markers, `git commit` exited 0,
+the pre-commit hook passed, `aahp verify --level ci` passed, and a marker line
+reached a pushed branch of a PUBLIC repository inside the file that becomes the
+release notes. Every gate called it clean, correctly, because none of them was
+looking there.
+
+The narrow scope was right for the job the file states, which is refusing a
+handoff REWRITE over unresolved markers. It is the wrong scope for the question
+anyone actually asks a marker gate, which is whether markers are about to ship.
+
+Root Markdown documents are scanned now. Two decisions inside that are worth
+recording. The listing is a directory read rather than `git ls-files`, because a
+project root need not be a git repository, which this protocol supports, and a
+gate that errors there would be worse than the gap it closes; it also means an
+UNTRACKED root document is covered, and there is no version of this check that
+should ignore one. And only the root level is scanned: `tests/` ships fixtures
+containing marker lines on purpose, and a gate that fails on its own test data
+gets bypassed.
+
+The OK line now carries both counts. Without them a scan that reached no root
+document reads exactly like a scan that found them clean, which is the shape of
+false green this change is about.
+
+Three tests, one claim each: a marker in CHANGELOG.md fails; clean root documents
+pass AND the count proves they were read; prose quoting a marker mid-line is not a
+marker. The third is load-bearing rather than decorative, because the entry you
+are reading names a marker inline, and a substring test would fail the file that
+documents the incident.
+
+NOT covered: files below the root. A marker in `docs/` or `assets/` still ships
+unseen. Extending there means deciding what to do about test fixtures that hold
+marker lines deliberately, and that decision was not taken here.
+
 ## Running the ritual the enforcement now requires, before it is urgent
 
 #102 turned Layer 4 enforcement on for this repository with both remaining

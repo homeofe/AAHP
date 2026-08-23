@@ -11,6 +11,17 @@ independently of the npm version).
 
 ## [Unreleased]
 
+### Fixed
+- **The conflict-marker gate now reads the documents this repository publishes, not
+  only handoff state.** It scanned `.ai/handoff/` and nothing else, so a marker in a
+  file that SHIPS was invisible. Measured here: a sync merge conflicted in
+  CHANGELOG.md, staging with `git add -A` committed the markers, and the pre-commit
+  hook, `aahp verify --level ci` and this gate all reported clean while a marker line
+  sat in the file that becomes the release notes. Root Markdown documents are scanned
+  now, by directory listing rather than `git ls-files` so a non-git project root still
+  works, and the OK line carries the count so a scan that reached nothing cannot look
+  like a scan that found nothing.
+
 ### Removed
 - **The publish job no longer accepts a manual dispatch from an arbitrary ref.**
   `publish` runs `npm publish --access public --provenance` with `id-token: write`,

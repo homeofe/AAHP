@@ -229,6 +229,85 @@
       },
       "additionalProperties": false
     },
+    "docPaths": {
+      "type": "object",
+      "description": "Shape assertions over the adopter-facing documents (check-doc-shape.mjs). Presence enables it. Backticked repo-relative paths whose first segment is a tracked top-level entry of this repository must resolve against the git index; paths that intentionally describe a CONSUMER's tree are declared in adopterPaths with a reason and are reported as not assessed on every run. The gate exits 2 on anything it could not assess, so an unreadable tree never reports clean.",
+      "properties": {
+        "include": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "git pathspecs of documents to scan (default: README.md, CLAUDE.md, CONTRIBUTING.md)."
+        },
+        "adopterPaths": {
+          "type": "array",
+          "description": "Reviewed exceptions: paths that resolve in an adopting repository rather than in this one. Each entry pins the exact number of occurrences it covers, so a NEW mention of the same string is a failure rather than a silent exemption, and an entry that matches nothing is a failure too. The same string is often right in one sentence and wrong in the next, which is why this is a counted change detector and not an allowlist.",
+          "items": {
+            "type": "object",
+            "required": [
+              "path",
+              "occurrences",
+              "reason"
+            ],
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The exact span as it appears between backticks, without a leading ./ or a trailing /."
+              },
+              "occurrences": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Exact number of reviewed occurrences across the scanned documents. Any other number is a finding, in both directions."
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Why this path is correct while naming nothing in this repository."
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "requiredHeadings": {
+          "type": "array",
+          "description": "Headings that must exist, optionally before another heading. A missing heading is a failure; an anchor that itself cannot be found is a failure too, because an ordering that cannot be judged is not a pass.",
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "file",
+              "pattern"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Short identifier used in messages."
+              },
+              "file": {
+                "type": "string",
+                "description": "Tracked file to search, relative to the project root."
+              },
+              "pattern": {
+                "type": "string",
+                "description": "Regex matched line by line; the first matching line is the heading."
+              },
+              "before": {
+                "type": "string",
+                "description": "Optional regex naming a line the heading must precede."
+              },
+              "note": {
+                "type": "string",
+                "description": "Human-readable consequence, printed when the heading is missing."
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
     "acceptanceCriteria": {
       "type": "object",
       "description": "Input paths for the ADVISORY `aahp criteria` report (report-acceptance-criteria.mjs). This is not a gate: it is not part of `aahp check`, it has no enforcing mode, and it always exits 0. It reports legacy heading aliases, plain bullets where task boxes belong, criteria left unresolved on tasks the manifest marks done, and everything it could not read. Optional: absent, the report uses these defaults. A clean report is not proof; see README Section 8.7 for the published blind spots.",

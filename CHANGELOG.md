@@ -12,6 +12,31 @@ independently of the npm version).
 ## [Unreleased]
 
 ### Added
+- An Installation and Quickstart section in `README.md`, above the architectural
+  material. There was no heading at any level matching install, quickstart, getting
+  started or setup anywhere in the document, and the single install command sat at 58%
+  depth under a heading about decisions. The five steps were each executed against a
+  throwaway repository before being written down, including the Layer 3 warning a first
+  run produces, so the section describes what the commands do rather than what they are
+  expected to do. Issue #74.
+- `scripts/check-doc-shape.mjs`, a repository-local gate: a backticked repo-relative
+  path in the configured documents has to resolve against the git index, and a required
+  heading has to exist before a named anchor. It is deliberately NOT part of
+  `aahp check`, so no consumer inherits it, and it is wired into the `check` chain the
+  required job runs. It is not a blanket rule over every backticked span: measured on
+  this README, 78 distinct path-shaped spans exist and 46 correctly name a file in an
+  ADOPTER's tree, so only spans whose first segment is a tracked top-level entry of this
+  repository are resolved. Exceptions are declared with an exact occurrence COUNT rather
+  than as an allowlist, because the defect and the correct uses are the same string in
+  different sentences: a path-level allowlist would have exempted the defect this gate
+  exists for. It exits 2 on anything it could not assess. ADR-022.
+- The five-field provenance block from Section 2.4 now ships in `templates/LOG.md` and
+  `templates/STATUS.md`. The templates carried one of the five, so a repository that
+  followed the shipped example produced entries that did not satisfy the section's own
+  rule. A `provenance-block` group in `aahp.config.json` binds the field list in
+  Section 2.4 to both templates through the existing `schema-doc-sync` gate, so dropping
+  a field from either side is red. Issue #86.
+
 - `tests/assert-repo-ci-shape.mjs` asserts release authorization in `ci.yml`. The
   `publish` job (npm, `id-token: write`) and the `release` job (the GitHub Release) each
   carried a hand-written `if:`; the two disagreed about what counts as a release, and
@@ -83,6 +108,22 @@ independently of the npm version).
   exit code for the wrong reason, and no message to tell the two apart.
 
 ### Changed
+- README Section 2.4 no longer states a provenance MUST, and no longer states an audit
+  trail as a property of the protocol. Nothing enforced either: no gate reads the fields,
+  `MANIFEST.last_session` records one agent for the most recent session across the whole
+  handoff set rather than per entry, and a handoff set stripped of every provenance line
+  passes lint, `verify --level ci` and `doctor` at exit 0, reproduced on a throwaway
+  repository. Enforcement was measured before being rejected: across the nine consumer
+  repositories in this estate, `LOG.md` holds 100 entries and 8 carry all five fields, so
+  a retroactive MUST would redden 9 of 9 over history none of them can change, and this
+  repository's own LOG would fail it too. The section now states the conditional version,
+  which is what is true. ADR-021.
+- `README.md` names `assets/governance/aahp-govern.yml` as the source to copy for the
+  governance workflow. It named a `.github/workflows/` path that does not exist in this
+  repository and is not in the published package. Measured across the nine consumer
+  checkouts: 9 of 9 carry `.github/workflows/aahp-verify.yml`, so the neighbouring copy
+  instruction was right, and 0 of 9 carry an `aahp-govern.yml` at all. The two mentions
+  that correctly describe the DESTINATION are unchanged. Issue #74.
 - `aahp doctor`'s `handoff-set` gate now names the check it did not run. Its pass
   reason reads `N indexed files present, no strays (content not compared; aahp
   verify Layer 1 owns checksum integrity)`. The gate's behaviour is unchanged, and

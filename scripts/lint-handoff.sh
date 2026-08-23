@@ -482,16 +482,21 @@ elif command -v node.exe &>/dev/null; then
     node.exe "$SCRIPT_DIR/check-conflict-markers.mjs" "$PROJECT_ROOT" || MARKER_RC=$?
 else
     # Pure-bash fallback: strip CR and match markers without node.
+    #
+    # Same two changes as the node path, so the two do not disagree about what a
+    # marker is. It walks the whole tree rather than the handoff directory, and the
+    # `=======` alternative is gone: seven equals signs is a Markdown setext
+    # underline and a Python docstring header, and it flipped 2 of 48 real adopter
+    # roots red on files with no conflict in them.
     MARKER_FOUND=0
-    shopt -s nullglob
-    for f in "$HANDOFF_DIR"/*.md "$HANDOFF_DIR"/*.json; do
+    while IFS= read -r f; do
         [ -f "$f" ] || continue
-        if tr -d '\r' < "$f" | grep -E '^(<<<<<<<|>>>>>>>|=======)($|[[:space:]])' -q; then
+        if tr -d '\r' < "$f" | grep -E '^(<<<<<<<|>>>>>>>)($|[[:space:]])' -q; then
             echo -e "  ${RED}✗ Conflict markers present in: $f${NC}"
             MARKER_FOUND=1
         fi
-    done
-    shopt -u nullglob
+    done < <(find "$PROJECT_ROOT" \( -name .git -o -name node_modules \) -prune \
+        -o -type f -print 2>/dev/null)
     if [ "$MARKER_FOUND" -eq 1 ]; then
         MARKER_RC=1
     fi

@@ -55,6 +55,52 @@ workflow in backticks while explaining that it was deleted, and the gate flagged
 correctly. Naming such a path as plain prose is the difference between describing a
 path and asserting one. That is the real cost ADR-023 was reaching for, and it is a
 writing rule rather than the per-session churn the ADR predicted.
+## The marker gate reached 5.7 percent of what it ships, and its third arm could not survive the rest
+
+#105 widened this gate from `.ai/handoff/` to `.ai/handoff/` plus ROOT-level
+`*.md`, and recorded the remaining gap as blocked on a decision about test
+fixtures. Both halves of that were wrong, and the measurement is what says so.
+
+THE GAP IS BIGGER THAN THE NOTE SUGGESTED. Of the 53 files npm ships, 50 were
+unscanned: 5.7 percent coverage. `templates/` is the worst of them, because it
+ships AND `aahp init` copies it into every adopting repository, so a marker there
+propagates rather than merely shipping. Reproduced on a clean copy of #105 before
+any change: a conflict block appended to `templates/STATUS.md` leaves the gate
+printing `OK` at exit 0.
+
+THE STATED BLOCKER DOES NOT EXIST. #105 said `tests/` ships fixtures holding
+marker lines deliberately, and the gate carried that claim in its own comment.
+Measured over all 130 tracked files: ZERO line-anchored marker lines, in
+`tests/` or anywhere else. The fixtures BUILD markers at runtime inside quoted
+arguments, on lines beginning `printf` or `node`, and the predicate is
+line-anchored. No carve-out was ever needed. The claim was asserted without being
+measured, in a pull request about controls that claim more than they do.
+
+WHAT WAS ACTUALLY BLOCKING, AND NOBODY HAD NAMED IT. The third arm of the
+predicate, a bare `=======`, cannot survive a whole-tree scan. Seven equals signs
+is a Markdown setext H1 underline and a Python docstring section header. Run
+against the real adopter roots on this machine, the walk with that arm intact
+flips repositories red on files containing no conflict at all.
+
+The obvious repair, making the separator conditional on an open fence, produces
+DEAD CODE: the opening line already returns true, so a conditional third arm can
+never be the reason anything is flagged. A check that cannot fire, left in place
+to look like coverage, is the exact defect this repository keeps closing. The arm
+is removed instead, and what that costs is written down rather than buried: a
+conflict whose opening AND closing fences were both hand-deleted while the
+separator survived is no longer detected. Git does not write that state.
+
+MEASURED AFTER: 131 files scanned instead of 19. A marker in `templates/STATUS.md`
+fails, a marker under `scripts/` fails, a setext heading passes, a Python
+docstring header passes, and 11 of 11 adopter roots on this machine stay clean,
+including the one the naive version broke.
+
+The bash fallback at `lint-handoff.sh` got the same two changes, so the two
+implementations cannot disagree about what a marker is.
+
+NOT covered: symlinks are skipped rather than followed, and binary files are
+skipped on a NUL byte in the first 8 KiB. Both are counted in the summary line
+rather than silently dropped.
 
 ## A gate that could not see the file it was protecting
 

@@ -11,6 +11,18 @@ independently of the npm version).
 
 ## [Unreleased]
 
+### Removed
+- **The publish job no longer accepts a manual dispatch from an arbitrary ref.**
+  `publish` runs `npm publish --access public --provenance` with `id-token: write`,
+  and its condition carried `github.event_name == 'workflow_dispatch'`, an operand
+  that constrains no ref, while the `release` job beside it was tag-only. Two jobs in
+  one file disagreed about what a release is and the looser one was wired to the
+  registry. The two conditions are now identical. This costs no capability:
+  `workflow_dispatch` is still a trigger and a dispatch runs against a chosen ref, so
+  selecting a version tag still satisfies the condition and a failed publish can still
+  be re-run by hand. Measured first: 206 runs of the workflow, zero manual dispatches.
+  See ADR-019.
+
 ### Added
 - **`trustTtl.enforce` gives verify Layer 4 a failing branch, per repository.**
   Nothing in Layer 4 incremented `FAILURES`, so no number of expired `verified` trust

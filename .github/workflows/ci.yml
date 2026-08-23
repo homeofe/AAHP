@@ -174,7 +174,18 @@ jobs:
     # tracked at https://github.com/homeofe/AAHP/issues/69. Until it is settled,
     # the same assertion pins this condition exactly as written, so any edit to
     # it must update the record in the same commit.
-    if: (startsWith(github.ref, 'refs/tags/v') && contains(github.ref, '.')) || github.event_name == 'workflow_dispatch'
+    # Identical to the `release` job's condition below, on purpose. These two are
+    # the release-critical pair and they used to disagree: this one additionally
+    # accepted `workflow_dispatch`, an operand constraining no ref, so a manual run
+    # from any ref reached `npm publish` while the GitHub Release stayed tag-only.
+    #
+    # Removing it costs no capability. `workflow_dispatch` is still a trigger, and a
+    # dispatch is dispatched against a ref: select a version tag and `github.ref` is
+    # `refs/tags/vX.Y.Z`, which satisfies the line below, so a failed publish can
+    # still be re-run by hand. What is gone is publishing from a ref that is not a
+    # release tag. Measured before the change: 206 runs of this workflow, zero of
+    # them a manual dispatch. See ADR-019.
+    if: startsWith(github.ref, 'refs/tags/v') && contains(github.ref, '.')
     permissions:
       contents: read
       id-token: write

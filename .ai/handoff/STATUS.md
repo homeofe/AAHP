@@ -1,3 +1,73 @@
+## Two jobs in one file disagreed about what a release is, and npm got the looser answer
+
+**One of the repaired tests asserted BOTH directions** of the ADR-versus-list comparison. That
+worked while the list was non-empty, because replacing the ADR’s operand line left
+the ADR carrying one operand and the code recording another, so both halves fired.
+With the list empty only one half is reachable, and it is the half the test is named
+for. The other assertion is removed rather than left as a second copy of the first.
+**CI found five tests this change had invalidated.** They copy this repository’s own shape and
+mutate it, so emptying the recorded operand list changed what each mutation meant.
+Three are re-aimed and keep their claims: the reformatting test now reformats the
+RELEASE definition rather than a condition carrying the operand, and the two ADR
+mutations target the `(none)` line the block now holds. Two are retired, because both
+need `PUBLISH_CONDITIONS_BEYOND_RELEASE` to be non-empty and it is a constant inside
+the assertion under test, so no fixture can construct them. The `recordedButGone`
+branch they covered still runs and simply has nothing to find; the first commit that
+records an operand again makes both constructible. That is written into the test file
+rather than left as a silent deletion.
+
+The local gates all passed before this was pushed, which is exactly why it was not
+enough: `bats` is not installed on the machine the work was done on, so the suite
+that owns this behaviour never ran until CI. It runs on the Linux host now, before the
+push rather than after it.
+**A second lesson from the same merge.** Syncing this branch after another merge produced conflicts in
+MANIFEST.json AND CHANGELOG.md. Staging with `git add -A` committed the CHANGELOG
+markers, `git commit` exited 0, and `aahp verify` passed, because
+`check-conflict-markers` reads `.ai/handoff/` only. So a `<<<<<<< HEAD` reached a
+pushed branch of a PUBLIC repository, in the file that becomes the release notes, and
+every gate called it clean. Resolved by keeping BOTH sides, which is what an append-log
+of release notes requires. The gate’s narrow scope is a real gap and is being closed
+separately rather than folded into this change.
+`publish` runs `npm publish --access public --provenance` with `id-token: write`.
+Its condition was a disjunction, and the right operand,
+`github.event_name == 'workflow_dispatch'`, constrains no ref at all. The
+`release` job directly below it used the tag-only form. So the tag requirement,
+which is the stated release control, was not the only path to the registry, and
+the two jobs that together define a release answered the question differently.
+
+Settled as ADR-019 option A: the operand is removed and the two conditions are
+now byte-identical.
+
+The fact that decided it, rather than a preference between three defensible
+options, is that removing it costs no capability. `workflow_dispatch` is still a
+trigger. A dispatch runs against a chosen ref, so selecting a version tag gives
+`github.ref` of `refs/tags/vX.Y.Z`, which satisfies the tag-only condition; a
+failed publish can still be re-run by hand. What is gone is publishing from a ref
+that is not a release tag.
+
+Option B wanted the job behind an `environment:` carrying a required reviewer,
+and that cannot be finished in the tree: this repository's one environment has
+zero protection rules, and adding one is a settings change. Naming an unprotected
+environment would have added a label and no control. Option C keeps a path
+nothing uses. Re-measured against the API before deciding: 206 runs of `ci.yml`,
+115 `pull_request` and 91 `push`, and zero `workflow_dispatch` in the entire
+history.
+
+Three records had to move together and the assertion in
+`tests/assert-repo-ci-shape.mjs` is what forces that: the workflow, the recorded
+list in that file, and the operand block in ADR-019, which now reads `(none)`.
+Both directions were mutated to check the assertion still bites. Re-adding the
+operand to the workflow alone is caught as an unrecorded publish permission;
+recording it in the list alone is caught as a record the README does not carry.
+
+A note on how that mutation nearly cost the change: `git checkout --` after each
+mutation restored the files from the INDEX, and the fix was not committed yet, so
+it silently reverted the work rather than the mutation. Both edits had to be
+re-applied. Commit before mutating, every time.
+
+NOT covered: whether the npm trusted-publisher configuration constrains the ref
+on the registry side. That is a setting outside this repository and was not read
+here, so this change tightens the workflow and says nothing about the registry.
 ## Every Dependabot pull request fails Layer 2, and that is the gate working
 
 `actions/setup-python` 6.0.0 to 7.0.0, across the six workflows that use it.

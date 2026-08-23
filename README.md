@@ -1225,7 +1225,7 @@ condition rather than a substring of the workflow, so reformatting changes no ve
 and it runs inside the required `lint-and-validate` check, so an unrecorded change to
 publish authorization cannot merge. A job with no `if:` at all is a failure rather than
 a pass: it would run on every event the workflow accepts.
-**Deliberately still open:** whether the `workflow_dispatch` operand on the publish
+**Settled 2026-08-23 as option A.** Whether the `workflow_dispatch` operand on the publish
 condition should exist at all. It permits a publish from any ref, producing no tag and
 no GitHub Release, for a principal who can already push a release tag; none of this
 workflow's 147 runs, measured 2026-08-22, was a manual dispatch. Three options, all
@@ -1233,8 +1233,15 @@ defensible: (A) delete the operand, leaving the two conditions identical; (B) ke
 manual path but require a release tag ref on it as well, and put the job behind an
 `environment:` that carries at least one required reviewer, since an environment with no
 protection rule adds a label and no control; (C) keep it and record what compensates for
-it. Adopting any of them means editing the workflow and the recorded list together, and
-the assertion is what forces the pair. Tracked at
+it. Option A was taken. The deciding fact is that it costs no capability:
+`workflow_dispatch` remains a trigger, and a dispatch runs against a chosen ref, so
+selecting a version tag gives `github.ref` = `refs/tags/vX.Y.Z` and the tag-only
+condition is satisfied. Re-running a failed publish by hand still works; publishing
+from a ref that is not a release tag does not. B could not be completed from the tree,
+because this repository's one environment carries zero protection rules and adding one
+is a settings change, so naming it here would add a label and no control. C keeps a
+path that 206 runs show nobody uses. The workflow, the recorded list and this section
+moved in one commit, which is what the assertion forces. Closed at
 https://github.com/homeofe/AAHP/issues/69.
 
 **Recorded operands beyond the release definition.** The block below is the DOCUMENTED
@@ -1246,7 +1253,7 @@ reaches for, was prose that anyone could edit or delete on its own. Write `(none
 block when the list is empty; an empty block is a state the assertion refuses to read.
 
 ```
-github.event_name == 'workflow_dispatch'
+(none)
 ```
 
 **Re-measured 2026-08-23**, so the decision rests on current numbers rather than

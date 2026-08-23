@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 // check-workflow-pinning.mjs - Whatever a workflow installs and then executes
 // must come from the committed lockfile, and the lockfile must pin it by hash.
+// Whatever a workflow USES must name a commit its author cannot repoint, and an
+// update lane must exist to move that pin forward.
 //
 // WHY THIS GATE EXISTS
 // ---------------------------------------------------------------------------
@@ -33,6 +35,31 @@
 // simply stops being applied, silently, the first time someone rewrites a file.
 // This gate turns it into a property of the repository, which does have one.
 //
+// AND THE SECOND TIME, THE GATE ITSELF WAS THE CONVENTION
+// ---------------------------------------------------------------------------
+// Measured 2026-08-23 on `main` at 2cdaf48. This file was named
+// check-workflow-PINNING, ran inside the required `lint-and-validate` check on
+// every pull request, and exited 0 - while 22 of this repository's 25 `uses:`
+// references ran on mutable major tags (`actions/checkout@v4` and friends). A
+// tag is whatever its owner last pointed it at, so those 22 lines were
+// "pinned-looking" and not pinned.
+//
+// The gate did not miss them. It never looked at them. Rules A to D read only
+// `step.run`, the shell text of a step; the scan loop skips every step without
+// one, which is every `uses:` step there is. So the gate's SCOPE was npm
+// packages inside workflows, while its NAME promised workflow pinning, and the
+// difference was invisible from a green check. That is the same failure shape as
+// the one above, one level up: a convention (pin your actions, as
+// aahp-verify.yml did) applied by hand in the one file where it would be seen.
+//
+// Rules E and F below are the missing reader. Rule F is the half that is easy to
+// leave out: `.github/dependabot.yml` named only the npm ecosystem, and an
+// ecosystem that is not named is not scanned - which produces no pull request,
+// exactly like an ecosystem that is up to date. The pull-request count therefore
+// could not distinguish "nothing to update" from "nothing is looking", and a pin
+// with nothing offering to move it stops at whatever the pinned commit turns out
+// to contain.
+//
 // WHAT IS ASSERTED, AND THE MUTATION THAT TURNS EACH ONE RED
 // ---------------------------------------------------------------------------
 //   A. No workflow performs a project-level `npm install` / `npm i` / `npm add`.
@@ -60,6 +87,33 @@
 //      declaration alone says which version, the lockfile says which BYTES.
 //      MUTATION: delete the `integrity` field from any locked direct dependency.
 //
+//   E. Every `uses:` in a scanned workflow names an immutable reference, and
+//      says in a trailing comment which release that is. For an action or a
+//      reusable workflow that means a full 40-character commit SHA; for a
+//      `docker://` image it means an `@sha256:` digest. A tag - `@v4`, `@main`,
+//      `@latest` - is a pointer its owner can move at any time, with no diff
+//      here to review, so a tag reference is not a pin no matter how stable the
+//      tag has been. The trailing `# vX.Y.Z` is not decoration: a bare SHA is
+//      unreadable in review, and Dependabot rewrites the SHA and that comment
+//      together, so the comment stays true rather than rotting.
+//      MUTATION: change any `uses:` back to `@v4`, or delete its trailing
+//      comment.
+//      A local action (`uses: ./path`) is exempt and counted separately: it has
+//      no ref to pin, because its bytes are the bytes of this commit.
+//
+//   F. `.github/dependabot.yml` declares a `github-actions` ecosystem covering
+//      the workflow directory. Rule E freezes the references; this is what
+//      thaws them on purpose. Asked only when the LOCAL workflow directory
+//      actually contains a remote `uses:` - with none there is nothing for the
+//      lane to update, and the summary line says so rather than counting it as
+//      a pass. MUTATION: delete the `github-actions` entry from
+//      .github/dependabot.yml, or point its `directory` somewhere else.
+//      NOT asserted, and said out loud rather than implied: whether Dependabot
+//      is enabled for the repository at all, and whether it has ever opened a
+//      pull request. Both are off-machine facts this gate cannot read from the
+//      tree. Measure them with
+//      `gh pr list -R <repo> --author app/dependabot --state all`.
+//
 // DELIBERATELY OUT OF SCOPE, so the hole is visible here rather than invisible
 // in CI: `npm install -g <pkg>` (ci.yml, publish job). It is a different risk
 // class - the package manager itself, published by the registry operator,
@@ -68,6 +122,12 @@
 // https://github.com/homeofe/AAHP/issues/68. Extending this gate to global
 // installs is a few lines once that decision lands. It is named here instead of
 // being quietly allowed by an exemption list that nobody would ever re-read.
+//
+// ALSO OUT OF SCOPE, for the same reason: whether a pinned SHA is STALE. Rule E
+// proves the reference cannot be repointed, not that it is current, and those
+// are different properties. Rule F is the answer to staleness, and it is an
+// update lane rather than an assertion because "current" is a fact about the
+// upstream repository, not about this tree.
 //
 // WHICH FILES ARE SCANNED
 // ---------------------------------------------------------------------------
@@ -81,8 +141,12 @@
 //   1  a rule is violated - a real finding
 //   2  the gate could not evaluate (no YAML parser, no workflow directory, no
 //      workflow files, unparseable workflow, unreadable package.json or
-//      package-lock.json). Never 0: "I could not look" must not read as
-//      "I looked and it was fine".
+//      package-lock.json, unreadable or unparseable .github/dependabot.yml).
+//      Never 0: "I could not look" must not read as "I looked and it was fine".
+//
+// A dependabot.yml that is ABSENT is exit 1, not exit 2. That is not a state
+// this gate failed to read; it is the finding itself, and it is the exact state
+// this repository was in.
 //
 // DELIBERATELY NOT IN bin/aahp.js CHECK_GATES
 // ---------------------------------------------------------------------------
@@ -116,6 +180,22 @@ const GLOBAL_FLAGS = /^(?:-g|--global|--location=global)$/;
 // exponentially ambiguous, and package.json is attacker-supplied on a fork
 // pull request. Reported by CodeQL js/redos against the earlier form.
 const EXACT_VERSION = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.]+)?$/;
+
+// The immutable forms of a `uses:` reference. Anchored and fixed-length on both
+// sides, so neither can walk: a git commit is exactly 40 lowercase hex, a
+// registry digest exactly 64 after `sha256:`.
+const COMMIT_SHA = /^[0-9a-f]{40}$/;
+const IMAGE_DIGEST = /^sha256:[0-9a-f]{64}$/;
+
+// The trailing comment must say which release the SHA is, and be checkable as
+// such. Dependabot writes `# v4.2.2`; a lone word would satisfy "has a comment"
+// while telling a reviewer nothing.
+const VERSION_COMMENT = /(?:^|\s)v?\d+(?:\.\d+)*(?:[-+][0-9A-Za-z.-]+)?(?:\s|$)/;
+
+// The ecosystem name Dependabot uses for `uses:` references, and the directory
+// value that covers `.github/workflows`.
+const ACTIONS_ECOSYSTEM = "github-actions";
+const WORKFLOW_ROOT_DIRECTORY = "/";
 
 const root = resolveRoot();
 
@@ -234,11 +314,19 @@ export function npxTarget(tokens) {
 }
 
 // ---------------------------------------------------------------------------
-// Rules A, B and C, over every `run:` in every scanned workflow.
+// Rules A, B, C and E, over every scanned workflow.
 // ---------------------------------------------------------------------------
 const findings = [];
 const npxTargets = [];
+const usesRefs = [];
+let localActionRefs = 0;
 
+// Parsed once as a DOCUMENT rather than twice: rules A to D need the plain
+// JavaScript value, and rule E needs the trailing comment on the `uses:` scalar,
+// which the plain value does not carry. `parseDocument` collects errors instead
+// of throwing, so the error check below is explicit rather than a caught
+// exception - a document with errors would otherwise return a half-read tree
+// that reads as clean.
 function parseWorkflow(file) {
   let text;
   try {
@@ -246,18 +334,55 @@ function parseWorkflow(file) {
   } catch (err) {
     bail(2, [`Workflow pinning: cannot read ${file.rel} (${err.message}).`]);
   }
+  const lineCounter = new YAML.LineCounter();
+  let doc;
   try {
-    return YAML.parse(text) ?? {};
+    doc = YAML.parseDocument(text, { lineCounter });
   } catch (err) {
     bail(2, [
       `Workflow pinning: ${file.rel} is not valid YAML (${err.message}).`,
       "The gate refuses to guess at a file it cannot parse.",
     ]);
   }
+  if (doc.errors.length > 0) {
+    bail(2, [
+      `Workflow pinning: ${file.rel} is not valid YAML (${doc.errors[0].message}).`,
+      "The gate refuses to guess at a file it cannot parse.",
+    ]);
+  }
+  return { doc, lineCounter, value: doc.toJS() ?? {} };
+}
+
+// Rule E, over the parsed document. Every `uses:` anywhere in the file is
+// collected, not only the ones under `jobs.*.steps`: a reusable-workflow call
+// sits at `jobs.<id>.uses`, and a `uses:` this gate does not recognise the
+// position of is still a reference GitHub will resolve and run.
+function collectUses(file, { doc, lineCounter }) {
+  YAML.visit(doc, {
+    Pair(_index, pair) {
+      if (!pair.key || pair.key.value !== "uses") return;
+      const node = pair.value;
+      const line = node?.range ? lineCounter.linePos(node.range[0]).line : 0;
+      const where = `${file.rel}:${line}`;
+      if (typeof node?.value !== "string") {
+        findings.push({
+          where,
+          command: "uses:",
+          message:
+            "has a `uses:` whose value is not a plain string, so nothing here can say " +
+            "which commit it resolves to. Write the reference literally.",
+        });
+        return;
+      }
+      usesRefs.push({ where, ref: node.value, comment: typeof node.comment === "string" ? node.comment : null });
+    },
+  });
 }
 
 for (const file of scanned) {
-  const doc = parseWorkflow(file);
+  const parsed = parseWorkflow(file);
+  collectUses(file, parsed);
+  const doc = parsed.value;
   const jobs = doc?.jobs;
   if (!jobs || typeof jobs !== "object") continue;
 
@@ -382,6 +507,158 @@ for (const [name, spec] of Object.entries(declared)) {
 }
 
 // ---------------------------------------------------------------------------
+// Rule E: every `uses:` names a commit its owner cannot repoint, and says which
+// release that commit is.
+//
+// The reference is split at the LAST `@`, because the path half may legitimately
+// contain none and the ref half never contains one:
+// `github/codeql-action/init@<sha>`.
+// ---------------------------------------------------------------------------
+let remoteUsesRefs = 0;
+
+for (const { where, ref, comment } of usesRefs) {
+  if (ref.startsWith("./") || ref.startsWith(".\\")) {
+    // A local action is the bytes of this commit. There is no ref to pin, and
+    // counting it as pinned would overstate what was checked.
+    localActionRefs += 1;
+    continue;
+  }
+
+  remoteUsesRefs += 1;
+  const at = ref.lastIndexOf("@");
+  const target = at === -1 ? "" : ref.slice(at + 1);
+
+  if (ref.startsWith("docker://")) {
+    if (!IMAGE_DIGEST.test(target)) {
+      findings.push({
+        where,
+        command: `uses: ${ref}`,
+        message:
+          "runs a container image by tag. A registry tag is repointable by whoever " +
+          "owns the repository, so it names no particular bytes. Pin it to an " +
+          "`@sha256:` digest.",
+      });
+    }
+    continue;
+  }
+
+  if (!COMMIT_SHA.test(target)) {
+    findings.push({
+      where,
+      command: `uses: ${ref}`,
+      message:
+        `resolves the mutable ref ${JSON.stringify(at === -1 ? "(none)" : target)} at run time. ` +
+        "Whoever owns that action chooses which commit a tag or branch points at, and can " +
+        "repoint it with no diff here to review, so this is not pinned. Use the full " +
+        "40-character commit SHA with the release in a trailing comment.",
+    });
+    continue;
+  }
+
+  if (comment === null || !VERSION_COMMENT.test(comment)) {
+    findings.push({
+      where,
+      command: `uses: ${ref}`,
+      message:
+        "is pinned to a commit but carries no trailing comment naming the release. A bare " +
+        "SHA is unreviewable, and Dependabot rewrites the SHA and the comment together, so " +
+        "the comment is what keeps the version readable AND true. Add `# vX.Y.Z`.",
+    });
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Rule F: something has to offer to move those pins.
+//
+// Asked only when the LOCAL workflow directory holds at least one remote `uses:`.
+// A tree with none has nothing for the lane to update, and that is reported on
+// the summary line as not asserted rather than counted as a pass.
+// ---------------------------------------------------------------------------
+const localUsesCount = usesRefs.filter(
+  ({ where, ref }) =>
+    where.startsWith(`${WORKFLOW_DIR.replace(/\\/g, "/")}/`) && !ref.startsWith("./") && !ref.startsWith(".\\"),
+).length;
+
+let dependabotVerdict = "not asserted: no remote `uses:` in the workflow directory";
+
+if (localUsesCount > 0) {
+  const candidates = [join(".github", "dependabot.yml"), join(".github", "dependabot.yaml")];
+  const present = candidates.filter((rel) => existsSync(join(root, rel)));
+
+  if (present.length === 0) {
+    findings.push({
+      where: ".github/dependabot.yml",
+      command: `package-ecosystem: "${ACTIONS_ECOSYSTEM}"`,
+      message:
+        `is missing: there is no Dependabot configuration at all, so nothing offers to move ` +
+        `the ${localUsesCount} pinned action reference(s) in ${WORKFLOW_DIR.replace(/\\/g, "/")}. ` +
+        "A pin with no update lane stops at whatever the pinned commit turns out to contain, " +
+        "and the absence looks exactly like an ecosystem with nothing to update: no pull " +
+        "request either way.",
+    });
+  } else {
+    const rel = present[0].replace(/\\/g, "/");
+    let cfg;
+    try {
+      cfg = YAML.parse(readFileSync(join(root, present[0]), "utf8"));
+    } catch (err) {
+      bail(2, [
+        `Workflow pinning: ${rel} is not valid YAML (${err.message}).`,
+        "A Dependabot configuration that does not parse is not a configuration: GitHub",
+        "rejects the whole file, so EVERY lane in it stops, including the npm one. The",
+        "gate refuses to guess at it.",
+      ]);
+    }
+    const updates = Array.isArray(cfg?.updates) ? cfg.updates : null;
+    if (updates === null) {
+      bail(2, [
+        `Workflow pinning: ${rel} has no \`updates\` list.`,
+        `This gate reads the Dependabot v2 shape; this file reports version ${JSON.stringify(cfg?.version)}.`,
+        "It refuses to report a clean result over a shape it cannot read.",
+      ]);
+    }
+    const actionsLanes = updates.filter((u) => u?.["package-ecosystem"] === ACTIONS_ECOSYSTEM);
+    if (actionsLanes.length === 0) {
+      findings.push({
+        where: rel,
+        command: `package-ecosystem: "${ACTIONS_ECOSYSTEM}"`,
+        message:
+          `is not declared, so Dependabot never scans the ${localUsesCount} action reference(s) ` +
+          `in ${WORKFLOW_DIR.replace(/\\/g, "/")}. An ecosystem that is not named here produces ` +
+          "no pull request, which is indistinguishable from an ecosystem that is up to date - " +
+          "so the pull-request count cannot tell you this lane is missing. Measure the " +
+          "ecosystem list.",
+      });
+    } else {
+      // `directory` (one path) and `directories` (a list) are both accepted by
+      // Dependabot. Either has to cover the workflow root, or the lane exists
+      // and looks somewhere else, which is a lane that reads no workflow here.
+      const covers = actionsLanes.some((lane) => {
+        const dirs = Array.isArray(lane.directories)
+          ? lane.directories
+          : lane.directory !== undefined
+            ? [lane.directory]
+            : [];
+        return dirs.some((d) => String(d) === WORKFLOW_ROOT_DIRECTORY);
+      });
+      if (!covers) {
+        findings.push({
+          where: rel,
+          command: `package-ecosystem: "${ACTIONS_ECOSYSTEM}"`,
+          message:
+            `is declared but no lane covers ${JSON.stringify(WORKFLOW_ROOT_DIRECTORY)}. For this ` +
+            `ecosystem Dependabot reads ${WORKFLOW_DIR.replace(/\\/g, "/")} under the named ` +
+            "directory, so a lane pointed elsewhere scans no workflow in this repository while " +
+            "still appearing in the configuration.",
+        });
+      } else {
+        dependabotVerdict = `${rel} declares a ${ACTIONS_ECOSYSTEM} lane covering ${WORKFLOW_ROOT_DIRECTORY}`;
+      }
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
 if (findings.length > 0) {
   console.error(`\n  Workflow pinning failed (${findings.length} finding(s)).\n`);
   for (const f of findings) {
@@ -396,6 +673,19 @@ if (findings.length > 0) {
 console.log(
   `Workflow pinning OK: ${scanned.length} workflow file(s), ` +
     `${npxTargets.length} pinned npx invocation(s), ` +
-    `${Object.keys(declared).length} direct dependencies locked by hash.`,
+    `${Object.keys(declared).length} direct dependencies locked by hash, ` +
+    `${remoteUsesRefs} action reference(s) pinned to an immutable ref` +
+    `${localActionRefs > 0 ? `, ${localActionRefs} local action reference(s) exempt` : ""}.`,
+);
+// Printed on a PASSING run on purpose. Rule F is the one whose satisfied state
+// is invisible - a working lane and a missing lane both look like an inbox with
+// no Dependabot pull request in it - so the verdict is stated rather than left
+// to be inferred from the absence of a finding.
+console.log(`    Dependabot lane: ${dependabotVerdict}`);
+console.log(
+  "    Not asserted here: whether Dependabot is enabled for this repository, and whether it has",
+);
+console.log(
+  "    ever opened a pull request. Measure with `gh pr list --author app/dependabot --state all`.",
 );
 for (const file of scanned) console.log(`    ${file.rel}`);

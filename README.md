@@ -1118,6 +1118,29 @@ it. Adopting any of them means editing the workflow and the recorded list togeth
 the assertion is what forces the pair. Tracked at
 https://github.com/homeofe/AAHP/issues/69.
 
+**Recorded operands beyond the release definition.** The block below is the DOCUMENTED
+record, and `tests/assert-repo-ci-shape.mjs` compares it as a set against
+`PUBLISH_CONDITIONS_BEYOND_RELEASE` in that file, in both directions. Until this existed
+the two records could disagree with nothing noticing: the assertion pinned the workflow
+to a list inside a test file, while this section, which is the part a reader actually
+reaches for, was prose that anyone could edit or delete on its own. Write `(none)` in the
+block when the list is empty; an empty block is a state the assertion refuses to read.
+
+```
+github.event_name == 'workflow_dispatch'
+```
+
+**Re-measured 2026-08-23**, so the decision rests on current numbers rather than
+remembered ones: 185 `ci.yml` runs, 99 `pull_request` and 86 `push`, still zero
+`workflow_dispatch`. The repository has one configured environment, it carries zero
+protection rules, and no job in `ci.yml` names it, so nothing stands between a dispatch
+and `npm publish`. A dispatch would still have to pass `needs: [lint-and-validate,
+runtime-matrix]`; what it skips is the tag, the GitHub Release (the `release` job is
+tag-only, so npm and the Releases page can diverge) and the review a tag implies.
+`--provenance` records the ref it was built from, which makes such a publish auditable
+afterwards but does not prevent it. Whether the npm trusted-publisher configuration
+constrains the ref is a registry-side setting and was NOT read here.
+
 ### ADR-020: anything AAHP runs or ships declares its permissions and refuses the persisted checkout credential
 **Why it recurs:** a new workflow is copied from an existing one, and the existing one
 never had a `permissions:` block or `persist-credentials: false`, so neither does the
@@ -1170,6 +1193,48 @@ than a note in a review, and the shipped template is held to the same bar perman
 The gate exits 2, not 0, on anything it cannot decide (a `${{ }}` expression it cannot
 evaluate, a job delegating to a reusable workflow, an empty or missing scan root), so
 "I could not look" never reads as "I looked and it was fine".
+
+### ADR-021: every action reference is a commit, and an update lane keeps it current
+**Why it recurs:** `uses: owner/action@v4` reads as a pin and is not one. The tag is a
+pointer, and whoever owns the action decides at run time what it points at, with no diff
+in this repository to review. The convention of pinning to a commit SHA was already
+known and already applied here - `.github/workflows/aahp-verify.yml` had done it for
+every one of its three references - but a convention has no failure mode, so the other
+six workflow files never acquired it.
+**Evidence:** measured on `main` at `2cdaf48` - 25 `uses:` references under
+`.github/workflows/`, 3 pinned to a commit SHA and 22 on mutable major tags, plus 2 more
+on tags in the template shipped to adopters. 5 of the 6 required status checks on `main`
+ran on those mutable references, and they are the same checks that stand in front of the
+`publish` job. `.github/dependabot.yml` declared exactly one ecosystem, `npm`, so nothing
+had ever offered to move an action reference. Measured against the nine consumer
+repositories the same day: all nine already declared a `github-actions` Dependabot lane,
+and three of them were fully SHA-pinned, so the protocol repository was behind the fleet
+that installs it.
+**Decision:** every `uses:` under `.github/workflows/` **and** under `assets/governance/`
+names a full 40-character commit SHA with the release in a trailing `# vX.Y.Z` comment,
+and `.github/dependabot.yml` declares a `github-actions` lane covering `/`.
+`scripts/check-workflow-pinning.mjs` asserts both on every pull request. The comment is
+not decoration: a bare SHA is unreadable in review, and Dependabot rewrites the SHA and
+the comment together, so the version stays true rather than rotting.
+**Why the gate had to change and not just the workflows:** that gate already existed,
+already ran in the required check, and exited 0 over all 22 floating references. It read
+only `step.run`, the shell text of a step, and every `uses:` step has no `run:` at all -
+so its NAME promised workflow pinning while its SCOPE was npm packages inside workflows.
+Fixing the 22 lines without fixing that leaves the next 22 to arrive silently.
+**Why the pin and the lane are one decision:** a pin with no update lane does not stay
+correct, it stops moving - including past the fix for whatever the pinned commit turns
+out to contain. And the absence of a lane is invisible from the outside: an ecosystem
+nobody scans and an ecosystem with nothing to update both produce zero pull requests.
+The thing to measure is therefore the ecosystem list, never the pull-request count.
+**Known gap, stated rather than left to be discovered:** for this ecosystem Dependabot
+reads `.github/workflows/` under the configured directory, so the lane does NOT cover
+`assets/governance/aahp-govern.yml`. That file's pins are held immutable by the gate and
+are moved by hand, or by the adopting repository's own lane once the file is copied into
+their `.github/workflows/`. Whether AAHP should instead ship that template with a
+different update path is open.
+**Consequence:** a reference added on a tag is a red required check. Staleness is
+explicitly NOT what the gate asserts - it proves a reference cannot be repointed, not
+that it is current, and those are different properties with different answers.
 
 ---
 

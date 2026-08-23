@@ -329,6 +329,351 @@ EOF
     [[ "$output" == *"no package-lock.json"* ]]
 }
 
+# ─── Rules E and F: what a workflow USES, and what moves those pins ─────────
+#
+# Rules A to D read `step.run`, the shell text of a step. Every `uses:` step has
+# no `run:` at all, so before rule E this gate skipped all of them - and exited 0
+# on this repository while 22 of its 25 action references sat on mutable major
+# tags. The fixtures below therefore start from a workflow that HAS a `uses:`,
+# because the rule-A-to-D fixtures have none and could never have detected this.
+
+# .github/dependabot.yml for a fixture project. With no argument it writes the
+# lane rule F requires; with one, that argument is the whole `updates:` body.
+# Written as a branch rather than a defaulted variable on purpose: the default is
+# multi-line and contains quotes, and a `${1:-...}` carrying both is the kind of
+# expression that breaks silently and takes a test's meaning with it.
+write_dependabot() {
+    mkdir -p "$TEST_TMPDIR/.github"
+    if [ "$#" -eq 0 ]; then
+        cat > "$TEST_TMPDIR/.github/dependabot.yml" <<'EOF'
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+EOF
+        return
+    fi
+    cat > "$TEST_TMPDIR/.github/dependabot.yml" <<EOF
+version: 2
+updates:
+$1
+EOF
+}
+
+# A workflow with one action reference. With one argument that argument replaces
+# the reference line, so every mutation below differs from the passing fixture by
+# exactly that one line.
+write_uses_workflow() {
+    local ref='      - uses: actions/checkout@1111111111111111111111111111111111111111 # v4.2.2'
+    if [ "$#" -ge 1 ]; then
+        ref="$1"
+    fi
+    mkdir -p "$(wf_dir)"
+    cat > "$(wf_dir)/ci.yml" <<EOF
+name: fx
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+$ref
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+      - name: Validate
+        run: npx --no-install fx-tool validate -s schema.json -d data.json
+EOF
+}
+
+# The passing fixture for rules E and F: one pinned reference, one lane.
+write_pinned_fixture() {
+    write_pkg
+    write_lock
+    write_uses_workflow
+    write_dependabot
+}
+
+@test "the pinned baseline fixture is clean" {
+    write_pinned_fixture
+
+    run node "$GATE" "$TEST_TMPDIR"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"1 action reference(s) pinned to an immutable ref"* ]]
+}
+
+@test "an action on a mutable major tag is red" {
+    write_pinned_fixture
+    write_uses_workflow "      - uses: actions/checkout@v4"
+
+    run node "$GATE" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"resolves the mutable ref \"v4\""* ]]
+}
+
+@test "an action on a branch is red, not only a version tag" {
+    # `@main` is the same defect with a friendlier name: whoever can push to that
+    # branch chooses what runs here, and needs no release to do it.
+    write_pinned_fixture
+    write_uses_workflow "      - uses: actions/checkout@main"
+
+    run node "$GATE" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"resolves the mutable ref \"main\""* ]]
+}
+
+@test "a reference with no ref at all is red" {
+    write_pinned_fixture
+    write_uses_workflow "      - uses: actions/checkout"
+
+    run node "$GATE" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"resolves the mutable ref \"(none)\""* ]]
+}
+
+@test "a 39-character hex ref is red, so the length is actually checked" {
+    # An anchored fixed-length pattern is the point: a prefix that merely LOOKS
+    # like a commit is not one, and git would not resolve it as this action.
+    write_pinned_fixture
+    write_uses_workflow "      - uses: actions/checkout@111111111111111111111111111111111111111 # v4.2.2"
+
+    run node "$GATE" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"resolves the mutable ref"* ]]
+}
+
+@test "a pinned SHA with no trailing version comment is red" {
+    write_pinned_fixture
+    write_uses_workflow "      - uses: actions/checkout@1111111111111111111111111111111111111111"
+
+    run node "$GATE" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"no trailing comment naming the release"* ]]
+}
+
+@test "a trailing comment that names no version is red" {
+    # "has a comment" is not the property. The comment has to say WHICH release,
+    # because that is the half a reviewer reads and the half Dependabot rewrites.
+    write_pinned_fixture
+    write_uses_workflow "      - uses: actions/checkout@1111111111111111111111111111111111111111 # pinned"
+
+    run node "$GATE" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"no trailing comment naming the release"* ]]
+}
+
+@test "a reusable workflow call outside steps is checked too" {
+    # jobs.<id>.uses is not a step and has no `run:`. A gate that walked only
+    # jobs.*.steps would report this file clean.
+    write_pkg
+    write_lock
+    write_dependabot
+    mkdir -p "$(wf_dir)"
+    cat > "$(wf_dir)/ci.yml" <<'EOF'
+name: fx
+on: [push]
+jobs:
+  call:
+    uses: some-org/some-repo/.github/workflows/shared.yml@v1
+EOF
+
+    run node "$GATE" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"resolves the mutable ref \"v1\""* ]]
+}
+
+@test "a local action reference is exempt, and said so rather than counted as pinned" {
+    # `./path` has no ref to pin: its bytes are the bytes of this commit.
+    # Reported separately so the pinned count stays a count of real pins.
+    write_pinned_fixture
+    write_uses_workflow "      - uses: ./.github/actions/local-thing"
+
+    run node "$GATE" "$TEST_TMPDIR"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"1 local action reference(s) exempt"* ]]
+    [[ "$output" == *"0 action reference(s) pinned"* ]]
+}
+
+@test "a container image on a tag is red, and on a digest is green" {
+    write_pinned_fixture
+    write_uses_workflow "      - uses: docker://alpine:3.20"
+
+    run node "$GATE" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"runs a container image by tag"* ]]
+
+    write_uses_workflow "      - uses: docker://alpine@sha256:1111111111111111111111111111111111111111111111111111111111111111"
+
+    run node "$GATE" "$TEST_TMPDIR"
+    [ "$status" -eq 0 ]
+}
+
+@test "a uses: whose value is not a plain string is red" {
+    write_pkg
+    write_lock
+    write_dependabot
+    mkdir -p "$(wf_dir)"
+    cat > "$(wf_dir)/ci.yml" <<'EOF'
+name: fx
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: [actions/checkout, v4]
+EOF
+
+    run node "$GATE" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"not a plain string"* ]]
+}
+
+@test "the shipped template directory is held to rule E as well" {
+    # assets/governance/aahp-govern.yml is copied into consumer repositories, so
+    # a mutable tag there is a mutable tag on somebody else's CI.
+    write_pinned_fixture
+    mkdir -p "$TEST_TMPDIR/assets/governance"
+    cat > "$TEST_TMPDIR/assets/governance/aahp-govern.yml" <<'EOF'
+name: govern
+on: [push]
+jobs:
+  govern:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-node@v4
+EOF
+
+    run node "$GATE" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"assets/governance/aahp-govern.yml"* ]]
+    [[ "$output" == *"resolves the mutable ref \"v4\""* ]]
+}
+
+# ─── Rule F: the pins have to be able to move ───────────────────────────────
+
+@test "pinned actions with no Dependabot configuration at all is red" {
+    write_pkg
+    write_lock
+    write_uses_workflow
+
+    run node "$GATE" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"there is no Dependabot configuration at all"* ]]
+}
+
+@test "a Dependabot configuration naming only npm is red" {
+    # The exact state of this repository before the fix: a visibly working npm
+    # lane, and no lane at all for the 22 floating action references.
+    write_pinned_fixture
+    write_dependabot '  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"'
+
+    run node "$GATE" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"is not declared, so Dependabot never scans"* ]]
+}
+
+@test "a github-actions lane pointed at another directory is red" {
+    write_pinned_fixture
+    write_dependabot '  - package-ecosystem: "github-actions"
+    directory: "/tools"
+    schedule:
+      interval: "weekly"'
+
+    run node "$GATE" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"no lane covers \"/\""* ]]
+}
+
+@test "a lane declared with directories: instead of directory: is accepted" {
+    write_pinned_fixture
+    write_dependabot '  - package-ecosystem: "github-actions"
+    directories:
+      - "/"
+    schedule:
+      interval: "weekly"'
+
+    run node "$GATE" "$TEST_TMPDIR"
+    [ "$status" -eq 0 ]
+}
+
+@test "with no action references the lane is reported NOT ASSERTED, not as a pass" {
+    # The third state. A tree with nothing to update is not a tree whose update
+    # lane was checked, and printing "OK" without saying which of the two it was
+    # is how a gate stops meaning anything.
+    write_good_fixture
+
+    run node "$GATE" "$TEST_TMPDIR"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"not asserted: no remote \`uses:\` in the workflow directory"* ]]
+}
+
+@test "an unparseable dependabot.yml exits 2, not 1" {
+    # GitHub rejects the whole file, so EVERY lane stops, including npm. That is
+    # a state the gate could not evaluate, which is not the same answer as a
+    # missing lane, and the exit code has to say which one it is.
+    write_pinned_fixture
+    printf 'version: 2\nupdates: [unclosed\n' > "$TEST_TMPDIR/.github/dependabot.yml"
+
+    run node "$GATE" "$TEST_TMPDIR"
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"is not valid YAML"* ]]
+}
+
+@test "a dependabot.yml with no updates list exits 2, not 0" {
+    write_pinned_fixture
+    printf 'version: 1\n' > "$TEST_TMPDIR/.github/dependabot.yml"
+
+    run node "$GATE" "$TEST_TMPDIR"
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"no \`updates\` list"* ]]
+}
+
+# ─── The finding itself, read off the repository rather than through the gate ─
+
+@test "every action reference in this repository is a commit SHA with a version" {
+    # Deliberately NOT a restatement of "the real repository satisfies every
+    # pinning rule": that test passes whenever the gate is satisfied, including
+    # if rule E were later weakened or deleted. This one reads the workflow text
+    # itself, so it stays red if the gate stops looking.
+    #
+    # `tr -d '\r'` first, and this is not defensive noise: on a Windows checkout
+    # these files are CRLF, and a shell regex anchored with `$` then reports a
+    # correctly pinned reference as unpinned. Issue 71 was written with that
+    # warning in it.
+    local total pinned
+    total=0
+    pinned=0
+    while IFS= read -r file; do
+        local t p
+        t="$(tr -d '\r' < "$file" | grep -cE '^[[:space:]]*-?[[:space:]]*uses:[[:space:]]+[A-Za-z]' || true)"
+        p="$(tr -d '\r' < "$file" | grep -E '^[[:space:]]*-?[[:space:]]*uses:[[:space:]]+[A-Za-z]' \
+            | grep -cE '@[0-9a-f]{40} # v?[0-9]' || true)"
+        total=$((total + t))
+        pinned=$((pinned + p))
+    done < <(find "$AAHP_ROOT/.github/workflows" "$AAHP_ROOT/assets/governance" -name '*.yml' -o -name '*.yaml')
+
+    # A relation, not a fixed count: the file may grow more references and each
+    # new one is still held to the rule. A fixed number would be an anchor whose
+    # obvious repair is to raise it.
+    [ "$total" -ge 25 ] || { echo "only $total action references found; the scan is not reading the files"; false; }
+    [ "$pinned" -eq "$total" ] || {
+        echo "$pinned of $total action references carry a 40-character SHA and a version comment"
+        false
+    }
+}
+
+@test "this repository declares a github-actions Dependabot lane" {
+    # Measured on the configuration, because the pull-request COUNT cannot
+    # answer it: an ecosystem that is absent and an ecosystem that is up to date
+    # both produce zero pull requests.
+    run grep -c 'package-ecosystem: "github-actions"' "$AAHP_ROOT/.github/dependabot.yml"
+    [ "$status" -eq 0 ]
+    [ "$output" -ge 1 ]
+}
+
 # ─── The gate has to actually RUN ───────────────────────────────────────────
 
 @test "the gate is wired into the aggregate check chain" {

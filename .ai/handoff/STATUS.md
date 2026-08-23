@@ -129,6 +129,45 @@ first version of the `--json` exit proof named the wrong `process.exit` call.
 landed, the file really changed, and the `--json` test stayed GREEN. A named
 anchor that turns nothing red is worth no more than no anchor at all. Split into
 two proofs, one per exit call, and both go red.
+## A pinning gate that never read a single `uses:`, and a record only a test file kept
+
+22 of 25 action references under `.github/workflows/` ran on mutable major tags,
+plus 2 more in the template adopters copy. A tag is a pointer its owner repoints
+at will, with no diff here, and 5 of the 6 required checks on `main` ran on those
+references. All 27 now name a 40-character commit SHA with the release in a
+trailing comment. SHAs resolved through the GitHub API, dereferencing annotated
+tag objects: checkout v7.0.1, setup-node v7.0.0, setup-python v6.0.0 (the three
+`aahp-verify.yml` already ran green here), codeql-action v3.37.8, which is what
+the `v3` tag currently points at.
+The part worth carrying forward is not the 22 lines. `check-workflow-pinning.mjs`
+already existed, already ran inside the required check, and exited 0 over every
+one of them: its rules read only `step.run`, and a `uses:` step has no `run:` at
+all. The NAME promised workflow pinning; the SCOPE was npm packages inside
+workflows, and nothing said so. Rules E and F close it - every `uses:` immutable
+with a version comment, and a `github-actions` Dependabot lane that keeps the
+pins moving. Both halves, because a pin nothing updates stops at whatever the
+pinned commit turns out to contain, and a missing lane is invisible from the
+pull-request count: an unscanned ecosystem and an up-to-date one both produce
+zero. ADR-021 records it.
+Also here, and touching NO workflow behaviour: `assert-repo-ci-shape.mjs` gained
+a fifth assertion comparing its own `PUBLISH_CONDITIONS_BEYOND_RELEASE` against
+ADR-019 in README.md, as sets, both directions. The code record existed; the
+record a person reads was prose anyone could edit alone.
+DOES NOT COVER, and none of it is implied by a green check here: whether
+Dependabot is enabled on this repository or has ever opened a pull request (an
+off-machine fact, measure with `gh pr list --author app/dependabot`); whether any
+pinned SHA is CURRENT, which is what the lane is for and not something the gate
+asserts; `assets/governance/aahp-govern.yml`, whose pins the lane does not reach
+because Dependabot reads `.github/workflows/` under the configured directory;
+`npm install -g npm@latest` in the publish job, still out of scope per issue 68;
+and the `workflow_dispatch` operand on the publish condition, which is measured
+and written up but deliberately UNCHANGED - it is the owner's call, tracked at
+issue 69.
+The publish job's steps do not run on a pull request, so the checkout and
+setup-node bump inside it is evidenced by the same SHAs running green in
+`aahp-verify.yml` and by reading `action.yml` at each pinned SHA for the inputs
+this repository passes, NOT by a green run of that job.
+VERIFIED ON LINUX, bats 1.10.0: see the pull request body for the transcripts.
 
 ## The class test could not detect its own class, and the README described a workflow that changed
 

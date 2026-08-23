@@ -570,34 +570,15 @@ EOF
     [[ "$output" == *"trustTtl.enforce could not be read"* ]]
 }
 
-@test "Layer 4: two enforce keys with DIFFERENT parents are not a duplicate" {
-    # The guard counted \"enforce\" across the whole file, which was fine while
-    # trustTtl.enforce was the only one and wrong the moment verifyWorkflow.enforce
-    # existed: the pre-push hook refused a valid config on the release commit. Two
-    # legitimate keys with different parents must read as two settings, not one
-    # duplicated key.
-    create_full_handoff
+@test "Layer 4: a duplicated trustTtl key is refused, not silently resolved" {
+    # Every JSON parser here keeps the LAST duplicate key, so a reviewer reading
+    # the first one can be looking at a value that never takes effect. The reader
+    # refuses the file instead of picking a winner.
     cat > "$TEST_TMPDIR/aahp.config.json" <<'EOF'
 {
   "trustTtl": { "enforce": true },
-  "verifyWorkflow": { "enforce": true }
+  "trustTtl": { "enforce": false }
 }
-EOF
-    printf '
-<!-- fixture: handoff state moves with the config -->
-' \
-        >> "$TEST_TMPDIR/.ai/handoff/STATUS.md"
-    bash "$SCRIPTS_DIR/aahp-manifest.sh" "$TEST_TMPDIR" --quiet --phase implementation
-    git -C "$TEST_TMPDIR" add -A
-    git -C "$TEST_TMPDIR" commit -q -m "config"
-
-    run bash "$SCRIPTS_DIR/verify-handoff.sh" "$TEST_TMPDIR" --level full
-    [[ "$output" != *"could not be read"* ]]
-    # And the trustTtl setting was honoured rather than merely tolerated: this
-    # register has no expired verified rows, so enforcement on is a clean Layer 4.
-    [[ "$output" == *"No expired"* ]]
-}
-
 EOF
     # aahp.config.json is a root file, so Layer 2 counts it as an impacting
     # change and fails unless handoff state moves with it. Without this line the

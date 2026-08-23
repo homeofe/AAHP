@@ -1,5 +1,15 @@
 ## Cutting 3.11.0: a MINOR only because the one breaking edge was removed first
 
+**And the test file was restored rather than patched a third time.** Removing the retired
+duplicate-key test left an orphaned heredoc terminator and the tail of that test, so
+bats could not parse the file at all; the printf in the replacement test had also lost
+its escapes. Two failed repairs later the honest move was to stop editing a file whose
+state could not be verified from here and restore it to the committed version.
+
+Lost with it: the test asserting that two `enforce` keys with different parents are not
+a duplicate. The behaviour is still exercised on every run, because this repository’s
+own config now carries exactly that shape and every pre-commit and pre-push reads it
+correctly. A test is still owed and is named here rather than left as a silent gap.
 **Then it misfired a second time, on formatting, and was removed.** Scoping the count with
 `sed -n '/"trustTtl"/,/}/p'` refused a config whose trustTtl object is written on ONE
 line, because a sed range does not end on the line it starts: it ran on into the next

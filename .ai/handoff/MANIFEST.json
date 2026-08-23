@@ -11,9 +11,9 @@
   },
   "files": {
     "STATUS.md": {
-      "checksum": "sha256:1dd238a30241e223c17f6cb2f8429384b37c12ac322da3cfe849ce4a36297f20",
+      "checksum": "sha256:f048001cc5f01a252a33ae40d9f9beda53f73fc825444f82f60ffdaa16132f36",
       "updated": "2026-08-23T00:30:12Z",
-      "lines": 210,
+      "lines": 217,
       "summary": "`.ai/handoff/STATUS.md` is prepend-only, so two branches almost always differ by"
     },
     "NEXT_ACTIONS.md": {
@@ -82,7 +82,60 @@
     "manifest_only": 85,
     "manifest_plus_core": 8300,
     "full_read": 18370
+  },
+  "next_task_id": 18,
+  "tasks": {
+    "T-006": {
+      "title": "Publish npm package",
+      "status": "done",
+      "priority": "medium",
+      "depends_on": [],
+      "created": "2026-06-28T10:10:21.975Z",
+      "notes": "**AAHP Task:** `T-006`  \n**Status:** blocked  \n**Priority:** medium  \n\n\n\n\n---\n*Auto-created from AAHP manifest · project: AAHP*",
+      "github_issue": 18,
+      "github_repo": "homeofe/AAHP",
+      "completed": "2026-07-14T00:00:00Z"
+    },
+    "T-014": {
+      "title": "Add CLI integration tests for bin/aahp.js [high]",
+      "status": "done",
+      "priority": "high",
+      "depends_on": [],
+      "created": "2026-06-28T10:10:21.975Z",
+      "notes": "**AAHP Task:** `T-014`  \n**Status:** ready  \n**Priority:** high  \n\n\n\n\n---\n*Auto-created from AAHP manifest · project: AAHP*",
+      "github_issue": 14,
+      "github_repo": "homeofe/AAHP",
+      "completed": "2026-07-14T00:00:00Z"
+    },
+    "T-015": {
+      "title": "Add `aahp status` quick-look command [medium]",
+      "status": "done",
+      "priority": "medium",
+      "depends_on": [],
+      "created": "2026-06-28T10:10:21.978Z",
+      "github_issue": 22,
+      "github_repo": "homeofe/AAHP",
+      "completed": "2026-07-14T00:00:00Z"
+    },
+    "T-016": {
+      "title": "Add `aahp archive` command for LOG.md rotation [medium]",
+      "status": "done",
+      "priority": "medium",
+      "depends_on": [],
+      "created": "2026-06-28T10:10:21.979Z",
+      "github_issue": 23,
+      "github_repo": "homeofe/AAHP",
+      "completed": "2026-07-14T00:00:00Z"
+    },
+    "T-017": {
+      "title": "Add project-level CLAUDE.md [low]",
+      "status": "done",
+      "priority": "low",
+      "depends_on": [],
+      "created": "2026-06-28T10:10:21.979Z",
+      "github_issue": 24,
+      "github_repo": "homeofe/AAHP",
+      "completed": "2026-07-14T00:00:00Z"
+    }
   }
-  ,"next_task_id": 18
-  ,"tasks": {"T-006":{"title":"Publish npm package","status":"done","priority":"medium","depends_on":[],"created":"2026-06-28T10:10:21.975Z","notes":"**AAHP Task:** `T-006`  \n**Status:** blocked  \n**Priority:** medium  \n\n\n\n\n---\n*Auto-created from AAHP manifest · project: AAHP*","github_issue":18,"github_repo":"homeofe/AAHP","completed":"2026-07-14T00:00:00Z"},"T-014":{"title":"Add CLI integration tests for bin/aahp.js [high]","status":"done","priority":"high","depends_on":[],"created":"2026-06-28T10:10:21.975Z","notes":"**AAHP Task:** `T-014`  \n**Status:** ready  \n**Priority:** high  \n\n\n\n\n---\n*Auto-created from AAHP manifest · project: AAHP*","github_issue":14,"github_repo":"homeofe/AAHP","completed":"2026-07-14T00:00:00Z"},"T-015":{"title":"Add `aahp status` quick-look command [medium]","status":"done","priority":"medium","depends_on":[],"created":"2026-06-28T10:10:21.978Z","github_issue":22,"github_repo":"homeofe/AAHP","completed":"2026-07-14T00:00:00Z"},"T-016":{"title":"Add `aahp archive` command for LOG.md rotation [medium]","status":"done","priority":"medium","depends_on":[],"created":"2026-06-28T10:10:21.979Z","github_issue":23,"github_repo":"homeofe/AAHP","completed":"2026-07-14T00:00:00Z"},"T-017":{"title":"Add project-level CLAUDE.md [low]","status":"done","priority":"low","depends_on":[],"created":"2026-06-28T10:10:21.979Z","github_issue":24,"github_repo":"homeofe/AAHP","completed":"2026-07-14T00:00:00Z"}}
 }

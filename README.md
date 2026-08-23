@@ -1031,9 +1031,11 @@ top-level `permissions:`, 11 `actions/checkout` steps, 1 setting
 `persist-credentials: false`. Read from real job logs on those workflows: a job that
 inherits is granted `Contents: read`, `Metadata: read` and `Packages: read` and writes
 the token into `.git/config` as an `extraheader`; a job that declares `contents: read`
-is granted only `Contents` and `Metadata` and writes a throwaway credentials file
-instead. So the declared block is strictly narrower today, not only after some future
-settings change.
+is granted only `Contents` and `Metadata`. What the narrower job writes in place of the
+`extraheader` was not established from those logs and is deliberately not claimed here.
+So the declared block is strictly narrower today, not only after some future settings
+change - and that conclusion rests on the granted-permission difference, which was
+measured, rather than on the mechanism, which was not.
 **Decision:** every workflow document under `.github/workflows/` **and** under
 `assets/governance/` declares a top-level `permissions:` mapping and sets
 `persist-credentials: false` on every checkout. `tests/assert-workflow-hardening.mjs`

@@ -215,9 +215,18 @@ npx --no-install ajv-cli validate --spec=draft2020 -c ajv-formats \
   -s schema/aahp-manifest.schema.json -d .ai/handoff/MANIFEST.json
 ```
 
-`--no-install` is what makes the pin load-bearing. Without it `npx` falls back to
-fetching from the registry whenever the local resolution misses, so the version
-that executes is whatever the registry serves at that moment.
+`npm ci --ignore-scripts` is what makes the pin load-bearing: it installs exactly
+the locked closure, so there is nothing left for the next line to resolve.
+
+**`--no-install` is not doing what its name suggests, and this README used to say
+it was.** `npx` is `npm exec`, which has no `--no-install` option; npm ignores
+the unknown flag without a warning. Measured on npm 10.9.0, in an empty directory:
+`npx --no-install <a name that does not exist>` still issues a `GET` to
+registry.npmjs.org and fails with E404. So the flag is a marker of intent, not a
+guard - if the install step above is ever edited, reordered or skipped, this line
+reaches the network. Prefer invoking the installed binary by path where the
+resolution has to be guaranteed, as the shipped governance workflow and the git
+hooks now do. Tightening this repository's own workflows is tracked separately.
 
 If the manifest doesn't conform, the pipeline rejects the commit. This prevents malformed handoffs from entering the repo.
 
@@ -292,7 +301,27 @@ In v1, a `(Verified)` status lives forever. In v2, trust has a TTL:
 
 ### 2.6 Secrets & PII Firewall
 
-Add a `.ai/handoff/.aiignore` file (conceptually similar to `.gitignore`) that defines patterns agents must never write into handoff files:
+> **`.aiignore` is agent-facing documentation, not a gate.** No code in this repository
+> parses `.ai/handoff/.aiignore`. This section used to close with "CI hook validates
+> that no handoff file contains these patterns", and that was false: a pattern written into
+> `.aiignore` has never been checked by `aahp lint`, by `aahp verify`, by `aahp check` or by
+> any shipped workflow. Measured on a fresh repository: with `10.0.0.*` and
+> `*.internal.example.com` in `.aiignore`, a committed `STATUS.md` line reading
+> `Deploy target: db.internal.example.com at 10.0.0.5` passes `lint-handoff.sh` and
+> `aahp verify --level ci`, both exit 0. `aahp lint` now prints, in check 2, how many
+> `.aiignore` patterns it is **not** applying, so the gap is visible at the point of use
+> instead of being inferred from a green run.
+>
+> **What is enforced** is the fixed `SECRET_PATTERNS` array in `scripts/lint-handoff.sh`,
+> the injection array in check 1, and the PII check plus `pii-allowlist.json` (Section 2.7).
+> **What is enforced and configurable** is `forbiddenPatterns` in `aahp.config.json`
+> (Section 11.1), which does fail the build and can be pointed at `.ai/handoff/*.md`.
+> Whether `.aiignore` should become a real rule source is an open decision, not an
+> oversight: enforcing an existing adopter's committed copy would newly fail their build on
+> patterns they never chose (the template's `sk-*` carries no length floor and matches the
+> word "task-type" inside AAHP's own shipped templates). Tracked as issue #80.
+
+Add a `.ai/handoff/.aiignore` file (conceptually similar to `.gitignore`) that briefs agents on patterns they must never write into handoff files:
 
 ```
 # .ai/handoff/.aiignore
@@ -313,7 +342,10 @@ ghp_*
 \b\d{3}-\d{2}-\d{4}\b   # SSN pattern
 ```
 
-CI hook validates that no handoff file contains these patterns.
+Nothing validates that a handoff file avoids these patterns. Agents are asked to honour
+the file; no gate checks that they did. To make a pattern block the build, express it as a
+`forbiddenPatterns` rule in `aahp.config.json` (Section 11.1) with an `include` of
+`.ai/handoff/*.md`.
 
 ### 2.7 Reviewed PII Allowlist
 
@@ -805,7 +837,7 @@ This takes ~100 tokens but prevents cascading failures.
 ├── WORKFLOW.md             # Extended: pipeline definition
 ├── GROUNDING.md            # Grounded Reflection Layer: task-type anchor matrix
 ├── pii-allowlist.json      # Optional: reviewed, expiring PII email allowlist
-├── .aiignore               # NEW: patterns to exclude from handoff files
+├── .aiignore               # Agent-facing pattern briefing. NOT enforced; see 2.6
 └── HANDOFF.lock            # NEW: transient, exists only during active updates
 ```
 
@@ -822,7 +854,7 @@ v2/v3 is fully backward compatible. An agent encountering a v1 directory (no `MA
 2. Add section markers to STATUS.md
 3. Split LOG.md if it exceeds 10 entries
 4. Add TTL column to TRUST.md
-5. Add .aiignore
+5. Add .aiignore (agent-facing briefing, not a gate -see Section 2.6)
 6. Done -no breaking changes
 ```
 
@@ -927,12 +959,16 @@ overlap looks like duplication to trim. **Decision:** `aahp doctor` is a stable
 `schemaVersion: 1` conformance record for a fleet dashboard; `aahp check` is the pass/fail
 gate runner whose exit code drives CI. The shared gates are intentional, not redundant.
 
-### ADR-013: git hooks resolve the vendored script first, then the CLI
+### ADR-013: git hooks resolve the vendored script first, then the local package by PATH
 **Why it recurs:** wiring a hook to one hard-coded path is the quick way. **Decision:**
-the hooks run `scripts/verify-handoff.sh` when it is vendored, else the installed `aahp`
-CLI via `npx --no-install`, and skip when neither resolves. The local hook is a
-convenience; the required CI check is the off-machine authority after its evaluator
-paths receive the trusted-review protection described in Section 2.8.
+the hooks run `scripts/verify-handoff.sh` when it is vendored, else
+`node_modules/@elvatis_com/aahp/bin/aahp.js` when that file exists, and skip when neither
+resolves. The fallback is a filesystem test on an exact path, never `npx`: `npx` is
+`npm exec`, which has no `--no-install` option and ignores it silently, so the previous
+guard reached the public registry for the unscoped, unowned name `aahp` on every commit
+and every push. The local hook is a convenience; the required CI check is the off-machine
+authority after its evaluator paths receive the trusted-review protection described in
+Section 2.8.
 
 ### ADR-014: enumerating gates scan git-tracked files and fail loud off-tree
 **Why it recurs:** a plain filesystem walk looks simpler than shelling out to git.
@@ -948,8 +984,9 @@ exact-pin behavior, and a repo whose own package name matches still reports `sel
 
 ### ADR-016: aahp-govern.yml is portable, opt-in, and verify-only
 **Why it recurs:** copying vendored script paths into the workflow is the obvious wiring.
-**Decision:** `assets/governance/aahp-govern.yml` calls the `aahp` CLI via `npx` (no
-vendored paths), is opt-in, and never mutates the repo. `aahp-verify.yml` gates handoff
+**Decision:** `assets/governance/aahp-govern.yml` calls the `aahp` CLI by path, at
+`node ./node_modules/@elvatis_com/aahp/bin/aahp.js` (no vendored copy of the CLI
+itself), is opt-in, and never mutates the repo. `aahp-verify.yml` gates handoff
 state; `aahp-govern.yml` gates governance. Two workflows, two concerns.
 
 ### ADR-017: a heuristic over hand-written prose is a report, never a gate
@@ -1525,7 +1562,7 @@ your-project/
     pre-push              # -> scripts/verify-handoff.sh . --level prepush
   .github/workflows/
     aahp-verify.yml       # runs `aahp verify --level ci` as a required check (handoff)
-    aahp-govern.yml       # portable governance gate: `aahp check` via npx (governance)
+    aahp-govern.yml       # portable governance gate: `aahp check` by path (governance)
   .claude/
     CLAUDE.md             # harness system prompt (see 9.3)
     commands/
@@ -1536,8 +1573,8 @@ your-project/
       grounding-auditor.md  # the Phase 4.5 auditor persona
 ```
 
-- **Hooks.** `scripts/install-hooks.sh` (shipped by AAHP) installs the pre-commit and pre-push hooks; the harness runs it once at setup. The hooks resolve the vendored `scripts/verify-handoff.sh` first, fall back to the installed `aahp` CLI via `npx --no-install` when it is absent, and skip when neither resolves (the required CI check is the off-machine backstop once its evaluator paths are protected). See Section 2.8.
-- **CI.** Copy `.github/workflows/aahp-verify.yml`; it runs `aahp verify --level ci` (no escape hatch) and should be a required status check. Also require trusted review for the workflow and its vendored gate/parser paths, because a `pull_request` workflow otherwise evaluates code from the proposed branch. For governance (changelog, version sync, forbidden patterns, doc links) copy the portable `.github/workflows/aahp-govern.yml` beside it, or let `aahp init --gates` scaffold it; it runs `aahp check` through the pinned devDependency via `npx` and is verify-only.
+- **Hooks.** `scripts/install-hooks.sh` (shipped by AAHP) installs the pre-commit and pre-push hooks; the harness runs it once at setup. The hooks resolve the vendored `scripts/verify-handoff.sh` first, fall back to `node_modules/@elvatis_com/aahp/bin/aahp.js` when that file exists, and skip when neither resolves (the required CI check is the off-machine backstop once its evaluator paths are protected). The fallback is a filesystem test, never `npx`, so a repository with the hooks installed and no local package makes no registry request. If your installed hooks still contain `npx --no-install aahp`, re-run `scripts/install-hooks.sh`: fixing the source here does not fix the copy in your `.git/hooks/`. See Section 2.8.
+- **CI.** Copy `.github/workflows/aahp-verify.yml`; it runs `aahp verify --level ci` (no escape hatch) and should be a required status check. Also require trusted review for the workflow and its vendored gate/parser paths, because a `pull_request` workflow otherwise evaluates code from the proposed branch. For governance (changelog, version sync, forbidden patterns, doc links) copy the portable `.github/workflows/aahp-govern.yml` beside it, or let `aahp init --gates` scaffold it; it runs `aahp check` by invoking `node ./node_modules/@elvatis_com/aahp/bin/aahp.js` directly and is verify-only. If your scaffolded copy still calls `npx --no-install aahp`, re-run `aahp init --gates --force`: that spelling can reach the public registry, and fixing the template here does not fix your copy. **`aahp init --gates --force` only rewrites `aahp-govern.yml`.** If the vulnerable spelling is in your `aahp-verify.yml` instead, which is the common case because AAHP does not generate that file, no command fixes it: edit the step yourself and replace `npx --no-install aahp` with `node node_modules/@elvatis_com/aahp/bin/aahp.js`, keeping the `npm ci` step that installs the exact-pinned devDependency ahead of it. A step that already reads `npx -y @elvatis_com/aahp@<version>` names the scoped package at an exact version and needs no change.
   Both shipped workflows declare their own `permissions:` (`contents: read`) and set
   `persist-credentials: false` on the checkout, so neither inherits your repository's
   `default_workflow_permissions` and neither leaves the job's `GITHUB_TOKEN` in
@@ -1545,7 +1582,7 @@ your-project/
   `aahp-govern.yml` before AAHP declared those two things, `aahp init --gates` will
   NOT replace your copy: it skips a workflow that already exists. Re-run it with
   `--force`, or add the two lines by hand.
-- **Referencing scripts.** Harness commands invoke AAHP by the vendored script path (`bash scripts/verify-handoff.sh . --level prepush`) or the CLI (`npx aahp verify`). They never reimplement the checks.
+- **Referencing scripts.** Harness commands invoke AAHP by the vendored script path (`bash scripts/verify-handoff.sh . --level prepush`) or the CLI by its scoped name (`npx @elvatis_com/aahp verify`; the unscoped `aahp` is owned by nobody). They never reimplement the checks.
 
 ### 9.3 Minimal harness bootstrap
 
@@ -1698,9 +1735,24 @@ skip). `acceptanceCriteria` (`include`/`manifest`) supplies the input paths for 
 advisory `aahp criteria` report of Section 8.7; it configures no gate, because that report
 is not one. Every section is optional.
 
-Run the gates two ways. `npx --no-install aahp check .` is the pass/fail RUN whose exit code
+**The config is validated against its own schema before any gate is evaluated.** This
+matters more than it sounds: applicability is decided on the PRESENCE of a config key, so
+a key misspelled by one letter used to be indistinguishable from a section that was never
+written, and an absent section is a clean `SKIP`. `forbiddenPatterns` typed as
+`forbiddenPaterns` therefore turned a FAILING gate into `Governance OK`, exit 0. An
+invalid config is now an error: it names the offending key, suggests the closest valid one,
+evaluates no gate, and the JSON record marks every gate `unevaluated` rather than `skip`,
+so a dashboard can tell "asked, not applicable here" from "never asked". The validator is
+dependency-free and ships in the package (ADR-002), and it REFUSES to run against a schema
+keyword it does not implement rather than skipping it, because a validator that silently
+ignores what it cannot evaluate reports "valid" for a document it never examined.
+
+Run the gates two ways, invoking the pinned devDependency by path rather than by name -
+`npx --no-install <name>` does not prevent a registry fetch, because `npx` is `npm exec`,
+which has no such option and ignores it silently.
+`node ./node_modules/@elvatis_com/aahp/bin/aahp.js check .` is the pass/fail RUN whose exit code
 gates CI: it aggregates every applicable gate and continues past failures so one run surfaces
-them all. `npx --no-install aahp doctor --json` emits the conformance RECORD a fleet
+them all. The same binary with `doctor --json` emits the conformance RECORD a fleet
 dashboard can aggregate. On a repo that does not use the handoff protocol, add `--governance`
 (alias `--no-handoff`) so the three handoff gates skip and the record can still be green. The
 tracked-file gates (`forbidden-patterns`, `doc-links`) scan git-tracked files and fail loud
@@ -1708,7 +1760,7 @@ outside a git work tree, so run them in a checkout (in CI, `actions/checkout`).
 
 The fastest way to adopt all of this is `aahp init --gates`, which scaffolds a trimmed
 `aahp.config.json`, a `govern` npm script (`aahp check .`), and a portable
-`.github/workflows/aahp-govern.yml` (verify-only, `npx`-based, no vendored paths) without
+`.github/workflows/aahp-govern.yml` (verify-only, invoked by path, no vendored copy of the CLI) without
 touching `.ai/handoff/`.
 
 ---

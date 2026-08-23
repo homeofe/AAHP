@@ -1,3 +1,286 @@
+## The class test could not detect its own class, and the README described a workflow that changed
+
+The test "every *_SUFFIX= rule in the shipped template has an enforced
+counterpart" derived the expected set from the template, which is the right
+shape, then looked for each suffix ANYWHERE in scripts/lint-handoff.sh. The same
+commit added a block comment naming all five suffixes in prose, so a sentence
+about a pattern stood in for the pattern:
+  line 130 [COMMENT]  `_CREDENTIALS=` is in the list because ...
+  line 184 [CODE]     "_CREDENTIALS=['\"]?..."
+Deleting the code entry left the test green. A class test that cannot detect its
+own class is the defect this suite exists to close, inside the suite.
+Now scoped to the SECRET_PATTERNS array, with an assertion that the extraction
+found the array at all so a rename cannot turn the test into a silent no-op.
+Proved: with the code entry deleted and the COMMENT still present, the test goes
+red. That comment is what made the old version pass.
+Separately, four README statements still described the shipped governance
+workflow as npx-based after it was changed to invoke the CLI by path. Those are
+corrected. The other npx mentions in the README are prose ABOUT the npx defect
+and are left alone - they are accurate.
+VERIFIED ON LINUX, bats 1.10.0: inert-controls 34 passed, 0 failed.
+
+## The length floor spared real credentials, and the count justifying it was wrong
+
+Two review findings on the secret patterns, both confirmed by measurement, plus
+one that did NOT survive checking.
+CONFIRMED, and the more serious: the five =assignment patterns absorbed a
+leading segment with `[-_.a-zA-Z0-9]*` before requiring a 16-run. `+`, `/` and
+`=` are not in that class, so the run is broken by exactly the characters base64
+uses. The canonical AWS example secret key was MISSED. Narrowing the patterns to
+spare prose also spared real credentials, which is the worse direction of error:
+a false positive is noisy, a false negative is the thing the gate exists to
+stop. The absorb class now carries `+/=`, which recovers every missed shape
+while all four prose cases the narrowing was for still miss.
+CONFIRMED: the comment claimed these five carry "the same length floor as the
+nine prefix patterns". Counted in the array: 14 patterns, 9 with a floor, and
+only FOUR of the nine prefix patterns have one. The other five carry none, by
+design, because their prefixes are specific enough alone. The corrected sentence
+still supports the change; the original was an argument resting on a number
+nobody had counted.
+REFUTED, recorded because a reviewer being wrong is worth the same care as a
+reviewer being right: a third finding said the consumer survey published in the
+CHANGELOG was "wrong on every count". Re-measured against the REMOTES rather
+than local checkouts: 10 of 10 consumers have aahp-verify.yml, 0 of 10 have
+aahp-govern.yml. The survey is correct and was left as written.
+VERIFIED ON LINUX, bats 1.10.0: 73 passed, 0 failed across inert-controls and
+lint.
+
+## A usability change turned the .aiignore exclusion into a content filter
+
+Adding `path:line` to the secret message changed `grep -rnl` to `grep -rn`. The
+`grep -v '.aiignore'` that followed had been filtering bare PATHS and silently
+became a filter on `path:line:MATCHED TEXT`.
+Measured: a real token shape on a line reading "note: excluded via .aiignore,
+token ghp_..." was reported by the previous form and DROPPED by the new one,
+with the gate printing "No secrets detected". That is a weakening of a security
+control, introduced inside a change whose stated purpose is to fix controls that
+report success without doing the work.
+Nobody wrote a bad filter. The filter was correct against `-l` output and became
+wrong when the shape of its input changed. That is the failure mode to remember:
+a pipeline stage is only as correct as the format of what feeds it, and changing
+the producer is a change to every consumer downstream.
+Fixed at the source with `--exclude='.aiignore'`, so nothing downstream reads
+the matched text and no content can subvert the exclusion. Both comments that
+described the old mechanism were corrected in the same edit.
+VERIFIED ON LINUX, bats 1.10.0: 34/34 green. The mutation proof discriminates
+rather than merely failing - restoring the previous form turns the
+secret-on-a-mentioning-line test RED while the ignore-file-still-skipped test
+stays GREEN, which is what shows the two tests measure different properties.
+
+## The required check was already red, and --json still reports a zero-gate run as a pass
+
+FOUND WHILE FIXING THE ABOVE, NOT FIXED, needs the owner's call.
+
+The branch arrived with `lint-and-validate` (REQUIRED) red. Same single failure
+on cd247ce, before this session pushed anything:
+  not ok 103 check: config.check.skip omits doc-links so a broken link is not caught
+Cause: that fixture configured `docLinks` and nothing else, then skipped
+`doc-links`, so ZERO gates ran and the test asserted exit 0 for a run that had
+assessed nothing. The zero-gate fix on this branch correctly turned it red - the
+test had the #84 defect written down as an expectation.
+RE-GROUNDED, NOT RELAXED: changing the 0 to a 1 would pin the aggregate verdict,
+which is not what the test is about. Its subject is the DESELECTION, so the
+fixture now also carries a gate that really runs and passes, and it additionally
+asserts the deselected gate never evaluated the broken link. A second test pins
+the other half: skipping the only configured gate is NOT EVALUATED, exit 1.
+
+STILL OPEN, and it is the same class one level down. The zero-gate branch lives
+in the text summary only, and `--json` returns before it:
+  aahp check .          -> "Governance NOT EVALUATED: 0 gate(s) ran."  exit 1
+  aahp check . --json   -> exit 0, every gate "skip"
+Same tree, same run, opposite verdicts, and the machine-readable path is the one
+a dashboard consumes. The JSON record marks the gates `skip` here, although the
+PR body's own argument for the invalid-config case is that `skip` ("asked, not
+applicable here") must never stand in for "never asked".
+NOT CHANGED HERE because the two intents on this branch genuinely conflict and
+the resolution is a commitment, not a defect fix: `tests/check.bats` states in
+its header that a repo with no package.json, no config and no `.ai/handoff` must
+stay green, and test 1 asserts exactly that - it passes today only because it
+uses `--json` and so misses the new branch. Deciding whether a bare repo is green
+or NOT EVALUATED changes `aahp check` for every adopter who runs it without a
+config.
+MEASURED, so the decision is not urgent: of the ten consuming repositories, the
+eight that can run `aahp check` all ship an `aahp.config.json` with at least one
+applicable gate, and the two without a config never invoke `check` at all. No
+consumer changes state either way today.
+
+## The live secret patterns turned a real consumer's protected branch red
+
+Escaping the BRE quantifier made five `=assignment` secret patterns live for the
+first time. Live and unfloored, `_KEY=['"]\?[a-zA-Z0-9]` matches a `*_KEY=`
+assignment of ANY value from one character up: a detector for the SHAPE of a
+configuration line, in files that are mostly prose ABOUT configuration.
+Reproduced against a real consumer checkout, whole-script exit code, not piped:
+  origin/main  -> "All checks passed."      exit 0
+  this branch  -> "1 violation(s) found."   exit 1
+One committed line caused it, and it was a handoff note DESCRIBING a security
+finding: it quoted the placeholder `API_KEY=your-api-key-here` from an
+.env.example the note was arguing against. That repository's
+`aahp verify --level ci` is a REQUIRED, branch-protected check, so the upgrade
+alone would have turned a green protected branch red with nothing of its own
+changed. This is the fleet-wide case: every consumer carries these gates.
+
+CHOSEN: narrow the patterns (option a), not opt-in-with-an-empty-default.
+Opt-in-empty would have disabled the NINE prefix patterns that do work and do
+block today, trading a false positive for a real regression, and a default that
+cannot fail is the exact disease this branch exists to cure. The floor is not a
+new heuristic either: the comment three lines above SECRET_PATTERNS has always
+stated it, for exactly this failure mode, and it was applied to nine of the
+fourteen patterns and missed on these five. Same defect class as the rest of the
+branch - a rule written down and not applied.
+
+Expressed as "an unbroken run of 16+ alphanumerics ANYWHERE in the value token",
+not "the value starts with one": modern tokens are segmented (`sk-proj-`,
+`github_pat_`, `rk_live_`) and anchoring at `=` misses all three. Placeholder
+prose is word-shaped, every segment far short of 16, so the two populations
+separate on precisely this property.
+MEASURED: real-secret corpus 8/8 matched, prose corpus 0/12 false positives
+(unfloored: 8/12 false positives). All eleven handoff directories available to
+measure: zero patterns fire, before and after, so no adopter changes state.
+Positive control on the real consumer content: unmodified -> 0 findings exit 0;
+same file plus four genuine secrets -> 4 findings exit 1.
+GIVEN UP DELIBERATELY: a short real password such as `DB_PASSWORD=hunter2`.
+Nothing separates that from prose by inspection; an entropy scanner is the right
+layer. A finding now prints `path:line` and never the matched text.
+
+## The prescribed remediation reached none of the affected repositories
+
+CHANGELOG told adopters to run `aahp init --gates --force`. That writes exactly
+one file, `.github/workflows/aahp-govern.yml`. SURVEYED, ten consuming
+repositories: ten have `aahp-verify.yml`, ZERO have `aahp-govern.yml`, and zero
+have vendored hooks under `scripts/hooks/` for `install-hooks.sh` to refresh.
+Running it would have added a second unreferenced workflow beside the one that
+gates the branch and left the vulnerable line in the file that runs. The
+vulnerable text lives in a hand-held `aahp-verify.yml` that AAHP does not
+generate and therefore cannot rewrite. CHANGELOG and README now say that
+plainly, with the per-shape manual edit, instead of naming a command that
+appears to fix it. Eight of the ten carry `npx --no-install aahp` (unscoped, the
+vulnerable spelling); two carry `npx -y @elvatis_com/aahp@<version>`, which is
+scoped and exact and needs no change.
+
+## The false sentence was fixed in the template and left in the live copy
+
+`templates/.aiignore` dropped "Validated by CI hooks and agents before
+committing" and the "add your internal hostnames" invitation; `.ai/handoff/
+.aiignore` kept BOTH, in the same commit - and that is the copy the new lint
+notice names. The live copy is now byte-identical to the template. The test that
+missed it named one path; it now DERIVES the copy list from `git ls-files
+'*.aiignore'`, so a third copy is covered without anyone remembering, and a
+second test fails if template and live copy ever diverge. NOT COVERED: copies
+already committed in adopter repositories. Nine of the ten still carry the false
+header; CHANGELOG says so and tells them to replace it.
+
+## Shipped code still told users to run the unscoped public name
+
+`bin/aahp.js` closed `aahp init --gates` with "(or: npx aahp check .)" and its
+`--help` printed eight more `npx aahp ...` lines. `bin/` is in package.json
+`files`, so that shipped to every adopter, naming the one unowned name issue 82
+is about. README had a tenth. All corrected.
+WHY THE EXISTING CONTROL MISSED THEM: it concatenates three files and all three
+are files COPIED into an adopter repo. `bin/aahp.js` is not copied, it is
+EXECUTED there and prints instructions. The new control covers `bin/`, with a
+deliberately different rule: npx is legitimate for a human running an
+uninstalled CLI, but only under the scoped name, so it bans the unscoped
+spelling rather than npx as such, and it does NOT strip comments because bin/
+has no reason to explain the npx hazard. Scoped name derived from package.json
+so a rename cannot leave it asserting a stale string.
+
+## Two ticked acceptance boxes cited test ordinals that did not match
+
+The box claimed the notice turns test 18 red and a quantifier turns test 20 red.
+Re-derived by running it: the notice turns test 20 red (18 stays green) and the
+quantifier turns test 22 red (20 stays green). A reviewer following that box
+mutates the code, watches a test the mutation cannot touch, sees green and
+concludes the coverage is real. Every ticked box on the pull request has been
+re-derived and the mutation table now names tests, never numbers them; the suite
+grew from 24 to 28 to 32 tests during this work and every ordinal shifted twice.
+
+## The gate id itself was never validated, which is the case issue 84 puts in its title
+
+This branch validated the config document and still let the defect through by the
+route the issue names. Measured on it before this commit:
+  check.only ["forbidden-patterns"] -> exit 1, the violation is caught
+  check.only ["forbidden-paterns"]  -> exit 0, "Governance OK: 0 gate(s) ran"
+  check.only ["totally-made-up"]    -> exit 0
+  check.only []                     -> exit 0
+In each of the last three the violation was still in the tree. `check.only` and
+`check.skip` items were typed as bare strings with no enum, while
+`pinnedDep.location` two sections away had one, and BOTH the new hand validator
+and AJV reported the typo config as valid.
+That falsified a sentence this branch ships in scripts/aahp-config.mjs: "Every
+gate reads its config through here, so validating here means no gate can be
+silently switched off by a typo."
+Ids are now checked against CHECK_GATES at the point of use, and zero gates ran
+no longer prints "Governance OK" - it reports NOT EVALUATED and exits 1, reusing
+the words this file already had for an unparseable config rather than inventing
+a second vocabulary for the same state.
+WHY NOT A SCHEMA ENUM: a copy of the gate ids in the schema is a second source
+that drifts the moment a gate is added, and drift there restores the defect with
+nothing turning red. The list that runs the gates cannot disagree with itself.
+VERIFIED ON LINUX, not on Windows: bats 1.10.0, 28/28 green. Mutation proof:
+restoring the unfixed bin/aahp.js turns tests 26, 27 and 28 red while the
+control at 25 stays green, BATS_EXIT=1.
+
+## 2026-08-23 - three inert controls, one regression suite (#84, #82, #80)
+
+Three HIGH issues, one shape: a control that could not fail. Fixed together
+because a shared suite that proves each one CAN fail closes the class, where
+three tests proving each one currently passes would close nothing - every one of
+these passed on the day it shipped.
+
+All three reproduced first on `origin/main` at `b67b3cc`, each against a positive
+control proving the harness was live.
+
+- **#84** `aahp.config.json` was never validated against its own schema.
+  `gateApplies` decides applicability from the PRESENCE of a key, so
+  `forbiddenPaterns` read as an absent section and a FAILING gate reported
+  `Governance OK`, exit 0, over a live em-dash violation. A config that was not
+  even JSON was worse: `readJsonSafe` returned null, the caller substituted `{}`,
+  and all eight gates skipped. Now validated before any gate is evaluated, by
+  `check`, by `doctor`, and inside `loadConfig` so the direct `npm run check:*`
+  path is covered too. `scripts/aahp-schema.mjs` is dependency-free (ADR-002) and
+  throws on any schema keyword it does not implement, so it cannot report "valid"
+  for a document it did not fully examine. CI cross-checks with AJV.
+- **#82** `npx --no-install` does not prevent a registry fetch: `npx` is
+  `npm exec`, which has no such option and ignores it silently. Five shipped call
+  sites resolved the UNSCOPED, unowned name `aahp`. Replaced with an explicit path
+  into the scoped package. Measured today: `GET registry.npmjs.org/aahp` still
+  returns 404, so the old behaviour was still correct by accident, not by
+  construction.
+- **#80** `.ai/handoff/.aiignore` is read by nothing. Both claims that CI validates
+  it are withdrawn, and `aahp lint` now names how many patterns it is NOT applying.
+
+**What this did NOT do, and it is an owner decision, not an oversight.** The
+firewall was not made real. Making it live would newly fail adopters' builds on
+patterns they never chose: the glob vocabulary cannot express what the enforced
+regexes do, and the template's `sk-*` (no length floor) matches the word
+"task-type" inside AAHP's own shipped templates, so `aahp init` followed by
+enforcement is red on an untouched repository - measured, 3 lines in
+`GROUNDING.md`, `TRUST.md` and `WORKFLOW.md`. Recommendation in the pull request:
+enforce, but as a NEW opt-in section with an empty default, not by activating the
+copy every adopter already committed.
+
+**Found while fixing, same class, fixed here.** Four of the thirteen enforced
+secret patterns matched nothing: `grep` runs in BRE, where the bare `?` in
+`['\"]?` is a literal question mark. `_KEY=`, `_SECRET=`, `_TOKEN=` and
+`_PASSWORD=` scored zero on a fixture containing all four. Adding `_CREDENTIALS=`
+to that list without escaping the quantifier would have been an anchor that
+anchors nothing.
+
+**Still open after this.** The repository's OWN workflows keep
+`npx --no-install ajv-cli`, and `scripts/check-workflow-pinning.mjs` Rule B still
+requires that spelling while describing it as the load-bearing guard. That claim
+is now known to be false. It is left alone deliberately: issue #68 owns the
+repository's own workflows, and #82 is scoped to code that ships to consumers.
+Named in the pull request as not done.
+
+**Environment note for the next agent.** `tests/lint.bats` test 32 fails on this
+Windows machine on unmodified `origin/main` as well - it builds a fake interpreter
+directory and prepends it with `PATH="$fake:$PATH"`, and a `C:/...` path splits on
+the colon so the fake is never found. Verified against a clean baseline worktree
+before concluding it was not a regression. The same trap bit the new suite's npx
+spy and is handled there with `cygpath -u`.
+
 ## 2026-08-23 - the shipped governance workflow pinned Node 20 against a >=22 floor
 
 `assets/governance/aahp-govern.yml` - the workflow `aahp init --gates` scaffolds

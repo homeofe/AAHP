@@ -14,9 +14,16 @@
 # The hooks resolve the "aahp verify" gate two ways: they prefer the vendored
 # <target>/scripts/verify-handoff.sh when it is present (a full AAHP checkout
 # that also ships scripts/_aahp-lib.sh + lint-handoff.sh via AAHP propagation),
-# and otherwise fall back to the installed aahp CLI (npx --no-install aahp). So
-# a consumer that only "npm install"ed @elvatis_com/aahp no longer needs a full
-# AAHP checkout for the hooks to work.
+# and otherwise fall back to the locally installed package at
+# <target>/node_modules/@elvatis_com/aahp/bin/aahp.js. So a consumer that only
+# "npm install"ed @elvatis_com/aahp no longer needs a full AAHP checkout for the
+# hooks to work. When neither resolves the hooks SKIP, and that skip is now a
+# filesystem test rather than an `npx` invocation, so it costs no network call
+# and cannot execute a package resolved from the public registry.
+#
+# If the hooks already in your .git/hooks/ still contain `npx`, re-run this
+# script: those copies are what execute, and fixing the sources here does not
+# fix them.
 #
 # Exit codes:
 #   0 = hooks installed

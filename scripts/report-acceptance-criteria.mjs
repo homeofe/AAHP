@@ -152,6 +152,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { resolveRoot, loadConfig, isInsideWorkTree, listTrackedFiles } from "./aahp-config.mjs";
+import { validateConfigObject } from "./aahp-schema.mjs";
 
 const CANONICAL_HEADING = "Acceptance criteria";
 
@@ -494,9 +495,16 @@ function gitReason(err) {
 function main() {
   const root = resolveRoot();
 
+  // NON-STRICT on purpose. Every GATE loads its config strictly, so a config
+  // that does not match schema/aahp-config.schema.json stops the gate rather
+  // than silently switching it off. This is not a gate: it has no authority and
+  // exits 0 whatever it finds, and hard-failing here would give it authority
+  // through the back door, over a document property it is not even reading.
+  // The schema errors are reported as FINDINGS below instead, which is the same
+  // treatment this report already gives every other unusable configuration.
   let config;
   try {
-    config = loadConfig(root);
+    config = loadConfig(root, { strict: false });
   } catch (err) {
     console.error(`  acceptance-criteria report: ${err.message}`);
     process.exit(1);
@@ -518,6 +526,31 @@ function main() {
   // readers to a file the loader never opens.
   const configFile = "aahp.config.json";
   const findings = [];
+
+  // Schema conformance, reported rather than enforced. A gate refuses to run on
+  // a config that does not match the schema, because a key misspelled by one
+  // letter reads as an absent section and an absent section is a clean skip. The
+  // same reasoning applies here in the weaker form this report is allowed: say
+  // so, do not decide. A validator that could not run at all (schema absent from
+  // the installed package, or a keyword it does not implement) is itself a
+  // finding, never silence.
+  try {
+    for (const e of validateConfigObject(config)) {
+      findings.push({
+        file: configFile,
+        line: 1,
+        id: "config-schema",
+        message: `${e.path === "" ? "the top level" : e.path} does not match schema/aahp-config.schema.json: ${e.message}`,
+      });
+    }
+  } catch (err) {
+    findings.push({
+      file: configFile,
+      line: 1,
+      id: "config-schema-unchecked",
+      message: `could not be validated against schema/aahp-config.schema.json, so nothing here says whether it is well formed: ${err.message}`,
+    });
+  }
 
   // Configuration is optional, but a value of the WRONG SHAPE must not be
   // indistinguishable from no value at all. Each fallback below is reported,

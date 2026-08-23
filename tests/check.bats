@@ -152,8 +152,23 @@ EOF
 # --- config.check.skip: a deselected gate does not run ----------------------
 
 @test "check: config.check.skip omits doc-links so a broken link is not caught" {
+    # RE-GROUNDED, not relaxed. This fixture used to configure `docLinks` and
+    # nothing else, then skip `doc-links` - so NO gate ran, and the test asserted
+    # exit 0 for a run that had assessed nothing. That is the #84 defect written
+    # down as an expectation, and the fix on this branch (zero gates ran reports
+    # NOT EVALUATED and exits 1) correctly turned it red. Changing the 0 to a 1
+    # would have been the wrong repair: it would pin the aggregate verdict, which
+    # is not what this test is about.
+    #
+    # The subject here is the DESELECTION: a skipped gate must not run, so its
+    # broken link must go unreported. The fixture therefore also carries a gate
+    # that really runs and really passes, which makes the exit 0 a genuine pass
+    # rather than a vacuous one. `z{99}` needs 99 consecutive `z` to match, so
+    # forbidden-patterns runs and finds nothing - the same device the
+    # `config.check.only` test below already uses.
     cat > "$TEST_TMPDIR/aahp.config.json" <<'EOF'
 {
+  "forbiddenPatterns": [ { "id": "nope", "pattern": "z{99}", "message": "x" } ],
   "docLinks": { "include": ["DOCS.md"] },
   "check": { "skip": ["doc-links"] }
 }
@@ -163,6 +178,30 @@ EOF
     run node "$AAHP" check "$TEST_TMPDIR"
     [ "$status" -eq 0 ]
     [[ "$output" == *"deselected by config.check"* ]]
+    # A gate really ran, so this is a pass and not "nothing was assessed".
+    [[ "$output" != *"NOT EVALUATED"* ]]
+    # The actual property: the deselected gate never evaluated the broken link.
+    [[ "$output" != *"nope.md"* ]]
+}
+
+@test "check: skipping the ONLY configured gate is NOT EVALUATED, never a pass" {
+    # The other half of the test above, and the reason it was re-grounded rather
+    # than have its 0 changed to a 1. `check.skip` can empty the run entirely,
+    # and a run that evaluated nothing must not report a pass - precisely the
+    # shape #84 was filed for ("Governance OK: 0 gate(s) ran, no failures").
+    # Anchor: the zero-gate branch of the summary in cmdCheck.
+    cat > "$TEST_TMPDIR/aahp.config.json" <<'EOF'
+{
+  "docLinks": { "include": ["DOCS.md"] },
+  "check": { "skip": ["doc-links"] }
+}
+EOF
+    printf '# Docs\n\n[missing](./nope.md)\n' > "$TEST_TMPDIR/DOCS.md"
+    gadd
+    run node "$AAHP" check "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"NOT EVALUATED"* ]]
+    [[ "$output" != *"Governance OK"* ]]
 }
 
 # --- config.check.only: run ONLY the named gate(s) --------------------------

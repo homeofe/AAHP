@@ -117,6 +117,56 @@ echo -e "${GREEN}[2/7]${NC} Checking for secrets and API keys..."
 # ordinary characters (e.g. the "sk-to" inside "task-to-model"). Real keys
 # are far longer than 16 chars. Note: grep below runs in BRE mode, so the
 # interval must be escaped as \{16,\}.
+#
+# THE QUANTIFIER MUST BE ESCAPED. grep below runs in BRE, where a bare `?` is a
+# LITERAL question mark, not "optional". Every "=assignment" entry here used to
+# read `['\"]?`, which demanded a quote followed by an actual `?` character, so
+# `API_KEY=abc123`, `DB_PASSWORD=hunter2`, `GH_TOKEN=...` and `X_SECRET=...` in a
+# handoff file matched NOTHING. Measured: four of the thirteen shipped patterns
+# scored 0 on a fixture containing all four, and scored 1-2 each once the
+# quantifier was escaped. The same trap is already documented one comment up for
+# the `\{16,\}` interval; it was applied to the intervals and missed here.
+#
+# `_CREDENTIALS=` is in the list because templates/.aiignore ships it. The
+# shipped template and this enforced list must not disagree: a pattern listed in
+# the template but absent here is a rule an adopter believes is on and is not.
+#
+# THE "=assignment" PATTERNS CARRY THE SAME LENGTH FLOOR AS THE PREFIX ONES, and
+# for the same reason the comment at the top of this block gives. Escaping the
+# quantifier without also applying the floor produced a half-fixed pattern: the
+# first version of this fix read `_KEY=['\"]\?[a-zA-Z0-9]`, which matches a
+# `*_KEY=` assignment of ANY value, one character upwards. That is not a secret
+# detector, it is a detector for the SHAPE of a configuration line, and handoff
+# files are full of prose that describes configuration.
+#
+# Measured, before the floor was added, against the ten handoff directories in
+# this project's own consumer estate: one consumer went from `All checks passed`
+# exit 0 to `1 violation(s) found` exit 1 on a single committed line, and that
+# line was a note DESCRIBING a security finding - it quoted the placeholder
+# `API_KEY=your-api-key-here` from an .env.example the note was arguing against.
+# Its `aahp verify --level ci` gate is REQUIRED and branch-protected, so the
+# upgrade alone would have turned a green protected branch red with nothing in
+# that repository changed. On a twelve-line prose corpus the unfloored spelling
+# scored EIGHT false positives; with the floor it scores zero and still matches
+# all eight entries of a real-secret corpus. A control that fails ordinary use
+# gets switched off, and it takes the nine prefix patterns down with it.
+#
+# The floor is expressed as "somewhere in the value token there is an unbroken
+# run of 16+ alphanumerics", not "the value STARTS with such a run". The absorb class carries `+`, `/`
+#   and `=` as well as word characters, because without them a base64 secret is
+#   broken by its own padding and the floor silently misses it - measured on the
+#   canonical AWS example key, which this pattern missed until that was fixed: modern
+# tokens are segmented (`sk-proj-...`, `github_pat_11...`, `rk_live_51...`) and
+# anchoring at `=` misses all three. Placeholder prose is word-shaped - hyphen
+# or underscore separated dictionary words, each far short of 16 - so the two
+# populations separate cleanly on exactly this property. `[-_.a-zA-Z0-9]*`
+# keeps `-` first in the bracket so BRE reads it as a literal.
+#
+# What this deliberately does NOT catch: a short real password such as
+# `DB_PASSWORD=hunter2`. Nothing distinguishes that from prose by inspection,
+# and guessing costs more than it buys here - a repository that wants it should
+# run a purpose-built entropy scanner. The nine prefixed patterns above are
+# unchanged and still block every well-known credential format.
 SECRET_PATTERNS=(
     "sk-[a-zA-Z0-9]\{16,\}"
     "ghp_[a-zA-Z0-9]\{16,\}"
@@ -127,15 +177,31 @@ SECRET_PATTERNS=(
     "AKIA[A-Z0-9]\{16,\}"
     "Bearer [a-zA-Z0-9]"
     "-----BEGIN.*PRIVATE KEY"
-    "_KEY=['\"]?[a-zA-Z0-9]"
-    "_SECRET=['\"]?[a-zA-Z0-9]"
-    "_TOKEN=['\"]?[a-zA-Z0-9]"
-    "_PASSWORD=['\"]?[a-zA-Z0-9]"
+    "_KEY=['\"]\?[-_.+/=a-zA-Z0-9]*[a-zA-Z0-9]\{16,\}"
+    "_SECRET=['\"]\?[-_.+/=a-zA-Z0-9]*[a-zA-Z0-9]\{16,\}"
+    "_TOKEN=['\"]\?[-_.+/=a-zA-Z0-9]*[a-zA-Z0-9]\{16,\}"
+    "_PASSWORD=['\"]\?[-_.+/=a-zA-Z0-9]*[a-zA-Z0-9]\{16,\}"
+    "_CREDENTIALS=['\"]\?[-_.+/=a-zA-Z0-9]*[a-zA-Z0-9]\{16,\}"
 )
 
 SECRET_FOUND=0
 for pattern in "${SECRET_PATTERNS[@]}"; do
-    MATCHES=$(grep -rnl "$pattern" "$HANDOFF_DIR" 2>/dev/null | grep -v '.aiignore' || true)
+    # `path:line`, never the matched text. A reader who goes red needs to reach
+    # the line to judge it - a bare filename against a 4,000-line STATUS.md is
+    # what makes a finding look arbitrary and gets the gate switched off. The
+    # matched text is deliberately NOT printed: if it really is a secret, echoing
+    # it into a CI log republishes it somewhere with a different retention
+    # policy. `cut` is safe here because HANDOFF_DIR is relative (the script
+    # cd'd into the project root above), so no Windows drive-letter colon.
+    #
+    # The ignore file is excluded by grep itself, NOT by filtering grep's
+    # output. An earlier revision piped `-n` output through `grep -v '.aiignore'`,
+    # which had been correct when the source was `-nl` and emitted bare paths. With
+    # line output it filters the MATCHED TEXT instead, so a real secret sitting on
+    # a line that merely mentions .aiignore was dropped and the gate printed
+    # "No secrets detected". Excluding at the source means no content can
+    # subvert the exclusion, because nothing downstream reads the match.
+    MATCHES=$(grep -rn --exclude='.aiignore' "$pattern" "$HANDOFF_DIR" 2>/dev/null | cut -d: -f1,2 || true)
     if [ -n "$MATCHES" ]; then
         echo -e "  ${RED}✗ Possible secret pattern '$pattern' found in:${NC}"
         echo "    $MATCHES"
@@ -147,6 +213,34 @@ if [ "$SECRET_FOUND" -eq 0 ]; then
     echo -e "  ${GREEN}✓ No secrets detected.${NC}"
 else
     VIOLATIONS=$((VIOLATIONS + SECRET_FOUND))
+fi
+
+# --- .aiignore: say out loud that it is NOT a rule source --------------------
+#
+# `.ai/handoff/.aiignore` reads like a firewall an adopter can extend, and the
+# shipped template used to close with an invitation to add internal hostnames
+# and IP ranges. Nothing has ever parsed it. The list above is the entire
+# enforced set, and the `--exclude='.aiignore'` above only keeps the file from
+# matching its OWN patterns - it is not a rule reader.
+#
+# An adopter who adds `10.0.0.*` and `*.internal.example.com` here, commits an
+# internal hostname into STATUS.md and watches this script exit 0 concludes the
+# control ran and cleared them. It did not: it never looked. So when the file is
+# present and carries patterns, this prints what was NOT assessed, by name and
+# by count. Silence here is what made the promise credible.
+#
+# This is deliberately advisory: it does not change the exit code, because
+# turning every adopter's committed `.aiignore` into live rules overnight would
+# fail builds on patterns nobody chose (`sk-*` with no length floor matches the
+# word "task-type" in AAHP's own shipped templates). Whether to enforce the file
+# is tracked as an owner decision; see README Section 2.6.
+AIIGNORE_FILE="$HANDOFF_DIR/.aiignore"
+if [ -f "$AIIGNORE_FILE" ]; then
+    AIIGNORE_RULES=$(grep -c -v -e '^[[:space:]]*#' -e '^[[:space:]]*$' "$AIIGNORE_FILE" || true)
+    echo -e "  ${YELLOW}NOT ENFORCED: $AIIGNORE_FILE lists ${AIIGNORE_RULES} pattern(s); no gate reads them.${NC}"
+    echo "    The enforced set is the ${#SECRET_PATTERNS[@]} built-in secret patterns above, plus the"
+    echo "    injection patterns in check 1 and the PII patterns in check 3. A pattern you add"
+    echo "    to .aiignore is NOT checked by this script, by 'aahp verify', or by any CI gate."
 fi
 
 # --- Check 3: PII Patterns and Reviewed Allowlist ----------------

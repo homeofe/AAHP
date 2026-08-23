@@ -89,6 +89,17 @@ jobs:
         # scripts/check-workflow-pinning.mjs keeps this shape.
         run: npx --no-install ajv-cli validate --spec=draft2020 -c ajv-formats -s schema/aahp-manifest.schema.json -d .ai/handoff/MANIFEST.json
 
+      - name: Validate aahp.config.json against schema
+        # This repository ships schema/aahp-config.schema.json to adopters and
+        # never applied it to its own config, so it did not dogfood the file
+        # through which every gate is switched on. Two validators run over it:
+        # AJV here (the reference implementation, and the one that would catch a
+        # bug in ours), and the dependency-free scripts/aahp-schema.mjs that
+        # ships inside the package and runs at gate time on a consumer machine
+        # where AJV is not installed. A disagreement between them is itself a
+        # finding, which is why both run rather than only the cheaper one.
+        run: npx --no-install ajv-cli validate --spec=draft2020 -c ajv-formats -s schema/aahp-config.schema.json -d aahp.config.json -d aahp.config.example.json
+
       - name: Syntax-check Node gates
         run: |
           for f in scripts/*.mjs; do node --check "$f"; done

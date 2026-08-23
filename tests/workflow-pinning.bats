@@ -94,13 +94,24 @@ write_good_fixture() {
     run grep -c -- "--no-save" "$ci" "$manifest"
     [ "$status" -eq 1 ]
 
-    # The fix, in both host jobs.
-    run grep -c -- "npx --no-install ajv-cli validate" "$ci"
-    [ "$status" -eq 0 ]
-    [ "$output" -eq 1 ]
-    run grep -c -- "npx --no-install ajv-cli validate" "$manifest"
-    [ "$status" -eq 0 ]
-    [ "$output" -eq 1 ]
+    # The fix, in both host jobs. Asserted as a RELATION - every `ajv-cli
+    # validate` invocation carries `--no-install` - and not as "there is exactly
+    # one". A fixed count is an anchor that a legitimate second validation step
+    # breaks, and the obvious repair is to raise the number, which silently
+    # exempts the new step from the property the count existed to protect. That
+    # is what happened when the aahp.config.json validation step was added.
+    # Written this way the file may grow further validation steps and each one is
+    # still held to the rule; a step added WITHOUT the flag is red.
+    local total flagged
+    for f in "$ci" "$manifest"; do
+        total="$(grep -c -- "ajv-cli validate" "$f" || true)"
+        flagged="$(grep -c -- "npx --no-install ajv-cli validate" "$f" || true)"
+        [ "$total" -ge 1 ] || { echo "no ajv-cli validate step in $f"; false; }
+        [ "$flagged" -eq "$total" ] || {
+            echo "$f: $total ajv-cli validate step(s), only $flagged carry --no-install"
+            false
+        }
+    done
 
     # And the packages the two steps execute are declared here at exact versions.
     run node "$AAHP_ROOT/tests/assert-pinning-gate-wired.mjs" "$AAHP_ROOT"

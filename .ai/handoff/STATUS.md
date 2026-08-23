@@ -105,12 +105,22 @@ because they are the same pattern a third and fourth time:
   `0 of 8 gate(s) ran` instead, which is strictly stronger, and a second test was
   added beside it for the `--json` half that was still open.
 
-ONE FULL-SUITE FAILURE IS NOT MINE.
+ONE FULL-SUITE FAILURE IS NOT MINE, AND IT IS NOT THE REPOSITORY'S EITHER.
 `tests/manifest.bats` "project name survives regeneration when node is
 unavailable" fails IDENTICALLY on unmodified `main` at `2cdaf48`, on the same
-Linux runner, checked before concluding anything. It builds a PATH without an
-interpreter and `bats` reports `exited with code 127` for `node --version` and
-`git --version` inside it. Pre-existing, untouched here.
+remote Linux runner, checked before concluding anything. It builds a PATH without
+an interpreter and `bats` reports `exited with code 127` for `node --version`
+inside it.
+The first version of this note stopped there and called it pre-existing, which is
+true and still understates the result. Hosted CI on this branch runs the same
+527 tests on three runners and reports 527 passed, 0 failed, 1581 `ok` lines and
+ZERO `not ok` - that test included. So it is an artefact of ONE machine, not a
+standing red test in this repository. Worth remembering next time: "fails on main
+too" rules out a regression, it does not establish that the suite is broken.
+
+HOSTED CI, this branch: all twelve checks green, mergeStateStatus CLEAN, the
+`ShellCheck scripts` step included, which is what covers `verify-handoff.sh`
+because shellcheck is not installed on the remote Linux runner used here.
 
 MUTATION PROOFS: eight, each with a control that stayed green, each restored to
 an md5-identical file. One of them is recorded rather than quietly corrected: the

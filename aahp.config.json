@@ -38,10 +38,47 @@
         { "file": "schema/aahp-manifest.schema.json", "pattern": "\"(research|architecture|implementation|review|fix|idle|documentation)\"" },
         { "file": "scripts/aahp-manifest.sh", "pattern": "(research|architecture|implementation|review|fix|idle|documentation)" }
       ]
+    },
+    {
+      "id": "provenance-block",
+      "sources": [
+        { "file": "README.md", "pattern": "> \\*\\*(Agent|Session ID|Timestamp|Commit before|Commit after):\\*\\*" },
+        { "file": "templates/LOG.md", "pattern": "> \\*\\*(Agent|Session ID|Timestamp|Commit before|Commit after):\\*\\*" },
+        { "file": "templates/STATUS.md", "pattern": "> \\*\\*(Agent|Session ID|Timestamp|Commit before|Commit after):\\*\\*" }
+      ]
     }
   ],
   "docLinks": {
     "include": ["README.md", "CLAUDE.md", "CONTRIBUTING.md", "CONSTITUTION.md", ".ai/handoff/*.md"]
+  },
+  "docPaths": {
+    "include": ["README.md", "CLAUDE.md", "CONTRIBUTING.md", "CONSTITUTION.md"],
+    "adopterPaths": [
+      {
+        "path": ".github/workflows/aahp-govern.yml",
+        "occurrences": 2,
+        "reason": "Both reviewed mentions are the DESTINATION that `aahp init --gates` writes inside an adopting repository, not a source in this one. The source is assets/governance/aahp-govern.yml. A third mention is how issue #74 happened, so the count is the guard: read the new sentence before raising it."
+      },
+      {
+        "path": ".ai/handoff-agent-a",
+        "occurrences": 1,
+        "reason": "Section 10 names it as an example of per-agent directory isolation in a non-git workflow. It is a path an adopter would create, and the same section says AAHP tooling does not officially support it."
+      },
+      {
+        "path": ".ai/handoff-agent-b",
+        "occurrences": 1,
+        "reason": "The second half of the same per-agent isolation example in Section 10."
+      }
+    ],
+    "requiredHeadings": [
+      {
+        "id": "setup",
+        "file": "README.md",
+        "pattern": "^#{1,3} .*(Install|Quickstart|Getting Started|Setup)",
+        "before": "^## 7\\. Architectural Decision Log",
+        "note": "A new adopter has to find install, init and the first verify run before the rationale material, not at 58% depth inside it (issue #74)."
+      }
+    ]
   },
   "acceptanceCriteria": {
     "include": [".ai/handoff/NEXT_ACTIONS.md"],

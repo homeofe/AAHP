@@ -129,6 +129,60 @@ first version of the `--json` exit proof named the wrong `process.exit` call.
 landed, the file really changed, and the `--json` test stayed GREEN. A named
 anchor that turns nothing red is worth no more than no anchor at all. Split into
 two proofs, one per exit call, and both go red.
+## Two published guarantees with nothing behind them: one withdrawn, one given a gate
+
+Section 2.4 stated a provenance MUST and an audit trail. Both are withdrawn
+(ADR-021). Enforcement was measured before it was rejected, not after: across the
+nine repositories in this estate that consume the protocol, LOG.md holds 100
+level-2 entries and 8 carry all five fields (agent 64, session id 27, timestamp
+31, commit-before 10, commit-after 8). Every one of the nine has at least one
+entry that would fail, so a retroactive MUST reddens 9 of 9 over history none of
+them can change, and this repository's own LOG fails it too (10 entries, 0 with
+all five). Reproduced the non-enforcement independently on a throwaway repo:
+after stripping every provenance line and appending an entry with none,
+lint / verify --level ci / doctor all exit 0. No gate was added and none was
+added off-by-default either, for ADR-017's reason. What ships instead: the five
+fields now sit in templates/LOG.md and templates/STATUS.md, bound to Section 2.4
+by a provenance-block docSync group, so the shipped example and the stated
+recommendation cannot drift apart.
+
+The README told adopters to copy a .github/workflows/ path this repository does
+not have; the real file is assets/governance/aahp-govern.yml. Fixed, and gated:
+scripts/check-doc-shape.mjs resolves backticked repo-relative paths against the
+git index and asserts a setup heading exists before the ADR log. Not a blanket
+rule - 46 of 78 path-shaped spans in this README correctly name a file in an
+ADOPTER's tree - so it only resolves spans whose first segment is tracked here,
+and exceptions carry an exact occurrence COUNT rather than being allowlisted. A
+path-level allowlist would have exempted the very defect it exists for, because
+the wrong sentence and the right ones use the same string. It exits 2 on anything
+it could not assess. The README also gained an Installation and Quickstart
+section; every command in it was run against a throwaway repository first.
+
+Found by running the suite on Linux rather than by reading it: the doc-shape
+fixture repository did not track a .github/ entry, so four tests that assert a
+FINDING passed vacuously - the first filter put the whole class out of scope
+before any assertion ran. The fixture now carries .github/workflows/aahp-verify.yml
+and no aahp-govern.yml, which is the shape the real defect had. A fifth test
+claimed the runtime guard rejects a missing occurrences count; the schema rejects
+it first, at exit 2, so that test now asserts the path that actually executes and
+the runtime guard is tested on the case only it can catch (a reason that is
+present and blank).
+
+NOT covered: no gate anywhere checks whether an adopting repository's LOG entries
+carry provenance, and after ADR-021 none is intended to. check-doc-shape is
+repository-local, absent from CHECK_GATES, so no consumer inherits it, and it
+still cannot see a path written without backticks or one whose first segment is
+not tracked here. Nothing here touches the nine consumer repositories.
+
+OPEN, found by this work and deliberately NOT fixed here. docPaths.include is the
+docLinks set minus .ai/handoff/*.md. Widening it to the full docLinks set was
+tried and is red: NEXT_ACTIONS.md names .github/workflows/publish.yml twice, and
+there is no such workflow in this repository - publish is a JOB inside ci.yml.
+Same defect class as issue #74, in the document that tells the next agent what to
+do. Left alone because handoff files collide across concurrent branches and this
+change set does not need them. The scope choice itself is recorded in ADR-022: an
+append-only STATUS.md quotes paths that WERE wrong on purpose, so a counted
+exception list over it churns every session and gets switched off.
 ## A pinning gate that never read a single `uses:`, and a record only a test file kept
 
 22 of 25 action references under `.github/workflows/` ran on mutable major tags,

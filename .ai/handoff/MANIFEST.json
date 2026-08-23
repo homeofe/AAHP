@@ -4,17 +4,17 @@
   "last_session": {
     "agent": "cli-tool",
     "session_id": "cli-1787489585",
-    "timestamp": "2026-08-23T14:48:02Z",
-    "commit": "abc6f8e",
+    "timestamp": "2026-08-23T15:23:48Z",
+    "commit": "87fa56e",
     "phase": "fix",
     "duration_minutes": 0
   },
   "files": {
     "STATUS.md": {
-      "checksum": "sha256:4a363b9f70209ad07f49ad14d8718dc275681948565164852cf3d02de28334fa",
-      "updated": "2026-08-23T14:48:02Z",
-      "lines": 837,
-      "summary": "Dependabot opened #96, #98 and #99 to move `github/codeql-action` from v3.37.8"
+      "checksum": "sha256:6b6646f93105ebc229594148827b4b484b4beea5ebd4e14ef90d3e7211fc9601",
+      "updated": "2026-08-23T15:23:48Z",
+      "lines": 880,
+      "summary": "`publish` runs `npm publish --access public --provenance` with `id-token: write`."
     },
     "NEXT_ACTIONS.md": {
       "checksum": "sha256:efdc6ef8664faf9ce5120fa797b702d2353bd4c3205c62e5ba651a465326103d",

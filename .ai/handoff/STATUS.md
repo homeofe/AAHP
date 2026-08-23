@@ -1,3 +1,46 @@
+## Two jobs in one file disagreed about what a release is, and npm got the looser answer
+
+`publish` runs `npm publish --access public --provenance` with `id-token: write`.
+Its condition was a disjunction, and the right operand,
+`github.event_name == 'workflow_dispatch'`, constrains no ref at all. The
+`release` job directly below it used the tag-only form. So the tag requirement,
+which is the stated release control, was not the only path to the registry, and
+the two jobs that together define a release answered the question differently.
+
+Settled as ADR-019 option A: the operand is removed and the two conditions are
+now byte-identical.
+
+The fact that decided it, rather than a preference between three defensible
+options, is that removing it costs no capability. `workflow_dispatch` is still a
+trigger. A dispatch runs against a chosen ref, so selecting a version tag gives
+`github.ref` of `refs/tags/vX.Y.Z`, which satisfies the tag-only condition; a
+failed publish can still be re-run by hand. What is gone is publishing from a ref
+that is not a release tag.
+
+Option B wanted the job behind an `environment:` carrying a required reviewer,
+and that cannot be finished in the tree: this repository's one environment has
+zero protection rules, and adding one is a settings change. Naming an unprotected
+environment would have added a label and no control. Option C keeps a path
+nothing uses. Re-measured against the API before deciding: 206 runs of `ci.yml`,
+115 `pull_request` and 91 `push`, and zero `workflow_dispatch` in the entire
+history.
+
+Three records had to move together and the assertion in
+`tests/assert-repo-ci-shape.mjs` is what forces that: the workflow, the recorded
+list in that file, and the operand block in ADR-019, which now reads `(none)`.
+Both directions were mutated to check the assertion still bites. Re-adding the
+operand to the workflow alone is caught as an unrecorded publish permission;
+recording it in the list alone is caught as a record the README does not carry.
+
+A note on how that mutation nearly cost the change: `git checkout --` after each
+mutation restored the files from the INDEX, and the fix was not committed yet, so
+it silently reverted the work rather than the mutation. Both edits had to be
+re-applied. Commit before mutating, every time.
+
+NOT covered: whether the npm trusted-publisher configuration constrains the ref
+on the registry side. That is a setting outside this repository and was not read
+here, so this change tightens the workflow and says nothing about the registry.
+
 ## A HIGH advisory whose only offered fix was a five-major downgrade
 
 `fast-json-patch` below 3.1.1 carries GHSA-8gh8-hqwg-xf34, prototype pollution,

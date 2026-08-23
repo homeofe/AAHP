@@ -185,6 +185,10 @@ if (!ci?.jobs?.["runtime-matrix"]) {
 // authorization would have been equally silent. This section is the missing
 // reader. Reported at https://github.com/homeofe/AAHP/issues/69.
 //
+// SETTLED 2026-08-23 as ADR-019 option A. The operand is removed and this list is
+// empty; the assertion below now proves the two conditions are identical, and that
+// re-adding any operand requires editing this file and ADR-019 in the same commit.
+//
 // It is a CHANGE DETECTOR, not a policy. It does not decide whether a manual
 // publish path should exist; that question is recorded as open in ADR-019 in
 // README.md. What it does is pin both conditions to the state this repository has
@@ -212,9 +216,11 @@ const RELEASE_REF_CONDITION =
 // manual dispatch. The options for settling it, and what each one requires, are in
 // ADR-019. Adopting any of them means editing ci.yml and this list in the same
 // commit, which is the entire point of the list.
-const PUBLISH_CONDITIONS_BEYOND_RELEASE = [
-  "github.event_name == 'workflow_dispatch'",
-];
+// Settled as ADR-019 option A on 2026-08-23: the operand is gone and the two
+// conditions are identical, so there is nothing beyond the release definition to
+// record. The list stays, and stays asserted in both directions, because it is what
+// makes re-adding a path to npm publish a visible edit rather than a quiet one.
+const PUBLISH_CONDITIONS_BEYOND_RELEASE = [];
 
 /**
  * Collapse every run of whitespace outside single-quoted literals to one space.

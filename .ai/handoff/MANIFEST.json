@@ -3,18 +3,18 @@
   "project": "AAHP",
   "last_session": {
     "agent": "cli-tool",
-    "session_id": "cli-1787482728",
-    "timestamp": "2026-08-23T10:58:48Z",
-    "commit": "cd247ce",
+    "session_id": "cli-1787483321",
+    "timestamp": "2026-08-23T11:08:41Z",
+    "commit": "0593ef0",
     "phase": "fix",
     "duration_minutes": 0
   },
   "files": {
     "STATUS.md": {
-      "checksum": "sha256:d3b0ce90e13369f589e45fc5671395801e22bc867c233031bee54ef81227ae91",
-      "updated": "2026-08-23T10:58:40Z",
-      "lines": 436,
-      "summary": "Escaping the BRE quantifier made five `=assignment` secret patterns live for the"
+      "checksum": "sha256:cf21e3d17ca12fdcc4e918d02343fc316821e342cf7a96c712462441a0516a94",
+      "updated": "2026-08-23T11:08:41Z",
+      "lines": 473,
+      "summary": "FOUND WHILE FIXING THE ABOVE, NOT FIXED, needs the owner's call."
     },
     "NEXT_ACTIONS.md": {
       "checksum": "sha256:efdc6ef8664faf9ce5120fa797b702d2353bd4c3205c62e5ba651a465326103d",
@@ -77,11 +77,11 @@
       "summary": "{"
     }
   },
-  "quick_context": "Escaping the BRE quantifier made five `=assignment` secret patterns live for the Current version: **v3.10.0** ",
+  "quick_context": "FOUND WHILE FIXING THE ABOVE, NOT FIXED, needs the owner's call. Current version: **v3.10.0** ",
   "token_budget": {
     "manifest_only": 85,
-    "manifest_plus_core": 11431,
-    "full_read": 21501
+    "manifest_plus_core": 11956,
+    "full_read": 22026
   }
   ,"next_task_id": 18
   ,"tasks": {"T-006":{"title":"Publish npm package","status":"done","priority":"medium","depends_on":[],"created":"2026-06-28T10:10:21.975Z","notes":"**AAHP Task:** `T-006`  \n**Status:** blocked  \n**Priority:** medium  \n\n\n\n\n---\n*Auto-created from AAHP manifest · project: AAHP*","github_issue":18,"github_repo":"homeofe/AAHP","completed":"2026-07-14T00:00:00Z"},"T-014":{"title":"Add CLI integration tests for bin/aahp.js [high]","status":"done","priority":"high","depends_on":[],"created":"2026-06-28T10:10:21.975Z","notes":"**AAHP Task:** `T-014`  \n**Status:** ready  \n**Priority:** high  \n\n\n\n\n---\n*Auto-created from AAHP manifest · project: AAHP*","github_issue":14,"github_repo":"homeofe/AAHP","completed":"2026-07-14T00:00:00Z"},"T-015":{"title":"Add `aahp status` quick-look command [medium]","status":"done","priority":"medium","depends_on":[],"created":"2026-06-28T10:10:21.978Z","github_issue":22,"github_repo":"homeofe/AAHP","completed":"2026-07-14T00:00:00Z"},"T-016":{"title":"Add `aahp archive` command for LOG.md rotation [medium]","status":"done","priority":"medium","depends_on":[],"created":"2026-06-28T10:10:21.979Z","github_issue":23,"github_repo":"homeofe/AAHP","completed":"2026-07-14T00:00:00Z"},"T-017":{"title":"Add project-level CLAUDE.md [low]","status":"done","priority":"low","depends_on":[],"created":"2026-06-28T10:10:21.979Z","github_issue":24,"github_repo":"homeofe/AAHP","completed":"2026-07-14T00:00:00Z"}}

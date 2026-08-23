@@ -1,3 +1,40 @@
+## The required check was already red, and --json still reports a zero-gate run as a pass
+
+FOUND WHILE FIXING THE ABOVE, NOT FIXED, needs the owner's call.
+
+The branch arrived with `lint-and-validate` (REQUIRED) red. Same single failure
+on cd247ce, before this session pushed anything:
+  not ok 103 check: config.check.skip omits doc-links so a broken link is not caught
+Cause: that fixture configured `docLinks` and nothing else, then skipped
+`doc-links`, so ZERO gates ran and the test asserted exit 0 for a run that had
+assessed nothing. The zero-gate fix on this branch correctly turned it red - the
+test had the #84 defect written down as an expectation.
+RE-GROUNDED, NOT RELAXED: changing the 0 to a 1 would pin the aggregate verdict,
+which is not what the test is about. Its subject is the DESELECTION, so the
+fixture now also carries a gate that really runs and passes, and it additionally
+asserts the deselected gate never evaluated the broken link. A second test pins
+the other half: skipping the only configured gate is NOT EVALUATED, exit 1.
+
+STILL OPEN, and it is the same class one level down. The zero-gate branch lives
+in the text summary only, and `--json` returns before it:
+  aahp check .          -> "Governance NOT EVALUATED: 0 gate(s) ran."  exit 1
+  aahp check . --json   -> exit 0, every gate "skip"
+Same tree, same run, opposite verdicts, and the machine-readable path is the one
+a dashboard consumes. The JSON record marks the gates `skip` here, although the
+PR body's own argument for the invalid-config case is that `skip` ("asked, not
+applicable here") must never stand in for "never asked".
+NOT CHANGED HERE because the two intents on this branch genuinely conflict and
+the resolution is a commitment, not a defect fix: `tests/check.bats` states in
+its header that a repo with no package.json, no config and no `.ai/handoff` must
+stay green, and test 1 asserts exactly that - it passes today only because it
+uses `--json` and so misses the new branch. Deciding whether a bare repo is green
+or NOT EVALUATED changes `aahp check` for every adopter who runs it without a
+config.
+MEASURED, so the decision is not urgent: of the ten consuming repositories, the
+eight that can run `aahp check` all ship an `aahp.config.json` with at least one
+applicable gate, and the two without a config never invoke `check` at all. No
+consumer changes state either way today.
+
 ## The live secret patterns turned a real consumer's protected branch red
 
 Escaping the BRE quantifier made five `=assignment` secret patterns live for the

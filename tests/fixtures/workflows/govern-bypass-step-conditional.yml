@@ -1,0 +1,34 @@
+# The tamper from the issue, verbatim: `if:` on the step that runs the gate,
+# while the step that emits the conformance record is left unconditional.
+#
+# This fixture is the reason the audit is per SUBCOMMAND rather than per job. A
+# job-wide "some governance step runs unconditionally" test reads this file as
+# enforced, because `aahp doctor` below has no condition. The gate that decides
+# pass or fail is `aahp check`, and it is the one wrapped.
+name: AAHP Govern
+
+permissions:
+  contents: read
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  govern:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install pinned aahp devDependency
+        run: npm ci --ignore-scripts
+      - name: Run governance gates
+        if: false
+        run: node ./node_modules/@elvatis_com/aahp/bin/aahp.js check .
+      - name: Governance conformance record
+        run: node ./node_modules/@elvatis_com/aahp/bin/aahp.js doctor --governance --json .

@@ -11,6 +11,55 @@ independently of the npm version).
 
 ## [Unreleased]
 
+### Changed
+- **`aahp doctor`'s conformance record moves to `schemaVersion: 2`, and its summary
+  counts gates that RAN.** The footer read `Conformance OK: 7 gate(s), no failures.`
+  on a repository where zero of seven gates evaluated anything, because it counted
+  the gates that exist. `aahp check`, on the same tree, already said `0 gate(s) ran`,
+  so the two commands disagreed about how to describe one emptiness and the one
+  positioned as the conformance evidence was the one that overstated. The footer now
+  reads `Conformance OK: 5 of 7 gate(s) ran, no failures.`, and a run where nothing
+  was evaluated reports `Conformance NOT EVALUATED: 0 of 7 gate(s) ran. This is not a
+  pass.` and exits 1, reusing the vocabulary this CLI already had for an invalid
+  config rather than inventing a second one for the same state. `--quiet` states the
+  overall result instead of printing nothing, on both commands.
+  **WHAT CONSUMERS MUST UPDATE.** `gates` is byte-for-byte what version 1 emitted:
+  same keys, same status tokens, same meaning. A reader that switches on `gates`
+  needs NO change. A reader that asserts `schemaVersion === 1` must widen to `>= 1`;
+  that is the only breaking edge, and it is why the version moved rather than fields
+  being added silently. Surveyed 2026-08-23 across the nine consuming repositories in
+  this estate: none of them parses the record. Every one runs `aahp doctor . --json`
+  as a CI step and consumes the exit code, so the field additions reach no parser, and
+  the exit code is unchanged for all nine (measured: each evaluates between 1 and 6
+  gates, so none reaches the zero-evaluated branch).
+  New in 2: `gateOutcomes` gives each gate a refined `outcome` plus the human
+  `reason`, `evaluated` counts the gates that produced a verdict, and `total` the
+  gates defined. The refinement is the point. Version 1's `skip` stood for four
+  different states at once, so a repository that had adopted governance and one that
+  had switched every gate off through `config.check` emitted identical records. The
+  outcomes are `pass`, `fail`, `missing`, `self`, `not-applicable`, `deselected` and
+  `unevaluated`.
+- **`aahp check --json` now reaches the same verdict as `aahp check`.** On one tree
+  the text path printed `Governance NOT EVALUATED: 0 gate(s) ran.` and exited 1 while
+  `--json` exited 0 with every gate `skip`, because the JSON branch returned above the
+  zero-gate test. The machine-readable path is the one a CI tick and a dashboard
+  consume, so it was the wrong half to leave green. The verdict is now computed once
+  and used by both paths. Measured against the nine consuming repositories: each runs
+  at least one applicable gate, so none changes exit code.
+- **`aahp verify` Layer 4 no longer reports a trust register it could not read as
+  clean.** `aahp_trust_expired` printed nothing both when no entry was expired and
+  when not one row was parsed, and Layer 4 called both of them
+  `No expired 'verified' trust entries.` A register whose header no longer names a
+  `Status` column, or which holds no table this reader recognises, is now reported as
+  `TTL was NOT evaluated`, and a clean result carries the number of entries checked.
+  This is not hypothetical: measured 2026-08-23 across the nine consuming
+  repositories, SIX have a `TRUST.md` in which this reader sees zero decidable rows,
+  and in one of them the register is a real, populated `Verified Properties` table
+  with an `Expires` column and no `Status` column, holding a row eight days past its
+  expiry, reported as clean. Layer 4 remains ADVISORY: it still increments no failure
+  count and still cannot fail a build. Whether an expired TTL should ever block is an
+  owner decision and is deliberately not taken here.
+
 ### Added
 
 - An Installation and Quickstart section in `README.md`, above the architectural
@@ -89,6 +138,25 @@ independently of the npm version).
   cannot be classified reports `fail`, because undecided is not clean. Two shapes are
   deliberately not findings because they fail CLOSED, not green: an `if:` on the
   checkout step alone, and `paths:` filters that stop the workflow triggering.
+- **The `verify-workflow` gate now audits `assets/governance/aahp-govern.yml` too**,
+  which is the shipped workflow with the widest blast radius and the one it did not
+  look at. `aahp init --gates` writes that file into an adopting repository, and a
+  governance-only adopter has no `aahp-verify.yml` at all, so it is their entire CI
+  backstop. Wrapping its `Run governance gates` step in `if: false` left `aahp doctor`
+  reporting `SKIP verify-workflow: no workflow here runs the AAHP verify gate` and
+  exiting 0: the same false green the gate exists to stop, one file over. Four
+  findings cover the governance shape: `govern-job-conditional`,
+  `govern-job-soft-failing`, `govern-step-conditional` and `govern-step-soft-failing`.
+  They are judged per SUBCOMMAND, because `aahp check` and `aahp doctor` are different
+  gates and the shipped template runs both, so a per-job test reads a file whose
+  `aahp check` step alone is wrapped as enforced. A repository that runs the
+  governance gate unconditionally and no verify gate gets its own verdict,
+  `governance-only`, exit 0, whose pass reason says out loud that nothing there
+  compares a handoff checksum. `npm run govern` is deliberately not recognised: what
+  that script expands to is not readable from the workflow. Measured 2026-08-23
+  against the nine consuming repositories in this estate, at their `origin/main`:
+  none holds an `aahp-govern.yml`, and every verdict and exit code is identical
+  before and after this change, so no consumer turns red without changing anything.
   The gate ships no YAML dependency, because AAHP has no runtime dependencies, so
   `tests/assert-workflow-parser-parity.mjs` holds its block-YAML reader against a real
   parser on every workflow and fixture in this repository, on the fields the audit

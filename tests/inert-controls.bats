@@ -744,9 +744,23 @@ write_only_config() {
   write_only_config '[]'
   run node "$AAHP_ROOT/bin/aahp.js" check "$FIXDIR"
   [ "$status" -eq 1 ]
-  [[ "$output" == *"0 gate(s) ran"* ]]
+  # The count now carries its denominator, so the sentence is readable as "none
+  # of eight" rather than as a bare zero. Asserted in the fuller form, which is
+  # a strictly stronger assertion than the "0 gate(s) ran" substring it replaces.
+  [[ "$output" == *"0 of 8 gate(s) ran"* ]]
   [[ "$output" == *"not a pass"* ]]
   [[ "$output" != *"Governance OK"* ]]
+}
+
+@test "84 zero gates ran is not evaluated on the --json path too" {
+  # The half that was still open when the zero-gate branch shipped: the JSON
+  # branch returned above the test, so this same fixture exited 0 there while
+  # the text path above exited 1.
+  setup_gate_id_fixture
+  write_only_config '[]'
+  run node "$AAHP_ROOT/bin/aahp.js" check "$FIXDIR" --json
+  [ "$status" -eq 1 ]
+  [[ "$output" == *'"evaluated": 0'* ]]
 }
 
 # --- the exclusion filters PATHS, never matched text ------------------------

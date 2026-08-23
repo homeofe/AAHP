@@ -309,8 +309,96 @@ EOF
 
     run bash "$SCRIPTS_DIR/verify-handoff.sh" "$TEST_TMPDIR" --level full
     # Expired trust is advisory: it warns but does not fail the gate on its own.
-    [[ "$output" == *"expired 'verified' trust"* ]]
+    [[ "$output" == *"'verified' trust entr(ies) expired"* ]]
     [[ "$output" == *"Stale claim"* ]]
+    # The count now carries its denominator, so "1" is readable as 1 of 1 rather
+    # than as a bare number over an unknown register size.
+    [[ "$output" == *"1 of 1"* ]]
+}
+
+# --- Layer 4 must not report a clean register it could not read --------------
+#
+# aahp_trust_expired prints nothing both when nothing is expired and when not
+# one row was parsed, and this layer called both of them clean. Measured
+# 2026-08-23 across the nine consuming repositories in this estate, SIX have a
+# TRUST.md in which this reader sees zero decidable rows, and in one of them the
+# register is a real, populated table with an Expires column and no Status
+# column, holding a row 8 days past its expiry, reported as clean.
+
+@test "Layer 4: a trust table with no Status column is NOT EVALUATED, not clean" {
+    # The real consumer shape: | Property | Value | Verified | TTL | Expires |.
+    # Every row is skipped for want of a Status column, and the row below is
+    # expired. The old wording for this state was "No expired 'verified' trust
+    # entries."
+    cat > "$TEST_TMPDIR/.ai/handoff/TRUST.md" <<'EOF'
+# Trust Register
+
+## Verified Properties
+
+| Property | Value | Verified | TTL | Expires | Provenance |
+|----------|-------|----------|-----|---------|------------|
+| Test count | 1953 passing | 2026-01-01 | 3 days | 2026-01-04 | tool_verified |
+EOF
+    bash "$SCRIPTS_DIR/aahp-manifest.sh" "$TEST_TMPDIR" --quiet --phase implementation
+    git -C "$TEST_TMPDIR" add -A
+    git -C "$TEST_TMPDIR" commit -q -m "trust"
+
+    run bash "$SCRIPTS_DIR/verify-handoff.sh" "$TEST_TMPDIR" --level full
+    [[ "$output" == *"TTL was NOT evaluated"* ]]
+    [[ "$output" == *"this is not 'no expired entries'"* ]]
+    [[ "$output" == *"Status"* ]]
+    [[ "$output" != *"No expired 'verified' trust entries"* ]]
+}
+
+@test "Layer 4: a TRUST.md with no table at all is NOT EVALUATED, not clean" {
+    # The other measured shape: a scope-and-boundaries document with no trust
+    # table in it. Nothing is expired because nothing was read.
+    cat > "$TEST_TMPDIR/.ai/handoff/TRUST.md" <<'EOF'
+# Trust and Scope Boundaries
+
+## Agents May
+
+- Read and write files in this project
+
+## Agents Must Not
+
+- Publish releases without approval
+EOF
+    bash "$SCRIPTS_DIR/aahp-manifest.sh" "$TEST_TMPDIR" --quiet --phase implementation
+    git -C "$TEST_TMPDIR" add -A
+    git -C "$TEST_TMPDIR" commit -q -m "trust"
+
+    run bash "$SCRIPTS_DIR/verify-handoff.sh" "$TEST_TMPDIR" --level full
+    [[ "$output" == *"no trust table this reader recognises"* ]]
+    [[ "$output" == *"TTL was NOT evaluated"* ]]
+    [[ "$output" != *"No expired 'verified' trust entries"* ]]
+}
+
+@test "Layer 4: a readable register with nothing expired still reports clean, with a count" {
+    # The CONTROL. Without it the two tests above would be satisfied by a Layer 4
+    # that had simply stopped saying anything is clean. The setup register has
+    # one verified row expiring in 2099.
+    run bash "$SCRIPTS_DIR/verify-handoff.sh" "$TEST_TMPDIR" --level full
+    [[ "$output" == *"No expired 'verified' trust entries (1 checked)"* ]]
+    [[ "$output" != *"TTL was NOT evaluated"* ]]
+}
+
+@test "Layer 4: stays advisory - an unreadable register does not fail the gate" {
+    # Whether a TTL should ever BLOCK is an owner decision, named in the pull
+    # request and not taken here. This pins the current contract so a future
+    # change to it is a deliberate, visible edit rather than a side effect.
+    cat > "$TEST_TMPDIR/.ai/handoff/TRUST.md" <<'EOF'
+# Trust Register
+
+no table here
+EOF
+    bash "$SCRIPTS_DIR/aahp-manifest.sh" "$TEST_TMPDIR" --quiet --phase implementation
+    git -C "$TEST_TMPDIR" add -A
+    git -C "$TEST_TMPDIR" commit -q -m "trust"
+
+    run bash "$SCRIPTS_DIR/verify-handoff.sh" "$TEST_TMPDIR" --level full
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"TTL was NOT evaluated"* ]]
 }
 
 # ─── Layer 3: commit-pointer freshness (warn, never blocks) ──

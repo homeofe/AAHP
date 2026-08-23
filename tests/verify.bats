@@ -462,6 +462,12 @@ EOF
   "trustTtl": { "enforce": true }
 }
 EOF
+    # aahp.config.json is a root file, so Layer 2 counts it as an impacting
+    # change and fails unless handoff state moves with it. Without this line the
+    # exit code below is Layer 2's, not Layer 4's, and every assertion on a
+    # non-zero status passes whether or not enforcement works at all.
+    printf '\n<!-- fixture: handoff state moves with the config -->\n' \
+        >> "$TEST_TMPDIR/.ai/handoff/STATUS.md"
     bash "$SCRIPTS_DIR/aahp-manifest.sh" "$TEST_TMPDIR" --quiet --phase implementation
     git -C "$TEST_TMPDIR" add -A
     git -C "$TEST_TMPDIR" commit -q -m "trust"
@@ -491,6 +497,12 @@ EOF
   "trustTtl": { "enforce": false }
 }
 EOF
+    # aahp.config.json is a root file, so Layer 2 counts it as an impacting
+    # change and fails unless handoff state moves with it. Without this line the
+    # exit code below is Layer 2's, not Layer 4's, and every assertion on a
+    # non-zero status passes whether or not enforcement works at all.
+    printf '\n<!-- fixture: handoff state moves with the config -->\n' \
+        >> "$TEST_TMPDIR/.ai/handoff/STATUS.md"
     bash "$SCRIPTS_DIR/aahp-manifest.sh" "$TEST_TMPDIR" --quiet --phase implementation
     git -C "$TEST_TMPDIR" add -A
     git -C "$TEST_TMPDIR" commit -q -m "trust"
@@ -517,13 +529,22 @@ EOF
   "trustTtl": { "enforce": true }
 }
 EOF
+    # aahp.config.json is a root file, so Layer 2 counts it as an impacting
+    # change and fails unless handoff state moves with it. Without this line the
+    # exit code below is Layer 2's, not Layer 4's, and every assertion on a
+    # non-zero status passes whether or not enforcement works at all.
+    printf '\n<!-- fixture: handoff state moves with the config -->\n' \
+        >> "$TEST_TMPDIR/.ai/handoff/STATUS.md"
     bash "$SCRIPTS_DIR/aahp-manifest.sh" "$TEST_TMPDIR" --quiet --phase implementation
     git -C "$TEST_TMPDIR" add -A
     git -C "$TEST_TMPDIR" commit -q -m "trust"
 
     run bash "$SCRIPTS_DIR/verify-handoff.sh" "$TEST_TMPDIR" --level full
     [ "$status" -ne 0 ]
-    [[ "$output" == *"TTL was NOT evaluated"* ]]
+    # The advisory branch prints "TTL was NOT evaluated" as well, so asserting
+    # that alone would pass with enforcement deleted. Assert the wording only the
+    # failing branch can produce.
+    [[ "$output" == *"trustTtl.enforce is on and TTL was NOT evaluated"* ]]
     [[ "$output" != *"No expired 'verified' trust entries"* ]]
 }
 
@@ -534,6 +555,12 @@ EOF
     cat > "$TEST_TMPDIR/aahp.config.json" <<'EOF'
 { "trustTtl": { "enforce": true },
 EOF
+    # aahp.config.json is a root file, so Layer 2 counts it as an impacting
+    # change and fails unless handoff state moves with it. Without this line the
+    # exit code below is Layer 2's, not Layer 4's, and every assertion on a
+    # non-zero status passes whether or not enforcement works at all.
+    printf '\n<!-- fixture: handoff state moves with the config -->\n' \
+        >> "$TEST_TMPDIR/.ai/handoff/STATUS.md"
     bash "$SCRIPTS_DIR/aahp-manifest.sh" "$TEST_TMPDIR" --quiet --phase implementation
     git -C "$TEST_TMPDIR" add -A
     git -C "$TEST_TMPDIR" commit -q -m "config"
@@ -553,6 +580,12 @@ EOF
   "trustTtl": { "enforce": false }
 }
 EOF
+    # aahp.config.json is a root file, so Layer 2 counts it as an impacting
+    # change and fails unless handoff state moves with it. Without this line the
+    # exit code below is Layer 2's, not Layer 4's, and every assertion on a
+    # non-zero status passes whether or not enforcement works at all.
+    printf '\n<!-- fixture: handoff state moves with the config -->\n' \
+        >> "$TEST_TMPDIR/.ai/handoff/STATUS.md"
     bash "$SCRIPTS_DIR/aahp-manifest.sh" "$TEST_TMPDIR" --quiet --phase implementation
     git -C "$TEST_TMPDIR" add -A
     git -C "$TEST_TMPDIR" commit -q -m "config"

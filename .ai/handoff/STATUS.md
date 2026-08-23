@@ -1,5 +1,13 @@
 ## Trust Decay could not decay, and the fix had to not break nine repositories
 
+**Correction, and the correction found a worse one.** The fixture for the enforce-false test added
+`aahp.config.json` at the repository root and never moved handoff state, so Layer 2
+failed it. Layer 4 had warned exactly as intended. The same flaw sat under the three
+tests asserting a NON-zero exit, and those were passing: Layer 2 was supplying the
+failure, so they would have passed with the enforcement code deleted. One of them
+asserted only `TTL was NOT evaluated`, which the advisory branch prints too, so
+nothing in it distinguished the two branches at all. Every fixture now moves handoff
+state, and that assertion names the wording only the failing branch produces.
 Layer 4 reads the trust register, finds expired `verified` rows and prints them.
 Nothing in the block increments `FAILURES`, so no number of expired rows could
 ever change the exit code. Eight of this repository's own ten verified rows sat

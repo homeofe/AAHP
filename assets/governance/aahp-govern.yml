@@ -78,7 +78,14 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          # Node 22 is the floor engines.node publishes for @elvatis_com/aahp.
+          # `aahp init --gates` copies this file into a consumer repository
+          # byte-identical, so this pin is the runtime every adopting repo runs
+          # the gates on. A lower pin does not fail loudly: `npm ci` emits
+          # EBADENGINE and carries on, so the CLI then runs on a runtime the
+          # package does not claim to support. scripts/check-runtime-support.mjs
+          # scans this directory for exactly that reason - see its SCAN_ROOTS.
+          node-version: '22'
       - name: Install pinned aahp devDependency
         run: npm ci --ignore-scripts
       - name: Run governance gates

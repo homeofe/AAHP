@@ -132,6 +132,28 @@ independently of the npm version).
   scalars, and would report a clean repository it never actually read.
 
 ### Fixed
+- The governance workflow `aahp init --gates` scaffolds into a consumer repository
+  (`assets/governance/aahp-govern.yml`) no longer pins Node 20 - a runtime end-of-life since
+  2026-04-30, and below the `engines.node: ">=22"` floor the package publishes. Every
+  repository that scaffolded it ran `npm ci --ignore-scripts` and then the AAHP CLI under
+  the CLI's own engine floor. Nothing reported it at either end: npm answers an unmet
+  `engines` range with an `EBADENGINE` warning and continues, so the adopter's gate stayed
+  green while running unsupported. `.github/workflows/aahp-verify.yml` - the file that
+  reaches consumers by the other route, `propagate.sh` - has pinned 22 with a comment
+  naming the reason since the floor moved; the scaffolded file was never brought along.
+- `npm run check:runtime-support` now reads `assets/governance/` as well as
+  `.github/workflows/`, which is why the pin above could sit wrong indefinitely. That
+  gate exists precisely to assert "no runtime pin is below the published floor", its
+  header names the file this package propagates as the reason it exists, and it was
+  green on every commit while the shipped template violated it - because AAHP
+  propagates by TWO routes and the gate read only the directory covered by one of
+  them. Its two sibling gates, `tests/assert-workflow-hardening.mjs` and
+  `scripts/check-workflow-pinning.mjs`, already scanned both; this was the odd one out.
+  A pin in the shipped template is reported with what actually goes wrong there (an
+  adopter's CI running the published CLI below its engine floor) rather than the
+  local wording, and it is excluded from the release-vs-build membership check: a job
+  that never executes here must not vouch for a release runtime nothing proved.
+  Widening a gate's scope must not let it assert less.
 - `MANIFEST.json`'s `project` no longer takes the name of the directory the generator
   ran in. It resolves the repository's identity instead: the name already on record in
   `MANIFEST.json` first, then the git remote's repository name, and the directory

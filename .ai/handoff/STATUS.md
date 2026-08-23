@@ -58,6 +58,48 @@ the colon so the fake is never found. Verified against a clean baseline worktree
 before concluding it was not a regression. The same trap bit the new suite's npx
 spy and is handled there with `cygpath -u`.
 
+## 2026-08-23 - the shipped governance workflow pinned Node 20 against a >=22 floor
+
+`assets/governance/aahp-govern.yml` - the workflow `aahp init --gates` scaffolds
+into a consumer repository - pinned `node-version: '20'` while `package.json`
+declared `engines.node: ">=22"`. Every repository that scaffolded it installed and
+ran the AAHP CLI below the CLI's own engine floor, on a runtime end-of-life since
+2026-04-30. It was silent at both ends: npm answers an unmet `engines` range with
+an `EBADENGINE` warning and exits 0, so the adopter's gate stayed green while
+running unsupported.
+
+The interesting half is why it lasted. `scripts/check-runtime-support.mjs` exists
+to assert exactly this relation, and its own header names the file this package
+propagates as the reason it was written - but it scanned `.github/workflows/`
+only. AAHP propagates by TWO routes: `propagate.sh` copies `aahp-verify.yml`, and
+`aahp init --gates` copies `aahp-govern.yml`. The gate covered the first and was
+green on every commit while the second violated it. Its two sibling gates,
+`tests/assert-workflow-hardening.mjs` and `scripts/check-workflow-pinning.mjs`,
+already scanned both directories; the runtime gate was the odd one out.
+
+So the pin is corrected AND the gate now reads `assets/governance/` too, with the
+shipped root excluded from the release-vs-build membership check - a job that never
+runs here must not vouch for a release runtime nothing proved. Widening a gate's
+scope must not let it assert less.
+
+The scan root is OPTIONAL rather than required, unlike its sibling in
+`assert-workflow-hardening.mjs`, because this gate also runs against fixture roots
+that legitimately ship no template. That leaves a hole - dropping the root would be
+silent - and it is closed from the other side: the gate's summary names every file
+it scanned, and `tests/runtime-support.bats` asserts the real tree's shipped
+template appears in it. Coverage is proved by observation, not assumed from a flag.
+
+Verified locally: `tests/runtime-support.bats` 30/30, `tests/init-gates.bats` and
+`tests/workflow-hardening.bats` green, `npm run check` green (10 gates). Mutation
+proof both ways - narrowing the gate back to one directory turns the two new
+coverage tests red; removing the shipped exclusion turns the membership test red.
+Per repository policy the full Bats suite is left to Linux CI, not run on Windows.
+
+Not touched: the template still uses `actions/checkout@v4` and
+`actions/setup-node@v4` by tag while this repository's own workflows pin action
+SHAs. That is a separate decision about what adopters should read, and
+`check-workflow-pinning.mjs` currently passes it, so it is recorded here rather
+than changed in a pin fix.
 ## 2026-08-23 - declare merge=union for the handoff append-log
 
 `.ai/handoff/STATUS.md` is prepend-only, so two branches almost always differ by

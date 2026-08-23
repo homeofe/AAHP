@@ -190,7 +190,15 @@ for pattern in "${SECRET_PATTERNS[@]}"; do
     # it into a CI log republishes it somewhere with a different retention
     # policy. `cut` is safe here because HANDOFF_DIR is relative (the script
     # cd'd into the project root above), so no Windows drive-letter colon.
-    MATCHES=$(grep -rn "$pattern" "$HANDOFF_DIR" 2>/dev/null | grep -v '.aiignore' | cut -d: -f1,2 || true)
+    #
+    # The ignore file is excluded by grep itself, NOT by filtering grep's
+    # output. An earlier revision piped `-n` output through `grep -v '.aiignore'`,
+    # which had been correct when the source was `-nl` and emitted bare paths. With
+    # line output it filters the MATCHED TEXT instead, so a real secret sitting on
+    # a line that merely mentions .aiignore was dropped and the gate printed
+    # "No secrets detected". Excluding at the source means no content can
+    # subvert the exclusion, because nothing downstream reads the match.
+    MATCHES=$(grep -rn --exclude='.aiignore' "$pattern" "$HANDOFF_DIR" 2>/dev/null | cut -d: -f1,2 || true)
     if [ -n "$MATCHES" ]; then
         echo -e "  ${RED}✗ Possible secret pattern '$pattern' found in:${NC}"
         echo "    $MATCHES"
@@ -209,7 +217,7 @@ fi
 # `.ai/handoff/.aiignore` reads like a firewall an adopter can extend, and the
 # shipped template used to close with an invitation to add internal hostnames
 # and IP ranges. Nothing has ever parsed it. The list above is the entire
-# enforced set, and the `grep -v '.aiignore'` above only keeps the file from
+# enforced set, and the `--exclude='.aiignore'` above only keeps the file from
 # matching its OWN patterns - it is not a rule reader.
 #
 # An adopter who adds `10.0.0.*` and `*.internal.example.com` here, commits an

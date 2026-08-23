@@ -737,3 +737,37 @@ write_only_config() {
   [[ "$output" == *"not a pass"* ]]
   [[ "$output" != *"Governance OK"* ]]
 }
+
+# --- the exclusion filters PATHS, never matched text ------------------------
+#
+# A revision of this branch changed the secret loop from `grep -rnl` to
+# `grep -rn ... | cut -d: -f1,2` to put path:line in the message. The
+# `grep -v '.aiignore'` that followed had been filtering bare PATHS and became a
+# filter on `path:line:MATCHED TEXT`, so any real secret on a line that also
+# mentioned the ignore file was dropped and the gate printed
+# "No secrets detected". The exclusion is done by grep itself now, so nothing
+# downstream reads the match and no content can subvert it.
+
+@test "80 a secret is still found on a line that MENTIONS .aiignore" {
+    create_full_handoff
+    printf '\nnote: excluded via .aiignore, token ghp_abcdefghijklmnopqrstuvwxyz012345\n' \
+        >> "$TEST_TMPDIR/.ai/handoff/STATUS.md"
+    create_manifest_json
+    run bash "$AAHP_ROOT/scripts/lint-handoff.sh" "$TEST_TMPDIR"
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"ghp_"* ]]
+    [[ "$output" == *"STATUS.md"* ]]
+    [[ "$output" != *"No secrets detected"* ]]
+}
+
+@test "80 the .aiignore file's own contents are still not scanned" {
+    # The other half. Without this, the test above would also pass for an
+    # implementation that dropped the exclusion entirely, which would make every
+    # adopter's ignore list light up as findings - noise that gets a gate
+    # switched off just as reliably as a false green.
+    create_full_handoff
+    printf 'ghp_abcdefghijklmnopqrstuvwxyz012345\n' > "$TEST_TMPDIR/.ai/handoff/.aiignore"
+    create_manifest_json
+    run bash "$AAHP_ROOT/scripts/lint-handoff.sh" "$TEST_TMPDIR"
+    [[ "$output" != *"Possible secret pattern"* ]]
+}

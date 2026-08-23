@@ -1,3 +1,25 @@
+## A usability change turned the .aiignore exclusion into a content filter
+
+Adding `path:line` to the secret message changed `grep -rnl` to `grep -rn`. The
+`grep -v '.aiignore'` that followed had been filtering bare PATHS and silently
+became a filter on `path:line:MATCHED TEXT`.
+Measured: a real token shape on a line reading "note: excluded via .aiignore,
+token ghp_..." was reported by the previous form and DROPPED by the new one,
+with the gate printing "No secrets detected". That is a weakening of a security
+control, introduced inside a change whose stated purpose is to fix controls that
+report success without doing the work.
+Nobody wrote a bad filter. The filter was correct against `-l` output and became
+wrong when the shape of its input changed. That is the failure mode to remember:
+a pipeline stage is only as correct as the format of what feeds it, and changing
+the producer is a change to every consumer downstream.
+Fixed at the source with `--exclude='.aiignore'`, so nothing downstream reads
+the matched text and no content can subvert the exclusion. Both comments that
+described the old mechanism were corrected in the same edit.
+VERIFIED ON LINUX, bats 1.10.0: 34/34 green. The mutation proof discriminates
+rather than merely failing - restoring the previous form turns the
+secret-on-a-mentioning-line test RED while the ignore-file-still-skipped test
+stays GREEN, which is what shows the two tests measure different properties.
+
 ## The required check was already red, and --json still reports a zero-gate run as a pass
 
 FOUND WHILE FIXING THE ABOVE, NOT FIXED, needs the owner's call.

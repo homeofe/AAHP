@@ -77,6 +77,22 @@ MEASURED AGAINST REAL CONSUMERS, at their `origin/main` rather than a local
 working copy: the `verify-workflow` verdict and exit code are identical for all
 nine before and after, and `doctor`/`check` exit codes are identical for all nine.
 
+TWO FIXTURES RE-GROUNDED AFTER THE FIRST LINUX RUN, and the reason is worth
+keeping. Three tests went red on bats 1.10.0 and none of the three was a defect
+in the change:
+- Two doctor tests asserted `Conformance OK: 5 of 7`. The real number is 4: the
+  three handoff gates plus `pinned-dep` evaluate, and `verify-workflow` does not,
+  because the fixture holds no workflows. The 5 was WRITTEN, not measured, which
+  is exactly the failure mode this branch is about. Corrected against the Linux
+  run, and the comment now says where the number came from.
+- `check: versionSites without package.json skips version-sync and exits 0`
+  configured `versionSites` and nothing else, so NO gate ran and the test pinned
+  exit 0 over a run that had assessed nothing - the same defect written down as
+  an expectation, surviving only because it used `--json`. Re-grounded the way
+  the doc-links deselection test above it already was: the applicability
+  assertion is unchanged, and a gate that really runs was added beside it so the
+  exit code means "no gate failed" rather than "nothing ran".
+
 ## The class test could not detect its own class, and the README described a workflow that changed
 
 The test "every *_SUFFIX= rule in the shipped template has an enforced

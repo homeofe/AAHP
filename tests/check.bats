@@ -136,7 +136,7 @@ EOF
 
 # --- --json: parseable record; exit 0 iff no gate fails ---------------------
 
-@test "check --json: emits {schemaVersion:1, command:check, gates} and exit 0 on a pass" {
+@test "check --json: emits {schemaVersion:2, command:check, gates} and exit 0 on a pass" {
     # pattern requires 99 consecutive "z"s: present in no tracked file, and the
     # literal source "z{99}" in this config does not satisfy the regex, so the
     # gate does not match its own config file. forbidden-patterns therefore PASS.
@@ -305,9 +305,24 @@ EOF
 
 # --- applicability: versionSites but NO package.json -> version-sync skips ---
 
-@test "check: versionSites without package.json skips version-sync and exits 0" {
+@test "check: versionSites without package.json skips version-sync, and the run is not vacuous" {
+    # RE-GROUNDED, not relaxed, the same way the doc-links deselection test above
+    # was. The SUBJECT is applicability: `versionSites` is configured, there is no
+    # package.json to read a version from, and version-sync must therefore report
+    # `not-applicable` rather than fail. That assertion is unchanged.
+    #
+    # The fixture used to configure `versionSites` and nothing else, so NO gate
+    # ran and the test asserted exit 0 for a run that had assessed nothing - the
+    # same defect this branch exists to close, written down as an expectation. It
+    # passed only because it used --json, which returned above the zero-gate test.
+    # Pinning exit 0 was therefore pinning the wrong thing. A forbidden-patterns
+    # rule that matches nothing is added so one gate really runs and passes, which
+    # is what makes the exit code mean "no gate failed" instead of "nothing ran".
+    # The pattern requires 99 consecutive "z"s; the literal "z{99}" in this config
+    # does not satisfy it, so the gate does not match its own config file.
     cat > "$TEST_TMPDIR/aahp.config.json" <<'EOF'
-{ "versionSites": [ { "file": "VERSION.txt", "minOccurrences": 1 } ] }
+{ "versionSites": [ { "file": "VERSION.txt", "minOccurrences": 1 } ],
+  "forbiddenPatterns": [ { "id": "nope", "pattern": "z{99}", "message": "x" } ] }
 EOF
     echo "shipped 0.9.0" > "$TEST_TMPDIR/VERSION.txt"
     gadd
@@ -316,7 +331,11 @@ EOF
     echo "$output" | node -e '
       let s=""; process.stdin.on("data",d=>s+=d).on("end",()=>{
         const r=JSON.parse(s);
-        process.exit(r.gates["version-sync"]==="skip"?0:1);
+        if (r.gates["version-sync"]!=="skip") process.exit(2);
+        if (r.gateOutcomes["version-sync"].outcome!=="not-applicable") process.exit(3);
+        // The guard that stops this passing over an empty run again.
+        if (r.evaluated!==1) process.exit(4);
+        if (r.gates["forbidden-patterns"]!=="pass") process.exit(5);
       });
     '
 }

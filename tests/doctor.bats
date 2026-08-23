@@ -96,8 +96,10 @@ EOF
     scaffold_conformant
     run node "$AAHP" doctor "$TEST_TMPDIR"
     [ "$status" -eq 0 ]
-    # 5 of 7 here: changelog-format and version-sync have nothing to check.
-    [[ "$output" == *"Conformance OK: 5 of 7 gate(s) ran, no failures."* ]]
+    # MEASURED on Linux, not guessed: the three handoff gates plus pinned-dep
+    # evaluate; changelog-format, version-sync and verify-workflow have nothing
+    # to check in this fixture.
+    [[ "$output" == *"Conformance OK: 4 of 7 gate(s) ran, no failures."* ]]
     [[ "$output" != *"Conformance OK: 7 gate(s)"* ]]
 }
 
@@ -126,7 +128,7 @@ EOF
     scaffold_conformant
     run node "$AAHP" doctor "$TEST_TMPDIR" --quiet
     [ "$status" -eq 0 ]
-    [[ "$output" == *"Conformance OK: 5 of 7 gate(s) ran, no failures."* ]]
+    [[ "$output" == *"Conformance OK: 4 of 7 gate(s) ran, no failures."* ]]
 }
 
 @test "doctor --json: the record separates governance-mode skips from not-applicable" {

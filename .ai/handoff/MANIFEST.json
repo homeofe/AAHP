@@ -3,85 +3,85 @@
   "project": "AAHP",
   "last_session": {
     "agent": "cli-tool",
-    "session_id": "cli-1787483321",
-    "timestamp": "2026-08-23T11:08:41Z",
-    "commit": "0593ef0",
+    "session_id": "cli-1787489585",
+    "timestamp": "2026-08-23T12:53:06Z",
+    "commit": "2cdaf48",
     "phase": "fix",
     "duration_minutes": 0
   },
   "files": {
     "STATUS.md": {
-      "checksum": "sha256:70ef6cd394426c10649e877c9c531347d5df0f9539bc5c76dd60b2732fb7bda8",
-      "updated": "2026-08-23T11:08:41Z",
-      "lines": 542,
-      "summary": "FOUND WHILE FIXING THE ABOVE, NOT FIXED, needs the owner's call."
+      "checksum": "sha256:cdf630cc96ba236d8f9386503580c0138d4e675603399ea9d00b4acaf2739507",
+      "updated": "2026-08-23T12:53:00Z",
+      "lines": 582,
+      "summary": "22 of 25 action references under `.github/workflows/` ran on mutable major tags,"
     },
     "NEXT_ACTIONS.md": {
       "checksum": "sha256:efdc6ef8664faf9ce5120fa797b702d2353bd4c3205c62e5ba651a465326103d",
-      "updated": "2026-08-23T10:35:07Z",
+      "updated": "2026-08-23T12:23:55Z",
       "lines": 239,
       "summary": "Current version: **v3.10.0**"
     },
     "LOG.md": {
       "checksum": "sha256:b6296369cedefd0c52a00e8ed2662ad839e238e8162d93c0fda76547e30c0bce",
-      "updated": "2026-08-23T10:35:07Z",
+      "updated": "2026-08-23T12:23:55Z",
       "lines": 250,
       "summary": "**Agent:** claude-opus-5"
     },
     "LOG-ARCHIVE.md": {
       "checksum": "sha256:952cebfc3ba42ba60c913defd9ca292d122a4151230b53e59b9201fd0dac5933",
-      "updated": "2026-08-23T10:35:07Z",
+      "updated": "2026-08-23T12:23:55Z",
       "lines": 159,
       "summary": "**Agent:** Claude Opus 4.6"
     },
     "LOG-ARCHIVE.index.json": {
       "checksum": "sha256:5cb8447453139052e528f8dfc67d88f3d5e74bb40e5fc1672aa55ca30980de98",
-      "updated": "2026-08-23T10:35:07Z",
+      "updated": "2026-08-23T12:23:55Z",
       "lines": 29,
       "summary": "{"
     },
     "DASHBOARD.md": {
       "checksum": "sha256:e96e392db8dab2e9719e542dfa2a10c240d0be16ac6721298c460a22985cbdea",
-      "updated": "2026-08-23T10:35:07Z",
+      "updated": "2026-08-23T12:23:55Z",
       "lines": 96,
       "summary": "| Name | Path | Build | Tests | Status | Notes |"
     },
     "TRUST.md": {
       "checksum": "sha256:91f124fe10a934779ef1d7442dd54af6656bbc03c4b1cde13a9d4cac9ab248e6",
-      "updated": "2026-08-23T10:35:07Z",
+      "updated": "2026-08-23T12:23:55Z",
       "lines": 93,
       "summary": "| Level | Meaning |"
     },
     "CONVENTIONS.md": {
       "checksum": "sha256:1c0150404d22c6e15e39139e8b2c991b0167ba1e095f579efafb85555dfe0d88",
-      "updated": "2026-08-23T10:35:07Z",
+      "updated": "2026-08-23T12:23:55Z",
       "lines": 93,
       "summary": "The project motto (Asimov's Three Laws) and the **do no damage** principle live once, in README (## Our Motto: The Three Laws). Agents must never take"
     },
     "WORKFLOW.md": {
       "checksum": "sha256:ef005f24e399791abb986b3a76403295c33ad3b28bb9b7dc777d1d0528b31151",
-      "updated": "2026-08-23T10:35:07Z",
+      "updated": "2026-08-23T12:23:55Z",
       "lines": 156,
       "summary": "| Agent | Model | Role | Responsibility |"
     },
     "GROUNDING.md": {
       "checksum": "sha256:7ef8cece585dc5defb4285175b9ba560d5469675df553d4ce28ec9e7aec24343",
-      "updated": "2026-08-23T10:35:07Z",
+      "updated": "2026-08-23T12:23:55Z",
       "lines": 209,
       "summary": "This register EXTENDS existing AAHP machinery; it does not fork or replace it. It"
     },
     "pii-allowlist.json": {
       "checksum": "sha256:7c1051f6e2bc3943b7c1dbe4da229694455681b8875a346c99279e555edb733f",
-      "updated": "2026-08-23T10:35:07Z",
+      "updated": "2026-08-23T12:23:55Z",
       "lines": 4,
       "summary": "{"
     }
   },
-  "quick_context": "FOUND WHILE FIXING THE ABOVE, NOT FIXED, needs the owner's call. Current version: **v3.10.0** ",
+  "quick_context": "22 of 25 action references under `.github/workflows/` ran on mutable major tags, Current version: **v3.10.0** ",
   "token_budget": {
     "manifest_only": 85,
-    "manifest_plus_core": 11956,
-    "full_read": 22026
+    "manifest_plus_core": 13498,
+    "full_read": 23568
   },
   "next_task_id": 18,
   "tasks": {

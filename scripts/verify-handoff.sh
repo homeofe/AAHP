@@ -621,8 +621,37 @@ fi
 
 # --- Layer 4: TRUST-TTL expiry ---------------------------------
 # Parse TRUST.md rows: any "verified" row whose Expires date is in the past
-# is reported. Advisory by default (warn): expired trust does not block a
-# commit, but the agent should re-verify.
+# is reported.
+#
+# ADVISORY BY DESIGN, AND WHAT FORCES RE-VERIFICATION INSTEAD.
+# Nothing in this block increments FAILURES, so no number of expired entries
+# can change this script's exit code. That is deliberate and it is the owner's
+# standing decision, not an oversight: an expired TTL says a claim is stale,
+# which is a reason to re-check it, not evidence that the tree is wrong. A
+# register left alone over a long weekend would otherwise block every commit in
+# the repository, including the commit that re-verifies it.
+#
+# Turning this into a blocking finding - outright, or above a threshold such as
+# "more than half the verified rows are expired" - is an OWNER DECISION and is
+# deliberately not taken here, because it would fail repositories that changed
+# nothing. Measured 2026-08-23 across the nine consuming repositories in this
+# estate: two hold registers with 24 of 25 and 20 of 21 verified rows already
+# expired, so a blocking Layer 4 turns them red on their next commit for a file
+# none of their pull requests touch. Recorded at the issue that raised it, with
+# the three options and this measurement attached.
+#
+# What forces re-verification today, named here so the advisory is not just an
+# absence: the expired rows are printed on every non-precommit run of this
+# script, including the required CI check, and the count carries its
+# denominator so the number is readable rather than a bare warning. The handoff
+# ritual that regenerates STATUS.md is where they get reset.
+#
+# WHAT IS NOT ADVISORY: whether the register could be READ. Silence from
+# aahp_trust_expired used to mean either "nothing is expired" or "not one row
+# was parsed", and this block called both of them clean. The census below
+# separates them, so a register this reader cannot classify is reported as
+# unread rather than as green. See aahp_trust_census in scripts/_aahp-lib.sh
+# for the measurement that motivated it.
 
 if [ "$LEVEL" != "precommit" ]; then
     echo ""
@@ -630,15 +659,26 @@ if [ "$LEVEL" != "precommit" ]; then
 
     TRUST_FILE="$HANDOFF_DIR/TRUST.md"
     if [ ! -f "$TRUST_FILE" ]; then
-        log_warn "TRUST.md not found. Skipping TTL check."
+        log_warn "TRUST.md not found. TTL was NOT evaluated."
     else
         TODAY=$(date -u +"%Y-%m-%d")
+        TRUST_CENSUS=$(aahp_trust_census "$TRUST_FILE")
+        TRUST_DECIDABLE=$(echo "$TRUST_CENSUS" | awk '{print $1 + 0}')
+        TRUST_CANDIDATE=$(echo "$TRUST_CENSUS" | awk '{print $2 + 0}')
         EXPIRED=$(aahp_trust_expired "$TRUST_FILE" "$TODAY")
-        if [ -z "$EXPIRED" ]; then
-            log_ok "No expired 'verified' trust entries."
+        if [ "$TRUST_DECIDABLE" -eq 0 ]; then
+            # No row reached the expiry comparison. Reporting "no expired
+            # entries" here would be a verdict over nothing.
+            if [ "$TRUST_CANDIDATE" -eq 0 ]; then
+                log_warn "TRUST.md holds no trust table this reader recognises. TTL was NOT evaluated (this is not 'no expired entries')."
+            else
+                log_warn "TRUST.md holds $TRUST_CANDIDATE trust row(s), but none could be classified as a dated 'verified' entry: a table needs BOTH a 'Status' and an 'Expires' column. TTL was NOT evaluated (this is not 'no expired entries')."
+            fi
+        elif [ -z "$EXPIRED" ]; then
+            log_ok "No expired 'verified' trust entries ($TRUST_DECIDABLE checked)."
         else
             EXPIRED_COUNT=$(echo "$EXPIRED" | sed '/^$/d' | wc -l | tr -d ' ')
-            log_warn "$EXPIRED_COUNT expired 'verified' trust entr(ies). Re-verify and reset TTL:"
+            log_warn "$EXPIRED_COUNT of $TRUST_DECIDABLE 'verified' trust entr(ies) expired. Re-verify and reset TTL:"
             echo "$EXPIRED" | sed '/^$/d' | sed 's/^/      - /' | head -20
         fi
     fi

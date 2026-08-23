@@ -810,6 +810,15 @@ function gateVersionSync(targetPath, config) {
 //
 // A repository with no such workflow SKIPs (nothing to weaken). A workflow that
 // hosts the gate but cannot be classified FAILs, because undecided is not clean.
+//
+// The governance workflow counts too, and it is the one this gate used to miss.
+// `aahp init --gates` scaffolds assets/governance/aahp-govern.yml, and a
+// governance-only adopter has no aahp-verify.yml at all, so that file is their
+// entire CI backstop. Its last step runs `aahp doctor --governance --json`, which
+// is this gate, which is why the report reaches the right pull request. Its
+// verdict is kept DISTINCT from `enforced`: the pass reason for a governance-only
+// repository says out loud that nothing there compares a handoff checksum, so a
+// green line cannot be read as a handoff-integrity statement.
 function gateVerifyWorkflow(targetPath) {
   let result
   try {
@@ -818,11 +827,20 @@ function gateVerifyWorkflow(targetPath) {
     return { status: 'fail', reason: `could not audit the verify workflow: ${err.message}` }
   }
   if (result.verdict === 'absent') {
-    return { status: 'skip', reason: 'no workflow here runs the AAHP verify gate' }
+    return { status: 'skip', reason: 'no workflow here runs the AAHP verify or governance gate' }
   }
   if (result.verdict === 'enforced') {
     const where = result.hosts.map((h) => `${h.file}:${h.job}`).join(', ')
     return { status: 'pass', reason: `the gate runs unconditionally at --level ci (${where})` }
+  }
+  if (result.verdict === 'governance-only') {
+    const where = result.governHosts.map((h) => `${h.file}:${h.job}`).join(', ')
+    return {
+      status: 'pass',
+      reason:
+        `the governance gate runs unconditionally (${where});` +
+        ' no workflow here runs aahp verify, so no handoff checksum is compared',
+    }
   }
   if (result.verdict === 'unclassifiable') {
     return { status: 'fail', reason: `undecidable verify workflow: ${result.unclassifiable[0]}` }
@@ -830,6 +848,52 @@ function gateVerifyWorkflow(targetPath) {
   const first = result.findings[0]
   const more = result.findings.length > 1 ? ` (+${result.findings.length - 1} more)` : ''
   return { status: 'fail', reason: `the gate can be skipped [${first.id}] ${first.detail}${more}` }
+}
+
+// ---------------------------------------------------------------------------
+// The record vocabulary: what `gates` says, and what `gateOutcomes` adds.
+//
+// THE DEFECT THIS CLOSES. `gates` carries one token per gate, and `skip` stood
+// for four different states at once: not applicable here, deselected by
+// config.check, not evaluated in governance mode, and (in `check` before the
+// config-schema fix) disabled by a typo. Two repositories in completely
+// different conditions - one that has adopted governance and one that has
+// switched every gate off - emitted byte-identical `gates` objects. README.md
+// offers this record to a fleet dashboard, and the dashboard could not tell a
+// conforming repository from an empty one.
+//
+// WHAT CHANGED AND WHAT DID NOT. `gates` is UNCHANGED: same keys, same values,
+// same meaning for every one of them. A reader that switches on `gates` needs no
+// change. What is added is `gateOutcomes` (a refined outcome plus the human
+// reason, per gate), `evaluated` and `total`. `schemaVersion` goes to 2 because
+// a reader must be able to tell a record that CAN answer "why was this skipped"
+// from one that cannot, which is the whole purpose of a version field. A reader
+// asserting `schemaVersion === 1` must widen to `>= 1`; a reader ignoring
+// unknown fields needs nothing.
+//
+// The outcome names are the ones this codebase already uses. `unevaluated` is
+// the token `check` and `doctor` already emit for an invalid config, so it is
+// reused here for governance mode rather than a second word being invented for
+// the same state.
+const OUTCOME = {
+  PASS: 'pass',
+  FAIL: 'fail',
+  MISSING: 'missing',
+  SELF: 'self',
+  NOT_APPLICABLE: 'not-applicable',
+  DESELECTED: 'deselected',
+  UNEVALUATED: 'unevaluated',
+}
+
+// A gate is EVALUATED when it examined this repository and produced a verdict
+// about it. `self` counts: the gate ran and concluded the check does not apply
+// to the package that ships it. The three that do not count never looked at
+// anything - a precondition was absent, the operator deselected the gate, or
+// governance mode declined to run it.
+const EVALUATED_OUTCOMES = new Set([OUTCOME.PASS, OUTCOME.FAIL, OUTCOME.MISSING, OUTCOME.SELF])
+
+function countEvaluated(outcomes) {
+  return Object.values(outcomes).filter((o) => EVALUATED_OUTCOMES.has(o.outcome)).length
 }
 
 function cmdDoctor(targetPath, flags) {
@@ -847,14 +911,21 @@ function cmdDoctor(targetPath, flags) {
   if (configProblem) {
     const gateIds = ['handoff-set', 'manifest-schema', 'grounding', 'pinned-dep', 'changelog-format', 'version-sync', 'verify-workflow']
     const gates = {}
-    for (const id of gateIds) gates[id] = 'unevaluated'
+    const gateOutcomes = {}
+    for (const id of gateIds) {
+      gates[id] = 'unevaluated'
+      gateOutcomes[id] = { outcome: OUTCOME.UNEVALUATED, reason: 'aahp.config.json is invalid, so no gate ran' }
+    }
     const record = {
-      schemaVersion: 1,
+      schemaVersion: 2,
       ...(governance ? { mode: 'governance' } : {}),
       repo: deriveRepo(targetPath, pkg),
       aahpVersion: getVersion(),
       config: { valid: false, errors: configErrors },
       gates,
+      gateOutcomes,
+      evaluated: 0,
+      total: gateIds.length,
       checkedAt: new Date().toISOString(),
     }
     if (jsonOnly) {
@@ -885,18 +956,36 @@ function cmdDoctor(targetPath, flags) {
     // without adopting the handoff files, and weakening it matters either way.
     'verify-workflow': gateVerifyWorkflow(targetPath),
   }
+  // The three handoff gates in governance mode are the one skip here that is a
+  // DECISION not to look, rather than an absent precondition. Everything else
+  // that skips did so because there was nothing of its kind in the repository.
+  const governanceSkipped = new Set(governance ? ['handoff-set', 'manifest-schema', 'grounding'] : [])
 
   const gates = {}
-  for (const [k, v] of Object.entries(results)) gates[k] = v.status
+  const gateOutcomes = {}
+  for (const [k, v] of Object.entries(results)) {
+    gates[k] = v.status
+    let outcome = v.status
+    if (v.status === 'skip') {
+      outcome = governanceSkipped.has(k) ? OUTCOME.UNEVALUATED : OUTCOME.NOT_APPLICABLE
+    }
+    gateOutcomes[k] = { outcome, reason: v.reason }
+  }
+  const evaluated = countEvaluated(gateOutcomes)
+  const total = Object.keys(gates).length
 
-  // `mode` is additive and present ONLY in governance mode, so the default
-  // record stays byte-for-byte identical to prior versions (backward compat).
+  // `mode` is additive and present ONLY in governance mode. `gates` is unchanged
+  // from schemaVersion 1; `gateOutcomes`, `evaluated` and `total` are what the
+  // bump buys. See the OUTCOME block above for the compatibility argument.
   const record = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     ...(governance ? { mode: 'governance' } : {}),
     repo: deriveRepo(targetPath, pkg),
     aahpVersion: getVersion(),
     gates,
+    gateOutcomes,
+    evaluated,
+    total,
     checkedAt: new Date().toISOString(),
   }
 
@@ -904,7 +993,9 @@ function cmdDoctor(targetPath, flags) {
 
   if (jsonOnly) {
     process.stdout.write(JSON.stringify(record, null, 2) + '\n')
-    process.exit(failing.length === 0 ? 0 : 1)
+    // Zero evaluated is a third outcome, not a pass, and --json must reach the
+    // same verdict as the text path on the same tree. See the summary below.
+    process.exit(failing.length === 0 && evaluated > 0 ? 0 : 1)
   }
 
   const labels = { pass: 'PASS', fail: 'FAIL', missing: 'MISSING', skip: 'SKIP', self: 'SELF' }
@@ -918,17 +1009,28 @@ function cmdDoctor(targetPath, flags) {
     if (!ok || !quiet) console.log(`  ${tag.padEnd(8)} ${k}: ${v.reason}`)
   }
   if (!quiet) console.log('=========================================')
-  if (failing.length === 0) {
-    if (!quiet) console.log(`Conformance OK: ${Object.keys(gates).length} gate(s), no failures.`)
-  } else {
+  // The summary counts gates that RAN, not gates that exist. `Conformance OK: 7
+  // gate(s), no failures.` was printed over seven skips and zero evaluations,
+  // and it is the line README.md positions as the conformance evidence a fleet
+  // dashboard and a consumer's own pull request read.
+  //
+  // Zero evaluated is NOT EVALUATED and exits 1, which is the verdict and the
+  // wording `aahp check` already uses for the same state. It is stated even
+  // under --quiet: a quiet CI run that printed nothing and exited 0 was an empty
+  // log under a green tick.
+  if (failing.length > 0) {
     console.log(`Conformance FAILED: ${failing.map(([k]) => k).join(', ')}.`)
+  } else if (evaluated === 0) {
+    console.log(`Conformance NOT EVALUATED: 0 of ${total} gate(s) ran. This is not a pass.`)
+  } else {
+    console.log(`Conformance OK: ${evaluated} of ${total} gate(s) ran, no failures.`)
   }
   if (!quiet) {
     console.log('\nJSON record:')
     console.log(JSON.stringify(record))
   }
 
-  process.exit(failing.length === 0 ? 0 : 1)
+  process.exit(failing.length === 0 && evaluated > 0 ? 0 : 1)
 }
 
 // ---------------------------------------------------------------------------
@@ -938,9 +1040,17 @@ function cmdDoctor(targetPath, flags) {
 // is the pass/fail RUN a consumer wires into CI. It executes every APPLICABLE
 // governance gate against [path], continues past a failure so one run surfaces
 // them all, and exits non-zero iff any gate fails. Each gate is a clean no-op
-// when its precondition is absent, so an unconfigured repo exits 0 with skips.
+// when its precondition is absent.
 // This is the SINGLE definition of the gate set; keep it in step with the
 // package.json "check" script chain (a test asserts dogfood parity).
+//
+// A run in which NO gate ran is a third outcome, not a pass: NOT EVALUATED,
+// exit 1. That verdict is reached by the text path and the --json path alike.
+// It was not, and the two disagreed about the same tree - `aahp check .` printed
+// NOT EVALUATED and exited 1 while `aahp check . --json` exited 0 with every
+// gate `skip`, because the JSON branch returned above the zero-gate test. The
+// machine-readable path is the one a dashboard and a CI tick consume, so it was
+// the wrong half to leave green.
 // ---------------------------------------------------------------------------
 
 const CHECK_GATES = [
@@ -969,14 +1079,21 @@ function cmdCheck(targetPath, flags) {
   // from "every gate passed" and from "a gate failed".
   if (configProblem) {
     const gates = {}
-    for (const gate of CHECK_GATES) gates[gate.id] = 'unevaluated'
+    const gateOutcomes = {}
+    for (const gate of CHECK_GATES) {
+      gates[gate.id] = 'unevaluated'
+      gateOutcomes[gate.id] = { outcome: OUTCOME.UNEVALUATED, reason: 'aahp.config.json is invalid, so no gate ran' }
+    }
     const record = {
-      schemaVersion: 1,
+      schemaVersion: 2,
       command: 'check',
       repo: deriveRepo(targetPath, pkg || {}),
       aahpVersion: getVersion(),
       config: { valid: false, errors: configErrors },
       gates,
+      gateOutcomes,
+      evaluated: 0,
+      total: CHECK_GATES.length,
       checkedAt: new Date().toISOString(),
     }
     if (jsonOnly) {
@@ -1020,12 +1137,14 @@ function cmdCheck(targetPath, flags) {
 
   const results = {}
   for (const gate of CHECK_GATES) {
-    let status, reason
+    let status, reason, outcome
     if ((only && !only.includes(gate.id)) || skip.includes(gate.id)) {
       status = 'skip'
+      outcome = OUTCOME.DESELECTED
       reason = 'deselected by config.check'
     } else if (!gateApplies(gate.id, targetPath, config)) {
       status = 'skip'
+      outcome = OUTCOME.NOT_APPLICABLE
       reason = 'not applicable here'
     } else {
       const r = spawnSync(process.execPath, [join(PACKAGE_ROOT, 'scripts', gate.script), ...gate.args, targetPath], { encoding: 'utf8' })
@@ -1042,25 +1161,39 @@ function cmdCheck(targetPath, flags) {
         reason = r.signal ? `gate killed by signal ${r.signal}` : firstLine(r.stderr || r.stdout)
       }
     }
-    results[gate.id] = { status, reason }
+    results[gate.id] = { status, reason, outcome: outcome || status }
   }
 
   const gates = {}
-  for (const [k, v] of Object.entries(results)) gates[k] = v.status
+  const gateOutcomes = {}
+  for (const [k, v] of Object.entries(results)) {
+    gates[k] = v.status
+    gateOutcomes[k] = { outcome: v.outcome, reason: v.reason }
+  }
   const failing = Object.entries(gates).filter(([, s]) => s === 'fail')
+  const ranCount = countEvaluated(gateOutcomes)
 
   const record = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     command: 'check',
     repo: deriveRepo(targetPath, pkg || {}),
     aahpVersion: getVersion(),
     gates,
+    gateOutcomes,
+    evaluated: ranCount,
+    total: CHECK_GATES.length,
     checkedAt: new Date().toISOString(),
   }
 
+  // ONE verdict, computed once, used by both output paths. The zero-gate test
+  // used to live below the --json return, so the same tree produced
+  // 'NOT EVALUATED, exit 1' in text and 'exit 0, every gate skip' in JSON.
+  const notEvaluated = failing.length === 0 && ranCount === 0
+  const exitCode = failing.length === 0 && !notEvaluated ? 0 : 1
+
   if (jsonOnly) {
     process.stdout.write(JSON.stringify(record, null, 2) + '\n')
-    process.exit(failing.length === 0 ? 0 : 1)
+    process.exit(exitCode)
   }
 
   const labels = { pass: 'PASS', fail: 'FAIL', skip: 'SKIP' }
@@ -1073,22 +1206,19 @@ function cmdCheck(targetPath, flags) {
     if (!ok || !quiet) console.log(`  ${(labels[v.status] || v.status).padEnd(6)} ${k}: ${v.reason}`)
   }
   if (!quiet) console.log('=========================================')
-  const ranCount = Object.values(gates).filter((s) => s !== 'skip').length
-  if (failing.length === 0 && ranCount === 0) {
+  if (notEvaluated) {
     // Nothing was examined. 'No failures' is true here and useless: it is the
     // same false green as an unparseable config, reached by a different route.
-    console.log('Governance NOT EVALUATED: 0 gate(s) ran. This is not a pass.')
-    process.exit(1)
-  }
-  if (failing.length === 0) {
-    if (!quiet) {
-      console.log(`Governance OK: ${ranCount} gate(s) ran, no failures.`)
-    }
+    console.log(`Governance NOT EVALUATED: 0 of ${CHECK_GATES.length} gate(s) ran. This is not a pass.`)
+  } else if (failing.length === 0) {
+    // Stated under --quiet too: a quiet run over an all-skipped tree printed
+    // zero bytes and exited 0, which in CI is an empty log under a green tick.
+    console.log(`Governance OK: ${ranCount} of ${CHECK_GATES.length} gate(s) ran, no failures.`)
   } else {
     console.log(`Governance FAILED: ${failing.map(([k]) => k).join(', ')}.`)
   }
 
-  process.exit(failing.length === 0 ? 0 : 1)
+  process.exit(exitCode)
 }
 
 // ---------------------------------------------------------------------------

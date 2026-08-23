@@ -590,12 +590,35 @@ is in sync across configured sites; and the workflow that runs the AAHP gate
 cannot skip it (`verify-workflow`, below). The record:
 
 ```json
-{ "schemaVersion": 1, "repo": "homeofe/AAHP", "aahpVersion": "3.6.0",
+{ "schemaVersion": 2, "repo": "homeofe/AAHP", "aahpVersion": "3.10.0",
   "gates": { "handoff-set": "pass", "manifest-schema": "pass", "grounding": "pass",
              "pinned-dep": "self", "changelog-format": "pass", "version-sync": "pass",
              "verify-workflow": "pass" },
+  "gateOutcomes": { "pinned-dep": { "outcome": "self", "reason": "this repo is @elvatis_com/aahp itself" } },
+  "evaluated": 7, "total": 7,
   "checkedAt": "2026-07-18T00:00:00Z" }
 ```
+
+`gateOutcomes` is abbreviated above; the real record carries one entry per gate.
+
+**Reading the summary line, and `schemaVersion` 2.** The human footer counts
+gates that RAN, not gates that exist: `Conformance OK: 5 of 7 gate(s) ran, no
+failures.` A run in which nothing was evaluated is a third outcome, not a pass:
+it prints `Conformance NOT EVALUATED: 0 of 7 gate(s) ran. This is not a pass.`
+and exits 1, on the text path, under `--quiet`, and under `--json` alike. Before
+version 2 the footer read `Conformance OK: 7 gate(s), no failures.` over seven
+skips and zero evaluations, and `--quiet` printed nothing at all.
+
+`schemaVersion` 2 adds three fields and changes none. `gates` is byte-for-byte
+what version 1 emitted, with the same keys and the same status tokens, so a
+reader that switches on `gates` needs no change. What is new is `gateOutcomes`
+(a refined `outcome` and the human `reason`, per gate), `evaluated` and `total`.
+The refinement matters because version 1's `skip` stood for four different
+states at once, so a repository that has adopted governance and one that has
+switched every gate off through `config.check` emitted identical records. The
+`outcome` values are `pass`, `fail`, `missing`, `self`, `not-applicable`,
+`deselected` and `unevaluated`. A reader asserting `schemaVersion === 1` must
+widen to `>= 1`; a reader that ignores unknown fields needs nothing.
 
 #### The `verify-workflow` gate: can the workflow that runs the gate skip it?
 
@@ -627,15 +650,43 @@ shape. The findings:
 | `ci-step-conditional` | no step runs the gate at `--level ci` unconditionally, so on some events the job succeeds having verified nothing |
 | `ci-step-soft-failing` | the gate runs unconditionally and its result is discarded |
 | `no-ci-level` | the gate never runs at `--level ci`, so `AAHP_SKIP_VERIFY=1` is honoured and a workflow-level `env:` can set it |
+| `govern-job-conditional` | the job hosting the GOVERNANCE gate carries an `if:`; when it is false the job is skipped having run no gate |
+| `govern-job-soft-failing` | that job sets `continue-on-error`, so it reports success when a governance gate fails |
+| `govern-step-conditional` | every step running `aahp check` (or every step running `aahp doctor`) carries an `if:`, so on some events the job succeeds having evaluated nothing |
+| `govern-step-soft-failing` | the governance gate runs unconditionally and its result is discarded |
 
-A repository whose workflows never run the gate reports `skip`: there is no CI
-backstop to weaken. A workflow that clearly hosts the gate but whose shape cannot
-be decided (the gate reached through a composite action, or a file that will not
-parse) reports `fail`, because undecided is not clean. Two shapes are deliberately
-NOT findings, because they fail closed rather than green: an `if:` on the checkout
-step alone (the gate then runs against an empty workspace and exits non-zero), and
-`paths:` filters that stop the workflow triggering (a required check that never
-reports leaves the pull request pending).
+**Both shipped workflows are audited.** ADR-016 splits them deliberately:
+`aahp-verify.yml` gates handoff state, `aahp-govern.yml` gates governance. The
+audit originally covered only the first, which left the wider blast radius
+uncovered: `aahp-govern.yml` is what `aahp init --gates` writes into an adopting
+repository, and a governance-only adopter has no `aahp-verify.yml` at all, so it
+is their entire CI backstop. Wrapping its `Run governance gates` step in
+`if: false` left `aahp doctor` reporting `SKIP: no workflow here runs the AAHP
+verify gate` and exiting 0.
+
+The governance findings are judged per SUBCOMMAND, not per job. `aahp check` and
+`aahp doctor` are different gates, and the shipped template runs both, so a
+per-job test ("some governance step is unconditional") reads a file whose
+`aahp check` step alone is wrapped as enforced. `npm run govern` is deliberately
+not recognised as a gate invocation: what that script expands to is not readable
+from the workflow, and a guess would be a finding this reader cannot support.
+
+A repository whose workflows never run either gate reports `skip`: there is no CI
+backstop to weaken. A repository that runs the governance gate unconditionally
+and no verify gate is a distinct verdict, `governance-only`, which exits 0 and
+whose pass reason says out loud that nothing there compares a handoff checksum,
+so a green line cannot be read as an integrity statement. A workflow that clearly
+hosts a gate but whose shape cannot be decided (the gate reached through a
+composite action, or a file that will not parse) reports `fail`, because undecided
+is not clean. Two shapes are deliberately NOT findings, because they fail closed
+rather than green: an `if:` on the checkout step alone (the gate then runs against
+an empty workspace and exits non-zero), and `paths:` filters that stop the
+workflow triggering (a required check that never reports leaves the pull request
+pending). One more is named rather than hidden: where `aahp verify` and
+`aahp doctor` run in the SAME job, that job's skippability is decided by the
+verify audit, so an `if:` on the record step alone (with the verify step
+unconditional) is not reported. The gate still runs all four layers there; only
+the record is lost.
 
 If a class of change genuinely does not need the handoff gate, put that exemption
 INSIDE the gate, keyed on the change, where it is visible and testable. Do not put
@@ -668,17 +719,14 @@ green line to imply integrity:
   PASS     handoff-set: 3 indexed files present, no strays (content not compared; aahp verify Layer 1 owns checksum integrity)
 ```
 
-That reason is emitted on one line, and only by the DEFAULT human-readable
-output. That is the limit of this wording, and it is deliberate:
-`aahp doctor --json` carries gate statuses and no reasons,
-`aahp doctor --quiet` prints nothing for a passing gate, and
-`aahp doctor --governance` marks the gate `skip` without evaluating it. Those
-three are the invocations wired into `.github/workflows/aahp-verify.yml`,
-`assets/governance/aahp-govern.yml` and `scripts/hooks/pre-push`, so a
-repository that treats the `schemaVersion: 1` record as its handoff-integrity
-signal reads exactly what it read before. Holding that record byte-identical is
-a compatibility choice for dashboards that already ingest it; changing it would
-be a `schemaVersion` decision.
+That reason is emitted on one line by the DEFAULT human-readable output, and
+from `schemaVersion` 2 it is in the record as well:
+`gateOutcomes["handoff-set"].reason` carries the same sentence, so a dashboard
+reads the limit rather than only a green token. `aahp doctor --quiet` still
+prints nothing for a passing gate, though it now always states the overall
+result, and `aahp doctor --governance` still marks the gate `skip` without
+evaluating it, distinguished in the record as `outcome: "unevaluated"` rather
+than as the same `skip` a gate with no inputs receives.
 
 One configuration deserves an explicit warning. When `verify-workflow` reports
 `skip`, meaning no workflow in the repository runs the AAHP verify gate, and the
@@ -696,21 +744,32 @@ and the `doctor` step never runs, so a green record cannot mask the drift.
 
 **`aahp check`** is the pass/fail counterpart to that record. Where `doctor` emits a
 conformance snapshot, `check` runs the config-driven governance gates as one aggregate
-and its exit code drives CI (0 only when no gate fails; a skipped gate never fails):
+and its exit code drives CI (0 only when no gate fails AND at least one gate ran;
+a skipped gate never fails):
 
 ```bash
 aahp check             # run every applicable gate; per-gate PASS/FAIL/SKIP plus a footer
-aahp check --json      # a { schemaVersion: 1, gates: { id: status } } record on stdout
-aahp check --quiet     # only failing gate lines plus the footer
+aahp check --json      # a { schemaVersion: 2, gates, gateOutcomes, evaluated, total } record
+aahp check --quiet     # only failing gate lines plus the footer, which is always printed
 ```
 
 Each gate is applicable only when its inputs exist (for example the `handoff` gate runs
 only when `.ai/handoff/MANIFEST.json` is present); otherwise it is reported `skip`, not
 run. `config.check.only` (a whitelist) and `config.check.skip` (a blacklist) narrow the
-set explicitly. The same governance-only stance is available from the record side:
+set explicitly, and the record tells the two kinds of skip apart:
+`outcome: "deselected"` for a gate the config switched off, `"not-applicable"`
+for one with nothing to check.
+
+A run in which NO gate ran is a third outcome, neither pass nor fail:
+`Governance NOT EVALUATED: 0 of 8 gate(s) ran. This is not a pass.`, exit 1. The
+text path, `--quiet` and `--json` all reach that same verdict on the same tree;
+until this was fixed `--json` returned above the test and exited 0 with every
+gate `skip`.
+
+The same governance-only stance is available from the record side:
 `aahp doctor --governance` (alias `--no-handoff`) forces the three handoff gates to
-`skip` without evaluating them, so a repo with no `.ai/handoff/` still emits a green
-conformance record; the default mode is unchanged.
+`skip` without evaluating them, so a repo with no `.ai/handoff/` still emits a
+conformance record over the remaining gates; the default mode is unchanged.
 
 **Config-driven gates.** These gates read an optional `aahp.config.json` at the
 project root and are a clean no-op when it (or the relevant section) is absent, so
@@ -955,9 +1014,12 @@ governance gates, emitting a single pass/fail run. It stays distinct from `aahp 
 
 ### ADR-012: doctor records conformance, check runs the gates
 **Why it recurs:** doctor and check both touch changelog-format and version-sync, so the
-overlap looks like duplication to trim. **Decision:** `aahp doctor` is a stable
-`schemaVersion: 1` conformance record for a fleet dashboard; `aahp check` is the pass/fail
-gate runner whose exit code drives CI. The shared gates are intentional, not redundant.
+overlap looks like duplication to trim. **Decision:** `aahp doctor` is a versioned
+conformance record for a fleet dashboard, currently `schemaVersion: 2`; `aahp check` is
+the pass/fail gate runner whose exit code drives CI. The shared gates are intentional,
+not redundant. Both commands agree on one thing the record must be able to say: a run in
+which no gate was evaluated is NOT EVALUATED, distinct from a pass and from a failure,
+and the same on every output path.
 
 ### ADR-013: git hooks resolve the vendored script first, then the local package by PATH
 **Why it recurs:** wiring a hook to one hard-coded path is the quick way. **Decision:**

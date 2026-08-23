@@ -1,3 +1,82 @@
+## Three verdicts nobody produced: a count, a record, and a register nobody read
+
+Three issues, one shape, and it is the shape the two entries below this one
+already named: a control that publishes a result it did not earn. The vocabulary
+is reused rather than reinvented - NOT EVALUATED and `unevaluated`, which this
+CLI already emitted for an invalid config.
+
+REPRODUCED FIRST, each against a positive control proving the harness was live.
+
+**doctor counted gates, not gates that ran.** On a fixture built exactly as an
+adopter would (`aahp init --gates` into an empty repository) it printed
+`Conformance OK: 7 gate(s), no failures.` over seven skips and zero evaluations,
+exit 0, and `--quiet` printed zero bytes and exited 0. Now
+`Conformance OK: N of 7 gate(s) ran`, and zero evaluated is
+`Conformance NOT EVALUATED: 0 of 7 gate(s) ran. This is not a pass.`, exit 1, on
+the text path, under `--quiet` and under `--json` alike.
+
+**The record collapsed four states into `skip`.** A repository that had adopted
+governance and one that had switched every gate off through `config.check`
+emitted byte-identical `gates` objects. `schemaVersion` is now 2: `gates` is
+UNCHANGED, and `gateOutcomes` (refined outcome plus the human reason, per gate),
+`evaluated` and `total` are added. Surveyed across the nine consuming
+repositories in this estate: none parses the record, every one runs
+`aahp doctor . --json` as a CI step and reads only the exit code, so the bump
+reaches no parser. The one breaking edge, a reader asserting
+`schemaVersion === 1`, is named in the CHANGELOG.
+
+**`aahp check --json` disagreed with `aahp check` about the same tree.** Measured
+on `origin/main` at `2cdaf48`: text `NOT EVALUATED, exit 1`, JSON `exit 0, every
+gate skip`, because the JSON branch returned above the zero-gate test. That was
+recorded here as STILL OPEN and read as a commitment about bare repositories.
+It is not: the commitment was made when the text path shipped, and the JSON path
+was simply left on the other side of a `return`. One verdict is now computed once
+and used by both.
+
+**The tamper gate did not look at the file with the widest blast radius.**
+`assets/governance/aahp-govern.yml` is what `aahp init --gates` writes into an
+adopting repository, and a governance-only adopter has no `aahp-verify.yml` at
+all. `if: false` on its `Run governance gates` step left doctor reporting
+`SKIP: no workflow here runs the AAHP verify gate`, exit 0. Now four
+`govern-*` findings, and a distinct `governance-only` verdict whose pass reason
+says out loud that nothing there compares a handoff checksum.
+FOUND WHILE FIXING, in the fix: the first draft tested skippability per JOB, and
+the shipped template runs `check` AND `doctor`, so wrapping only the gate step
+still read as enforced. The audit is per SUBCOMMAND for that reason, and the
+fixture that caught it is in the test set.
+
+**Layer 4 called a register clean that it never managed to read.**
+`aahp_trust_expired` prints nothing both when nothing is expired and when not one
+row was parsed. Measured across the nine consuming repositories: SIX have a
+`TRUST.md` in which this reader sees zero decidable rows, and in one the register
+is a real, populated `Verified Properties` table with an `Expires` column and no
+`Status` column, holding a row eight days past expiry, reported as clean. The new
+census separates "no trust table here" from "a table this reader cannot classify"
+from "N checked, none expired".
+
+**WHAT THIS DOES NOT COVER, and it is deliberate.**
+- Layer 4 is still ADVISORY. It increments no failure count and cannot fail a
+  build, whatever it finds. Making it fail is an OWNER DECISION and is named in
+  the pull request with the measurement that argues against doing it silently:
+  two consuming repositories hold registers with 24 of 25 and 20 of 21 verified
+  rows already expired, so a blocking Layer 4 turns them red on their next commit
+  for a file none of their pull requests touch.
+- Layer 3 has the same all-warnings shape and is untouched here.
+- Where `aahp verify` and `aahp doctor` run in the SAME job, an `if:` on the
+  doctor step alone is still not a finding. The gate runs all four layers there;
+  only the record is lost. Flagging it would fire on the legitimate
+  `if: github.event_name == 'pull_request'`, and a false positive is what gets a
+  gate switched off.
+- The expired rows in this repository's own register are re-dated only where
+  something was actually re-run on Linux this session; the rest are downgraded to
+  `assumed` rather than given a date nobody earned.
+- No consumer repository is changed. Six of the nine report `bypassable` against
+  their own `aahp-verify.yml` and only the owning repositories can fix that.
+
+MEASURED AGAINST REAL CONSUMERS, at their `origin/main` rather than a local
+working copy: the `verify-workflow` verdict and exit code are identical for all
+nine before and after, and `doctor`/`check` exit codes are identical for all nine.
+
 ## The class test could not detect its own class, and the README described a workflow that changed
 
 The test "every *_SUFFIX= rule in the shipped template has an enforced

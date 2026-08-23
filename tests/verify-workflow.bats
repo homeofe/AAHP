@@ -188,12 +188,148 @@ install_workflow() {
 }
 
 @test "doctor: a repo with no workflows skips the gate rather than failing it" {
+    # RE-GROUNDED, not relaxed. The subject is the gate STATUS: absence of a
+    # workflow is `skip` ("there is nothing here to weaken"), never `fail`. The
+    # exit code used to be 0 and is now 1, because this fixture is also a
+    # repository in which doctor evaluates ZERO gates, and zero evaluated is NOT
+    # EVALUATED. Both halves are asserted so neither can drift unnoticed.
     run node "$AAHP" doctor "$TEST_TMPDIR" --governance --json
-    [ "$status" -eq 0 ]
+    [ "$status" -eq 1 ]
     [[ "$output" == *'"verify-workflow": "skip"'* ]]
+    [[ "$output" != *'"verify-workflow": "fail"'* ]]
+    [[ "$output" == *'"evaluated": 0'* ]]
 }
 
 @test "doctor: AAHP's own workflow passes its own gate (dogfood)" {
     run node "$AAHP" doctor "$AAHP_ROOT" --json
     [[ "$output" == *'"verify-workflow": "pass"'* ]]
+}
+
+# ─── the governance workflow, which this gate used to skip entirely ──────────
+#
+# assets/governance/aahp-govern.yml is what `aahp init --gates` writes into an
+# adopting repository, and a governance-only adopter has no aahp-verify.yml at
+# all, so it is their whole CI backstop. Before these tests the audit did not
+# look at it: `if: false` on its gate step left `aahp doctor` reporting
+# `SKIP verify-workflow: no workflow here runs the AAHP verify gate`, exit 0.
+
+install_govern_workflow() {
+    mkdir -p "$TEST_TMPDIR/.github/workflows"
+    cp "$FIXTURES/$1" "$TEST_TMPDIR/.github/workflows/aahp-govern.yml"
+}
+
+@test "govern: the scaffolded governance workflow is recognised, exit 0" {
+    install_govern_workflow govern-enforced.yml
+    run node "$GATE" "$TEST_TMPDIR" --json
+    [ "$status" -eq 0 ]
+    [[ "$output" == *'"verdict": "governance-only"'* ]]
+    [[ "$output" == *'"job": "govern"'* ]]
+}
+
+@test "govern: governance-only is NOT reported as enforced" {
+    # The two verdicts answer different questions. `enforced` means the verify
+    # gate runs at --level ci, which is the only thing that compares a handoff
+    # checksum. Collapsing them would let a repository with no handoff integrity
+    # checking anywhere emit the same token as one that has it.
+    install_govern_workflow govern-enforced.yml
+    run node "$GATE" "$TEST_TMPDIR"
+    [ "$status" -eq 0 ]
+    [[ "$output" != *"unconditionally at --level ci"* ]]
+    [[ "$output" == *"nothing in this repository compares a handoff checksum"* ]]
+}
+
+@test "govern: an if: on the step that runs aahp check is reported, exit 1" {
+    # The finding from the issue. The record step below it is unconditional, so
+    # a per-JOB test reads this file as enforced; the audit is per subcommand.
+    install_govern_workflow govern-bypass-step-conditional.yml
+    run node "$GATE" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"govern-step-conditional"* ]]
+    [[ "$output" == *'aahp check'* ]]
+}
+
+@test "govern: a job-level if: over the governance job is reported, exit 1" {
+    install_govern_workflow govern-bypass-job-conditional.yml
+    run node "$GATE" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"govern-job-conditional"* ]]
+}
+
+@test "govern: continue-on-error on the governance gate step is reported, exit 1" {
+    install_govern_workflow govern-bypass-soft-failing.yml
+    run node "$GATE" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"govern-step-soft-failing"* ]]
+}
+
+@test "govern: an explicit continue-on-error: false is not itself a finding" {
+    # govern-bypass-soft-failing.yml sets it on the record step. Exactly one
+    # finding must come out of that file, and it must be about the gate step.
+    install_govern_workflow govern-bypass-soft-failing.yml
+    run node "$GATE" "$TEST_TMPDIR" --json
+    [ "$status" -eq 1 ]
+    # Exactly ONE finding out of that file, and it is the one about the gate
+    # step. Two would mean the explicit `false` on the record step was read as a
+    # bypass, which is the false positive this asserts against.
+    [ "$(printf '%s\n' "$output" | grep -c '"id":')" -eq 1 ]
+    [ "$(printf '%s\n' "$output" | grep -c 'govern-step-soft-failing')" -eq 1 ]
+}
+
+@test "govern: the SHIPPED assets/governance/aahp-govern.yml passes its own gate" {
+    # Dogfood on the real file, not on a copy of it: this is the document with
+    # the widest blast radius in the package, and a fixture cannot prove the
+    # shipped bytes are clean.
+    mkdir -p "$TEST_TMPDIR/.github/workflows"
+    cp "$AAHP_ROOT/assets/governance/aahp-govern.yml" "$TEST_TMPDIR/.github/workflows/aahp-govern.yml"
+    run node "$GATE" "$TEST_TMPDIR" --json
+    [ "$status" -eq 0 ]
+    [[ "$output" == *'"verdict": "governance-only"'* ]]
+}
+
+@test "govern: doctor FAILS the record when the governance gate can be skipped" {
+    install_govern_workflow govern-bypass-step-conditional.yml
+    run node "$AAHP" doctor "$TEST_TMPDIR" --governance
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Conformance FAILED"* ]]
+    [[ "$output" == *"verify-workflow"* ]]
+}
+
+@test "govern: doctor's pass line says no handoff checksum is compared" {
+    # A green `verify-workflow` line in a governance-only repository must not be
+    # readable as a handoff-integrity statement. Nothing there hashes a file.
+    install_govern_workflow govern-enforced.yml
+    run node "$AAHP" doctor "$TEST_TMPDIR" --governance
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"PASS"* ]]
+    [[ "$output" == *"no handoff checksum is compared"* ]]
+}
+
+@test "govern: a workflow named as the governance one that this reader cannot follow is undecidable" {
+    mkdir -p "$TEST_TMPDIR/.github/workflows"
+    printf 'name: AAHP Govern\non:\n  pull_request:\njobs:\n  govern:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: ./.github/actions/run-governance\n' \
+        > "$TEST_TMPDIR/.github/workflows/aahp-govern.yml"
+    run node "$GATE" "$TEST_TMPDIR"
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"UNDECIDED"* ]]
+}
+
+@test "govern: a verify workflow alongside a clean governance one stays enforced" {
+    # Adopting both must not degrade the stronger verdict.
+    install_workflow enforced-canonical.yml
+    install_govern_workflow govern-enforced.yml
+    run node "$GATE" "$TEST_TMPDIR" --json
+    [ "$status" -eq 0 ]
+    [[ "$output" == *'"verdict": "enforced"'* ]]
+}
+
+@test "govern: npm run govern is deliberately NOT treated as a gate invocation" {
+    # What the script expands to is not readable from the workflow. Guessing
+    # would be a finding this reader cannot support, and a false positive here
+    # is what gets the whole gate switched off.
+    mkdir -p "$TEST_TMPDIR/.github/workflows"
+    printf 'name: CI\non:\n  pull_request:\njobs:\n  build:\n    if: false\n    runs-on: ubuntu-latest\n    steps:\n      - run: npm run govern\n' \
+        > "$TEST_TMPDIR/.github/workflows/ci.yml"
+    run node "$GATE" "$TEST_TMPDIR"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"SKIP"* ]]
 }

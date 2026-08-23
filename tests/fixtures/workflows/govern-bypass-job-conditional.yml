@@ -1,0 +1,25 @@
+# A job-level `if:` over the whole governance job. On the events where the
+# actor is a bot the job is skipped, the check reports success or is treated as
+# satisfied, and no governance gate ran at all. This is the same shape that
+# shipped in the verify workflow in v3.6.0 and propagated to consumers.
+name: AAHP Govern
+
+permissions:
+  contents: read
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  govern:
+    if: github.actor != 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Run governance gates
+        run: npx aahp check .
+      - name: Governance conformance record
+        run: npx aahp doctor --governance --json .

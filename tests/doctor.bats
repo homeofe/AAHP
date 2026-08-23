@@ -58,11 +58,97 @@ EOF
       let s = "";
       process.stdin.on("data", (d) => (s += d)).on("end", () => {
         const r = JSON.parse(s);
-        if (r.schemaVersion !== 1) process.exit(2);
+        if (r.schemaVersion !== 2) process.exit(2);
         const keys = ["handoff-set","manifest-schema","grounding","pinned-dep","changelog-format","version-sync","verify-workflow"];
         for (const k of keys) if (!(k in r.gates)) process.exit(3);
         if (typeof r.checkedAt !== "string") process.exit(4);
         if (typeof r.aahpVersion !== "string") process.exit(5);
+        // schemaVersion 2 additions. `gates` above is unchanged from 1.
+        for (const k of keys) {
+          if (!(k in r.gateOutcomes)) process.exit(6);
+          if (typeof r.gateOutcomes[k].outcome !== "string") process.exit(7);
+          if (typeof r.gateOutcomes[k].reason !== "string") process.exit(8);
+        }
+        if (typeof r.evaluated !== "number") process.exit(9);
+        if (r.total !== keys.length) process.exit(10);
+      });
+    '
+}
+
+# --- the summary counts gates that RAN, not gates that exist ------------------
+#
+# `Conformance OK: 7 gate(s), no failures.` was printed over seven skips and
+# zero evaluations. README positions that line, and the record beside it, as the
+# conformance evidence a fleet dashboard and a consumer's own pull request read.
+
+@test "doctor: a tree where every gate skips reports NOT EVALUATED, never a count" {
+    # Nothing here for any gate: no config, no CHANGELOG, no workflows, no
+    # .ai/handoff. The old build printed 'Conformance OK: 7 gate(s)' and exit 0.
+    rm -rf "$TEST_TMPDIR/.ai"
+    printf '{"name":"empty","version":"1.0.0","private":true}\n' > "$TEST_TMPDIR/package.json"
+    run node "$AAHP" doctor "$TEST_TMPDIR" --governance
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Conformance NOT EVALUATED: 0 of 7 gate(s) ran. This is not a pass."* ]]
+    [[ "$output" != *"Conformance OK"* ]]
+}
+
+@test "doctor: the OK summary names how many gates ran, not how many exist" {
+    scaffold_conformant
+    run node "$AAHP" doctor "$TEST_TMPDIR"
+    [ "$status" -eq 0 ]
+    # 5 of 7 here: changelog-format and version-sync have nothing to check.
+    [[ "$output" == *"Conformance OK: 5 of 7 gate(s) ran, no failures."* ]]
+    [[ "$output" != *"Conformance OK: 7 gate(s)"* ]]
+}
+
+@test "doctor --json: zero evaluated exits 1, the same verdict as the text path" {
+    # The two paths must not disagree about one tree. --json is the one CI and a
+    # dashboard consume, so it is the wrong half to leave green.
+    rm -rf "$TEST_TMPDIR/.ai"
+    printf '{"name":"empty","version":"1.0.0","private":true}\n' > "$TEST_TMPDIR/package.json"
+    run node "$AAHP" doctor "$TEST_TMPDIR" --governance --json
+    [ "$status" -eq 1 ]
+    [[ "$output" == *'"evaluated": 0'* ]]
+}
+
+@test "doctor --quiet: an all-skipped tree still states the result, never zero bytes" {
+    # A quiet CI run that printed nothing and exited 0 is an empty log under a
+    # green tick, which is the shape of the whole defect.
+    rm -rf "$TEST_TMPDIR/.ai"
+    printf '{"name":"empty","version":"1.0.0","private":true}\n' > "$TEST_TMPDIR/package.json"
+    run node "$AAHP" doctor "$TEST_TMPDIR" --governance --quiet
+    [ "$status" -eq 1 ]
+    [ -n "$output" ]
+    [[ "$output" == *"NOT EVALUATED"* ]]
+}
+
+@test "doctor --quiet: a passing run states the result too" {
+    scaffold_conformant
+    run node "$AAHP" doctor "$TEST_TMPDIR" --quiet
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Conformance OK: 5 of 7 gate(s) ran, no failures."* ]]
+}
+
+@test "doctor --json: the record separates governance-mode skips from not-applicable" {
+    # The defect: `gates` said `skip` for both, so a dashboard could not tell a
+    # gate that was DECLINED from one whose precondition was absent.
+    scaffold_conformant
+    rm -rf "$TEST_TMPDIR/.ai"
+    run node "$AAHP" doctor "$TEST_TMPDIR" --governance --json
+    [ "$status" -eq 0 ]
+    echo "$output" | node -e '
+      let s = "";
+      process.stdin.on("data", (d) => (s += d)).on("end", () => {
+        const r = JSON.parse(s);
+        // Unchanged from schemaVersion 1: both are still `skip` in `gates`.
+        for (const k of ["handoff-set", "changelog-format"]) {
+          if (r.gates[k] !== "skip") process.exit(2);
+        }
+        // New in 2: they are no longer the same token.
+        if (r.gateOutcomes["handoff-set"].outcome !== "unevaluated") process.exit(3);
+        if (r.gateOutcomes["changelog-format"].outcome !== "not-applicable") process.exit(4);
+        if (r.gateOutcomes["handoff-set"].outcome === r.gateOutcomes["changelog-format"].outcome) process.exit(5);
+        if (r.evaluated !== 1) process.exit(6);
       });
     '
 }

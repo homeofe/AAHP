@@ -448,6 +448,76 @@ aahp_trust_expired() {
     ' "$trust_file"
 }
 
+# Census of what the TTL reader above could actually READ in a TRUST.md.
+# Echoes two integers on one line: "<decidable> <candidate>".
+#
+#   decidable - rows that reached the expiry comparison: the row sits in a table
+#               with both a Status and an Expires header column, its Status cell
+#               says `verified`, and its Expires cell is a YYYY-MM-DD date.
+#               This is the DENOMINATOR of aahp_trust_expired.
+#   candidate - data rows in any table that names a Status OR an Expires column.
+#               A register this reader cannot classify still lands here.
+#
+# WHY THIS EXISTS. aahp_trust_expired prints nothing in two completely different
+# situations: no verified row is expired, and no verified row was READ AT ALL.
+# Its caller could not tell them apart, so it reported "No expired 'verified'
+# trust entries." for a register it never managed to parse - a control
+# announcing a clean result over a file it did not read.
+#
+# This is not hypothetical and not a Windows artefact. Measured 2026-08-23
+# across the nine consuming repositories in this estate: SIX have a TRUST.md in
+# which this reader sees zero decidable rows. In one of them the register is a
+# real, populated `Verified Properties` table whose header is
+# `| Property | Value | Verified | TTL | Expires | Provenance |` - an Expires
+# column and no Status column, because the section heading carries the status.
+# Every row is skipped for want of status_col, one of them was 8 days past its
+# expiry on the day this was measured, and Layer 4 called the register clean.
+#
+# Splitting `candidate` from `decidable` is what turns that into a report a
+# reader can act on: candidate == 0 means there is no trust table here at all,
+# while candidate > 0 with decidable == 0 means there IS one and this reader
+# could not classify a single row of it. Those need different answers, and
+# neither of them is "no expired entries".
+aahp_trust_census() {
+    local trust_file="$1"
+    [ -f "$trust_file" ] || { echo "0 0"; return 0; }
+
+    awk '
+        function trim(s) { gsub(/^[ \t]+|[ \t]+$/, "", s); return s }
+        BEGIN { decidable = 0; candidate = 0 }
+        /^[ \t]*\|/ {
+            n = split($0, cell, "|")
+            for (i = 1; i <= n; i++) cell[i] = trim(cell[i])
+
+            sep = 1
+            for (i = 2; i < n; i++) {
+                if (cell[i] != "" && cell[i] !~ /^:?-+:?$/) { sep = 0; break }
+            }
+            if (sep) next
+
+            is_header = 0
+            for (i = 2; i < n; i++) {
+                lc = tolower(cell[i])
+                if (lc == "status")  { status_col = i; is_header = 1 }
+                if (lc == "expires") { expires_col = i; is_header = 1 }
+            }
+            if (is_header) next
+
+            # A data row under a header that named either column is a row this
+            # register meant to be read, whether or not it can be decided.
+            if (status_col == 0 && expires_col == 0) next
+            candidate++
+
+            if (status_col == 0 || expires_col == 0) next
+            if (tolower(cell[status_col]) != "verified") next
+            if (cell[expires_col] !~ /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/) next
+            decidable++
+        }
+        /^[ \t]*$/ { status_col = 0; expires_col = 0 }
+        END { print decidable + 0, candidate + 0 }
+    ' "$trust_file"
+}
+
 # Generate a JSON file entry block for MANIFEST.json
 # Outputs raw JSON (no trailing comma -caller handles commas)
 aahp_file_entry_json() {

@@ -486,18 +486,24 @@ set_job_if() {
     [[ "$output" == *"has not recorded: github.ref == 'refs/heads/main'"* ]]
 }
 
-@test "release authorization: removing a recorded operand is red until the record is updated" {
-    # Tightening the condition is not a defect, but leaving the record claiming a
-    # permission the workflow no longer grants is. Adopting that option is a
-    # two-line edit the failure message names.
-    copy_repo_shape
-    set_job_if publish "    if: startsWith(github.ref, 'refs/tags/v') && contains(github.ref, '.')"
 
-    run node "$AAHP_ROOT/tests/assert-repo-ci-shape.mjs" "$TEST_TMPDIR"
-    [ "$status" -eq 1 ]
-    [[ "$output" == *"no longer carries a recorded condition: github.event_name == 'workflow_dispatch'"* ]]
-}
-
+# --- two tests retired here on purpose, and what brings them back ------------
+#
+# `release authorization: removing a recorded operand is red until the record is
+# updated` and `publish record: writing (none) while the code records an operand
+# is red` both required PUBLISH_CONDITIONS_BEYOND_RELEASE to be NON-empty: each
+# asserted that dropping a recorded operand from one of the two records is caught.
+#
+# ADR-019 was settled as option A, so that list is now `[]` and the ADR block reads
+# `(none)`. The list is a constant inside the assertion under test, so no fixture
+# can make it non-empty, and neither scenario can be built.
+#
+# The `recordedButGone` branch they covered is UNCHANGED and still runs on every
+# invocation. It has nothing to find while the record is empty. The first commit
+# that records an operand again makes both tests constructible, and they should
+# come back in that commit. They are removed rather than left red, and named here
+# rather than deleted silently, because a test that cannot fail is not coverage and
+# a deletion nobody can find is not a decision.
 @test "release authorization: an AND-shaped publish condition is red, not silently accepted" {
     # Requiring a tag ref on the dispatch path too is one of the options open in
     # ADR-019. It is a policy change, so it must be recorded rather than absorbed.
@@ -515,7 +521,12 @@ set_job_if() {
     # they must stay green, or the gate would be a formatting rule wearing a
     # security rule's clothes.
     copy_repo_shape
-    set_job_if publish "    if: ((  startsWith(github.ref, 'refs/tags/v')   &&   contains(github.ref, '.')  ))   ||   github.event_name == 'workflow_dispatch'"
+    # Reformats the RELEASE definition itself. It used to reformat a condition
+    # carrying the dispatch operand, which was green while that operand was
+    # recorded; with option A adopted it would now be an unrecorded permission, so
+    # the expectation would be wrong for a reason that has nothing to do with
+    # formatting. The property under test is unchanged.
+    set_job_if publish "    if: ((  startsWith(github.ref, 'refs/tags/v')   &&   contains(github.ref, '.')  ))"
 
     run node "$AAHP_ROOT/tests/assert-repo-ci-shape.mjs" "$TEST_TMPDIR"
     [ "$status" -eq 0 ]
@@ -602,7 +613,7 @@ copy_repo_shape_with_readme() {
 @test "publish record: documenting an operand the code does not record is red" {
     copy_repo_shape_with_readme
     replace_line "$TEST_TMPDIR/README.md" \
-        "github.event_name == 'workflow_dispatch'" \
+        "(none)" \
         "github.actor == 'some-bot'"
 
     run node "$AAHP_ROOT/tests/assert-repo-ci-shape.mjs" "$TEST_TMPDIR"
@@ -615,23 +626,13 @@ copy_repo_shape_with_readme() {
     # Deleting the last line of the block is the edit that would otherwise read as
     # "there are no extra operands", which is the opposite of what ci.yml says.
     copy_repo_shape_with_readme
-    drop_line "$TEST_TMPDIR/README.md" "github.event_name == 'workflow_dispatch'"
+    drop_line "$TEST_TMPDIR/README.md" "(none)"
 
     run node "$AAHP_ROOT/tests/assert-repo-ci-shape.mjs" "$TEST_TMPDIR"
     [ "$status" -eq 1 ]
     [[ "$output" == *"recorded-operands block in ADR-019 is empty"* ]]
 }
 
-@test "publish record: writing (none) while the code records an operand is red" {
-    copy_repo_shape_with_readme
-    replace_line "$TEST_TMPDIR/README.md" \
-        "github.event_name == 'workflow_dispatch'" \
-        "(none)"
-
-    run node "$AAHP_ROOT/tests/assert-repo-ci-shape.mjs" "$TEST_TMPDIR"
-    [ "$status" -eq 1 ]
-    [[ "$output" == *"ADR-019 does not document"* ]]
-}
 
 @test "publish record: deleting the marker line is red" {
     # The single line a reviewer deletes to disarm section 5. Named here and

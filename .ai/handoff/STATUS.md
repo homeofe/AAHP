@@ -1,5 +1,20 @@
 ## Two jobs in one file disagreed about what a release is, and npm got the looser answer
 
+**CI found five tests this change had invalidated.** They copy this repository’s own shape and
+mutate it, so emptying the recorded operand list changed what each mutation meant.
+Three are re-aimed and keep their claims: the reformatting test now reformats the
+RELEASE definition rather than a condition carrying the operand, and the two ADR
+mutations target the `(none)` line the block now holds. Two are retired, because both
+need `PUBLISH_CONDITIONS_BEYOND_RELEASE` to be non-empty and it is a constant inside
+the assertion under test, so no fixture can construct them. The `recordedButGone`
+branch they covered still runs and simply has nothing to find; the first commit that
+records an operand again makes both constructible. That is written into the test file
+rather than left as a silent deletion.
+
+The local gates all passed before this was pushed, which is exactly why it was not
+enough: `bats` is not installed on the machine the work was done on, so the suite
+that owns this behaviour never ran until CI. It runs on the Linux host now, before the
+push rather than after it.
 **A second lesson from the same merge.** Syncing this branch after another merge produced conflicts in
 MANIFEST.json AND CHANGELOG.md. Staging with `git add -A` committed the CHANGELOG
 markers, `git commit` exited 0, and `aahp verify` passed, because

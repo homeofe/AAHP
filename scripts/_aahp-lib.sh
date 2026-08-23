@@ -395,6 +395,98 @@ for index, entry in enumerate(entries):
 ' "$config" || return 1
 }
 
+# Read trustTtl.enforce from aahp.config.json. Echoes "1" or "0".
+#
+# Opt-in, on the same pattern as pinnedDep: absent config, absent section, or
+# enforce:false all mean 0, so a repository that has never heard of this setting
+# keeps the advisory behaviour it has always had.
+#
+# Fails closed on a config it cannot read. A required CI gate must not silently
+# fall back to "not enforcing" because the policy file is broken, since that
+# turns a malformed config into a way to switch the gate off.
+#
+# DUPLICATE KEYS. Every JSON parser here keeps the LAST duplicate object key, so
+# a reviewer reading `"enforce": true` near the top can be looking at a file
+# whose effective value is a `false` further down. The raw-text guard below
+# refuses a config that mentions either key more than once. It is deliberately
+# blunt: it counts the key name anywhere in the file, including inside a string
+# value, and would reject a legitimate config that merely talks about itself.
+# Rejecting a readable config is a visible, fixable failure; accepting a value
+# the reviewer never saw is not.
+#
+# Exit codes:
+#   0 = value determined (echoed)
+#   1 = config unreadable, malformed, or ambiguous
+#   2 = no JSON interpreter available (neither node nor python)
+aahp_trust_enforce() {
+    local config="$1"
+    if [ ! -e "$config" ] && [ ! -L "$config" ]; then
+        echo "0"
+        return 0
+    fi
+    if [ ! -f "$config" ] || [ ! -r "$config" ]; then
+        echo "aahp.config.json is not a readable regular file" >&2
+        return 1
+    fi
+
+    local mentions
+    mentions=$(grep -c '"trustTtl"' "$config" 2>/dev/null || true)
+    if [ "${mentions:-0}" -gt 1 ]; then
+        echo "aahp.config.json mentions \"trustTtl\" $mentions times; a duplicate key would be resolved silently" >&2
+        return 1
+    fi
+    mentions=$(grep -c '"enforce"' "$config" 2>/dev/null || true)
+    if [ "${mentions:-0}" -gt 1 ]; then
+        echo "aahp.config.json mentions \"enforce\" $mentions times; a duplicate key would be resolved silently" >&2
+        return 1
+    fi
+
+    local py
+    if command -v node &>/dev/null; then
+        # shellcheck disable=SC2016
+        node -e '
+            const fs = require("fs");
+            const cfg = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+            const section = cfg.trustTtl;
+            if (section === undefined) { process.stdout.write("0\n"); process.exit(0); }
+            if (section === null || typeof section !== "object" || Array.isArray(section)) {
+                console.error("aahp.config.json: trustTtl must be an object");
+                process.exit(1);
+            }
+            const value = section.enforce;
+            if (value !== undefined && typeof value !== "boolean") {
+                console.error("aahp.config.json: trustTtl.enforce must be true or false");
+                process.exit(1);
+            }
+            process.stdout.write((value === true ? "1" : "0") + "\n");
+        ' "$config" || return 1
+        return 0
+    fi
+
+    py=$(aahp_python_cmd)
+    if [ -z "$py" ]; then
+        echo "no JSON interpreter available (neither node nor python)" >&2
+        return 2
+    fi
+    "$py" -c '
+import json, sys
+with open(sys.argv[1], encoding="utf-8") as handle:
+    cfg = json.load(handle)
+section = cfg.get("trustTtl")
+if section is None:
+    print("0")
+    raise SystemExit(0)
+if not isinstance(section, dict):
+    sys.stderr.write("aahp.config.json: trustTtl must be an object\n")
+    raise SystemExit(1)
+value = section.get("enforce")
+if value is not None and not isinstance(value, bool):
+    sys.stderr.write("aahp.config.json: trustTtl.enforce must be true or false\n")
+    raise SystemExit(1)
+print("1" if value is True else "0")
+' "$config" || return 1
+}
+
 # Report expired "verified" trust rows from a TRUST.md file.
 # Trust tables are Markdown with a header row that includes "Status" and
 # "Expires" columns. We locate those columns from the header, then for each

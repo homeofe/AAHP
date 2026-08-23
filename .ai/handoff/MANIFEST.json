@@ -4,17 +4,17 @@
   "last_session": {
     "agent": "cli-tool",
     "session_id": "cli-1787489585",
-    "timestamp": "2026-08-23T15:23:48Z",
+    "timestamp": "2026-08-23T15:10:13Z",
     "commit": "87fa56e",
     "phase": "fix",
     "duration_minutes": 0
   },
   "files": {
     "STATUS.md": {
-      "checksum": "sha256:6b6646f93105ebc229594148827b4b484b4beea5ebd4e14ef90d3e7211fc9601",
-      "updated": "2026-08-23T15:23:48Z",
-      "lines": 880,
-      "summary": "`publish` runs `npm publish --access public --provenance` with `id-token: write`."
+      "checksum": "sha256:fffc280899c643b5d56d3707e06f639c9f41b96d29b985d557ea084c39667d7c",
+      "updated": "2026-08-23T15:15:12Z",
+      "lines": 950,
+      "summary": "Layer 4 reads the trust register, finds expired `verified` rows and prints them."
     },
     "NEXT_ACTIONS.md": {
       "checksum": "sha256:efdc6ef8664faf9ce5120fa797b702d2353bd4c3205c62e5ba651a465326103d",

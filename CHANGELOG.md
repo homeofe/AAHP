@@ -11,6 +11,7 @@ independently of the npm version).
 
 ## [Unreleased]
 
+<<<<<<< HEAD
 ### Removed
 - **The publish job no longer accepts a manual dispatch from an arbitrary ref.**
   `publish` runs `npm publish --access public --provenance` with `id-token: write`,
@@ -22,6 +23,19 @@ independently of the npm version).
   selecting a version tag still satisfies the condition and a failed publish can still
   be re-run by hand. Measured first: 206 runs of the workflow, zero manual dispatches.
   See ADR-019.
+=======
+### Added
+- **`trustTtl.enforce` gives verify Layer 4 a failing branch, per repository.**
+  Nothing in Layer 4 incremented `FAILURES`, so no number of expired `verified` trust
+  rows could change the exit code, and 8 of this repository's own 10 verified rows sat
+  expired, one by 16 days, with every gate green. Trust Decay is the mechanism by which
+  a claim stops counting as verified and it could not stop anything. Absent or false,
+  behaviour is unchanged: expired rows warn and the run passes. True, and they fail it,
+  as does a register this reader cannot classify, so the gate cannot be disabled by
+  breaking the table rather than editing the config. Opt-in because blocking everywhere
+  was measured as the wrong trade: two of the nine consuming repositories hold registers
+  with 24 of 25 and 20 of 21 rows already expired. See ADR-024.
+>>>>>>> origin/main
 
 ### Changed
 - **`aahp doctor`'s conformance record moves to `schemaVersion: 2`, and its summary

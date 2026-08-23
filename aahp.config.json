@@ -28,31 +28,63 @@
     {
       "id": "task-status-enum",
       "sources": [
-        { "file": "schema/aahp-manifest.schema.json", "pattern": "\"(ready|in_progress|blocked|done|cancelled)\"" },
-        { "file": "README.md", "pattern": "`(ready|in_progress|blocked|done|cancelled)`" }
+        {
+          "file": "schema/aahp-manifest.schema.json",
+          "pattern": "\"(ready|in_progress|blocked|done|cancelled)\""
+        },
+        {
+          "file": "README.md",
+          "pattern": "`(ready|in_progress|blocked|done|cancelled)`"
+        }
       ]
     },
     {
       "id": "phase-enum",
       "sources": [
-        { "file": "schema/aahp-manifest.schema.json", "pattern": "\"(research|architecture|implementation|review|fix|idle|documentation)\"" },
-        { "file": "scripts/aahp-manifest.sh", "pattern": "(research|architecture|implementation|review|fix|idle|documentation)" }
+        {
+          "file": "schema/aahp-manifest.schema.json",
+          "pattern": "\"(research|architecture|implementation|review|fix|idle|documentation)\""
+        },
+        {
+          "file": "scripts/aahp-manifest.sh",
+          "pattern": "(research|architecture|implementation|review|fix|idle|documentation)"
+        }
       ]
     },
     {
       "id": "provenance-block",
       "sources": [
-        { "file": "README.md", "pattern": "> \\*\\*(Agent|Session ID|Timestamp|Commit before|Commit after):\\*\\*" },
-        { "file": "templates/LOG.md", "pattern": "> \\*\\*(Agent|Session ID|Timestamp|Commit before|Commit after):\\*\\*" },
-        { "file": "templates/STATUS.md", "pattern": "> \\*\\*(Agent|Session ID|Timestamp|Commit before|Commit after):\\*\\*" }
+        {
+          "file": "README.md",
+          "pattern": "> \\*\\*(Agent|Session ID|Timestamp|Commit before|Commit after):\\*\\*"
+        },
+        {
+          "file": "templates/LOG.md",
+          "pattern": "> \\*\\*(Agent|Session ID|Timestamp|Commit before|Commit after):\\*\\*"
+        },
+        {
+          "file": "templates/STATUS.md",
+          "pattern": "> \\*\\*(Agent|Session ID|Timestamp|Commit before|Commit after):\\*\\*"
+        }
       ]
     }
   ],
   "docLinks": {
-    "include": ["README.md", "CLAUDE.md", "CONTRIBUTING.md", "CONSTITUTION.md", ".ai/handoff/*.md"]
+    "include": [
+      "README.md",
+      "CLAUDE.md",
+      "CONTRIBUTING.md",
+      "CONSTITUTION.md",
+      ".ai/handoff/*.md"
+    ]
   },
   "docPaths": {
-    "include": ["README.md", "CLAUDE.md", "CONTRIBUTING.md", "CONSTITUTION.md"],
+    "include": [
+      "README.md",
+      "CLAUDE.md",
+      "CONTRIBUTING.md",
+      "CONSTITUTION.md"
+    ],
     "adopterPaths": [
       {
         "path": ".github/workflows/aahp-govern.yml",
@@ -81,7 +113,12 @@
     ]
   },
   "acceptanceCriteria": {
-    "include": [".ai/handoff/NEXT_ACTIONS.md"],
+    "include": [
+      ".ai/handoff/NEXT_ACTIONS.md"
+    ],
     "manifest": ".ai/handoff/MANIFEST.json"
+  },
+  "trustTtl": {
+    "enforce": true
   }
 }

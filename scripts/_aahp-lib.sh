@@ -435,9 +435,18 @@ aahp_trust_enforce() {
         echo "aahp.config.json mentions \"trustTtl\" $mentions times; a duplicate key would be resolved silently" >&2
         return 1
     fi
-    mentions=$(grep -c '"enforce"' "$config" 2>/dev/null || true)
+    # Scoped to the trustTtl object, not the whole file. This counted "enforce"
+    # everywhere, which was fine while trustTtl.enforce was the only such key and
+    # wrong the moment verifyWorkflow.enforce was added: two legitimate keys with
+    # different parents were read as one duplicated key, and the pre-push hook
+    # refused a valid config. A guard that rejects valid configuration gets deleted
+    # wholesale, and the risk it covered returns with it.
+    #
+    # The section name stays counted whole-file above, because two trustTtl objects
+    # is precisely the shape that hides a value from its reviewer.
+    mentions=$(sed -n '/"trustTtl"/,/}/p' "$config" 2>/dev/null | grep -c '"enforce"' || true)
     if [ "${mentions:-0}" -gt 1 ]; then
-        echo "aahp.config.json mentions \"enforce\" $mentions times; a duplicate key would be resolved silently" >&2
+        echo "aahp.config.json mentions \"enforce\" $mentions times inside trustTtl; a duplicate key would be resolved silently" >&2
         return 1
     fi
 

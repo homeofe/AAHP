@@ -1,5 +1,15 @@
 ## Cutting 3.11.0: a MINOR only because the one breaking edge was removed first
 
+**The release commit was blocked by a guard I wrote two changes earlier.** The
+trustTtl duplicate-key guard counts `"enforce"` and refuses a config that mentions it
+more than once. Adding `verifyWorkflow.enforce` in this same release gave the file a
+second, legitimate `enforce` with a different parent, and the pre-push hook refused it:
+`mentions "enforce" 2 times; a duplicate key would be resolved silently`. The guard was
+documented as deliberately blunt when it was written, which does not make it right once a
+second section exists. A guard that rejects valid configuration gets deleted wholesale,
+and the risk it covered comes back with it. Scoped to the trustTtl object now; the
+section name is still counted whole-file, because two trustTtl objects is the shape that
+actually hides a value from its reviewer.
 Version 3.10.0 to 3.11.0. It is a MINOR by measurement rather than by preference:
 the release had exactly one change that turned consumers red without them
 changing anything, and that change now ships reporting-only by default. With the

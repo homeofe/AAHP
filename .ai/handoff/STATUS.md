@@ -1,5 +1,19 @@
 ## Cutting 3.11.0: a MINOR only because the one breaking edge was removed first
 
+**Then it misfired a second time, on formatting, and was removed.** Scoping the count with
+`sed -n '/"trustTtl"/,/}/p'` refused a config whose trustTtl object is written on ONE
+line, because a sed range does not end on the line it starts: it ran on into the next
+section and counted that section’s `enforce` too. CI caught it; the local tree happened
+to have a multi-line object.
+
+Two attempts, two misfires on VALID input. The guard is removed rather than patched a
+third time, because one that fires on valid configuration gets deleted wholesale and
+takes the risk it covered with it. What survives is the whole-file `"trustTtl"` count,
+which refuses the shape that actually hides a value: two trustTtl objects. What is now
+explicitly NOT covered, and is written into the helper rather than left implicit, is a
+duplicate `enforce` INSIDE one trustTtl object; it parses, every parser here keeps the
+last key, and schema validation does not catch it either. Detecting it properly means
+walking the raw JSON in both interpreters, which is worth doing and is not done here.
 **The release commit was blocked by a guard I wrote two changes earlier.** The
 trustTtl duplicate-key guard counts `"enforce"` and refuses a config that mentions it
 more than once. Adding `verifyWorkflow.enforce` in this same release gave the file a

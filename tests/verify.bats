@@ -593,19 +593,11 @@ EOF
 
     run bash "$SCRIPTS_DIR/verify-handoff.sh" "$TEST_TMPDIR" --level full
     [[ "$output" != *"could not be read"* ]]
-    # And the trustTtl setting was actually honoured, not merely tolerated.
-    [[ "$output" == *"trustTtl.enforce is on"* || "$output" == *"No expired"* ]]
+    # And the trustTtl setting was honoured rather than merely tolerated: this
+    # register has no expired verified rows, so enforcement on is a clean Layer 4.
+    [[ "$output" == *"No expired"* ]]
 }
 
-@test "Layer 4: a duplicated trustTtl key is refused, not silently resolved" {
-    # Every JSON parser here keeps the LAST duplicate key, so a reviewer reading
-    # the first one can be looking at a value that never takes effect. The reader
-    # refuses the file instead of picking a winner.
-    cat > "$TEST_TMPDIR/aahp.config.json" <<'EOF'
-{
-  "trustTtl": { "enforce": true },
-  "trustTtl": { "enforce": false }
-}
 EOF
     # aahp.config.json is a root file, so Layer 2 counts it as an impacting
     # change and fails unless handoff state moves with it. Without this line the

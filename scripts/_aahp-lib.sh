@@ -435,21 +435,23 @@ aahp_trust_enforce() {
         echo "aahp.config.json mentions \"trustTtl\" $mentions times; a duplicate key would be resolved silently" >&2
         return 1
     fi
-    # Scoped to the trustTtl object, not the whole file. This counted "enforce"
-    # everywhere, which was fine while trustTtl.enforce was the only such key and
-    # wrong the moment verifyWorkflow.enforce was added: two legitimate keys with
-    # different parents were read as one duplicated key, and the pre-push hook
-    # refused a valid config. A guard that rejects valid configuration gets deleted
-    # wholesale, and the risk it covered returns with it.
+    # There is NO textual duplicate check on `enforce`, and its absence is the
+    # finding rather than an omission. Two attempts, two misfires on VALID input:
+    # counting the key across the whole file refused a config the moment
+    # verifyWorkflow.enforce existed alongside trustTtl.enforce, and scoping it with
+    # `sed -n '/"trustTtl"/,/}/p'` refused a config whose trustTtl object is written
+    # on one line, because a sed range does not end on the line it starts.
     #
-    # The section name stays counted whole-file above, because two trustTtl objects
-    # is precisely the shape that hides a value from its reviewer.
-    mentions=$(sed -n '/"trustTtl"/,/}/p' "$config" 2>/dev/null | grep -c '"enforce"' || true)
-    if [ "${mentions:-0}" -gt 1 ]; then
-        echo "aahp.config.json mentions \"enforce\" $mentions times inside trustTtl; a duplicate key would be resolved silently" >&2
-        return 1
-    fi
-
+    # A guard that fires on valid configuration gets deleted wholesale, taking the
+    # risk it covered with it. Detecting a duplicate key properly means walking the
+    # raw JSON, which this helper's two interpreters would each need separately; that
+    # is worth doing and is not done here.
+    #
+    # WHAT IS STILL COVERED: the `"trustTtl"` count above. Two trustTtl objects is the
+    # shape that actually hides a value from a reviewer, and it is refused.
+    # WHAT IS NOT: `{ "trustTtl": { "enforce": true, "enforce": false } }` parses, and
+    # every parser here keeps the last key, so it reads as false. Schema validation in
+    # CI does not catch it either.
     local py
     if command -v node &>/dev/null; then
         # shellcheck disable=SC2016

@@ -483,15 +483,19 @@ elif command -v node.exe &>/dev/null; then
 else
     # Pure-bash fallback: strip CR and match markers without node.
     #
-    # Same two changes as the node path, so the two do not disagree about what a
-    # marker is. It walks the whole tree rather than the handoff directory, and the
+    # Same two changes as the node path AND the same predicate shape. An earlier
+    # version of this comment claimed the two could not disagree while they did, on
+    # three of six cases: node trims the line before testing and this anchored `^`,
+    # so an INDENTED marker was caught there and missed here; and node uses
+    # startsWith, so eight angle brackets matched there and not here. Measured, then
+    # aligned to node's predicate, because an indented marker is still a marker. It walks the whole tree rather than the handoff directory, and the
     # `=======` alternative is gone: seven equals signs is a Markdown setext
     # underline and a Python docstring header, and it flipped 2 of 48 real adopter
     # roots red on files with no conflict in them.
     MARKER_FOUND=0
     while IFS= read -r f; do
         [ -f "$f" ] || continue
-        if tr -d '\r' < "$f" | grep -E '^(<<<<<<<|>>>>>>>)($|[[:space:]])' -q; then
+        if tr -d '\r' < "$f" | grep -E '^[[:space:]]*(<<<<<<<|>>>>>>>)' -q; then
             echo -e "  ${RED}✗ Conflict markers present in: $f${NC}"
             MARKER_FOUND=1
         fi

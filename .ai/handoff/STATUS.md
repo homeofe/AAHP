@@ -1,3 +1,61 @@
+## A correct gate that would have turned eight of ten consumers red on day one
+
+The new verify-workflow gate finds that a consumer wrapping the --level ci verify
+step in an `if:` keeps the required check green while evaluating nothing, Layer 1
+checksum integrity included. The finding is right. Measured against each adopter
+repository’s real origin/main, it is right in eight of ten.
+
+That is also the problem. `aahp doctor . --json` is the exact command every one of
+those repositories runs as a CI step, and it goes from exit 0 under the published
+3.10.0 to exit 1 under this tree with nothing changed on their side. The previous
+minor, 3.9.2 to 3.10.0, flipped nobody. There was no way to switch it off either:
+--governance still exited 1, and check with an empty only-list still exited 1.
+
+Nobody broke this by accident. The `if:` is a documented estate-wide response to
+Layer 2 hard-failing a pure dependency bump, and clearing it means editing
+workflow YAML in each repository, which no pull-request author can do from their
+own pull request. Nine of the ten would not even see the red on the bump, because
+the doctor step carries the same exemption; it would land on the next unrelated
+human pull request, for a file that pull request never touched. The tenth runs
+doctor unconditionally in a matrix job, so its own bump could not have merged.
+
+So the choice was never between reporting the finding and hiding it. It was
+between failing the fleet for a pre-existing deliberate configuration and
+reporting it without failing until a repository opts in. A gate that reds
+everyone on day one is the kind that gets switched off, and then it protects
+nobody.
+
+`verifyWorkflow.enforce`, absent or false by default, on the same pattern
+trustTtl.enforce uses in this release. Measured after: 10 of 10 adopters back to
+exit 0, with the finding reported as `advisory` in every one of them.
+
+`advisory` is a new token in `gates` rather than a reuse. `pass` would be a false
+green over a real finding, which is the class this repository exists to close.
+`skip` claims there was nothing of this kind to look at, which is untrue when the
+gate found something. It counts as EVALUATED, because the gate did examine the
+repository and did produce a verdict. Safe in practice because no adopter parses
+the record; all ten consume only the exit code.
+
+One deliberate inversion, stated because it contradicts the house rule: an
+unreadable config here fails OPEN, not closed. Everywhere else a broken policy
+file is a blocking finding. This gate is advisory by default, so failing closed on
+a malformed config would let a typo turn a non-blocking finding into a fleet
+outage. The finding is still reported either way, so the safer direction hides
+nothing.
+
+Also corrected here, from the same review: the bash fallback predicate in
+lint-handoff.sh did not match the node one, on three of six cases, while carrying
+a comment saying the two could not disagree. node trims the line before testing
+and the grep anchored to start of line, so an indented marker was caught by one
+and missed by the other; node uses startsWith, so eight angle brackets matched
+there and not here. Aligned to node’s predicate, because an indented conflict
+marker is still a conflict marker.
+
+NOT covered: the remediation the gate itself recommends, putting the Dependabot
+exemption INSIDE the gate keyed on the change rather than around the step keyed on
+who pushed it, does not exist in the shipped gate. Until it does, a repository
+that opts in has to choose between the exemption and the gate.
+
 ## The path gate read four documents and the link gate read thirteen
 
 `docLinks.include` covered `.ai/handoff/*.md`. `docPaths.include` did not. So

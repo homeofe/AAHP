@@ -433,6 +433,17 @@
         }
       },
       "additionalProperties": false
+    },
+    "verifyWorkflow": {
+      "type": "object",
+      "description": "Opt-in enforcement for the aahp doctor verify-workflow gate. Absent or enforce:false: a workflow that can skip the gate is reported as 'advisory' and the exit code is unchanged. enforce:true: it fails the run. Default off because the finding is pre-existing and deliberate in most adopting repositories, and clearing it requires a workflow edit no pull-request author can make from their own pull request.",
+      "properties": {
+        "enforce": {
+          "type": "boolean",
+          "description": "If true, a verify workflow that can be skipped fails aahp doctor. Default false, which reports the finding without changing the exit code."
+        }
+      },
+      "additionalProperties": false
     }
   },
   "additionalProperties": false

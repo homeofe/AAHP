@@ -29,6 +29,44 @@ and does not make it acceptable to leave.
 NOT covered: the override applies to whatever else in the tree may later ask for
 `fast-json-patch@2`. Nothing does today, and if something does, npm will resolve
 it to 3.1.1 silently rather than warn.
+## Three pull requests, each correct, none of them mergeable
+
+Dependabot opened #96, #98 and #99 to move `github/codeql-action` from v3.37.8
+to v4.37.7: one per sub-path, `init`, `autobuild` and `analyze`, all three
+pointing at the SAME commit `ff2f1c62`. Each is correct in isolation and none of
+them has a green state. The action refuses to run when its steps are on
+different versions, so every single-path change fails with "Not all workflow
+steps that use github/codeql-action actions use the same version" and "Loaded a
+configuration file for version '4.37.7', but running version '3.37.8'". Merging
+them in some order does not help either, because the tree stays mixed until the
+last one lands and each run gates on the state before it.
+
+Fixed by moving all three refs in one commit, which is what the action requires.
+#96, #98 and #99 are closed as superseded rather than merged, since their
+branches each carry the split that caused this.
+
+The split is the defect worth fixing, not the version. Dependabot resolves every
+SUB-PATH of an action repository as a separate dependency, so the next
+codeql-action release arrives the same way unless something changes.
+`.github/dependabot.yml` now carries a `groups:` entry covering
+`github/codeql-action*`, and `check-workflow-pinning.mjs` gains rule G, which
+fails when ANY action used through more than one sub-path is left ungrouped. It
+is written as a property of multi-path actions rather than as a codeql special
+case, so the next action shipped this way is covered without another change.
+Green on this tree, red with the `groups:` block deleted, green again once it is
+restored.
+
+Same investigation, second finding, and it is the one that explains a symptom
+nobody had traced: `labels: ["dependencies"]` in both Dependabot lanes names a
+label this repository did not have. Dependabot applies configured labels but
+never creates them, so all four of its pull requests arrived unlabelled while
+every human pull request carried labels. The label exists now. That is
+repository state and not tree state, so nothing in this commit proves it and no
+gate here can.
+
+NOT covered: whether v4.37.7 changes any CodeQL result. This moves three pins
+and nothing else. The first analysis run on the new major is the only thing that
+answers that, and it has not run yet at the time of writing.
 
 ## Three verdicts nobody produced: a count, a record, and a register nobody read
 

@@ -530,17 +530,74 @@ PY
     [[ "$output" == *"CHANGELOG.md"* ]]
 }
 
-@test "conflict markers: clean root documents pass, and the count proves they were read" {
-    # The other half. Without it, an implementation that flags every root document
-    # would pass the test above. The count matters too: a scan that reached no root
-    # document looks identical to one that found them clean.
+@test "conflict markers: clean files pass, and the count proves they were read" {
+    # The other half. Without it, an implementation that flags everything would pass
+    # the test above. The count matters too: a scan that reached no file looks
+    # identical to one that found them clean, and this gate has already shipped one
+    # version of that mistake.
     create_full_handoff
     echo '# Changelog' > "$TEST_TMPDIR/CHANGELOG.md"
     echo '# Readme' > "$TEST_TMPDIR/README.md"
 
     run node "$SCRIPTS_DIR/check-conflict-markers.mjs" "$TEST_TMPDIR"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"2 root document(s)"* ]]
+    [[ "$output" == *"file(s) scanned"* ]]
+    [[ "$output" != *"0 file(s) scanned"* ]]
+}
+
+@test "conflict markers: a marker BELOW the root is caught" {
+    # The gap #105 left. templates/ is the worst case: it ships to npm and
+    # `aahp init` copies it into every adopting repository, so a marker there
+    # propagates rather than merely shipping.
+    create_full_handoff
+    mkdir -p "$TEST_TMPDIR/templates"
+    {
+        echo '# Status'
+        echo '<<<<<<< HEAD'
+        echo 'ours'
+        echo '======='
+        echo 'theirs'
+        echo '>>>>>>> branch'
+    } > "$TEST_TMPDIR/templates/STATUS.md"
+
+    run node "$SCRIPTS_DIR/check-conflict-markers.mjs" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"STATUS.md"* ]]
+}
+
+@test "conflict markers: a setext heading underlined with seven equals is not a marker" {
+    # Seven equals signs is a Markdown H1 underline. The old third arm of the
+    # predicate matched it, which was harmless while only handoff files and root
+    # documents were read and unusable the moment the scan reached a whole tree.
+    create_full_handoff
+    {
+        echo 'Release Notes'
+        echo '======='
+        echo 'body'
+    } > "$TEST_TMPDIR/NOTES.md"
+
+    run node "$SCRIPTS_DIR/check-conflict-markers.mjs" "$TEST_TMPDIR"
+    [ "$status" -eq 0 ]
+}
+
+@test "conflict markers: a Python docstring section underline is not a marker" {
+    # The same predicate, a different file type, and this is the shape that
+    # actually flipped a real adopter repository red when the whole-tree walk was
+    # first tried with the old predicate. Kept separate from the Markdown case so a
+    # future change that filters by extension cannot silently drop one of them.
+    create_full_handoff
+    mkdir -p "$TEST_TMPDIR/scripts"
+    {
+        echo 'def main():'
+        echo '    """Do the thing.'
+        echo ''
+        echo 'Args'
+        echo '======='
+        echo '    """'
+    } > "$TEST_TMPDIR/scripts/probe.py"
+
+    run node "$SCRIPTS_DIR/check-conflict-markers.mjs" "$TEST_TMPDIR"
+    [ "$status" -eq 0 ]
 }
 
 @test "conflict markers: prose quoting a marker mid-line is not a marker" {

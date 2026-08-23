@@ -152,7 +152,10 @@ echo -e "${GREEN}[2/7]${NC} Checking for secrets and API keys..."
 # gets switched off, and it takes the nine prefix patterns down with it.
 #
 # The floor is expressed as "somewhere in the value token there is an unbroken
-# run of 16+ alphanumerics", not "the value STARTS with such a run": modern
+# run of 16+ alphanumerics", not "the value STARTS with such a run". The absorb class carries `+`, `/`
+#   and `=` as well as word characters, because without them a base64 secret is
+#   broken by its own padding and the floor silently misses it - measured on the
+#   canonical AWS example key, which this pattern missed until that was fixed: modern
 # tokens are segmented (`sk-proj-...`, `github_pat_11...`, `rk_live_51...`) and
 # anchoring at `=` misses all three. Placeholder prose is word-shaped - hyphen
 # or underscore separated dictionary words, each far short of 16 - so the two
@@ -174,11 +177,11 @@ SECRET_PATTERNS=(
     "AKIA[A-Z0-9]\{16,\}"
     "Bearer [a-zA-Z0-9]"
     "-----BEGIN.*PRIVATE KEY"
-    "_KEY=['\"]\?[-_.a-zA-Z0-9]*[a-zA-Z0-9]\{16,\}"
-    "_SECRET=['\"]\?[-_.a-zA-Z0-9]*[a-zA-Z0-9]\{16,\}"
-    "_TOKEN=['\"]\?[-_.a-zA-Z0-9]*[a-zA-Z0-9]\{16,\}"
-    "_PASSWORD=['\"]\?[-_.a-zA-Z0-9]*[a-zA-Z0-9]\{16,\}"
-    "_CREDENTIALS=['\"]\?[-_.a-zA-Z0-9]*[a-zA-Z0-9]\{16,\}"
+    "_KEY=['\"]\?[-_.+/=a-zA-Z0-9]*[a-zA-Z0-9]\{16,\}"
+    "_SECRET=['\"]\?[-_.+/=a-zA-Z0-9]*[a-zA-Z0-9]\{16,\}"
+    "_TOKEN=['\"]\?[-_.+/=a-zA-Z0-9]*[a-zA-Z0-9]\{16,\}"
+    "_PASSWORD=['\"]\?[-_.+/=a-zA-Z0-9]*[a-zA-Z0-9]\{16,\}"
+    "_CREDENTIALS=['\"]\?[-_.+/=a-zA-Z0-9]*[a-zA-Z0-9]\{16,\}"
 )
 
 SECRET_FOUND=0

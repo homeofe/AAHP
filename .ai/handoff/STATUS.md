@@ -1,3 +1,29 @@
+## The length floor spared real credentials, and the count justifying it was wrong
+
+Two review findings on the secret patterns, both confirmed by measurement, plus
+one that did NOT survive checking.
+CONFIRMED, and the more serious: the five =assignment patterns absorbed a
+leading segment with `[-_.a-zA-Z0-9]*` before requiring a 16-run. `+`, `/` and
+`=` are not in that class, so the run is broken by exactly the characters base64
+uses. The canonical AWS example secret key was MISSED. Narrowing the patterns to
+spare prose also spared real credentials, which is the worse direction of error:
+a false positive is noisy, a false negative is the thing the gate exists to
+stop. The absorb class now carries `+/=`, which recovers every missed shape
+while all four prose cases the narrowing was for still miss.
+CONFIRMED: the comment claimed these five carry "the same length floor as the
+nine prefix patterns". Counted in the array: 14 patterns, 9 with a floor, and
+only FOUR of the nine prefix patterns have one. The other five carry none, by
+design, because their prefixes are specific enough alone. The corrected sentence
+still supports the change; the original was an argument resting on a number
+nobody had counted.
+REFUTED, recorded because a reviewer being wrong is worth the same care as a
+reviewer being right: a third finding said the consumer survey published in the
+CHANGELOG was "wrong on every count". Re-measured against the REMOTES rather
+than local checkouts: 10 of 10 consumers have aahp-verify.yml, 0 of 10 have
+aahp-govern.yml. The survey is correct and was left as written.
+VERIFIED ON LINUX, bats 1.10.0: 73 passed, 0 failed across inert-controls and
+lint.
+
 ## A usability change turned the .aiignore exclusion into a content filter
 
 Adding `path:line` to the secret message changed `grep -rnl` to `grep -rn`. The

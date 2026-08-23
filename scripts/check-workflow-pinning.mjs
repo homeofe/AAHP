@@ -108,6 +108,19 @@
 //      lane to update, and the summary line says so rather than counting it as
 //      a pass. MUTATION: delete the `github-actions` entry from
 //      .github/dependabot.yml, or point its `directory` somewhere else.
+//
+//   G. An action repository used through more than one SUB-PATH is covered by a
+//      `groups:` entry in that lane. Dependabot resolves each sub-path as its own
+//      dependency, so an ungrouped multi-path action arrives as one pull request
+//      per path. For github/codeql-action that has no green state at all: the
+//      action refuses to run when init, autobuild and analyze are on different
+//      versions, so every single-path pull request fails with "Not all workflow
+//      steps that use github/codeql-action actions use the same version". The
+//      three refs have to move in one commit, and only a group makes Dependabot
+//      produce one. Stated as a property of multi-path actions, not as a codeql
+//      special case, so the next action shipped this way is covered too.
+//      MUTATION: delete the `groups:` block from the `github-actions` lane in
+//      .github/dependabot.yml, or narrow its pattern so it stops matching.
 //      NOT asserted, and said out loud rather than implied: whether Dependabot
 //      is enabled for the repository at all, and whether it has ever opened a
 //      pull request. Both are off-machine facts this gate cannot read from the
@@ -653,6 +666,59 @@ if (localUsesCount > 0) {
         });
       } else {
         dependabotVerdict = `${rel} declares a ${ACTIONS_ECOSYSTEM} lane covering ${WORKFLOW_ROOT_DIRECTORY}`;
+      }
+
+      // Rule G. Which action repositories does this tree use through more than one
+      // sub-path? Those are the ones Dependabot will split, so those are the ones a
+      // group has to cover. Derived from the refs actually present rather than from
+      // a hardcoded list, so it does not go stale when the workflows change.
+      const subPathsByRepo = new Map();
+      for (const { ref } of usesRefs) {
+        if (typeof ref !== "string") continue;
+        if (ref.startsWith("./") || ref.startsWith("docker://")) continue;
+        const at = ref.lastIndexOf("@");
+        const path = at === -1 ? ref : ref.slice(0, at);
+        const parts = path.split("/");
+        if (parts.length < 3) continue;
+        const repo = `${parts[0]}/${parts[1]}`;
+        if (!subPathsByRepo.has(repo)) subPathsByRepo.set(repo, new Set());
+        subPathsByRepo.get(repo).add(path);
+      }
+      const multiPath = [...subPathsByRepo.entries()].filter(([, s]) => s.size > 1);
+
+      // Dependabot's group patterns are globs over the dependency NAME, which for
+      // this ecosystem is the full `owner/repo/sub/path`. A group matching any one
+      // of an action's sub-paths does not help, so every sub-path must match.
+      const groupPatterns = [];
+      for (const lane of actionsLanes) {
+        for (const g of Object.values(lane.groups ?? {})) {
+          for (const pat of g?.patterns ?? []) groupPatterns.push(String(pat));
+        }
+      }
+      const globToRe = (pattern) =>
+        new RegExp(
+          "^" +
+            pattern.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*") +
+            "$",
+        );
+      const groupRes = groupPatterns.map(globToRe);
+
+      for (const [repo, paths] of multiPath) {
+        const uncovered = [...paths].filter((p) => !groupRes.some((re) => re.test(p)));
+        if (uncovered.length > 0) {
+          findings.push({
+            where: rel,
+            command: `groups: (covering ${repo})`,
+            message:
+              `is missing: ${repo} is used through ${paths.size} sub-paths ` +
+              `(${[...paths].sort().join(", ")}) and Dependabot resolves each as its own ` +
+              "dependency, so it opens one pull request per path. An action that requires " +
+              "its steps to be on the same version then has NO green single-path change: " +
+              "each pull request is correct and each one fails. Add a `groups:` entry " +
+              `matching all of them, for example \`"${repo}*"\`. ` +
+              `Not matched by any current pattern: ${uncovered.sort().join(", ")}.`,
+          });
+        }
       }
     }
   }

@@ -56,12 +56,51 @@ jobs:
 EOF
 }
 
+# assets/governance is the SECOND scan root: the workflow template
+# `aahp init --gates` copies into a consumer repository. $1 is the Node major
+# it pins. A file here never runs in this repository, so these tests are the
+# only thing that exercises the shipped-template half of the gate.
+tpl_dir() {
+    printf '%s/assets/governance' "$TEST_TMPDIR"
+}
+
+write_template() {
+    mkdir -p "$(tpl_dir)"
+    cat > "$(tpl_dir)/aahp-govern.yml" <<EOF
+name: AAHP Govern
+on: [push]
+jobs:
+  govern:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '$1'
+EOF
+}
+
 # ─── The load-bearing assertion: the real repository ────────────────────────
 
 @test "this repository's own workflows satisfy the runtime relation" {
     run node "$GATE" "$AAHP_ROOT"
     [ "$status" -eq 0 ]
     [[ "$output" == *"Runtime support OK"* ]]
+}
+
+@test "the gate actually reads the shipped template, not just what runs here" {
+    # The scan root is OPTIONAL - a project that ships no template is not a
+    # finding - so nothing in the gate can prove the root is still wired up.
+    # This does, against the real tree: the summary names every file scanned,
+    # so renaming assets/governance, dropping it from SCAN_ROOTS, or filtering
+    # it out all turn this red. Without it the widened scope could silently
+    # revert to reading one directory, which is the exact defect it fixed.
+    #
+    # Measured 2026-08-23: assets/governance/aahp-govern.yml pinned Node 20
+    # against engines.node '>=22' and this gate was green on every commit,
+    # because it scanned .github/workflows only.
+    run node "$GATE" "$AAHP_ROOT"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"assets/governance/aahp-govern.yml:govern"* ]]
 }
 
 @test "the baseline fixture passes, so every mutation below starts from green" {
@@ -82,6 +121,60 @@ EOF
     run node "$GATE" "$TEST_TMPDIR"
     [ "$status" -eq 1 ]
     [[ "$output" == *"below the engines.node floor of 22"* ]]
+}
+
+@test "a shipped-template pin below the published floor is a failure" {
+    # The defect this scan root exists for. Every LOCAL pin clears the floor
+    # here, so the only thing that can turn this red is the template - which
+    # this repository never executes and, before 2026-08-23, never read either.
+    write_pkg ">=22"
+    write_good_workflow
+    write_template 20
+
+    run node "$GATE" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"assets/governance/aahp-govern.yml:govern scaffolds consumers onto Node 20"* ]]
+    [[ "$output" == *"EBADENGINE"* ]]
+}
+
+@test "a shipped template on the floor keeps the fixture green" {
+    # The control for the test above: same fixture, compliant pin. Without it a
+    # red result there could just mean "any template at all breaks the gate".
+    write_pkg ">=22"
+    write_good_workflow
+    write_template 22
+
+    run node "$GATE" "$TEST_TMPDIR"
+    [ "$status" -eq 0 ]
+}
+
+@test "a shipped template does not vouch for an untested release runtime" {
+    # Widening a gate's scope must not make it assert LESS. The release check is
+    # a membership test against the runtimes this repository's build jobs prove;
+    # a template job counted as a build job would supply Node 26 to that set and
+    # silence the finding below. It runs in the adopter's CI, never in ours, so
+    # it proves nothing about our release path.
+    write_pkg ">=22"
+    write_good_workflow
+    sed -i "s/node-version: '24'/node-version: '26'/" "$(wf_dir)/ci.yml"
+    write_template 26
+
+    run node "$GATE" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"release path runs on Node 26, which no build or test job exercises"* ]]
+}
+
+@test "a project that ships no template is not a finding" {
+    # The asymmetry between the two scan roots, asserted rather than assumed.
+    # A missing .github/workflows is exit 2; a missing assets/governance is a
+    # package with nothing to ship, which is the shape of every other fixture
+    # in this file and of every consumer project.
+    write_pkg ">=22"
+    write_good_workflow
+    [ ! -d "$(tpl_dir)" ]
+
+    run node "$GATE" "$TEST_TMPDIR"
+    [ "$status" -eq 0 ]
 }
 
 @test "widening the published range below what CI proves is a failure" {

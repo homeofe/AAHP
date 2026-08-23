@@ -505,6 +505,55 @@ PY
     [[ "$output" == *"conflict markers"* ]] || [[ "$output" == *"check-conflict-markers"* ]]
 }
 
+# --- markers outside .ai/handoff/ ------------------------------------------
+#
+# This gate read `.ai/handoff/` and nothing else, so a conflict marker in a file
+# that SHIPS was invisible to it. Measured on this repository: a sync merge
+# conflicted in CHANGELOG.md, `git add -A` committed the markers, and the
+# pre-commit hook, `aahp verify --level ci` and this gate all reported clean while
+# a marker line sat in the file that becomes the release notes, on a PUBLIC
+# repository.
+
+@test "conflict markers: a marker in a ROOT document is caught, not just handoff" {
+    create_full_handoff
+    {
+        echo '# Changelog'
+        echo '<<<<<<< HEAD'
+        echo 'ours'
+        echo '======='
+        echo 'theirs'
+        echo '>>>>>>> branch'
+    } > "$TEST_TMPDIR/CHANGELOG.md"
+
+    run node "$SCRIPTS_DIR/check-conflict-markers.mjs" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"CHANGELOG.md"* ]]
+}
+
+@test "conflict markers: clean root documents pass, and the count proves they were read" {
+    # The other half. Without it, an implementation that flags every root document
+    # would pass the test above. The count matters too: a scan that reached no root
+    # document looks identical to one that found them clean.
+    create_full_handoff
+    echo '# Changelog' > "$TEST_TMPDIR/CHANGELOG.md"
+    echo '# Readme' > "$TEST_TMPDIR/README.md"
+
+    run node "$SCRIPTS_DIR/check-conflict-markers.mjs" "$TEST_TMPDIR"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"2 root document(s)"* ]]
+}
+
+@test "conflict markers: prose quoting a marker mid-line is not a marker" {
+    # Detection is line-anchored and must stay so. STATUS.md in this repository now
+    # carries an entry about the incident above which names a marker inline, and a
+    # substring test would fail the very file that documents it.
+    create_full_handoff
+    echo 'A merge left a <<<<<<< HEAD marker in the release notes.' > "$TEST_TMPDIR/NOTES.md"
+
+    run node "$SCRIPTS_DIR/check-conflict-markers.mjs" "$TEST_TMPDIR"
+    [ "$status" -eq 0 ]
+}
+
 @test "check-conflict-markers.mjs is clean on full handoff" {
     create_full_handoff
     run node "$SCRIPTS_DIR/check-conflict-markers.mjs" "$TEST_TMPDIR"

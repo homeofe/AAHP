@@ -4,17 +4,17 @@
   "last_session": {
     "agent": "cli-tool",
     "session_id": "cli-1787489585",
-    "timestamp": "2026-08-23T15:52:40Z",
-    "commit": "4f18df5",
-    "phase": "review",
+    "timestamp": "2026-08-23T16:01:08Z",
+    "commit": "3cdaa04",
+    "phase": "fix",
     "duration_minutes": 0
   },
   "files": {
     "STATUS.md": {
-      "checksum": "sha256:7287c50ba0bf6277da0ca5aca5fbf5ba6ada5de919df9540ea47ad21053f59b7",
-      "updated": "2026-08-23T15:52:40Z",
-      "lines": 1041,
-      "summary": "#102 turned Layer 4 enforcement on for this repository with both remaining"
+      "checksum": "sha256:85c0b21822d2a5ba0d30c1d92e257a28bf7f7e46cfbb51386ff7369b8bd9c4c2",
+      "updated": "2026-08-23T16:01:08Z",
+      "lines": 1078,
+      "summary": "`check-conflict-markers` read `.ai/handoff/` and nothing else. Measured today,"
     },
     "NEXT_ACTIONS.md": {
       "checksum": "sha256:efdc6ef8664faf9ce5120fa797b702d2353bd4c3205c62e5ba651a465326103d",

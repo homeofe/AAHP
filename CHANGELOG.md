@@ -9,30 +9,7 @@ independently of the npm version).
 > disabled, so `3.3.0` and `3.4.0` were developed in the repository but never published.
 > `3.5.0` is the first npm release since `3.2.1` and ships everything below it.
 
-## [Unreleased]
-
-### Fixed
-- **The conflict-marker gate now reads the documents this repository publishes, not
-  only handoff state.** It scanned `.ai/handoff/` and nothing else, so a marker in a
-  file that SHIPS was invisible. Measured here: a sync merge conflicted in
-  CHANGELOG.md, staging with `git add -A` committed the markers, and the pre-commit
-  hook, `aahp verify --level ci` and this gate all reported clean while a marker line
-  sat in the file that becomes the release notes. Root Markdown documents are scanned
-  now, by directory listing rather than `git ls-files` so a non-git project root still
-  works, and the OK line carries the count so a scan that reached nothing cannot look
-  like a scan that found nothing.
-
-### Removed
-- **The publish job no longer accepts a manual dispatch from an arbitrary ref.**
-  `publish` runs `npm publish --access public --provenance` with `id-token: write`,
-  and its condition carried `github.event_name == 'workflow_dispatch'`, an operand
-  that constrains no ref, while the `release` job beside it was tag-only. Two jobs in
-  one file disagreed about what a release is and the looser one was wired to the
-  registry. The two conditions are now identical. This costs no capability:
-  `workflow_dispatch` is still a trigger and a dispatch runs against a chosen ref, so
-  selecting a version tag still satisfies the condition and a failed publish can still
-  be re-run by hand. Measured first: 206 runs of the workflow, zero manual dispatches.
-  See ADR-019.
+## [3.11.0] - 2026-08-23
 
 ### Added
 - **`trustTtl.enforce` gives verify Layer 4 a failing branch, per repository.**
@@ -46,57 +23,6 @@ independently of the npm version).
   was measured as the wrong trade: two of the nine consuming repositories hold registers
   with 24 of 25 and 20 of 21 rows already expired. See ADR-024.
 
-### Changed
-- **`aahp doctor`'s conformance record moves to `schemaVersion: 2`, and its summary
-  counts gates that RAN.** The footer read `Conformance OK: 7 gate(s), no failures.`
-  on a repository where zero of seven gates evaluated anything, because it counted
-  the gates that exist. `aahp check`, on the same tree, already said `0 gate(s) ran`,
-  so the two commands disagreed about how to describe one emptiness and the one
-  positioned as the conformance evidence was the one that overstated. The footer now
-  reads `Conformance OK: 5 of 7 gate(s) ran, no failures.`, and a run where nothing
-  was evaluated reports `Conformance NOT EVALUATED: 0 of 7 gate(s) ran. This is not a
-  pass.` and exits 1, reusing the vocabulary this CLI already had for an invalid
-  config rather than inventing a second one for the same state. `--quiet` states the
-  overall result instead of printing nothing, on both commands.
-  **WHAT CONSUMERS MUST UPDATE.** `gates` is byte-for-byte what version 1 emitted:
-  same keys, same status tokens, same meaning. A reader that switches on `gates`
-  needs NO change. A reader that asserts `schemaVersion === 1` must widen to `>= 1`;
-  that is the only breaking edge, and it is why the version moved rather than fields
-  being added silently. Surveyed 2026-08-23 across the nine consuming repositories in
-  this estate: none of them parses the record. Every one runs `aahp doctor . --json`
-  as a CI step and consumes the exit code, so the field additions reach no parser, and
-  the exit code is unchanged for all nine (measured: each evaluates between 1 and 6
-  gates, so none reaches the zero-evaluated branch).
-  New in 2: `gateOutcomes` gives each gate a refined `outcome` plus the human
-  `reason`, `evaluated` counts the gates that produced a verdict, and `total` the
-  gates defined. The refinement is the point. Version 1's `skip` stood for four
-  different states at once, so a repository that had adopted governance and one that
-  had switched every gate off through `config.check` emitted identical records. The
-  outcomes are `pass`, `fail`, `missing`, `self`, `not-applicable`, `deselected` and
-  `unevaluated`.
-- **`aahp check --json` now reaches the same verdict as `aahp check`.** On one tree
-  the text path printed `Governance NOT EVALUATED: 0 gate(s) ran.` and exited 1 while
-  `--json` exited 0 with every gate `skip`, because the JSON branch returned above the
-  zero-gate test. The machine-readable path is the one a CI tick and a dashboard
-  consume, so it was the wrong half to leave green. The verdict is now computed once
-  and used by both paths. Measured against the nine consuming repositories: each runs
-  at least one applicable gate, so none changes exit code.
-- **`aahp verify` Layer 4 no longer reports a trust register it could not read as
-  clean.** `aahp_trust_expired` printed nothing both when no entry was expired and
-  when not one row was parsed, and Layer 4 called both of them
-  `No expired 'verified' trust entries.` A register whose header no longer names a
-  `Status` column, or which holds no table this reader recognises, is now reported as
-  `TTL was NOT evaluated`, and a clean result carries the number of entries checked.
-  This is not hypothetical: measured 2026-08-23 across the nine consuming
-  repositories, SIX have a `TRUST.md` in which this reader sees zero decidable rows,
-  and in one of them the register is a real, populated `Verified Properties` table
-  with an `Expires` column and no `Status` column, holding a row eight days past its
-  expiry, reported as clean. Layer 4 remains ADVISORY: it still increments no failure
-  count and still cannot fail a build. Whether an expired TTL should ever block is an
-  owner decision and is deliberately not taken here.
-
-### Added
-
 - An Installation and Quickstart section in `README.md`, above the architectural
   material. There was no heading at any level matching install, quickstart, getting
   started or setup anywhere in the document, and the single install command sat at 58%
@@ -104,6 +30,7 @@ independently of the npm version).
   throwaway repository before being written down, including the Layer 3 warning a first
   run produces, so the section describes what the commands do rather than what they are
   expected to do. Issue #74.
+
 - `scripts/check-doc-shape.mjs`, a repository-local gate: a backticked repo-relative
   path in the configured documents has to resolve against the git index, and a required
   heading has to exist before a named anchor. It is deliberately NOT part of
@@ -115,6 +42,7 @@ independently of the npm version).
   than as an allowlist, because the defect and the correct uses are the same string in
   different sentences: a path-level allowlist would have exempted the defect this gate
   exists for. It exits 2 on anything it could not assess. ADR-022.
+
 - The five-field provenance block from Section 2.4 now ships in `templates/LOG.md` and
   `templates/STATUS.md`. The templates carried one of the five, so a repository that
   followed the shipped example produced entries that did not satisfy the section's own
@@ -137,12 +65,14 @@ independently of the npm version).
   with no update lane does not stay correct, it stops moving, and a missing lane cannot be
   seen from the pull-request count: an unscanned ecosystem and an up-to-date one both
   produce zero pull requests. Recorded as ADR-021.
+
 - `tests/assert-repo-ci-shape.mjs` gained a fifth assertion: the recorded list of publish
   conditions in that file and ADR-019 in `README.md`, which is the record a person
   actually reads, are now compared as sets in both directions. Until now either could be
   edited alone with every check green. No workflow behaviour changes; whether the
   `workflow_dispatch` operand should exist at all remains the owner's open decision, and
   ADR-019 now carries the re-measured numbers behind it.
+
 - `tests/assert-repo-ci-shape.mjs` asserts release authorization in `ci.yml`. The
   `publish` job (npm, `id-token: write`) and the `release` job (the GitHub Release) each
   carried a hand-written `if:`; the two disagreed about what counts as a release, and
@@ -155,6 +85,7 @@ independently of the npm version).
   pass. It runs inside the required `lint-and-validate` check. No workflow behaviour
   changes here: whether the `workflow_dispatch` operand should exist at all is the
   owner's call and is recorded as open, with its options, in ADR-019.
+
 - `aahp doctor` gains a `verify-workflow` gate that answers, from inside a consumer,
   whether the workflow hosting the AAHP gate can skip it. Wrapping the `aahp-verify`
   job in an `if:`, or wrapping the gate step inside it, leaves a REQUIRED status check
@@ -173,6 +104,7 @@ independently of the npm version).
   cannot be classified reports `fail`, because undecided is not clean. Two shapes are
   deliberately not findings because they fail CLOSED, not green: an `if:` on the
   checkout step alone, and `paths:` filters that stop the workflow triggering.
+
 - **The `verify-workflow` gate now audits `assets/governance/aahp-govern.yml` too**,
   which is the shipped workflow with the widest blast radius and the one it did not
   look at. `aahp init --gates` writes that file into an adopting repository, and a
@@ -196,6 +128,7 @@ independently of the npm version).
   `tests/assert-workflow-parser-parity.mjs` holds its block-YAML reader against a real
   parser on every workflow and fixture in this repository, on the fields the audit
   reads and on the resulting findings.
+
 - `npm run check:runtime-support` asserts that the runtimes CI exercises and the
   runtimes `engines.node` publishes are the same set, and that the floor of that set
   still receives security patches. It is a RELATION rather than a list of dead
@@ -204,6 +137,7 @@ independently of the npm version).
   evaluate - a non-matrix `${{ }}` expression, or `node-version-file` - fail rather
   than being skipped, and a state it cannot classify at all exits 2 rather than 0, so
   "I could not look" never reads as "I looked and it was fine".
+
 - A `runtime-matrix` CI job exercises the whole published range (Node 22 and 24), not
   only its floor. The gate binds that matrix directly: emptying it or cutting it to a
   single entry is red even though the standalone pins in the other jobs would keep a
@@ -221,6 +155,7 @@ independently of the npm version).
   gate, are reviewed as a code change, and print their reason on every run; the list is
   empty, and that is measured rather than assumed, since no workflow here runs
   `git push`, `git commit`, `git fetch`, `git pull` or `git remote`. See ADR-020.
+
 - `tests/assert-repo-ci-shape.mjs` additionally pins the three job-level elevations by
   name. A job-level `permissions:` REPLACES the top-level block rather than merging with
   it, so once `ci.yml` and `codeql.yml` gained a top-level `contents: read`, deleting a
@@ -233,6 +168,61 @@ independently of the npm version).
   exit code for the wrong reason, and no message to tell the two apart.
 
 ### Changed
+- **`aahp doctor`'s conformance record moves to `schemaVersion: 2`, and its summary
+  counts gates that RAN.** The footer read `Conformance OK: 7 gate(s), no failures.`
+  on a repository where zero of seven gates evaluated anything, because it counted
+  the gates that exist. `aahp check`, on the same tree, already said `0 gate(s) ran`,
+  so the two commands disagreed about how to describe one emptiness and the one
+  positioned as the conformance evidence was the one that overstated. The footer now
+  reads `Conformance OK: 5 of 7 gate(s) ran, no failures.`, and a run where nothing
+  was evaluated reports `Conformance NOT EVALUATED: 0 of 7 gate(s) ran. This is not a
+  pass.` and exits 1, reusing the vocabulary this CLI already had for an invalid
+  config rather than inventing a second one for the same state. `--quiet` states the
+  overall result instead of printing nothing, on both commands.
+  **WHAT CONSUMERS MUST UPDATE.** `gates` is byte-for-byte what version 1 emitted:
+  same meaning for every key carried over. NOT the same key set: `gates` gains a
+  `verify-workflow` key in this release, and an `advisory` value token with it.
+  A reader that switches on `gates`
+  needs NO change. A reader that asserts `schemaVersion === 1` must widen to `>= 1`;
+  that is the only breaking edge, and it is why the version moved rather than fields
+  being added silently. Surveyed 2026-08-23 across the nine consuming repositories in
+  this estate: none of them parses the record. Every one runs `aahp doctor . --json`
+  as a CI step and consumes the exit code, so the field additions reach no parser, and
+  the exit code is NOT unchanged, and the corrected measurement is this: across the ten
+  consuming repositories (not nine), `aahp doctor . --json` went from exit 0 under 3.10.0
+  to exit 1 in EIGHT of them, caused by the new `verify-workflow` gate. That is why the
+  gate ships reporting-only by default in this release, behind `verifyWorkflow.enforce`;
+  with the default, all ten are back to exit 0. (each evaluates between 1 and 6
+  gates, so none reaches the zero-evaluated branch).
+  New in 2: `gateOutcomes` gives each gate a refined `outcome` plus the human
+  `reason`, `evaluated` counts the gates that produced a verdict, and `total` the
+  gates defined. The refinement is the point. Version 1's `skip` stood for four
+  different states at once, so a repository that had adopted governance and one that
+  had switched every gate off through `config.check` emitted identical records. The
+  outcomes are `pass`, `fail`, `missing`, `self`, `not-applicable`, `deselected` and
+  `unevaluated`.
+
+- **`aahp check --json` now reaches the same verdict as `aahp check`.** On one tree
+  the text path printed `Governance NOT EVALUATED: 0 gate(s) ran.` and exited 1 while
+  `--json` exited 0 with every gate `skip`, because the JSON branch returned above the
+  zero-gate test. The machine-readable path is the one a CI tick and a dashboard
+  consume, so it was the wrong half to leave green. The verdict is now computed once
+  and used by both paths. Measured against the nine consuming repositories: each runs
+  at least one applicable gate, so none changes exit code.
+
+- **`aahp verify` Layer 4 no longer reports a trust register it could not read as
+  clean.** `aahp_trust_expired` printed nothing both when no entry was expired and
+  when not one row was parsed, and Layer 4 called both of them
+  `No expired 'verified' trust entries.` A register whose header no longer names a
+  `Status` column, or which holds no table this reader recognises, is now reported as
+  `TTL was NOT evaluated`, and a clean result carries the number of entries checked.
+  This is not hypothetical: measured 2026-08-23 across the nine consuming
+  repositories, SIX have a `TRUST.md` in which this reader sees zero decidable rows,
+  and in one of them the register is a real, populated `Verified Properties` table
+  with an `Expires` column and no `Status` column, holding a row eight days past its
+  expiry, reported as clean. Layer 4 remains ADVISORY: it still increments no failure
+  count and still cannot fail a build. Whether an expired TTL should ever block is an
+  owner decision and is deliberately not taken here.
 
 - README Section 2.4 no longer states a provenance MUST, and no longer states an audit
   trail as a property of the protocol. Nothing enforced either: no gate reads the fields,
@@ -244,12 +234,14 @@ independently of the npm version).
   a retroactive MUST would redden 9 of 9 over history none of them can change, and this
   repository's own LOG would fail it too. The section now states the conditional version,
   which is what is true. ADR-021.
+
 - `README.md` names `assets/governance/aahp-govern.yml` as the source to copy for the
   governance workflow. It named a `.github/workflows/` path that does not exist in this
   repository and is not in the published package. Measured across the nine consumer
   checkouts: 9 of 9 carry `.github/workflows/aahp-verify.yml`, so the neighbouring copy
   instruction was right, and 0 of 9 carry an `aahp-govern.yml` at all. The two mentions
   that correctly describe the DESTINATION are unchanged. Issue #74.
+
 - `aahp doctor`'s `handoff-set` gate now names the check it did not run. Its pass
   reason reads `N indexed files present, no strays (content not compared; aahp
   verify Layer 1 owns checksum integrity)`. The gate's behaviour is unchanged, and
@@ -267,6 +259,7 @@ independently of the npm version).
   evaluating it. A repository that ingests the `schemaVersion: 1` record is
   therefore told exactly what it was told before, which is the compatibility
   choice this entry is making rather than an omission.
+
 - README now states the one configuration in which that split has consequences for
   an adopter: when `verify-workflow` reports `skip`, meaning no workflow in the
   repository runs the AAHP verify gate, and the handoff gates are still evaluated,
@@ -277,6 +270,7 @@ independently of the npm version).
   The README no longer offers `aahp lint` as an equivalent remedy: lint's
   checksum comparison runs only under a Python interpreter and exits 0 when
   there is none, so it can pass silently on a drifted tree where Layer 1 fails.
+
 - `assets/governance/aahp-govern.yml`, the workflow `aahp init --gates` scaffolds
   into consumers, now says in its own header that it runs no handoff-integrity gate,
   that neither of its own steps stands in for one (`aahp check` has no file-set or
@@ -285,15 +279,18 @@ independently of the npm version).
   that sets up Node and not Python, and that a repository which also keeps
   `.ai/handoff/` needs `aahp-verify.yml` beside it. Comment only; the workflow
   itself is unchanged.
+
 - `engines.node` is now `>=22`, was `>=18`. Node 18 reached end of life on 2025-04-30
   and Node 20 on 2026-04-30, so the package publicly claimed support for a runtime it
   could not have security-patched, and every repository in the estate inherited that
   claim on install. Consumers still running Node 18 or 20 will now see an engine
   warning, which is the intended signal.
+
 - CI validates on Node 22 instead of Node 20, in `ci.yml`, `aahp-manifest.yml` and the
   `aahp-verify.yml` reference workflow that `propagate.sh` installs into consumers. The
   publish job stays on Node 24, and the gate now enforces that the release path is
   never older than the build path.
+
 - `yaml` is added as a devDependency (zero transitive dependencies) so the new gate
   PARSES the workflow files. Matching YAML with a regex misreads quoting and block
   scalars, and would report a clean repository it never actually read.
@@ -324,7 +321,28 @@ independently of the npm version).
   AAHP's own shipped templates, so `aahp init` followed by enforcement is red on an
   untouched repository.
 
+### Removed
+- **The publish job no longer accepts a manual dispatch from an arbitrary ref.**
+  `publish` runs `npm publish --access public --provenance` with `id-token: write`,
+  and its condition carried `github.event_name == 'workflow_dispatch'`, an operand
+  that constrains no ref, while the `release` job beside it was tag-only. Two jobs in
+  one file disagreed about what a release is and the looser one was wired to the
+  registry. The two conditions are now identical. This costs no capability:
+  `workflow_dispatch` is still a trigger and a dispatch runs against a chosen ref, so
+  selecting a version tag still satisfies the condition and a failed publish can still
+  be re-run by hand. Measured first: 206 runs of the workflow, zero manual dispatches.
+  See ADR-019.
+
 ### Fixed
+- **The conflict-marker gate now reads the documents this repository publishes, not
+  only handoff state.** It scanned `.ai/handoff/` and nothing else, so a marker in a
+  file that SHIPS was invisible. Measured here: a sync merge conflicted in
+  CHANGELOG.md, staging with `git add -A` committed the markers, and the pre-commit
+  hook, `aahp verify --level ci` and this gate all reported clean while a marker line
+  sat in the file that becomes the release notes. Root Markdown documents are scanned
+  now, by directory listing rather than `git ls-files` so a non-git project root still
+  works, and the OK line carries the count so a scan that reached nothing cannot look
+  like a scan that found nothing.
 
 - The governance workflow `aahp init --gates` scaffolds into a consumer repository
   (`assets/governance/aahp-govern.yml`) no longer pins Node 20 - a runtime end-of-life since
@@ -335,6 +353,7 @@ independently of the npm version).
   green while running unsupported. `.github/workflows/aahp-verify.yml` - the file that
   reaches consumers by the other route, `propagate.sh` - has pinned 22 with a comment
   naming the reason since the floor moved; the scaffolded file was never brought along.
+
 - `npm run check:runtime-support` now reads `assets/governance/` as well as
   `.github/workflows/`, which is why the pin above could sit wrong indefinitely. That
   gate exists precisely to assert "no runtime pin is below the published floor", its
@@ -348,6 +367,7 @@ independently of the npm version).
   local wording, and it is excluded from the release-vs-build membership check: a job
   that never executes here must not vouch for a release runtime nothing proved.
   Widening a gate's scope must not let it assert less.
+
 - `MANIFEST.json`'s `project` no longer takes the name of the directory the generator
   ran in. It resolves the repository's identity instead: the name already on record in
   `MANIFEST.json` first, then the git remote's repository name, and the directory
@@ -356,16 +376,20 @@ independently of the npm version).
   the old behaviour rewrote `project` to that name on every regeneration, silently,
   unless somebody re-read the file afterwards. Two such names reached consumer main
   branches.
+
 - An unsubstituted `[PROJECT]` placeholder, which `aahp init` copies in from
   `templates/MANIFEST.json`, is no longer carried forward as though it were a chosen
   name. It falls through to the remote-derived name.
+
 - The remote-derived name needs only `git`, so the project name is now correct where
   `node` is absent (a stripped hook `PATH`, a slim CI image). That path previously fell
   back to the directory basename with no diagnostic, because the warning about failing
   to read the existing manifest sits inside the `command -v node` guard.
+
 - The `project` value is escaped for JSON on write, as the quick context already was, so
   a quote or backslash in a preserved name or a directory basename cannot emit a
   `MANIFEST.json` that no longer parses.
+
 - Committed handoff state and one gate comment no longer name private repositories. This
   repository is public and ships to npm, so naming consumer repositories here published
   a list of them to anyone reading the repository or the package. The `What is Missing`
@@ -374,6 +398,7 @@ independently of the npm version).
   counts without identities. `.ai/handoff/` is outside the `files` list, so the row
   itself never reached the npm tarball, but `scripts/` is inside it, so the comment in
   `check-runtime-support.mjs` would have shipped on the next publish.
+
 - A `no-private-repo-names` forbidden-pattern rule keeps most such names out. The same
   names had already been removed once, from the propagation playbook, and returned in a
   later change because nothing gated them. The rule matches on shape rather than on a
@@ -387,6 +412,7 @@ independently of the npm version).
   out by review, not by the gate. Adding it to the rule is not the fix, because the rule
   lives in a tracked config file in this public repository and would then publish the one
   identity this change exists to withhold.
+
 - The only CLI-level test of the prompt-injection detector no longer passes with the
   detector switched off. It appended an injection line to an indexed handoff file and
   asserted nothing but a non-zero exit; appending to an indexed file breaks its checksum,
@@ -399,7 +425,6 @@ independently of the npm version).
   turns exactly that test red and says which; six of the ten had no coverage at all.
 
 ### Security
-
 - The two required status checks that validate `MANIFEST.json` no longer download
   and execute unpinned third-party code. `lint-and-validate` and `aahp-manifest`
   ran `npm install --no-save ajv-cli ajv-formats` and executed the result on the
@@ -412,6 +437,7 @@ independently of the npm version).
   closure with `npm ci`, and both invoke the tool with `npx --no-install`. The
   `--no-install` is the load-bearing half: without it npx falls back to the
   registry whenever the local resolution misses, and the pin buys nothing.
+
 - `npm run check:workflow-pinning` is why it stays that way. The root cause was
   not a forgotten pin, it was that pinning here was a hand-applied convention:
   the workflow template this package ships to consumers
@@ -427,11 +453,13 @@ independently of the npm version).
   quietly exempted: `npm install -g` in the publish job, a different risk class
   with an owner decision still open on it, tracked at
   https://github.com/homeofe/AAHP/issues/68.
+
 - Three schema tests stop failing open. The two in `tests/handoff-impact.bats` and
   the one in `tests/init-gates.bats` skip when `ajv-cli` cannot be resolved, so
   they only ever ran in the one job that happened to have installed it and
   reported "# skip ajv-cli not installed" everywhere else while the check stayed
   green. Declaring the package means `npm ci` installs it and the tests execute.
+
 - The version regex in the new gate is not exponentially ambiguous. Its first form
   repeated a group whose character class also contained the group's own delimiter,
   which CodeQL reported as `js/redos`. Measured on the input shape it named,
@@ -464,6 +492,7 @@ independently of the npm version).
   **Adopters who already scaffolded the file keep their old copy:** `aahp init --gates`
   skips a workflow that already exists. Re-run it with `--force`, or add the two lines
   by hand, to pick this up.
+
 - The six repository workflows that had no top-level `permissions:` block now declare
   `contents: read` (`aahp-archive.yml`, `aahp-lint.yml`, `aahp-manifest.yml`,
   `aahp-pii-allowlist.yml`, `ci.yml`, `codeql.yml`), and ten more `actions/checkout`
@@ -504,6 +533,7 @@ independently of the npm version).
   implement, so a partial validator can never report "valid" for a document it did not
   fully examine. CI validates this repository's own config with AJV as well, so the two
   implementations cross-check.
+
 - No code AAHP ships can fetch a package from the public registry as a fallback. The
   portable governance workflow and both git hooks called `npx --no-install aahp`.
   `npx` is `npm exec`, which has NO `--no-install` option and ignores the unknown flag
@@ -544,6 +574,7 @@ independently of the npm version).
 
   Fixing the sources here does not fix a copy, and no `init` command can reach a file it
   never wrote.
+
 - Four of the thirteen secret patterns `aahp lint` enforces matched nothing at all.
   `grep` runs in BRE mode, where the bare `?` in `['\"]?` is a LITERAL question mark
   rather than an optional-quantifier, so `_KEY=`, `_SECRET=`, `_TOKEN=` and `_PASSWORD=`
@@ -1116,7 +1147,8 @@ independently of the npm version).
 
 - Relicensed to Apache-2.0 (earlier commits carried MIT, then CC BY 4.0, headers).
 
-[Unreleased]: https://github.com/homeofe/AAHP/compare/v3.10.0...HEAD
+[Unreleased]: https://github.com/homeofe/AAHP/compare/v3.11.0...HEAD
+[3.11.0]: https://github.com/homeofe/AAHP/compare/v3.10.0...v3.11.0
 [3.10.0]: https://github.com/homeofe/AAHP/compare/v3.9.2...v3.10.0
 [3.9.2]: https://github.com/homeofe/AAHP/compare/v3.9.1...v3.9.2
 [3.9.1]: https://github.com/homeofe/AAHP/compare/v3.9.0...v3.9.1

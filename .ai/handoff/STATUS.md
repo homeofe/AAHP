@@ -1,3 +1,48 @@
+## Cutting 3.11.0: a MINOR only because the one breaking edge was removed first
+
+Version 3.10.0 to 3.11.0. It is a MINOR by measurement rather than by preference:
+the release had exactly one change that turned consumers red without them
+changing anything, and that change now ships reporting-only by default. With the
+default, all ten adopter repositories are back to exit 0 on `aahp doctor --json`,
+the command every one of them runs as a CI step.
+
+`aahp_version` stays at 3.0. The file-format contract did not move this cycle, and
+ADR-008 says the two numbers are independent, so a tooling release does not drag
+the protocol version with it.
+
+THE CHANGELOG NEEDED MORE THAN A HEADING. Two statements in it were false, and a
+release body is public, indexed and cannot be repaired by a later commit:
+
+"the exit code is unchanged for all nine" was wrong twice. It is ten repositories,
+not nine, and the exit code was not unchanged: eight of them went from 0 to 1.
+The corrected sentence states the measurement and names the switch that returns
+them to 0.
+
+"same keys" was wrong: `gates` gains a verify-workflow key this release, and an
+`advisory` value token with it.
+
+The section also carried EIGHT headings for five categories, because entries were
+appended by different pull requests over weeks. Consolidated into Keep a Changelog
+order with every entry preserved verbatim, and the per-category counts asserted
+before and after so nothing could be lost in the move: Added 13, Changed 12,
+Removed 1, Fixed 10, Security 9.
+
+WHAT A RELEASE ACTUALLY TAKES HERE, since it was not written down anywhere: five
+files plus a tag. package.json and CHANGELOG.md carry the version and
+check-version-sync compares them (proved both directions: it exits 1 when only one
+of the two moves). Those two are handoff-impacting, so STATUS.md and MANIFEST.json
+must move with them, and NEXT_ACTIONS.md is regenerated. Then a tag.
+
+Nothing creates that tag. ci.yml only REACTS to `push: tags: v[0-9]+.[0-9]+.[0-9]+`,
+and both release jobs gate on the ref already being a tag. So the publish and the
+GitHub Release are automatic and the tag is not; without it nothing happens at all.
+
+NOT covered, and worth knowing before the tag goes up: nothing binds the tag to
+the reviewed commit, so a tag pushed from a stale checkout would publish that
+commit instead. And the tag pattern accepts no prerelease suffix, while
+changelog-grammar.mjs does, so an rc is not available as a de-risking step without
+a workflow change.
+
 ## A correct gate that would have turned eight of ten consumers red on day one
 
 The new verify-workflow gate finds that a consumer wrapping the --level ci verify

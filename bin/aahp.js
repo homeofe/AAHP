@@ -872,11 +872,14 @@ function gateVerifyWorkflow(targetPath) {
 }
 
 // Absent config, absent section, or enforce:false all mean NOT enforced, so a
-// repository that has never heard of this setting keeps the exit code it had. A
-// config that cannot be read is treated the same way rather than failing closed:
-// this reports a finding either way, and refusing to run because a policy file is
-// malformed would turn a config typo into a fleet outage on a gate that is
-// advisory by default.
+// repository that has never heard of this setting keeps the exit code it had.
+//
+// The catch is a safety net, NOT a policy, and an earlier version of this comment
+// claimed otherwise. `doctor` already refuses an unreadable aahp.config.json before
+// any gate runs, marking all of them unevaluated, so an unparseable config never
+// reaches this function from the CLI. Returning false here only matters if some
+// future caller reaches it another way, and not-enforced is the right default for
+// a gate that is advisory by default.
 function verifyWorkflowEnforced(targetPath) {
   try {
     const raw = readFileSync(join(targetPath, 'aahp.config.json'), 'utf8')

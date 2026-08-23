@@ -212,18 +212,6 @@ EOF
     [[ "$output" == *"NOT ENFORCED"* ]]
 }
 
-@test "doctor: an unreadable config does not silently enable enforcement" {
-    # Fail OPEN here, deliberately, and the direction is worth stating. Everywhere
-    # else in this repository a broken policy file fails closed. This gate is
-    # advisory by default, so failing closed on a malformed config would let a typo
-    # turn a non-blocking finding into a fleet-wide outage. The finding is still
-    # reported either way, so nothing is hidden by choosing the safer direction.
-    install_workflow bypass-step-conditional.yml
-    printf '{ "verifyWorkflow": { "enforce": true },' > "$TEST_TMPDIR/aahp.config.json"
-    run node "$AAHP" doctor "$TEST_TMPDIR" --governance --json
-    [ "$status" -eq 0 ]
-    [[ "$output" == *'"verify-workflow": "advisory"'* ]]
-}
 
 @test "doctor: an undecidable verify workflow fails closed, it does not skip" {
     install_workflow undecidable-indirect.yml
@@ -331,8 +319,13 @@ install_govern_workflow() {
     [[ "$output" == *'"verdict": "governance-only"'* ]]
 }
 
-@test "govern: doctor FAILS the record when the governance gate can be skipped" {
+@test "govern: doctor FAILS the record when the governance gate can be skipped AND enforce is on" {
     install_govern_workflow govern-bypass-step-conditional.yml
+    cat > "$TEST_TMPDIR/aahp.config.json" <<'EOF'
+{
+  "verifyWorkflow": { "enforce": true }
+}
+EOF
     run node "$AAHP" doctor "$TEST_TMPDIR" --governance
     [ "$status" -eq 1 ]
     [[ "$output" == *"Conformance FAILED"* ]]

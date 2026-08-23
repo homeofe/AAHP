@@ -1,3 +1,31 @@
+## Every Dependabot pull request fails Layer 2, and that is the gate working
+
+`actions/setup-python` 6.0.0 to 7.0.0, across the six workflows that use it.
+Dependabot opened it as #97 and it failed `aahp-verify` while every other check
+passed. The cause is not the bump: Layer 2 requires that a change to a tracked
+file outside `.ai/handoff/` move handoff state with it, and Dependabot does not
+write handoff state. So this entry is what the gate was asking for, and the
+failure was correct.
+
+Worth stating plainly because it recurs on a weekly schedule: this will happen to
+every Dependabot pull request this repository ever receives, in both lanes. The
+options are to keep resolving them by hand as here, to have something append the
+entry automatically, or to teach Layer 2 that an action-SHA-only change by a
+known bot is not handoff-impacting. The third weakens the gate for exactly the
+changes that alter the CI supply chain, which is the wrong direction. The choice
+between the first two is the owner's and is not taken here.
+
+On the bump itself: v7 is a major, so the question is whether anything behind it
+moved. All six call sites pin a SHA and pass no inputs beyond `python-version`,
+and the evidence that it works is already on the pull request. Every job that
+runs Python passed on v7 before this commit existed, including
+`aahp-pii-allowlist`, which is the one whose only purpose is to execute a Python
+validator. `lint-and-validate`, `aahp-lint`, `aahp-manifest`, `aahp-archive` and
+both runtime-matrix jobs also passed.
+
+NOT covered: nothing here re-reads the v7 release notes for behaviour that this
+repository's workflows do not exercise. The claim is that the six uses in this
+tree work, not that the major is inert.
 ## Trust Decay could not decay, and the fix had to not break nine repositories
 
 **And the correction found the real one.** `log_fail` in this script only PRINTS;

@@ -1,3 +1,74 @@
+## Trust Decay could not decay, and the fix had to not break nine repositories
+
+**And the correction found the real one.** `log_fail` in this script only PRINTS;
+every one of its thirty-odd call sites increments `FAILURES` on the following line.
+The five new Layer 4 calls did not, so the layer announced `FAIL:` and the run still
+exited 0. A control that reports a failure it does not enforce is the exact defect
+this change exists to close, shipped inside the change closing it.
+
+It survived a local run because the tree used there was failing Layers 1 and 2 for
+unrelated reasons, and `FAILED: 2 blocking issue(s)` was read as proof when neither
+of the two was Layer 4. It was caught only once the fixtures were repaired and the
+run was otherwise clean, which is the argument for repairing fixtures rather than
+relaxing assertions.
+**Correction, and the correction found a worse one.** The fixture for the enforce-false test added
+`aahp.config.json` at the repository root and never moved handoff state, so Layer 2
+failed it. Layer 4 had warned exactly as intended. The same flaw sat under the three
+tests asserting a NON-zero exit, and those were passing: Layer 2 was supplying the
+failure, so they would have passed with the enforcement code deleted. One of them
+asserted only `TTL was NOT evaluated`, which the advisory branch prints too, so
+nothing in it distinguished the two branches at all. Every fixture now moves handoff
+state, and that assertion names the wording only the failing branch produces.
+Layer 4 reads the trust register, finds expired `verified` rows and prints them.
+Nothing in the block increments `FAILURES`, so no number of expired rows could
+ever change the exit code. Eight of this repository's own ten verified rows sat
+past expiry, one by 16 days, with every gate on `main` green. One of the expired
+rows asserted `verify-handoff.sh runs all 4 layers`, and two of those four could
+not produce a verdict.
+
+The obvious fix is the wrong one, and the original comment said so with a
+measurement behind it: across the nine consuming repositories two hold registers
+with 24 of 25 and 20 of 21 rows already expired, so a blocking Layer 4 turns them
+red on their next commit for a file their pull requests never touch. A gate that
+fires on repositories which changed nothing gets switched off, and a gate that is
+off is worse than one that warns.
+
+So enforcement is opt-in, on the same pattern `pinnedDep` already uses.
+`trustTtl.enforce` absent or false is the historical behaviour to the byte, which
+is what all nine consumers get. True, and expired rows fail the run. This
+repository sets it to true.
+
+Two properties that took more thought than the switch itself:
+
+A register that cannot be CLASSIFIED fails under enforcement as well. The census
+already refused to call that state clean; if it stayed a pass under enforcement,
+the gate could be switched off by breaking the table instead of by editing the
+reviewed config line, which is the class of evasion this repository keeps
+finding.
+
+The reader fails closed. An unparseable config is a blocking finding rather than
+a silent fall back to `not enforcing`, and a config mentioning `trustTtl` or
+`enforce` twice is refused outright, because every JSON parser here keeps the LAST
+duplicate key and a reviewer reading the first one would be looking at a value
+that never takes effect.
+
+Five tests, and it is worth naming what each one owns. One proves an expired row
+now fails. One proves the same register still only warns with enforcement off,
+which is the half that would catch an implementation that ignores the config and
+fails everywhere. The other three close the three ways the control could be
+disabled without touching the line that enables it: an unreadable register, an
+unparseable config, a duplicated key.
+
+The deadlock the original comment worried about does not apply to this shape.
+Layer 4 does not run at `precommit`, so no local commit is blocked, and the pull
+request that refreshes `TRUST.md` carries the refreshed rows, so CI reads a
+register that is already clean.
+
+NOT covered: this does not re-verify anything. The two rows this repository still
+carries as `verified` expire on 2026-09-02, and when they do, enforcement will
+turn CI red until somebody actually re-runs the checks behind them. That is the
+intended behaviour and it will be inconvenient on the day.
+
 ## A HIGH advisory whose only offered fix was a five-major downgrade
 
 `fast-json-patch` below 3.1.1 carries GHSA-8gh8-hqwg-xf34, prototype pollution,

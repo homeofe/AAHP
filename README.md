@@ -403,6 +403,21 @@ In v1, a `(Verified)` status lives forever. In v2, trust has a TTL:
 - Stable properties (architecture, conventions) get long TTLs (30 days)
 - Any agent can re-verify and reset the TTL
 
+
+**Making decay bite.** A TTL that nothing enforces records staleness without acting
+on it: eight of this repository's own ten `verified` rows once sat expired, one by 16
+days, with every gate green. `trustTtl.enforce` in `aahp.config.json` turns expired
+rows into a blocking finding, and under it a register this reader cannot classify
+fails too, since an unreadable register is not a clean one.
+
+It is opt-in and the default did not move, because blocking everywhere was measured
+as the wrong trade: across the nine consuming repositories, two hold registers with
+24 of 25 and 20 of 21 rows already expired, and a blocking Layer 4 would turn them red
+on their next commit for a file their pull requests never touch. Layer 4 does not run
+at `precommit` level, so enforcement gates CI rather than local work, and the pull
+request that refreshes `TRUST.md` carries the refreshed rows with it: the failure
+heals through the ordinary route instead of deadlocking.
+
 ### 2.6 Secrets & PII Firewall
 
 > **`.aiignore` is agent-facing documentation, not a gate.** No code in this repository
@@ -498,7 +513,7 @@ up to 4 layers:
    handoff edits, and any mixed source change remain impacting. The gate logs
    every applied classification with its required review reason.
 3. **Commit-pointer freshness** - `MANIFEST.last_session.commit` vs HEAD.
-4. **TRUST-TTL expiry** - reports expired `verified` rows (advisory).
+4. **TRUST-TTL expiry** - reports expired `verified` rows. Advisory by default; blocking in a repository that sets `trustTtl.enforce` (see 2.5).
 
 ```bash
 ./scripts/verify-handoff.sh [path] --level precommit   # fast: layers 1-2
@@ -1090,7 +1105,7 @@ human-auditable trust record in one human-readable file.
 
 ### ADR-007: gate severities are fixed (drift blocks, TTL warns, escape hatch is local-only)
 **Why it recurs:** each severity is a knob an agent could flip while "tuning" the gate.
-**Decision:** the content-drift gate hard-fails; TRUST-TTL is advisory (warn); and
+**Decision:** the content-drift gate hard-fails; TRUST-TTL is advisory (warn) by default, with per-repository opt-in enforcement added later in ADR-024; and
 `AAHP_SKIP_VERIFY` is honored locally but ignored at `--level ci`, so that environment
 variable cannot skip the required invocation. The pull-request evaluator paths still
 need trusted-review protection as described in Section 2.8.
@@ -1537,6 +1552,32 @@ The lint tool (`lint-handoff.sh`) detects `HANDOFF.lock` files across branches a
 See **Section 8** below for the full v3 task ID and dependency graph specification.
 
 ---
+
+
+### ADR-024: trust decay can block, and each repository decides whether it does
+**Why it recurs:** a control with no failing branch is indistinguishable from a
+control that always passes, and this one had none. Nothing in Layer 4 incremented
+`FAILURES`, so no number of expired rows could change the exit code. Trust Decay is
+the mechanism by which a `verified` claim stops counting as verified, and it could
+not stop anything.
+**Evidence:** 8 of the 10 `verified` rows in this repository's own register were past
+expiry, some by 12 days and one by 16, while every gate on `main` was green. One of
+the expired rows asserted `verify-handoff.sh runs all 4 layers`; two of those four
+could not produce a verdict. Reported at https://github.com/homeofe/AAHP/issues/73.
+**What was rejected, and why:** blocking for every repository. Measured across the
+nine consuming repositories, two hold registers with 24 of 25 and 20 of 21 rows
+already expired, so that change turns them red on their next commit for a file their
+pull requests never touch. A gate that fires on repositories which changed nothing is
+the kind that gets switched off, which costs more than the finding.
+**Decision:** `trustTtl.enforce` in `aahp.config.json`, opt-in, on the same pattern as
+`pinnedDep`. Absent or false, Layer 4 warns exactly as before and no consumer changes
+behaviour. True, and expired rows fail the run, as does a register that cannot be
+classified, so enforcement cannot be disabled by breaking the table instead of editing
+the reviewed config. This repository sets it to true.
+**The deadlock objection does not apply to this shape:** Layer 4 does not run at
+`precommit`, so no local commit is blocked, and the pull request that refreshes the
+register carries the refreshed rows, so CI reads a clean one. It heals through the
+ordinary route.
 
 ## 8. v3 -Task IDs and Dependency Graphs
 
@@ -2052,7 +2093,9 @@ exact-file, M-only Layer 2 classifications described in Section 2.8. Two selecti
 tune the surface:
 `check` (`only`/`skip`) chooses which gates `aahp check` runs, and `pinnedDep`
 (`name`/`location`/`allowRange`) opts the `doctor` pinned-dep gate in (absent, it is a clean
-skip). `acceptanceCriteria` (`include`/`manifest`) supplies the input paths for the
+skip). `trustTtl` (`enforce`) opts verify Layer 4 in the same way: absent or false, expired
+`verified` rows warn and the run still passes, which is what every existing repository
+gets; true, and they fail it. `acceptanceCriteria` (`include`/`manifest`) supplies the input paths for the
 advisory `aahp criteria` report of Section 8.7; it configures no gate, because that report
 is not one. Every section is optional.
 

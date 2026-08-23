@@ -8,9 +8,23 @@
 
 <!-- EXAMPLE ENTRIES, delete these before using in production -->
 
+<!--
+  The blockquote at the top of the first entry is the provenance block from
+  README Section 2.4. It is a CONVENTION: no AAHP gate reads these five fields,
+  and no gate fails when an entry omits them (ADR-021). It ships here so that a
+  repository following the template produces entries that can be traced back to
+  an agent and a session. If your project needs that trail to be complete, you
+  have to enforce it yourself; AAHP will not tell you when it is missing.
+-->
+
 ## [YYYY-MM-DD] [Agent]: [Task Name]
 
-**Agent:** Claude Sonnet 4.6 (or whichever model)
+> **Agent:** claude-opus-4.6
+> **Session ID:** sess_abc123
+> **Timestamp:** 2026-02-26T14:30:00Z
+> **Commit before:** abc1234
+> **Commit after:** def5678
+
 **Phase:** 3 (Implementer)
 **Branch:** feat/example-feature
 

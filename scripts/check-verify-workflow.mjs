@@ -26,8 +26,17 @@
  * the workflow from triggering (a required check that never reports leaves the
  * pull request pending).
  *
+ * BOTH SHIPPED WORKFLOWS ARE IN SCOPE. `aahp-verify.yml` gates handoff state and
+ * `aahp-govern.yml` gates governance (ADR-016). The audit originally covered only
+ * the first, so a governance-only adopter - exactly the audience `aahp init
+ * --gates` and the "Portable Governance" positioning target, and an adopter with
+ * no `aahp-verify.yml` at all - could wrap their one CI backstop in `if: false`
+ * and still read `SKIP: no workflow here runs the AAHP verify gate`, exit 0. The
+ * verdicts stay separate (see `governance-only` below), because the two files
+ * answer different questions and one is not evidence for the other.
+ *
  * Usage: node scripts/check-verify-workflow.mjs [path-to-project] [--json]
- * Exit:  0 enforced or not adopted here
+ * Exit:  0 enforced, governance-only, or not adopted here
  *        1 the gate can be skipped (findings printed)
  *        2 a workflow hosts the gate but its shape cannot be classified, or IO
  *          error. Never silently 0: unclassifiable is not clean.
@@ -377,8 +386,66 @@ const RUNS_VERIFY = [
 ];
 const CI_LEVEL = /--level[\s=]+ci\b/;
 
+// The GOVERNANCE gate: the other workflow this package ships, and the only CI
+// backstop a governance-only adopter has.
+//
+// `aahp init --gates` writes assets/governance/aahp-govern.yml into an adopting
+// repository. That file runs `aahp check` and `aahp doctor --governance`, and an
+// adopter who never keeps .ai/handoff/ has no aahp-verify.yml at all. Until this
+// list existed, wrapping its `Run governance gates` step in `if: false` left
+// `aahp doctor` reporting `SKIP verify-workflow: no workflow here runs the AAHP
+// verify gate` and exiting 0 - the same false green this gate exists to stop,
+// one file over, in the file with the wider blast radius.
+//
+// `doctor` counts for the same reason `check` does: it is not a report, it exits
+// non-zero when a conformance gate fails. Skipping it removes a verdict.
+//
+// The `aahp.js` path form is load-bearing, not a nicety. The shipped template
+// invokes `node ./node_modules/@elvatis_com/aahp/bin/aahp.js check .`, so a
+// pattern that only knew the bare binary name would miss the exact file this was
+// added for. `npm run govern` is deliberately NOT matched: what that script
+// expands to is not readable from the workflow, and a guess is a finding this
+// reader cannot support.
+const RUNS_GOVERN = [
+  /(^|[\s"'/@])aahp(@[^\s"']*)?\s+(check|doctor)(\s|$)/,
+  /aahp\.js\s+(check|doctor)(\s|$)/,
+];
+
 export function runsVerify(run) {
   return typeof run === "string" && RUNS_VERIFY.some((re) => re.test(run));
+}
+
+export function runsGovern(run) {
+  return governSubcommands(run).length > 0;
+}
+
+// Which governance SUBCOMMANDS a `run:` invokes, as a sorted list.
+//
+// The split matters and the first draft of this file got it wrong. `aahp check`
+// and `aahp doctor` are different gates, not two spellings of one, so "some step
+// in this job runs unconditionally" is the wrong test: the shipped
+// aahp-govern.yml runs both, and wrapping ONLY `Run governance gates` in
+// `if: false` leaves the doctor step unconditional. Under a per-job test that
+// tamper reads as enforced, which is the finding this gate was extended to
+// catch, surviving inside the fix for it. Each subcommand is therefore required
+// to have an unconditional instance of its own.
+export function governSubcommands(run) {
+  if (typeof run !== "string") return [];
+  const found = new Set();
+  for (const re of RUNS_GOVERN) {
+    const g = new RegExp(re.source, "g");
+    let m;
+    while ((m = g.exec(run)) !== null) {
+      // Read the subcommand out of whichever capture group holds it rather than
+      // by index: the two patterns have different group counts, and indexing by
+      // position picked up the trailing-whitespace group in an earlier draft.
+      for (const group of m.slice(1)) {
+        if (group === "check" || group === "doctor") found.add(group);
+      }
+      if (g.lastIndex === m.index) g.lastIndex++;
+    }
+  }
+  return [...found].sort();
 }
 
 export function isCiLevel(run) {
@@ -401,13 +468,15 @@ function describeStep(step, index) {
 
 /**
  * Audit one parsed workflow document.
- * Returns { hosts, findings } where hosts is the list of jobs that run the gate.
+ * Returns { hosts, governHosts, findings }: `hosts` are jobs that run the verify
+ * gate, `governHosts` are jobs that run the governance gate.
  */
 export function auditDoc(doc, file) {
   const findings = [];
   const hosts = [];
+  const governHosts = [];
   const jobs = doc && typeof doc === "object" && doc.jobs && typeof doc.jobs === "object" ? doc.jobs : null;
-  if (!jobs) return { hosts, findings };
+  if (!jobs) return { hosts, governHosts, findings };
 
   for (const [jobId, job] of Object.entries(jobs)) {
     if (!job || typeof job !== "object") continue;
@@ -415,7 +484,13 @@ export function auditDoc(doc, file) {
     const verifySteps = steps
       .map((s, i) => ({ step: s, i }))
       .filter(({ step }) => runsVerify(step.run));
-    if (verifySteps.length === 0) continue;
+    const governSteps = steps
+      .map((s, i) => ({ step: s, i }))
+      .filter(({ step }) => runsGovern(step.run));
+    if (verifySteps.length === 0) {
+      if (governSteps.length > 0) auditGovernJob(findings, governHosts, file, jobId, job, governSteps);
+      continue;
+    }
     hosts.push({ file, job: jobId });
     const at = `${file}: job "${jobId}"`;
 
@@ -474,7 +549,77 @@ export function auditDoc(doc, file) {
     }
   }
 
-  return { hosts, findings };
+  return { hosts, governHosts, findings };
+}
+
+// Audit a job whose only AAHP invocation is the governance gate.
+//
+// SCOPE, and why it is narrower than it looks. This runs only for jobs that host
+// NO verify step. Where `aahp verify` and `aahp doctor` sit in the same job -
+// the shape of every consumer measured on 2026-08-23, 8 of 9 of which run
+// `aahp doctor . --json` immediately after the verify step - that job's
+// skippability is already decided above, and a second verdict over the same
+// `if:` would double-report one condition. The uncovered case is therefore
+// narrow and named rather than hidden: a job whose verify step is unconditional
+// while its doctor step alone carries an `if:`. There the gate still runs all
+// four layers and only the conformance record is lost, which is a smaller
+// finding than this gate is built to make, and flagging the common and
+// legitimate `if: github.event_name == 'pull_request'` on a record-emitting step
+// would be a false positive. A false positive here gets the gate switched off.
+//
+// There is no --level to test: neither `aahp check` nor `aahp doctor` takes one,
+// so the `no-ci-level` finding has no counterpart. Everything else does.
+function auditGovernJob(findings, governHosts, file, jobId, job, governSteps) {
+  governHosts.push({ file, job: jobId });
+  const at = `${file}: job "${jobId}"`;
+
+  if (job.if !== undefined && job.if !== null) {
+    findings.push({
+      id: "govern-job-conditional",
+      detail:
+        `${at} runs the AAHP governance gate under a job-level \`if:\` (${String(job.if).trim()}). ` +
+        "When it evaluates false the job is skipped and reports success, having run no gate. " +
+        "For a repository whose only AAHP workflow is the governance one, that is the whole backstop.",
+    });
+  }
+  if (softFailing(job["continue-on-error"])) {
+    findings.push({
+      id: "govern-job-soft-failing",
+      detail: `${at} runs the AAHP governance gate but sets continue-on-error, so the job reports success even when a gate fails.`,
+    });
+  }
+
+  // Per SUBCOMMAND, never per job: see governSubcommands above for why a
+  // job-wide "some step is unconditional" test lets the real tamper through.
+  for (const sub of ["check", "doctor"]) {
+    const subSteps = governSteps.filter(({ step }) => governSubcommands(step.run).includes(sub));
+    if (subSteps.length === 0) continue;
+
+    const unconditional = subSteps.filter(({ step }) => step.if === undefined || step.if === null);
+    if (unconditional.length === 0) {
+      const conds = subSteps
+        .map(({ step, i }) => `"${describeStep(step, i)}" if: ${String(step.if).trim()}`)
+        .join("; ");
+      findings.push({
+        id: "govern-step-conditional",
+        detail:
+          `${at} runs \`aahp ${sub}\` only under a condition (${conds}). ` +
+          "On the events where that condition is false the job still reports success, " +
+          `having run no ${sub === "check" ? "governance gate" : "conformance gate"}.`,
+      });
+      continue;
+    }
+
+    const hard = unconditional.filter(({ step }) => !softFailing(step["continue-on-error"]));
+    if (hard.length === 0) {
+      findings.push({
+        id: "govern-step-soft-failing",
+        detail:
+          `${at} runs \`aahp ${sub}\` unconditionally, but every such step sets ` +
+          "continue-on-error, so a failing gate still leaves the check green.",
+      });
+    }
+  }
 }
 
 // A workflow file that is clearly the AAHP verify workflow but exposes no `run:`
@@ -486,9 +631,18 @@ function looksLikeVerifyWorkflow(file, doc) {
   return typeof name === "string" && /^aahp\s+verify$/i.test(name.trim());
 }
 
+// Same argument for the governance workflow: a file named or titled as the one
+// `aahp init --gates` scaffolds, which exposes no `run:` this reader recognises,
+// is undecidable rather than absent.
+function looksLikeGovernWorkflow(file, doc) {
+  if (basename(file) === "aahp-govern.yml" || basename(file) === "aahp-govern.yaml") return true;
+  const name = doc && typeof doc === "object" ? doc.name : null;
+  return typeof name === "string" && /^aahp\s+govern$/i.test(name.trim());
+}
+
 export function audit(root) {
   const dir = join(root, ".github", "workflows");
-  const result = { verdict: "absent", hosts: [], findings: [], unclassifiable: [] };
+  const result = { verdict: "absent", hosts: [], governHosts: [], findings: [], unclassifiable: [] };
   let entries;
   try {
     entries = readdirSync(dir);
@@ -513,13 +667,18 @@ export function audit(root) {
     } catch (err) {
       // Only a workflow that plausibly hosts the gate matters here. An unrelated
       // workflow this reader cannot parse is not this gate's business.
-      if (looksLikeVerifyWorkflow(file, null) || /verify-handoff\.sh|aahp\s+verify/.test(text)) {
+      if (
+        looksLikeVerifyWorkflow(file, null) ||
+        looksLikeGovernWorkflow(file, null) ||
+        /verify-handoff\.sh|aahp\s+verify|aahp\s+(check|doctor)/.test(text)
+      ) {
         result.unclassifiable.push(`${file}: cannot be parsed (${err.message})`);
       }
       continue;
     }
-    const { hosts, findings } = auditDoc(doc, file);
+    const { hosts, governHosts, findings } = auditDoc(doc, file);
     result.hosts.push(...hosts);
+    result.governHosts.push(...governHosts);
     result.findings.push(...findings);
     if (hosts.length === 0 && looksLikeVerifyWorkflow(file, doc)) {
       result.unclassifiable.push(
@@ -527,16 +686,31 @@ export function audit(root) {
           "skipped cannot be decided from this file (a composite action or reusable workflow?).",
       );
     }
+    if (hosts.length === 0 && governHosts.length === 0 && looksLikeGovernWorkflow(file, doc)) {
+      result.unclassifiable.push(
+        `${file}: no step runs the AAHP governance gate directly, so whether the gate can be ` +
+          "skipped cannot be decided from this file (an `npm run` indirection, a composite " +
+          "action or a reusable workflow?).",
+      );
+    }
   }
 
   if (result.unclassifiable.length > 0) result.verdict = "unclassifiable";
   else if (result.findings.length > 0) result.verdict = "bypassable";
   else if (result.hosts.length > 0) result.verdict = "enforced";
+  else if (result.governHosts.length > 0) result.verdict = "governance-only";
   else result.verdict = "absent";
   return result;
 }
 
-const EXIT = { enforced: 0, absent: 0, bypassable: 1, unclassifiable: 2 };
+// `governance-only` is deliberately NOT folded into `enforced`. Both exit 0 and
+// both mean "nothing here can skip the AAHP gate this repository runs", but they
+// are answers about different gates: `enforced` says the verify gate runs at
+// --level ci, which is the one that compares a handoff checksum, and
+// `governance-only` says the repository runs the governance gates and no verify
+// gate at all. Collapsing them would let a repository with no handoff integrity
+// checking anywhere report the same token as one that has it.
+const EXIT = { enforced: 0, absent: 0, "governance-only": 0, bypassable: 1, unclassifiable: 2 };
 
 export function main(argv = process.argv.slice(2)) {
   const flags = argv.filter((a) => a.startsWith("--"));
@@ -561,6 +735,14 @@ export function main(argv = process.argv.slice(2)) {
   if (result.verdict === "enforced") {
     const where = result.hosts.map((h) => `${h.file}:${h.job}`).join(", ");
     console.log(`check-verify-workflow: OK - the gate runs unconditionally at --level ci (${where}).`);
+    return 0;
+  }
+  if (result.verdict === "governance-only") {
+    const where = result.governHosts.map((h) => `${h.file}:${h.job}`).join(", ");
+    console.log(
+      `check-verify-workflow: OK - the AAHP governance gate runs unconditionally (${where}). ` +
+        "No workflow here runs `aahp verify`, so nothing in this repository compares a handoff checksum.",
+    );
     return 0;
   }
   if (result.verdict === "unclassifiable") {

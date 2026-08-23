@@ -1,3 +1,258 @@
+## A HIGH advisory whose only offered fix was a five-major downgrade
+
+`fast-json-patch` below 3.1.1 carries GHSA-8gh8-hqwg-xf34, prototype pollution,
+rated HIGH. It reaches this repository through `ajv-cli@5.0.0`, which requires
+`^2.0.0` and therefore cannot take the fix inside its own range. `npm audit fix`
+offers exactly one remedy: `ajv-cli@0.6.0`, five majors back, which predates
+`--spec=draft2020` and so would take both schema validation steps in `ci.yml`
+with it. That is the shape worth naming: an advisory where the tool's suggested
+fix costs more than the finding.
+
+Resolved with an `overrides` entry pinning `fast-json-patch` to `^3.1.1`.
+`npm audit` goes from 2 HIGH to 0 across every severity.
+
+An override is a claim that the new major still works, so it was measured rather
+than assumed. `ajv-cli` touches exactly one symbol, `jsonPatch.compare(a, b)`, in
+`validate.js` and `migrate.js`, and v3 keeps it unchanged. All three commands
+were then run against this tree: the MANIFEST schema step, the config step with
+both documents, and `--changes=json`, which is the branch that actually calls
+`compare` and which neither CI step exercises. All exit 0. A deliberately
+invalid MANIFEST, with `aahp_version` removed and `files` replaced by a string,
+still exits 1, so the validator was proved to be doing work rather than passing
+everything.
+
+There are no runtime dependencies in this package, so no adopter ever received
+the vulnerable code; the exposure was this repository's own CI and any
+contributor's `npm ci`. That makes it lower impact than the severity suggests
+and does not make it acceptable to leave.
+
+NOT covered: the override applies to whatever else in the tree may later ask for
+`fast-json-patch@2`. Nothing does today, and if something does, npm will resolve
+it to 3.1.1 silently rather than warn.
+## Three pull requests, each correct, none of them mergeable
+
+Dependabot opened #96, #98 and #99 to move `github/codeql-action` from v3.37.8
+to v4.37.7: one per sub-path, `init`, `autobuild` and `analyze`, all three
+pointing at the SAME commit `ff2f1c62`. Each is correct in isolation and none of
+them has a green state. The action refuses to run when its steps are on
+different versions, so every single-path change fails with "Not all workflow
+steps that use github/codeql-action actions use the same version" and "Loaded a
+configuration file for version '4.37.7', but running version '3.37.8'". Merging
+them in some order does not help either, because the tree stays mixed until the
+last one lands and each run gates on the state before it.
+
+Fixed by moving all three refs in one commit, which is what the action requires.
+#96, #98 and #99 are closed as superseded rather than merged, since their
+branches each carry the split that caused this.
+
+The split is the defect worth fixing, not the version. Dependabot resolves every
+SUB-PATH of an action repository as a separate dependency, so the next
+codeql-action release arrives the same way unless something changes.
+`.github/dependabot.yml` now carries a `groups:` entry covering
+`github/codeql-action*`, and `check-workflow-pinning.mjs` gains rule G, which
+fails when ANY action used through more than one sub-path is left ungrouped. It
+is written as a property of multi-path actions rather than as a codeql special
+case, so the next action shipped this way is covered without another change.
+Green on this tree, red with the `groups:` block deleted, green again once it is
+restored.
+
+Same investigation, second finding, and it is the one that explains a symptom
+nobody had traced: `labels: ["dependencies"]` in both Dependabot lanes names a
+label this repository did not have. Dependabot applies configured labels but
+never creates them, so all four of its pull requests arrived unlabelled while
+every human pull request carried labels. The label exists now. That is
+repository state and not tree state, so nothing in this commit proves it and no
+gate here can.
+
+NOT covered: whether v4.37.7 changes any CodeQL result. This moves three pins
+and nothing else. The first analysis run on the new major is the only thing that
+answers that, and it has not run yet at the time of writing.
+
+## Three verdicts nobody produced: a count, a record, and a register nobody read
+
+Three issues, one shape, and it is the shape the two entries below this one
+already named: a control that publishes a result it did not earn. The vocabulary
+is reused rather than reinvented - NOT EVALUATED and `unevaluated`, which this
+CLI already emitted for an invalid config.
+
+REPRODUCED FIRST, each against a positive control proving the harness was live.
+
+**doctor counted gates, not gates that ran.** On a fixture built exactly as an
+adopter would (`aahp init --gates` into an empty repository) it printed
+`Conformance OK: 7 gate(s), no failures.` over seven skips and zero evaluations,
+exit 0, and `--quiet` printed zero bytes and exited 0. Now
+`Conformance OK: N of 7 gate(s) ran`, and zero evaluated is
+`Conformance NOT EVALUATED: 0 of 7 gate(s) ran. This is not a pass.`, exit 1, on
+the text path, under `--quiet` and under `--json` alike.
+
+**The record collapsed four states into `skip`.** A repository that had adopted
+governance and one that had switched every gate off through `config.check`
+emitted byte-identical `gates` objects. `schemaVersion` is now 2: `gates` is
+UNCHANGED, and `gateOutcomes` (refined outcome plus the human reason, per gate),
+`evaluated` and `total` are added. Surveyed across the nine consuming
+repositories in this estate: none parses the record, every one runs
+`aahp doctor . --json` as a CI step and reads only the exit code, so the bump
+reaches no parser. The one breaking edge, a reader asserting
+`schemaVersion === 1`, is named in the CHANGELOG.
+
+**`aahp check --json` disagreed with `aahp check` about the same tree.** Measured
+on `origin/main` at `2cdaf48`: text `NOT EVALUATED, exit 1`, JSON `exit 0, every
+gate skip`, because the JSON branch returned above the zero-gate test. That was
+recorded here as STILL OPEN and read as a commitment about bare repositories.
+It is not: the commitment was made when the text path shipped, and the JSON path
+was simply left on the other side of a `return`. One verdict is now computed once
+and used by both.
+
+**The tamper gate did not look at the file with the widest blast radius.**
+`assets/governance/aahp-govern.yml` is what `aahp init --gates` writes into an
+adopting repository, and a governance-only adopter has no `aahp-verify.yml` at
+all. `if: false` on its `Run governance gates` step left doctor reporting
+`SKIP: no workflow here runs the AAHP verify gate`, exit 0. Now four
+`govern-*` findings, and a distinct `governance-only` verdict whose pass reason
+says out loud that nothing there compares a handoff checksum.
+FOUND WHILE FIXING, in the fix: the first draft tested skippability per JOB, and
+the shipped template runs `check` AND `doctor`, so wrapping only the gate step
+still read as enforced. The audit is per SUBCOMMAND for that reason, and the
+fixture that caught it is in the test set.
+
+**Layer 4 called a register clean that it never managed to read.**
+`aahp_trust_expired` prints nothing both when nothing is expired and when not one
+row was parsed. Measured across the nine consuming repositories: SIX have a
+`TRUST.md` in which this reader sees zero decidable rows, and in one the register
+is a real, populated `Verified Properties` table with an `Expires` column and no
+`Status` column, holding a row eight days past expiry, reported as clean. The new
+census separates "no trust table here" from "a table this reader cannot classify"
+from "N checked, none expired".
+
+**WHAT THIS DOES NOT COVER, and it is deliberate.**
+- Layer 4 is still ADVISORY. It increments no failure count and cannot fail a
+  build, whatever it finds. Making it fail is an OWNER DECISION and is named in
+  the pull request with the measurement that argues against doing it silently:
+  two consuming repositories hold registers with 24 of 25 and 20 of 21 verified
+  rows already expired, so a blocking Layer 4 turns them red on their next commit
+  for a file none of their pull requests touch.
+- Layer 3 has the same all-warnings shape and is untouched here.
+- Where `aahp verify` and `aahp doctor` run in the SAME job, an `if:` on the
+  doctor step alone is still not a finding. The gate runs all four layers there;
+  only the record is lost. Flagging it would fire on the legitimate
+  `if: github.event_name == 'pull_request'`, and a false positive is what gets a
+  gate switched off.
+- The expired rows in this repository's own register are re-dated only where
+  something was actually re-run on Linux this session; the rest are downgraded to
+  `assumed` rather than given a date nobody earned.
+- No consumer repository is changed. Six of the nine report `bypassable` against
+  their own `aahp-verify.yml` and only the owning repositories can fix that.
+
+MEASURED AGAINST REAL CONSUMERS, at their `origin/main` rather than a local
+working copy: the `verify-workflow` verdict and exit code are identical for all
+nine before and after, and `doctor`/`check` exit codes are identical for all nine.
+
+TWO FIXTURES RE-GROUNDED AFTER THE FIRST LINUX RUN, and the reason is worth
+keeping. Three tests went red on bats 1.10.0 and none of the three was a defect
+in the change:
+- Two doctor tests asserted `Conformance OK: 5 of 7`. The real number is 4: the
+  three handoff gates plus `pinned-dep` evaluate, and `verify-workflow` does not,
+  because the fixture holds no workflows. The 5 was WRITTEN, not measured, which
+  is exactly the failure mode this branch is about. Corrected against the Linux
+  run, and the comment now says where the number came from.
+- `check: versionSites without package.json skips version-sync and exits 0`
+  configured `versionSites` and nothing else, so NO gate ran and the test pinned
+  exit 0 over a run that had assessed nothing - the same defect written down as
+  an expectation, surviving only because it used `--json`. Re-grounded the way
+  the doc-links deselection test above it already was: the applicability
+  assertion is unchanged, and a gate that really runs was added beside it so the
+  exit code means "no gate failed" rather than "nothing ran".
+
+THE FULL SUITE THEN FOUND TWO MORE OF THE SAME, and they are worth naming
+because they are the same pattern a third and fourth time:
+- `acceptance-criteria.bats` "the gate set is eight ids" configured nothing, so
+  it too pinned exit 0 over a run that assessed nothing. Its subject is the gate
+  SET, which is unchanged; the exit assertion is now 1 with `evaluated === 0`
+  asserted beside it, so the test states WHY rather than leaving the number to
+  be guessed.
+- `inert-controls.bats` "84 zero gates ran" asserted the substring
+  `0 gate(s) ran`, which the new denominator form does not contain. Asserted as
+  `0 of 8 gate(s) ran` instead, which is strictly stronger, and a second test was
+  added beside it for the `--json` half that was still open.
+
+ONE FULL-SUITE FAILURE IS NOT MINE, AND IT IS NOT THE REPOSITORY'S EITHER.
+`tests/manifest.bats` "project name survives regeneration when node is
+unavailable" fails IDENTICALLY on unmodified `main` at `2cdaf48`, on the same
+remote Linux runner, checked before concluding anything. It builds a PATH without
+an interpreter and `bats` reports `exited with code 127` for `node --version`
+inside it.
+The first version of this note stopped there and called it pre-existing, which is
+true and still understates the result. Hosted CI on this branch runs the same
+527 tests on three runners and reports 527 passed, 0 failed, 1581 `ok` lines and
+ZERO `not ok` - that test included. So it is an artefact of ONE machine, not a
+standing red test in this repository. Worth remembering next time: "fails on main
+too" rules out a regression, it does not establish that the suite is broken.
+
+HOSTED CI, this branch: all twelve checks green, mergeStateStatus CLEAN, the
+`ShellCheck scripts` step included, which is what covers `verify-handoff.sh`
+because shellcheck is not installed on the remote Linux runner used here.
+
+MUTATION PROOFS: eight, each with a control that stayed green, each restored to
+an md5-identical file. One of them is recorded rather than quietly corrected: the
+first version of the `--json` exit proof named the wrong `process.exit` call.
+`cmdDoctor` has TWO, and the one it named was the text path's, so the mutation
+landed, the file really changed, and the `--json` test stayed GREEN. A named
+anchor that turns nothing red is worth no more than no anchor at all. Split into
+two proofs, one per exit call, and both go red.
+## Two published guarantees with nothing behind them: one withdrawn, one given a gate
+
+Section 2.4 stated a provenance MUST and an audit trail. Both are withdrawn
+(ADR-021). Enforcement was measured before it was rejected, not after: across the
+nine repositories in this estate that consume the protocol, LOG.md holds 100
+level-2 entries and 8 carry all five fields (agent 64, session id 27, timestamp
+31, commit-before 10, commit-after 8). Every one of the nine has at least one
+entry that would fail, so a retroactive MUST reddens 9 of 9 over history none of
+them can change, and this repository's own LOG fails it too (10 entries, 0 with
+all five). Reproduced the non-enforcement independently on a throwaway repo:
+after stripping every provenance line and appending an entry with none,
+lint / verify --level ci / doctor all exit 0. No gate was added and none was
+added off-by-default either, for ADR-017's reason. What ships instead: the five
+fields now sit in templates/LOG.md and templates/STATUS.md, bound to Section 2.4
+by a provenance-block docSync group, so the shipped example and the stated
+recommendation cannot drift apart.
+
+The README told adopters to copy a .github/workflows/ path this repository does
+not have; the real file is assets/governance/aahp-govern.yml. Fixed, and gated:
+scripts/check-doc-shape.mjs resolves backticked repo-relative paths against the
+git index and asserts a setup heading exists before the ADR log. Not a blanket
+rule - 46 of 78 path-shaped spans in this README correctly name a file in an
+ADOPTER's tree - so it only resolves spans whose first segment is tracked here,
+and exceptions carry an exact occurrence COUNT rather than being allowlisted. A
+path-level allowlist would have exempted the very defect it exists for, because
+the wrong sentence and the right ones use the same string. It exits 2 on anything
+it could not assess. The README also gained an Installation and Quickstart
+section; every command in it was run against a throwaway repository first.
+
+Found by running the suite on Linux rather than by reading it: the doc-shape
+fixture repository did not track a .github/ entry, so four tests that assert a
+FINDING passed vacuously - the first filter put the whole class out of scope
+before any assertion ran. The fixture now carries .github/workflows/aahp-verify.yml
+and no aahp-govern.yml, which is the shape the real defect had. A fifth test
+claimed the runtime guard rejects a missing occurrences count; the schema rejects
+it first, at exit 2, so that test now asserts the path that actually executes and
+the runtime guard is tested on the case only it can catch (a reason that is
+present and blank).
+
+NOT covered: no gate anywhere checks whether an adopting repository's LOG entries
+carry provenance, and after ADR-021 none is intended to. check-doc-shape is
+repository-local, absent from CHECK_GATES, so no consumer inherits it, and it
+still cannot see a path written without backticks or one whose first segment is
+not tracked here. Nothing here touches the nine consumer repositories.
+
+OPEN, found by this work and deliberately NOT fixed here. docPaths.include is the
+docLinks set minus .ai/handoff/*.md. Widening it to the full docLinks set was
+tried and is red: NEXT_ACTIONS.md names .github/workflows/publish.yml twice, and
+there is no such workflow in this repository - publish is a JOB inside ci.yml.
+Same defect class as issue #74, in the document that tells the next agent what to
+do. Left alone because handoff files collide across concurrent branches and this
+change set does not need them. The scope choice itself is recorded in ADR-022: an
+append-only STATUS.md quotes paths that WERE wrong on purpose, so a counted
+exception list over it churns every session and gets switched off.
 ## A pinning gate that never read a single `uses:`, and a record only a test file kept
 
 22 of 25 action references under `.github/workflows/` ran on mutable major tags,

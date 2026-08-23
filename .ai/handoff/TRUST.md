@@ -34,12 +34,12 @@ anchor matrix and README section 2.10 for the doctrine.
 
 | Property | Status | Provenance | Last Verified | Agent | TTL | Expires | Notes |
 |----------|--------|------------|---------------|-------|-----|---------|-------|
-| aahp-manifest.sh generates valid JSON | verified | tool_verified | 2026-08-03 | grok-4.5 | 7d | 2026-08-10 | Re-verified 2026-08-03: regenerated MANIFEST.json with real summaries; doctor + handoff check green |
+| aahp-manifest.sh generates valid JSON | assumed | - | 2026-08-03 | grok-4.5 | 7d | 2026-08-10 | Downgraded 2026-08-23: TTL lapsed on 2026-08-10 and nothing re-ran it. `assumed` is what this register's own table calls an unverified claim; a fresh date would have been a verdict nobody produced |
 | aahp-migrate-v2.sh delegates correctly | assumed | - | 2026-07-25 | claude-opus-5 | 7d | 2026-08-10 | Deferred full migrate.bats this session; prior test_verified evidence kept as assumed after TTL |
-| lint-handoff.sh runs all 7 checks | verified | tool_verified | 2026-08-03 | grok-4.5 | 7d | 2026-08-10 | Conflict-marker check 7 shipped in #55; lint-handoff runs green on this tree |
-| verify-handoff.sh runs all 4 layers | verified | tool_verified | 2026-08-03 | grok-4.5 | 7d | 2026-08-10 | `aahp verify --level prepush` re-run after handoff rewrite |
+| lint-handoff.sh runs all 7 checks | assumed | - | 2026-08-03 | grok-4.5 | 7d | 2026-08-10 | Downgraded 2026-08-23: TTL lapsed on 2026-08-10 and nothing re-ran it. `assumed` is what this register's own table calls an unverified claim; a fresh date would have been a verdict nobody produced |
+| verify-handoff.sh runs all 4 layers | assumed | - | 2026-08-03 | grok-4.5 | 7d | 2026-08-10 | Downgraded 2026-08-23: TTL lapsed on 2026-08-10 and nothing re-ran it. `assumed` is what this register's own table calls an unverified claim; a fresh date would have been a verdict nobody produced |
 | Content-drift gate hard-fails | assumed | - | 2026-07-25 | claude-opus-5 | 7d | 2026-08-10 | Deferred throwaway-repo re-proof this session; prior behavioral proof retained as assumed |
-| Config gates + aahp doctor pass | verified | tool_verified | 2026-08-03 | grok-4.5 | 7d | 2026-08-10 | `npm run check` 8/8 green; doctor 6 gates clean; partial-index smoke FAIL as expected |
+| Config gates + aahp doctor pass | assumed | - | 2026-08-03 | grok-4.5 | 7d | 2026-08-10 | Downgraded 2026-08-23: TTL lapsed on 2026-08-10 and nothing re-ran it. `assumed` is what this register's own table calls an unverified claim; a fresh date would have been a verdict nobody produced |
 | Escape hatch ignored at level ci | assumed | - | 2026-07-25 | claude-opus-5 | 30d | 2026-08-24 | Prior behavioral proof; TTL still valid on 30d row |
 | _aahp-lib.sh functions portable | assumed | - | 2026-08-03 | grok-4.5 | 7d | 2026-08-10 | Exercised on Windows + Git Bash this session; not re-proven on macOS/Linux host here |
 | Scripts pass shellcheck | assumed | - | 2026-08-03 | grok-4.5 | 7d | 2026-08-10 | shellcheck not installable offline here; CI shellcheck job remains the authority |
@@ -51,8 +51,8 @@ anchor matrix and README section 2.10 for the doctrine.
 | Property | Status | Provenance | Last Verified | Agent | TTL | Expires | Notes |
 |----------|--------|------------|---------------|-------|-----|---------|-------|
 | aahp-manifest.schema.json valid JSON Schema | assumed | - | 2026-08-03 | grok-4.5 | 30d | 2026-09-02 | Stable; doctor manifest-schema structural check green |
-| Generated MANIFEST.json passes schema | verified | tool_verified | 2026-08-03 | grok-4.5 | 7d | 2026-08-10 | doctor manifest-schema PASS after regeneration |
-| Checksums match file contents | verified | tool_verified | 2026-08-03 | grok-4.5 | 3d | 2026-08-06 | verify Layer 1 / lint green after rewrite |
+| Generated MANIFEST.json passes schema | assumed | - | 2026-08-03 | grok-4.5 | 7d | 2026-08-10 | Downgraded 2026-08-23: TTL lapsed on 2026-08-10 and nothing re-ran it. `assumed` is what this register's own table calls an unverified claim; a fresh date would have been a verdict nobody produced |
+| Checksums match file contents | assumed | - | 2026-08-03 | grok-4.5 | 3d | 2026-08-06 | Downgraded 2026-08-23: TTL lapsed on 2026-08-06 and nothing re-ran it. `assumed` is what this register's own table calls an unverified claim; a fresh date would have been a verdict nobody produced |
 | aahp-config.schema.json valid JSON Schema | assumed | - | 2026-08-03 | grok-4.5 | 30d | 2026-09-02 | Consumed by config-driven gates; check suite green |
 
 ---
@@ -71,9 +71,9 @@ anchor matrix and README section 2.10 for the doctrine.
 
 | Property | Status | Provenance | Last Verified | Agent | TTL | Expires | Notes |
 |----------|--------|------------|---------------|-------|-----|---------|-------|
-| No secrets in source | verified | tool_verified | 2026-08-03 | grok-4.5 | 7d | 2026-08-10 | lint-handoff secret scan + forbidden-patterns green |
+| No secrets in source | assumed | - | 2026-08-03 | grok-4.5 | 7d | 2026-08-10 | Downgraded 2026-08-23: TTL lapsed on 2026-08-10 and nothing re-ran it. `assumed` is what this register's own table calls an unverified claim; a fresh date would have been a verdict nobody produced |
 | LICENSE matches declared license | verified | source_verified | 2026-08-03 | grok-4.5 | 30d | 2026-09-02 | Apache-2.0 in LICENSE, package.json, README |
-| README.md is single source of truth | verified | tool_verified | 2026-08-03 | grok-4.5 | 7d | 2026-08-10 | doc-links 17/17 + schema-doc-sync 2/2 green |
+| README.md is single source of truth | assumed | - | 2026-08-03 | grok-4.5 | 7d | 2026-08-10 | Downgraded 2026-08-23: TTL lapsed on 2026-08-10 and nothing re-ran it. `assumed` is what this register's own table calls an unverified claim; a fresh date would have been a verdict nobody produced |
 
 ---
 

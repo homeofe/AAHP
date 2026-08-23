@@ -1,0 +1,29 @@
+# The shape `aahp init --gates` scaffolds into an adopting repository, reduced
+# to the parts this gate reads. Both governance steps run unconditionally, so
+# there is no event on which this job reports success having run no gate.
+name: AAHP Govern
+
+permissions:
+  contents: read
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  govern:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install pinned aahp devDependency
+        run: npm ci --ignore-scripts
+      - name: Run governance gates
+        run: node ./node_modules/@elvatis_com/aahp/bin/aahp.js check .
+      - name: Governance conformance record
+        run: node ./node_modules/@elvatis_com/aahp/bin/aahp.js doctor --governance --json .

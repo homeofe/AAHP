@@ -73,6 +73,81 @@ AAHP v1 works. But in practice, three pain points emerge at scale:
 
 ---
 
+## Installation and Quickstart
+
+Everything below this section explains *why* AAHP is shaped the way it is. This
+section is the shortest path to a repository that has the protocol running. It is
+five steps, and every command in them was executed in a throwaway git repository
+against this tree before it was written down.
+
+**1. Install the CLI.** The package is scoped; the unscoped name `aahp` on npm is
+owned by nobody, so always install the scoped name.
+
+```bash
+npm i -g @elvatis_com/aahp          # global, for the one-off adoption run
+npm i -D @elvatis_com/aahp          # or as an exact-pinned devDependency (what CI uses)
+```
+
+Pin the devDependency exactly, with no range. `aahp doctor` has a `pinned-dep`
+gate that reports on it (Section 2.11), and the workflow below runs the CLI from
+`node_modules/`, never from the registry.
+
+**2. Create the handoff set.** From the root of the repository you are adopting:
+
+```bash
+aahp init .
+```
+
+That copies the templates into `.ai/handoff/`. It does not touch anything else.
+Then do what its own closing message says: replace the `[PROJECT]` placeholders,
+and put your project's rules into `CONVENTIONS.md`.
+
+**3. Generate the manifest.** `MANIFEST.json` is generated, never hand-edited
+(ADR-001, ADR-011):
+
+```bash
+aahp manifest . --phase idle
+git add .ai/handoff/ && git commit -m "chore: init AAHP handoff files"
+```
+
+**4. Run the gate once, by hand, before you rely on it.**
+
+```bash
+aahp verify . --level prepush
+```
+
+A first run straight after the commit above reports Layers 1, 2 and 4 OK and a
+Layer 3 WARN, because the manifest was generated before the commit that contains
+it, so `last_session.commit` is one commit behind `HEAD`. That warning is
+expected on the very first run and clears at the next `/handoff`. Layer 3 warns;
+it does not fail (ADR-007).
+
+**5. Install the hooks and the CI check.**
+
+```bash
+bash node_modules/@elvatis_com/aahp/scripts/install-hooks.sh .   # pre-commit + pre-push
+```
+
+Then copy `.github/workflows/aahp-verify.yml` from this repository into your own
+`.github/workflows/` and make it a required status check. That workflow is the
+off-machine backstop: the local hooks honour `AAHP_SKIP_VERIFY=1`, and
+`--level ci` ignores it. Section 9.2 covers the rest of the harness wiring,
+including the separate, opt-in governance workflow.
+
+**Governance gates are a separate, optional adoption.** They are about releases
+(changelog, version sync, forbidden patterns, doc links), not about handoff
+state, and they have their own scaffolder:
+
+```bash
+aahp init --gates
+```
+
+That writes an `aahp.config.json`, a `govern` npm script, and
+`.github/workflows/aahp-govern.yml` in your repository, and creates no handoff
+files. Section 2.11 documents each gate and what makes it applicable.
+
+---
+
 ## 1. Token Efficiency: The Layered Read Strategy
 
 ### 1.1 Introduce `MANIFEST.json` (new mandatory file)
@@ -270,7 +345,14 @@ Handoff files are read by LLMs. A malicious or compromised agent could inject in
 
 ### 2.4 Agent Identity & Provenance
 
-Every entry in `LOG.md` and every update to `STATUS.md` must include:
+> **This is a convention, not a gate. No code in this repository reads these
+> fields, and nothing fails when they are absent.** The section used to open with
+> "must include" and to close by calling the result an audit trail. Both are
+> withdrawn here, because neither was ever backed by a mechanism. See ADR-021 for
+> the decision and the measurement behind it.
+
+The recommended provenance block, which the shipped `LOG.md` and `STATUS.md`
+templates now carry, is:
 
 ```markdown
 > **Agent:** claude-opus-4.6
@@ -280,7 +362,29 @@ Every entry in `LOG.md` and every update to `STATUS.md` must include:
 > **Commit after:** def5678
 ```
 
-This creates an audit trail. If a `(Verified)` claim turns out to be wrong, you can trace it back to exactly which agent, in which session, made that claim.
+What this buys you, when agents comply, is that a wrong `(Verified)` claim can be
+traced back to the agent and session that made it. That is worth having, and it
+is why the block is recommended and shipped in the templates.
+
+What it does not buy you is any assurance that the block is there. Deleting every
+provenance line from `LOG.md` and `STATUS.md` and appending a new entry with none
+at all leaves `aahp lint`, `aahp verify --level ci` and `aahp doctor` all at exit
+0. `MANIFEST.json` does not carry per-entry provenance either: `last_session`
+records one agent for the most recent session across the whole handoff set, and
+it is rewritten by whoever last ran `aahp manifest`.
+
+So the honest statement of the guarantee is conditional. If an entry carries the
+block, you can trace that entry. If it does not, nothing in AAHP will tell you,
+and a compliance reader should not cite this section as evidence that the trail
+is complete. A repository that needs a complete trail has to enforce it itself,
+in review or in its own CI, and should say so where it makes the claim.
+
+The one thing that is machine-checked here is agreement between this section and
+the shipped templates: the `provenance-block` group in `aahp.config.json` binds
+the five field names above to `templates/LOG.md` and `templates/STATUS.md`, so
+dropping a field from either side turns the `schema-doc-sync` gate red. That gate
+holds the example and the recommendation in step. It says nothing about any
+adopting repository's actual entries.
 
 ### 2.5 Trust Decay
 
@@ -590,12 +694,35 @@ is in sync across configured sites; and the workflow that runs the AAHP gate
 cannot skip it (`verify-workflow`, below). The record:
 
 ```json
-{ "schemaVersion": 1, "repo": "homeofe/AAHP", "aahpVersion": "3.6.0",
+{ "schemaVersion": 2, "repo": "homeofe/AAHP", "aahpVersion": "3.10.0",
   "gates": { "handoff-set": "pass", "manifest-schema": "pass", "grounding": "pass",
              "pinned-dep": "self", "changelog-format": "pass", "version-sync": "pass",
              "verify-workflow": "pass" },
+  "gateOutcomes": { "pinned-dep": { "outcome": "self", "reason": "this repo is @elvatis_com/aahp itself" } },
+  "evaluated": 7, "total": 7,
   "checkedAt": "2026-07-18T00:00:00Z" }
 ```
+
+`gateOutcomes` is abbreviated above; the real record carries one entry per gate.
+
+**Reading the summary line, and `schemaVersion` 2.** The human footer counts
+gates that RAN, not gates that exist: `Conformance OK: 5 of 7 gate(s) ran, no
+failures.` A run in which nothing was evaluated is a third outcome, not a pass:
+it prints `Conformance NOT EVALUATED: 0 of 7 gate(s) ran. This is not a pass.`
+and exits 1, on the text path, under `--quiet`, and under `--json` alike. Before
+version 2 the footer read `Conformance OK: 7 gate(s), no failures.` over seven
+skips and zero evaluations, and `--quiet` printed nothing at all.
+
+`schemaVersion` 2 adds three fields and changes none. `gates` is byte-for-byte
+what version 1 emitted, with the same keys and the same status tokens, so a
+reader that switches on `gates` needs no change. What is new is `gateOutcomes`
+(a refined `outcome` and the human `reason`, per gate), `evaluated` and `total`.
+The refinement matters because version 1's `skip` stood for four different
+states at once, so a repository that has adopted governance and one that has
+switched every gate off through `config.check` emitted identical records. The
+`outcome` values are `pass`, `fail`, `missing`, `self`, `not-applicable`,
+`deselected` and `unevaluated`. A reader asserting `schemaVersion === 1` must
+widen to `>= 1`; a reader that ignores unknown fields needs nothing.
 
 #### The `verify-workflow` gate: can the workflow that runs the gate skip it?
 
@@ -627,15 +754,43 @@ shape. The findings:
 | `ci-step-conditional` | no step runs the gate at `--level ci` unconditionally, so on some events the job succeeds having verified nothing |
 | `ci-step-soft-failing` | the gate runs unconditionally and its result is discarded |
 | `no-ci-level` | the gate never runs at `--level ci`, so `AAHP_SKIP_VERIFY=1` is honoured and a workflow-level `env:` can set it |
+| `govern-job-conditional` | the job hosting the GOVERNANCE gate carries an `if:`; when it is false the job is skipped having run no gate |
+| `govern-job-soft-failing` | that job sets `continue-on-error`, so it reports success when a governance gate fails |
+| `govern-step-conditional` | every step running `aahp check` (or every step running `aahp doctor`) carries an `if:`, so on some events the job succeeds having evaluated nothing |
+| `govern-step-soft-failing` | the governance gate runs unconditionally and its result is discarded |
 
-A repository whose workflows never run the gate reports `skip`: there is no CI
-backstop to weaken. A workflow that clearly hosts the gate but whose shape cannot
-be decided (the gate reached through a composite action, or a file that will not
-parse) reports `fail`, because undecided is not clean. Two shapes are deliberately
-NOT findings, because they fail closed rather than green: an `if:` on the checkout
-step alone (the gate then runs against an empty workspace and exits non-zero), and
-`paths:` filters that stop the workflow triggering (a required check that never
-reports leaves the pull request pending).
+**Both shipped workflows are audited.** ADR-016 splits them deliberately:
+`aahp-verify.yml` gates handoff state, `aahp-govern.yml` gates governance. The
+audit originally covered only the first, which left the wider blast radius
+uncovered: `aahp-govern.yml` is what `aahp init --gates` writes into an adopting
+repository, and a governance-only adopter has no `aahp-verify.yml` at all, so it
+is their entire CI backstop. Wrapping its `Run governance gates` step in
+`if: false` left `aahp doctor` reporting `SKIP: no workflow here runs the AAHP
+verify gate` and exiting 0.
+
+The governance findings are judged per SUBCOMMAND, not per job. `aahp check` and
+`aahp doctor` are different gates, and the shipped template runs both, so a
+per-job test ("some governance step is unconditional") reads a file whose
+`aahp check` step alone is wrapped as enforced. `npm run govern` is deliberately
+not recognised as a gate invocation: what that script expands to is not readable
+from the workflow, and a guess would be a finding this reader cannot support.
+
+A repository whose workflows never run either gate reports `skip`: there is no CI
+backstop to weaken. A repository that runs the governance gate unconditionally
+and no verify gate is a distinct verdict, `governance-only`, which exits 0 and
+whose pass reason says out loud that nothing there compares a handoff checksum,
+so a green line cannot be read as an integrity statement. A workflow that clearly
+hosts a gate but whose shape cannot be decided (the gate reached through a
+composite action, or a file that will not parse) reports `fail`, because undecided
+is not clean. Two shapes are deliberately NOT findings, because they fail closed
+rather than green: an `if:` on the checkout step alone (the gate then runs against
+an empty workspace and exits non-zero), and `paths:` filters that stop the
+workflow triggering (a required check that never reports leaves the pull request
+pending). One more is named rather than hidden: where `aahp verify` and
+`aahp doctor` run in the SAME job, that job's skippability is decided by the
+verify audit, so an `if:` on the record step alone (with the verify step
+unconditional) is not reported. The gate still runs all four layers there; only
+the record is lost.
 
 If a class of change genuinely does not need the handoff gate, put that exemption
 INSIDE the gate, keyed on the change, where it is visible and testable. Do not put
@@ -668,17 +823,14 @@ green line to imply integrity:
   PASS     handoff-set: 3 indexed files present, no strays (content not compared; aahp verify Layer 1 owns checksum integrity)
 ```
 
-That reason is emitted on one line, and only by the DEFAULT human-readable
-output. That is the limit of this wording, and it is deliberate:
-`aahp doctor --json` carries gate statuses and no reasons,
-`aahp doctor --quiet` prints nothing for a passing gate, and
-`aahp doctor --governance` marks the gate `skip` without evaluating it. Those
-three are the invocations wired into `.github/workflows/aahp-verify.yml`,
-`assets/governance/aahp-govern.yml` and `scripts/hooks/pre-push`, so a
-repository that treats the `schemaVersion: 1` record as its handoff-integrity
-signal reads exactly what it read before. Holding that record byte-identical is
-a compatibility choice for dashboards that already ingest it; changing it would
-be a `schemaVersion` decision.
+That reason is emitted on one line by the DEFAULT human-readable output, and
+from `schemaVersion` 2 it is in the record as well:
+`gateOutcomes["handoff-set"].reason` carries the same sentence, so a dashboard
+reads the limit rather than only a green token. `aahp doctor --quiet` still
+prints nothing for a passing gate, though it now always states the overall
+result, and `aahp doctor --governance` still marks the gate `skip` without
+evaluating it, distinguished in the record as `outcome: "unevaluated"` rather
+than as the same `skip` a gate with no inputs receives.
 
 One configuration deserves an explicit warning. When `verify-workflow` reports
 `skip`, meaning no workflow in the repository runs the AAHP verify gate, and the
@@ -696,21 +848,32 @@ and the `doctor` step never runs, so a green record cannot mask the drift.
 
 **`aahp check`** is the pass/fail counterpart to that record. Where `doctor` emits a
 conformance snapshot, `check` runs the config-driven governance gates as one aggregate
-and its exit code drives CI (0 only when no gate fails; a skipped gate never fails):
+and its exit code drives CI (0 only when no gate fails AND at least one gate ran;
+a skipped gate never fails):
 
 ```bash
 aahp check             # run every applicable gate; per-gate PASS/FAIL/SKIP plus a footer
-aahp check --json      # a { schemaVersion: 1, gates: { id: status } } record on stdout
-aahp check --quiet     # only failing gate lines plus the footer
+aahp check --json      # a { schemaVersion: 2, gates, gateOutcomes, evaluated, total } record
+aahp check --quiet     # only failing gate lines plus the footer, which is always printed
 ```
 
 Each gate is applicable only when its inputs exist (for example the `handoff` gate runs
 only when `.ai/handoff/MANIFEST.json` is present); otherwise it is reported `skip`, not
 run. `config.check.only` (a whitelist) and `config.check.skip` (a blacklist) narrow the
-set explicitly. The same governance-only stance is available from the record side:
+set explicitly, and the record tells the two kinds of skip apart:
+`outcome: "deselected"` for a gate the config switched off, `"not-applicable"`
+for one with nothing to check.
+
+A run in which NO gate ran is a third outcome, neither pass nor fail:
+`Governance NOT EVALUATED: 0 of 8 gate(s) ran. This is not a pass.`, exit 1. The
+text path, `--quiet` and `--json` all reach that same verdict on the same tree;
+until this was fixed `--json` returned above the test and exited 0 with every
+gate `skip`.
+
+The same governance-only stance is available from the record side:
 `aahp doctor --governance` (alias `--no-handoff`) forces the three handoff gates to
-`skip` without evaluating them, so a repo with no `.ai/handoff/` still emits a green
-conformance record; the default mode is unchanged.
+`skip` without evaluating them, so a repo with no `.ai/handoff/` still emits a
+conformance record over the remaining gates; the default mode is unchanged.
 
 **Config-driven gates.** These gates read an optional `aahp.config.json` at the
 project root and are a clean no-op when it (or the relevant section) is absent, so
@@ -955,9 +1118,12 @@ governance gates, emitting a single pass/fail run. It stays distinct from `aahp 
 
 ### ADR-012: doctor records conformance, check runs the gates
 **Why it recurs:** doctor and check both touch changelog-format and version-sync, so the
-overlap looks like duplication to trim. **Decision:** `aahp doctor` is a stable
-`schemaVersion: 1` conformance record for a fleet dashboard; `aahp check` is the pass/fail
-gate runner whose exit code drives CI. The shared gates are intentional, not redundant.
+overlap looks like duplication to trim. **Decision:** `aahp doctor` is a versioned
+conformance record for a fleet dashboard, currently `schemaVersion: 2`; `aahp check` is
+the pass/fail gate runner whose exit code drives CI. The shared gates are intentional,
+not redundant. Both commands agree on one thing the record must be able to say: a run in
+which no gate was evaluated is NOT EVALUATED, distinct from a pass and from a failure,
+and the same on every output path.
 
 ### ADR-013: git hooks resolve the vendored script first, then the local package by PATH
 **Why it recurs:** wiring a hook to one hard-coded path is the quick way. **Decision:**
@@ -1173,6 +1339,96 @@ different update path is open.
 **Consequence:** a reference added on a tag is a red required check. Staleness is
 explicitly NOT what the gate asserts - it proves a reference cannot be repointed, not
 that it is current, and those are different properties with different answers.
+### ADR-022: section 2.4 provenance is a convention, and the audit-trail claim is withdrawn
+**Why it recurs:** provenance fields look like metadata a protocol obviously
+validates, so a reader assumes a gate reads them and a writer assumes stating
+"must" is the same as enforcing it. Section 2.4 said "must include" and then
+called the result an audit trail. Reported at
+https://github.com/homeofe/AAHP/issues/86.
+**Evidence, measured 2026-08-23.** Nothing reads the fields: `grep -rn` for
+`Session ID`, `Commit before` and `Commit after` across `scripts/` and `bin/`
+returns one hit, and it prints a session id from `MANIFEST.json` in `aahp status`.
+It is not per-entry either: `MANIFEST.last_session` holds one agent for the most
+recent session across the whole handoff set, rewritten by whoever last ran
+`aahp manifest`. Reproduced independently on a throwaway repository: after
+`aahp init`, deleting every provenance line from `LOG.md` and `STATUS.md`,
+appending an entry with none at all, regenerating the manifest and committing,
+`lint-handoff.sh` exits 0, `verify-handoff.sh --level ci` exits 0 and
+`aahp doctor --quiet` exits 0. The shipped `templates/LOG.md` carried one of the
+five fields, so an adopter following the example produced entries that did not
+satisfy the section's own rule.
+**What enforcement would cost, measured before deciding.** Across the nine
+repositories in this estate that consume the protocol, `.ai/handoff/LOG.md` holds
+100 level-2 entries. 8 carry all five fields; 92 do not. Per field: agent 64,
+session id 27, timestamp 31, commit-before 10, commit-after 8. Every one of the
+nine has at least one entry that would fail, so a retroactive MUST turns 9 of 9
+red on history none of them can now change. This repository's own `LOG.md` fails
+it too: 10 entries, 0 with all five.
+**Decision:** the rule stands down to a documented convention. Section 2.4 no
+longer says "must", and no longer states an audit trail as a property of the
+protocol; it states the conditional version, which is what is true. No gate is
+added, and none is added off-by-default either, for the reason ADR-017 gives: an
+enforcing option gets switched on somewhere and the first legacy entry becomes a
+red build in a consumer that changed nothing.
+**What ships instead of the promise:** the templates now carry all five fields,
+so a repository that follows the example accumulates the data from its first
+entry, and the `provenance-block` group in `aahp.config.json` binds the five
+names in Section 2.4 to `templates/LOG.md` and `templates/STATUS.md` through the
+existing `schema-doc-sync` gate. Dropping a field from either side is red.
+**Consequence, stated plainly because it is the point:** AAHP does not give you a
+complete audit trail over agent entries, and after this change it does not say it
+does. A repository that needs one enforces it itself and makes the claim in its
+own name. Reversing this decision is a fleet-wide migration of existing LOG
+history, not a config change, and it is an owner call with the numbers above in
+front of it.
+
+### ADR-023: a path a document tells you to copy is a path a gate resolves
+**Why it recurs:** `check-doc-links.mjs` resolves Markdown inline links and only
+those.
+Every other path in the documentation is an inline code span in prose, which the
+link gate structurally cannot see, so a copy instruction naming a file that does
+not exist is invisible to CI and stays wrong until a human tries to follow it.
+Reported at https://github.com/homeofe/AAHP/issues/74.
+**Evidence:** `README.md` told adopters to copy the governance workflow from a
+`.github/workflows/` path in THIS repository. No such file exists here and none
+is in the published package; the file lives at
+`assets/governance/aahp-govern.yml`, which the same README
+states correctly in ADR-016. Measured across the nine consumer checkouts in this
+estate: 9 of 9 carry `.github/workflows/aahp-verify.yml`, so the first copy
+instruction in that sentence was right, and 0 of 9 carry an `aahp-govern.yml` at
+all, so nothing in the fleet had followed the second one.
+**Decision:** `scripts/check-doc-shape.mjs` resolves backticked repo-relative
+paths in the configured documents against the git index. It is deliberately not a
+blanket rule over every backticked span: measured on this README, 78 distinct
+path-shaped spans exist and 46 do not resolve, because most of them name a file
+in an ADOPTER's tree. So the gate checks only spans whose first segment is a
+tracked top-level entry of THIS repository, and every intentional exception is
+declared in `docPaths.adopterPaths` with a reason. An exception that no longer
+matches anything is itself a failure, so the list cannot rot into a silent
+allowlist.
+**Why the exceptions are a counted list and not an allowlist:** the same string is
+correct in one sentence and wrong in the next. The governance workflow's
+`.github/workflows/` spelling is the right answer where the README says what
+`aahp init --gates` writes into YOUR repository, and the wrong answer where it
+says "copy this from here". A path-level allowlist exempts both, so declaring the
+path would have made this gate unable to fail on the defect it was written for.
+Each entry therefore pins the exact number of reviewed occurrences, and any other
+number is red in both directions: a new mention is what re-introducing the defect
+looks like, and a count that matches nothing is a dead exception.
+**Scope, chosen by measurement rather than by symmetry:** `docPaths.include` is
+the adopter-facing document set, which is the `docLinks` set MINUS
+`.ai/handoff/*.md`. Widening it to match `docLinks` exactly was tried first, and
+it does find real stale paths, so the exclusion is a cost rather than a free
+choice. It was excluded anyway because `.ai/handoff/STATUS.md` is an append-only
+log in which quoting a path that WAS wrong is frequently the point of the entry.
+A counted exception list over an append-log churns on every session and ends up
+switched off, which is the ADR-017 failure mode by a different route. Widening
+this needs a rule for the append-log first.
+**Consequence:** this gate is in the `check` chain that the required
+`lint-and-validate` job runs, and it is NOT in `CHECK_GATES`, so it is not part of
+`aahp check` and no consumer inherits it. It exits 2 on anything it could not
+assess (not a git work tree, no document enumerated, a file it cannot read), so a
+tree it could not read never reports clean.
 
 ---
 
@@ -1639,7 +1895,7 @@ your-project/
 ```
 
 - **Hooks.** `scripts/install-hooks.sh` (shipped by AAHP) installs the pre-commit and pre-push hooks; the harness runs it once at setup. The hooks resolve the vendored `scripts/verify-handoff.sh` first, fall back to `node_modules/@elvatis_com/aahp/bin/aahp.js` when that file exists, and skip when neither resolves (the required CI check is the off-machine backstop once its evaluator paths are protected). The fallback is a filesystem test, never `npx`, so a repository with the hooks installed and no local package makes no registry request. If your installed hooks still contain `npx --no-install aahp`, re-run `scripts/install-hooks.sh`: fixing the source here does not fix the copy in your `.git/hooks/`. See Section 2.8.
-- **CI.** Copy `.github/workflows/aahp-verify.yml`; it runs `aahp verify --level ci` (no escape hatch) and should be a required status check. Also require trusted review for the workflow and its vendored gate/parser paths, because a `pull_request` workflow otherwise evaluates code from the proposed branch. For governance (changelog, version sync, forbidden patterns, doc links) copy the portable `.github/workflows/aahp-govern.yml` beside it, or let `aahp init --gates` scaffold it; it runs `aahp check` by invoking `node ./node_modules/@elvatis_com/aahp/bin/aahp.js` directly and is verify-only. If your scaffolded copy still calls `npx --no-install aahp`, re-run `aahp init --gates --force`: that spelling can reach the public registry, and fixing the template here does not fix your copy. **`aahp init --gates --force` only rewrites `aahp-govern.yml`.** If the vulnerable spelling is in your `aahp-verify.yml` instead, which is the common case because AAHP does not generate that file, no command fixes it: edit the step yourself and replace `npx --no-install aahp` with `node node_modules/@elvatis_com/aahp/bin/aahp.js`, keeping the `npm ci` step that installs the exact-pinned devDependency ahead of it. A step that already reads `npx -y @elvatis_com/aahp@<version>` names the scoped package at an exact version and needs no change.
+- **CI.** Copy `.github/workflows/aahp-verify.yml`; it runs `aahp verify --level ci` (no escape hatch) and should be a required status check. Also require trusted review for the workflow and its vendored gate/parser paths, because a `pull_request` workflow otherwise evaluates code from the proposed branch. For governance (changelog, version sync, forbidden patterns, doc links) copy the portable `assets/governance/aahp-govern.yml` into your own `.github/workflows/` beside it, or let `aahp init --gates` scaffold it; it runs `aahp check` by invoking `node ./node_modules/@elvatis_com/aahp/bin/aahp.js` directly and is verify-only. If your scaffolded copy still calls `npx --no-install aahp`, re-run `aahp init --gates --force`: that spelling can reach the public registry, and fixing the template here does not fix your copy. **`aahp init --gates --force` only rewrites `aahp-govern.yml`.** If the vulnerable spelling is in your `aahp-verify.yml` instead, which is the common case because AAHP does not generate that file, no command fixes it: edit the step yourself and replace `npx --no-install aahp` with `node node_modules/@elvatis_com/aahp/bin/aahp.js`, keeping the `npm ci` step that installs the exact-pinned devDependency ahead of it. A step that already reads `npx -y @elvatis_com/aahp@<version>` names the scoped package at an exact version and needs no change.
   Both shipped workflows declare their own `permissions:` (`contents: read`) and set
   `persist-credentials: false` on the checkout, so neither inherits your repository's
   `default_workflow_permissions` and neither leaves the job's `GITHUB_TOKEN` in
@@ -1799,6 +2055,14 @@ tune the surface:
 skip). `acceptanceCriteria` (`include`/`manifest`) supplies the input paths for the
 advisory `aahp criteria` report of Section 8.7; it configures no gate, because that report
 is not one. Every section is optional.
+
+One key is deliberately NOT part of `aahp check` and so is not inherited by a consumer
+that runs it: `docPaths` configures `scripts/check-doc-shape.mjs`, which resolves
+backticked repo-relative paths in the configured documents against the git index and
+asserts that a required heading appears before a named anchor (ADR-022). It is a
+repository-local gate in AAHP's own `check` npm-script chain, alongside
+`check:runtime-support` and `check:workflow-pinning`. A consumer that wants it runs the
+script by path. It exits 2, not 0 and not 1, on anything it could not assess.
 
 **The config is validated against its own schema before any gate is evaluated.** This
 matters more than it sounds: applicability is decided on the PRESENCE of a config key, so

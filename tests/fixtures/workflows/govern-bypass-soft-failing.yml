@@ -1,0 +1,25 @@
+# continue-on-error on the step that runs the governance gate. The gate runs,
+# it can fail, and the job reports success anyway. An explicit
+# `continue-on-error: false` on the record step is here on purpose: the audit
+# must read that as NOT a bypass, so a fixture carrying both shapes proves the
+# finding comes from the first step and not from the presence of the key.
+name: AAHP Govern
+
+permissions:
+  contents: read
+
+on:
+  pull_request:
+jobs:
+  govern:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Run governance gates
+        continue-on-error: true
+        run: npx aahp check .
+      - name: Governance conformance record
+        continue-on-error: false
+        run: npx aahp doctor --governance --json .

@@ -1,3 +1,38 @@
+## Running the ritual the enforcement now requires, before it is urgent
+
+#102 turned Layer 4 enforcement on for this repository with both remaining
+`verified` rows expiring on 2026-09-02. On that date CI would have gone red until
+somebody re-ran the checks behind them. Somebody doing that is the entire point of
+Trust Decay, so it is done now rather than on the day it blocks a release.
+
+Both rows were re-RUN against this tree, not re-dated. `templates/` holds exactly
+12 entries, named individually in the row now so the next reader can check the
+claim without trusting the count. `package.json` declares `Apache-2.0` and
+`LICENSE` opens `Apache License / Version 2.0, January 2004`.
+
+The TTL review is the other half and the more useful one. Intervals in use: 3d on
+1 row, 7d on 11, 30d on 7. The defect this register showed was never the length of
+an interval. Eleven rows were stamped on one day with the same interval, so they
+expired on one day, and a wall of identical warnings is exactly the state in which
+a new one goes unread. That is how eight rows sat expired for over two weeks while
+the control printed them on every run.
+
+Intervals are now set per row against how fast the underlying fact can change. A
+fact that only moves when a tracked file moves gets 30d, because Layer 2 already
+fails a commit that moves such a file without moving handoff state, so the TTL is
+a backstop rather than the primary control.
+
+One row changed an opinion rather than a date. `Checksums match file contents`
+carries a 3d interval, and Layer 1 recomputes precisely that on every run, so the
+calendar records nothing the gate is not already proving continuously. A short
+interval there reads as a stronger claim than it is. It stays `assumed` and the
+note now says why, instead of being quietly refreshed to look maintained.
+
+NOT covered: the eleven rows still at 7d are left as they are. Every one is
+`assumed`, so Layer 4 does not read them and enforcement is unaffected; promoting
+any of them means running the check behind it, which is a separate piece of work
+and not something a date change can substitute for.
+
 ## Two jobs in one file disagreed about what a release is, and npm got the looser answer
 
 **One of the repaired tests asserted BOTH directions** of the ADR-versus-list comparison. That

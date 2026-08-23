@@ -93,6 +93,33 @@ in the change:
   assertion is unchanged, and a gate that really runs was added beside it so the
   exit code means "no gate failed" rather than "nothing ran".
 
+THE FULL SUITE THEN FOUND TWO MORE OF THE SAME, and they are worth naming
+because they are the same pattern a third and fourth time:
+- `acceptance-criteria.bats` "the gate set is eight ids" configured nothing, so
+  it too pinned exit 0 over a run that assessed nothing. Its subject is the gate
+  SET, which is unchanged; the exit assertion is now 1 with `evaluated === 0`
+  asserted beside it, so the test states WHY rather than leaving the number to
+  be guessed.
+- `inert-controls.bats` "84 zero gates ran" asserted the substring
+  `0 gate(s) ran`, which the new denominator form does not contain. Asserted as
+  `0 of 8 gate(s) ran` instead, which is strictly stronger, and a second test was
+  added beside it for the `--json` half that was still open.
+
+ONE FULL-SUITE FAILURE IS NOT MINE.
+`tests/manifest.bats` "project name survives regeneration when node is
+unavailable" fails IDENTICALLY on unmodified `main` at `2cdaf48`, on the same
+Linux runner, checked before concluding anything. It builds a PATH without an
+interpreter and `bats` reports `exited with code 127` for `node --version` and
+`git --version` inside it. Pre-existing, untouched here.
+
+MUTATION PROOFS: eight, each with a control that stayed green, each restored to
+an md5-identical file. One of them is recorded rather than quietly corrected: the
+first version of the `--json` exit proof named the wrong `process.exit` call.
+`cmdDoctor` has TWO, and the one it named was the text path's, so the mutation
+landed, the file really changed, and the `--json` test stayed GREEN. A named
+anchor that turns nothing red is worth no more than no anchor at all. Split into
+two proofs, one per exit call, and both go red.
+
 ## The class test could not detect its own class, and the README described a workflow that changed
 
 The test "every *_SUFFIX= rule in the shipped template has an enforced

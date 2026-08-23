@@ -373,7 +373,14 @@ EOF
 EOF
     gadd
     run node "$AAHP" check "$TEST_TMPDIR" --json
-    [ "$status" -eq 0 ]
+    # RE-GROUNDED, not relaxed. The SUBJECT is the gate SET: eight ids, and
+    # `acceptance-criteria` is not one of them, because the criteria report is
+    # advisory and must never acquire an exit code. That assertion is unchanged.
+    # The exit code moved from 0 to 1 because this fixture configures nothing, so
+    # every gate self-skips and the run evaluated nothing - and a run that
+    # evaluated nothing is NOT EVALUATED. Asserting that explicitly, rather than
+    # asserting 0, is what stops this test from re-encoding the defect.
+    [ "$status" -eq 1 ]
     echo "$output" | node -e '
       let s=""; process.stdin.on("data",d=>s+=d).on("end",()=>{
         const r=JSON.parse(s);
@@ -383,6 +390,8 @@ EOF
         if (keys.length!==ids.length) process.exit(2);
         for (const id of ids) if (!(id in r.gates)) process.exit(3);
         if ("acceptance-criteria" in r.gates) process.exit(4);
+        // Why the exit code is 1 here, stated rather than left to be guessed.
+        if (r.evaluated!==0) process.exit(5);
       });
     '
 }

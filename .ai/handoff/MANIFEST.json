@@ -4,21 +4,21 @@
   "last_session": {
     "agent": "cli-tool",
     "session_id": "cli-1787489585",
-    "timestamp": "2026-08-23T16:01:08Z",
-    "commit": "3cdaa04",
+    "timestamp": "2026-08-23T17:07:32Z",
+    "commit": "bbf6482",
     "phase": "fix",
     "duration_minutes": 0
   },
   "files": {
     "STATUS.md": {
-      "checksum": "sha256:85c0b21822d2a5ba0d30c1d92e257a28bf7f7e46cfbb51386ff7369b8bd9c4c2",
-      "updated": "2026-08-23T16:01:08Z",
-      "lines": 1078,
-      "summary": "`check-conflict-markers` read `.ai/handoff/` and nothing else. Measured today,"
+      "checksum": "sha256:705c3838f7481d183d0a879d362abf714991edf40670f29bb1b96122f4de99d3",
+      "updated": "2026-08-23T17:08:24Z",
+      "lines": 1136,
+      "summary": "`docLinks.include` covered `.ai/handoff/*.md`. `docPaths.include` did not. So"
     },
     "NEXT_ACTIONS.md": {
-      "checksum": "sha256:efdc6ef8664faf9ce5120fa797b702d2353bd4c3205c62e5ba651a465326103d",
-      "updated": "2026-08-23T12:23:55Z",
+      "checksum": "sha256:06eede346c363c25415d9156b0c3ce9a7ed332e2ea3fd9534c0d0ec4e443efcf",
+      "updated": "2026-08-23T17:07:32Z",
       "lines": 239,
       "summary": "Current version: **v3.10.0**"
     },

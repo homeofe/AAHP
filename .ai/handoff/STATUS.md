@@ -1,3 +1,61 @@
+## The path gate read four documents and the link gate read thirteen
+
+`docLinks.include` covered `.ai/handoff/*.md`. `docPaths.include` did not. So
+the link checker resolved Markdown links inside the nine handoff files while the
+backticked-path check never opened them, and the config looked complete either
+way. #94 recorded this honestly and declined to tick the box, which was right; it
+also recorded a reason for the exclusion that does not survive measurement.
+
+ADR-023 said a counted exception list over an append-log would churn every
+session. Measured: STATUS.md, LOG.md and LOG-ARCHIVE.md carry 115 in-scope path
+spans between them and exactly ONE unresolved, which is the already-declared
+exception. Across 60 commits touching `.ai/handoff/` the unresolved set changed
+five times, not once per session.
+
+Widening it found two real defects and one bookkeeping mismatch:
+
+`NEXT_ACTIONS.md` named .github/workflows/publish.yml twice, once in a Files
+list and once in a Key File Locations table. That workflow was deleted; publishing
+is the `publish` job inside `ci.yml`. Two stale pointers in the document an agent
+reads to find out where things are.
+
+The third finding was a count: the adopter path .github/workflows/aahp-govern.yml
+is recorded as appearing twice and the widened scan found three. Raising the
+recorded count to three was rejected after being measured, because it converts the
+guard into a SUM over thirteen documents, nine of them session-churn handoff
+files: a regression in README could then be netted out by an unrelated removal in
+STATUS.md. The third mention is prose naming the DESTINATION inside a consumer
+tree rather than a path in this repository, so the code span around it is what
+drew the gate. It is de-backticked instead. The sentence keeps its meaning, the
+recorded count stays at two, and a README regression stays red.
+
+That is an edit to an existing STATUS.md entry, which this protocol otherwise
+treats as append-only, so it is named here rather than left for someone to find
+in a diff: one pair of backticks removed, no wording changed, no claim altered.
+
+The wiring assertion gained a SCOPE check. Proving the gate runs said nothing
+about what it reads, so narrowing the include list back would have dropped nine
+files with everything still green. It asserts a relationship rather than a list,
+whatever `docLinks` reads `docPaths` reads too, so it does not go stale when
+either list grows.
+
+MEASURED: 100 paths across 4 documents before, 278 across 13 after, exit 0.
+Narrowing the config back is exit 1 naming the uncovered entry. Removing
+`docLinks` entirely reports rather than throwing, which the optional chaining on
+both sides is there for.
+
+NOT covered: the gate counts adopter-path occurrences globally rather than per
+file. Until it can scope a count to one document, any future backticked mention of
+a declared path inside a handoff file re-opens the same window.
+
+A convention this entry had to learn the hard way, stated so the next one does not:
+once the path check reads the handoff set, an entry that DISCUSSES a path which does
+not resolve must not present it as a code span. This entry named the deleted publish
+workflow in backticks while explaining that it was deleted, and the gate flagged it,
+correctly. Naming such a path as plain prose is the difference between describing a
+path and asserting one. That is the real cost ADR-023 was reaching for, and it is a
+writing rule rather than the per-session churn the ADR predicted.
+
 ## A gate that could not see the file it was protecting
 
 `check-conflict-markers` read `.ai/handoff/` and nothing else. Measured today,
@@ -682,7 +740,7 @@ layer. A finding now prints `path:line` and never the matched text.
 ## The prescribed remediation reached none of the affected repositories
 
 CHANGELOG told adopters to run `aahp init --gates --force`. That writes exactly
-one file, `.github/workflows/aahp-govern.yml`. SURVEYED, ten consuming
+one file, aahp-govern.yml, into the consumer's workflow directory. SURVEYED, ten consuming
 repositories: ten have `aahp-verify.yml`, ZERO have `aahp-govern.yml`, and zero
 have vendored hooks under `scripts/hooks/` for `install-hooks.sh` to refresh.
 Running it would have added a second unreferenced workflow beside the one that

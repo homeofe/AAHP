@@ -46,6 +46,38 @@ if (!pkg.scripts?.check?.includes("check:doc-shape")) {
   );
 }
 
+// SCOPE, not just wiring. Proving the gate runs says nothing about what it reads:
+// narrowing docPaths.include back to the four adopter documents drops nine files
+// from coverage with every check still green.
+//
+// Stated as a RELATIONSHIP rather than a literal list, so it does not go stale the
+// next time either list grows: whatever docLinks reads, docPaths reads too.
+// docLinks already covered .ai/handoff/*.md while docPaths did not, which is how
+// nine files sat outside the path check while the config looked complete.
+let cfg = null;
+try {
+  cfg = JSON.parse(readFileSync(join(root, "aahp.config.json"), "utf8"));
+} catch (err) {
+  console.error(
+    `  - aahp.config.json under ${root} could not be read as JSON (${err.code || err.message}).`,
+  );
+  process.exit(1);
+}
+
+// Optional on BOTH sides. `cfg.docLinks.include?.length` throws a TypeError when
+// the section is absent, and a gate that dies with a stack trace where it should
+// report a finding is the failure mode this repository pins elsewhere.
+const linkDocs = cfg.docLinks?.include ?? [];
+const pathDocs = cfg.docPaths?.include ?? [];
+const uncovered = linkDocs.filter((entry) => !pathDocs.includes(entry));
+if (uncovered.length > 0) {
+  problems.push(
+    `docPaths must cover everything docLinks reads; in docLinks.include but not in ` +
+      `docPaths.include: ${uncovered.join(", ")}. The link checker resolves Markdown ` +
+      `links in those documents while the path check never opens them.`,
+  );
+}
+
 if (problems.length > 0) {
   for (const p of problems) console.error(`  - ${p}`);
   process.exit(1);

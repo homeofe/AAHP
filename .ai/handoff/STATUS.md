@@ -1,3 +1,35 @@
+## A HIGH advisory whose only offered fix was a five-major downgrade
+
+`fast-json-patch` below 3.1.1 carries GHSA-8gh8-hqwg-xf34, prototype pollution,
+rated HIGH. It reaches this repository through `ajv-cli@5.0.0`, which requires
+`^2.0.0` and therefore cannot take the fix inside its own range. `npm audit fix`
+offers exactly one remedy: `ajv-cli@0.6.0`, five majors back, which predates
+`--spec=draft2020` and so would take both schema validation steps in `ci.yml`
+with it. That is the shape worth naming: an advisory where the tool's suggested
+fix costs more than the finding.
+
+Resolved with an `overrides` entry pinning `fast-json-patch` to `^3.1.1`.
+`npm audit` goes from 2 HIGH to 0 across every severity.
+
+An override is a claim that the new major still works, so it was measured rather
+than assumed. `ajv-cli` touches exactly one symbol, `jsonPatch.compare(a, b)`, in
+`validate.js` and `migrate.js`, and v3 keeps it unchanged. All three commands
+were then run against this tree: the MANIFEST schema step, the config step with
+both documents, and `--changes=json`, which is the branch that actually calls
+`compare` and which neither CI step exercises. All exit 0. A deliberately
+invalid MANIFEST, with `aahp_version` removed and `files` replaced by a string,
+still exits 1, so the validator was proved to be doing work rather than passing
+everything.
+
+There are no runtime dependencies in this package, so no adopter ever received
+the vulnerable code; the exposure was this repository's own CI and any
+contributor's `npm ci`. That makes it lower impact than the severity suggests
+and does not make it acceptable to leave.
+
+NOT covered: the override applies to whatever else in the tree may later ask for
+`fast-json-patch@2`. Nothing does today, and if something does, npm will resolve
+it to 3.1.1 silently rather than warn.
+
 ## Three verdicts nobody produced: a count, a record, and a register nobody read
 
 Three issues, one shape, and it is the shape the two entries below this one

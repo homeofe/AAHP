@@ -1,5 +1,30 @@
 name: AAHP CI
 
+# Two hardening properties hold across this file, and a gate keeps each true.
+#
+# 1. A declared floor instead of an inherited one. Without a top-level
+#    `permissions:` block every job here takes the repository's
+#    `default_workflow_permissions`, which is a SETTING: flipping it widens this
+#    workflow with no diff here to review. `contents: read` is what the two
+#    untagged jobs need, since they only read the checkout and run local
+#    scripts. Required by tests/assert-workflow-hardening.mjs.
+#
+#    The publish and release jobs below carry their own blocks. A job-level
+#    `permissions:` REPLACES the top-level one rather than merging with it, so
+#    this line does not reduce what they get, and deleting one of their blocks
+#    as "redundant" would drop an elevation whose failure only appears on a
+#    release tag. Required by tests/assert-repo-ci-shape.mjs.
+#
+# 2. `persist-credentials: false` on every checkout below. actions/checkout
+#    defaults it to true, which writes the job's GITHUB_TOKEN into .git/config
+#    where every later step in the job can read it, including anything a
+#    dependency lifecycle script runs. No job in this workflow needs it: the
+#    release job authenticates `gh` through GH_TOKEN in the environment, and
+#    publish authenticates to npm by OIDC. Required by
+#    tests/assert-workflow-hardening.mjs.
+permissions:
+  contents: read
+
 on:
   push:
     branches: [main]
@@ -16,6 +41,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false  # see the header
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -94,6 +121,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false  # see the header
       - name: Set up Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v4
         with:
@@ -140,6 +169,8 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false  # see the header
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -166,6 +197,8 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false  # see the header
       - name: Create GitHub Release
         run: gh release create "$GITHUB_REF_NAME" --title "AAHP $GITHUB_REF_NAME" --notes "Release $GITHUB_REF_NAME. See CHANGELOG.md for details."
         env:

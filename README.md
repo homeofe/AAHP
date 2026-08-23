@@ -1019,6 +1019,59 @@ it. Adopting any of them means editing the workflow and the recorded list togeth
 the assertion is what forces the pair. Tracked at
 https://github.com/homeofe/AAHP/issues/69.
 
+### ADR-020: anything AAHP runs or ships declares its permissions and refuses the persisted checkout credential
+**Why it recurs:** a new workflow is copied from an existing one, and the existing one
+never had a `permissions:` block or `persist-credentials: false`, so neither does the
+copy. Nothing is red, because a missing block is not a syntax error; it is an
+inheritance. AAHP reached eight workflow documents with exactly one hardened, and the
+one that was not hardened with the widest blast radius was the template it ships to
+adopters.
+**Evidence:** measured on `main` before this decision - 8 workflow documents, 7 with no
+top-level `permissions:`, 11 `actions/checkout` steps, 1 setting
+`persist-credentials: false`. Read from real job logs on those workflows: a job that
+inherits is granted `Contents: read`, `Metadata: read` and `Packages: read` and writes
+the token into `.git/config` as an `extraheader`; a job that declares `contents: read`
+is granted only `Contents` and `Metadata`. What the narrower job writes in place of the
+`extraheader` was not established from those logs and is deliberately not claimed here.
+So the declared block is strictly narrower today, not only after some future settings
+change - and that conclusion rests on the granted-permission difference, which was
+measured, rather than on the mechanism, which was not.
+**Decision:** every workflow document under `.github/workflows/` **and** under
+`assets/governance/` declares a top-level `permissions:` mapping and sets
+`persist-credentials: false` on every checkout. `tests/assert-workflow-hardening.mjs`
+enforces it on every pull request. Elevation belongs on the job that needs it, never at
+the top of the file, and the three job-level elevations this repository depends on
+(`publish` `id-token: write`, `release` `contents: write`, `analyze`
+`security-events: write`) are pinned by name in `tests/assert-repo-ci-shape.mjs`,
+because a job-level block REPLACES the top-level one rather than merging with it.
+That gate takes the root to assert as an argument, and not every caller passes a whole
+repository, so it states on every run which recorded elevations the given root does not
+contain and therefore did not assert. It never infers an answer from a file it could not
+open: an absent workflow is named as not asserted, and a workflow that is present but
+unreadable, unparseable or empty is a failure. What it must not do is throw, because a
+thrown `ENOENT` exits 1 with a stack trace and none of the gate's own findings, which a
+caller reads as a defect that is not there.
+The block must be a MAPPING: the string forms `permissions: read-all` and
+`permissions: write-all` are rejected at both levels, because they look like a
+declaration while setting every scope at once, which is the opposite of the reason to
+declare one. A top-level scope set to `write` is rejected for the same reason.
+**Why both directories and not just the one CI runs:** the reasons the local workflows
+were low-impact - public repository, `default_workflow_permissions` set to `read`,
+throwaway hosted runners, no organization layer above the repository - are facts about
+this repository. None of them travels with a file copied into a consumer whose
+visibility, defaults and organization settings AAHP cannot see. A project that ships a
+governance workflow cannot ship one weaker than the one it hardened for itself.
+**Rejected alternative:** allowing a YAML comment beside a checkout to excuse it, as a
+lighter-weight exemption. A comment is not readable by the gate, so an exemption written
+that way is indistinguishable from an oversight. Exemptions are recorded in
+`CHECKOUT_CREDENTIAL_EXEMPTIONS` in the gate, are reviewed as a code change, and their
+reasons are printed on every run.
+**Consequence:** a workflow added without either property is a red required check rather
+than a note in a review, and the shipped template is held to the same bar permanently.
+The gate exits 2, not 0, on anything it cannot decide (a `${{ }}` expression it cannot
+evaluate, a job delegating to a reusable workflow, an empty or missing scan root), so
+"I could not look" never reads as "I looked and it was fine".
+
 ---
 
 *The v2-proposal questions below were resolved earlier and are retained for detail.*
@@ -1485,6 +1538,13 @@ your-project/
 
 - **Hooks.** `scripts/install-hooks.sh` (shipped by AAHP) installs the pre-commit and pre-push hooks; the harness runs it once at setup. The hooks resolve the vendored `scripts/verify-handoff.sh` first, fall back to the installed `aahp` CLI via `npx --no-install` when it is absent, and skip when neither resolves (the required CI check is the off-machine backstop once its evaluator paths are protected). See Section 2.8.
 - **CI.** Copy `.github/workflows/aahp-verify.yml`; it runs `aahp verify --level ci` (no escape hatch) and should be a required status check. Also require trusted review for the workflow and its vendored gate/parser paths, because a `pull_request` workflow otherwise evaluates code from the proposed branch. For governance (changelog, version sync, forbidden patterns, doc links) copy the portable `.github/workflows/aahp-govern.yml` beside it, or let `aahp init --gates` scaffold it; it runs `aahp check` through the pinned devDependency via `npx` and is verify-only.
+  Both shipped workflows declare their own `permissions:` (`contents: read`) and set
+  `persist-credentials: false` on the checkout, so neither inherits your repository's
+  `default_workflow_permissions` and neither leaves the job's `GITHUB_TOKEN` in
+  `.git/config` where later steps can read it (ADR-020). If you scaffolded
+  `aahp-govern.yml` before AAHP declared those two things, `aahp init --gates` will
+  NOT replace your copy: it skips a workflow that already exists. Re-run it with
+  `--force`, or add the two lines by hand.
 - **Referencing scripts.** Harness commands invoke AAHP by the vendored script path (`bash scripts/verify-handoff.sh . --level prepush`) or the CLI (`npx aahp verify`). They never reimplement the checks.
 
 ### 9.3 Minimal harness bootstrap

@@ -1,4 +1,18 @@
 name: "CodeQL"
+
+# A floor for the file, declared rather than inherited: without it every job here
+# takes the repository's default_workflow_permissions, which is a SETTING and can
+# widen this workflow with no diff here to review.
+#
+# The analyze job below carries its own block, and a job-level `permissions:`
+# REPLACES the top-level one rather than merging with it, so this line does not
+# reduce what analyze gets and deleting analyze's block as "redundant" would drop
+# the security-events: write grant its SARIF upload needs. Both facts are held by
+# gates: tests/assert-workflow-hardening.mjs requires this block, and
+# tests/assert-repo-ci-shape.mjs requires analyze's.
+permissions:
+  contents: read
+
 on:
   push:
     branches: [main, master]
@@ -24,6 +38,10 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          # CodeQL uploads its SARIF over the API, not over git, so the job has
+          # no use for the checkout credential. See the header.
+          persist-credentials: false
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3

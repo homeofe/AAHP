@@ -27,7 +27,27 @@
 #   - @elvatis_com/aahp pinned as an exact devDependency (npm i -D -E @elvatis_com/aahp)
 #   - a committed package-lock.json (npm ci needs it)
 #   - an aahp.config.json (see `aahp init --gates`)
+#
+# Hardening, and why it is stated here rather than left to the adopting repo:
+# AAHP cannot know an adopter's repository visibility, their
+# `default_workflow_permissions` setting, or whether an organization default
+# grants `write`. So this file declares what it needs instead of inheriting it.
+#   - `permissions: contents: read` is the whole grant. This workflow only reads
+#     the checkout and runs `aahp` locally; it opens no issue, posts no comment
+#     and pushes nothing. Without this block the job inherits the repository
+#     default, and in a repository whose default is `write` that hands a
+#     write-capable GITHUB_TOKEN to `npm ci` and to everything `aahp` executes.
+#   - `persist-credentials: false` keeps that token out of `.git/config`.
+#     actions/checkout defaults it to true, which writes the token into the
+#     workspace where every later step in the job can read it. Nothing here
+#     needs it: the checkout is the only network git operation in the job.
+# If you add a step that pushes, revisit both lines deliberately rather than
+# deleting them.
 name: AAHP Govern
+
+permissions:
+  contents: read
+
 on:
   push:
     branches: [main]
@@ -39,6 +59,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: '20'

@@ -25,7 +25,7 @@ Counts mirror the `tasks` registry in `MANIFEST.json`.
 
 ## Recently Completed
 
-### 2026-08-20: v3.11.0 prepared - fail-closed CI base + reviewed M-only impact
+### 2026-08-20: v3.10.0 prepared - fail-closed CI base + reviewed M-only impact
 
 - Added explicit `--base SHA` / `AAHP_BASE_SHA` anchoring. CI rejects missing, zero,
   invalid, unreadable, HEAD-equal, and undiffable bases.

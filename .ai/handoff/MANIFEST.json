@@ -17,7 +17,7 @@
       "summary": "Version 3.10.0 to 3.11.0. It is a MINOR by measurement rather than by preference:"
     },
     "NEXT_ACTIONS.md": {
-      "checksum": "sha256:d75ebdb91ecb1768d5d7e468c2a2d763c11e70dfcd1ce6bb77b443967c251458",
+      "checksum": "sha256:57e3a2f06dcbe9f6d942d903b1869a1ac6f70506758e8bd68a8d97a7aecc139c",
       "updated": "2026-08-23T12:23:55Z",
       "lines": 239,
       "summary": "Current version: **v3.10.0**"

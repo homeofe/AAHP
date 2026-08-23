@@ -209,7 +209,7 @@ lists eleven versions with `latest` at 3.8.1 (2026-07-19). CI publishes it, so t
 "blocked on human npm auth" note that stood in this file was years of releases out of
 date. The registry itself is the evidence: `npm view @elvatis_com/aahp version`.
 
-**Files:** `package.json`, `bin/aahp.js`, `.github/workflows/publish.yml`
+**Files:** `package.json`, `bin/aahp.js`, `.github/workflows/ci.yml` (`publish` job)
 
 **Acceptance criteria:**
 - [x] Package published to npm registry (public registry, `@elvatis_com/aahp`, `latest` 3.8.1, eleven versions since 2026-03-19)
@@ -233,7 +233,7 @@ None.
 | JSON Schema | `schema/aahp-manifest.schema.json` |
 | CLI entry point | `bin/aahp.js` |
 | CI workflow | `.github/workflows/ci.yml` |
-| Publish workflow | `.github/workflows/publish.yml` |
+| Publish job | `.github/workflows/ci.yml` (`publish`) |
 | Test suite | `tests/` |
 | License | `LICENSE` (Apache-2.0) |
 | Own handoff files | `.ai/handoff/` |

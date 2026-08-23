@@ -83,7 +83,8 @@
       "README.md",
       "CLAUDE.md",
       "CONTRIBUTING.md",
-      "CONSTITUTION.md"
+      "CONSTITUTION.md",
+      ".ai/handoff/*.md"
     ],
     "adopterPaths": [
       {

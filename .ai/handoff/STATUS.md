@@ -1,5 +1,16 @@
 ## Trust Decay could not decay, and the fix had to not break nine repositories
 
+**And the correction found the real one.** `log_fail` in this script only PRINTS;
+every one of its thirty-odd call sites increments `FAILURES` on the following line.
+The five new Layer 4 calls did not, so the layer announced `FAIL:` and the run still
+exited 0. A control that reports a failure it does not enforce is the exact defect
+this change exists to close, shipped inside the change closing it.
+
+It survived a local run because the tree used there was failing Layers 1 and 2 for
+unrelated reasons, and `FAILED: 2 blocking issue(s)` was read as proof when neither
+of the two was Layer 4. It was caught only once the fixtures were repaired and the
+run was otherwise clean, which is the argument for repairing fixtures rather than
+relaxing assertions.
 **Correction, and the correction found a worse one.** The fixture for the enforce-false test added
 `aahp.config.json` at the repository root and never moved handoff state, so Layer 2
 failed it. Layer 4 had warned exactly as intended. The same flaw sat under the three

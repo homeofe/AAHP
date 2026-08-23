@@ -11,9 +11,9 @@
   },
   "files": {
     "STATUS.md": {
-      "checksum": "sha256:44852037ebd47c89aeeaab83bd14901e66082b6f2e34baf00b50aab9fab2588d",
-      "updated": "2026-08-23T15:12:44Z",
-      "lines": 897,
+      "checksum": "sha256:48e098b02796aeed5a0a2cd267304979ef8218e3645bba4467ba5eb2340856bd",
+      "updated": "2026-08-23T15:15:12Z",
+      "lines": 908,
       "summary": "Layer 4 reads the trust register, finds expired `verified` rows and prints them."
     },
     "NEXT_ACTIONS.md": {

@@ -683,6 +683,7 @@ if [ "$LEVEL" != "precommit" ]; then
             log_warn "trustTtl.enforce could not be read: $TRUST_ENFORCE_OUT"
         else
             log_fail "trustTtl.enforce could not be read: $TRUST_ENFORCE_OUT"
+            FAILURES=$((FAILURES + 1))
         fi
     fi
 
@@ -690,6 +691,7 @@ if [ "$LEVEL" != "precommit" ]; then
     if [ ! -f "$TRUST_FILE" ]; then
         if [ "$TRUST_ENFORCE" = "1" ]; then
             log_fail "TRUST.md not found and trustTtl.enforce is on. TTL was NOT evaluated, which is not a pass."
+            FAILURES=$((FAILURES + 1))
         else
             log_warn "TRUST.md not found. TTL was NOT evaluated."
         fi
@@ -705,12 +707,14 @@ if [ "$LEVEL" != "precommit" ]; then
             if [ "$TRUST_CANDIDATE" -eq 0 ]; then
                 if [ "$TRUST_ENFORCE" = "1" ]; then
                     log_fail "TRUST.md holds no trust table this reader recognises and trustTtl.enforce is on. TTL was NOT evaluated, which is not a pass."
+                    FAILURES=$((FAILURES + 1))
                 else
                     log_warn "TRUST.md holds no trust table this reader recognises. TTL was NOT evaluated (this is not 'no expired entries')."
                 fi
             else
                 if [ "$TRUST_ENFORCE" = "1" ]; then
                     log_fail "TRUST.md holds $TRUST_CANDIDATE trust row(s), but none could be classified as a dated 'verified' entry: a table needs BOTH a 'Status' and an 'Expires' column. trustTtl.enforce is on and TTL was NOT evaluated, which is not a pass."
+                    FAILURES=$((FAILURES + 1))
                 else
                     log_warn "TRUST.md holds $TRUST_CANDIDATE trust row(s), but none could be classified as a dated 'verified' entry: a table needs BOTH a 'Status' and an 'Expires' column. TTL was NOT evaluated (this is not 'no expired entries')."
                 fi
@@ -721,6 +725,7 @@ if [ "$LEVEL" != "precommit" ]; then
             EXPIRED_COUNT=$(echo "$EXPIRED" | sed '/^$/d' | wc -l | tr -d ' ')
             if [ "$TRUST_ENFORCE" = "1" ]; then
                 log_fail "$EXPIRED_COUNT of $TRUST_DECIDABLE 'verified' trust entr(ies) expired and trustTtl.enforce is on. Re-verify and reset TTL:"
+                FAILURES=$((FAILURES + 1))
             else
                 log_warn "$EXPIRED_COUNT of $TRUST_DECIDABLE 'verified' trust entr(ies) expired. Re-verify and reset TTL:"
             fi

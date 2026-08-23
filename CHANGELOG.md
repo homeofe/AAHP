@@ -12,6 +12,27 @@ independently of the npm version).
 ## [Unreleased]
 
 ### Added
+- Every `uses:` in `.github/workflows/` and in the shipped
+  `assets/governance/aahp-govern.yml` is pinned to a full 40-character commit SHA with
+  the release in a trailing `# vX.Y.Z` comment, and `.github/dependabot.yml` declares a
+  `github-actions` lane so those pins keep moving. Measured on `main` at `2cdaf48`: 25
+  references under `.github/workflows/`, 3 pinned and 22 on mutable major tags, plus 2
+  more on tags in the template adopters copy. A tag is a pointer its owner can repoint at
+  any time with no diff here to review, and 5 of the 6 required status checks ran on
+  those references. `scripts/check-workflow-pinning.mjs` gained rules E and F, which
+  assert the two halves together: the pin, and the lane that keeps it current. That gate
+  already ran in the required check and already exited 0 over all 22 floating references,
+  because rules A to D read only `step.run` and a `uses:` step has no `run:` at all - its
+  name promised workflow pinning while its scope was npm packages inside workflows. A pin
+  with no update lane does not stay correct, it stops moving, and a missing lane cannot be
+  seen from the pull-request count: an unscanned ecosystem and an up-to-date one both
+  produce zero pull requests. Recorded as ADR-021.
+- `tests/assert-repo-ci-shape.mjs` gained a fifth assertion: the recorded list of publish
+  conditions in that file and ADR-019 in `README.md`, which is the record a person
+  actually reads, are now compared as sets in both directions. Until now either could be
+  edited alone with every check green. No workflow behaviour changes; whether the
+  `workflow_dispatch` operand should exist at all remains the owner's open decision, and
+  ADR-019 now carries the re-measured numbers behind it.
 - `tests/assert-repo-ci-shape.mjs` asserts release authorization in `ci.yml`. The
   `publish` job (npm, `id-token: write`) and the `release` job (the GitHub Release) each
   carried a hand-written `if:`; the two disagreed about what counts as a release, and

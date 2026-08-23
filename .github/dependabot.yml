@@ -1,6 +1,36 @@
+# Dependabot lanes. An ecosystem that is not named here is not scanned, and the
+# absence looks exactly like "there was nothing to update": no pull request is
+# opened either way. So the thing to measure is the ECOSYSTEM LIST, never the
+# pull-request count.
+#
+# That is how 22 of this repository's 25 action references sat on mutable major
+# tags while the npm lane was visibly working. `scripts/check-workflow-pinning.mjs`
+# now asserts that the `github-actions` lane below exists, so deleting it is red
+# rather than silent.
 version: 2
 updates:
   - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+
+  # Every `uses:` in .github/workflows/ is pinned to a commit SHA, which is the
+  # only reference GitHub cannot repoint. A pin with no update lane is not the
+  # end state though: it stops moving, including past the fix for whatever the
+  # pinned commit turns out to contain. This lane is what moves them. Dependabot
+  # rewrites the SHA and the trailing `# vX.Y.Z` comment together, so the
+  # human-readable version stays true.
+  #
+  # `directory: "/"` is the whole repository's workflow directory: for the
+  # github-actions ecosystem Dependabot reads `.github/workflows/` under the
+  # named directory. assets/governance/aahp-govern.yml is a TEMPLATE, not a
+  # workflow directory, so this lane does not reach it - see ADR-021 for what
+  # covers that file instead.
+  - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"

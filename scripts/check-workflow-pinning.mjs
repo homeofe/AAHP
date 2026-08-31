@@ -127,14 +127,11 @@
 //      tree. Measure them with
 //      `gh pr list -R <repo> --author app/dependabot --state all`.
 //
-// DELIBERATELY OUT OF SCOPE, so the hole is visible here rather than invisible
-// in CI: `npm install -g <pkg>` (ci.yml, publish job). It is a different risk
-// class - the package manager itself, published by the registry operator,
-// inside the only job holding `id-token: write` - and there is an open owner
-// decision on whether that step should exist at all rather than be pinned. See
-// https://github.com/homeofe/AAHP/issues/68. Extending this gate to global
-// installs is a few lines once that decision lands. It is named here instead of
-// being quietly allowed by an exemption list that nobody would ever re-read.
+// Global installs are covered too. The repository used to run
+// `npm install -g npm@latest` immediately before publishing while holding
+// `id-token: write`. Node 24 already ships an npm version new enough for trusted
+// publishing, so that install was deleted and global installs are now rejected
+// by the same lockfile rule instead of remaining a permanent exception.
 //
 // ALSO OUT OF SCOPE, for the same reason: whether a pinned SHA is STALE. Rule E
 // proves the reference cannot be repointed, not that it is current, and those
@@ -183,9 +180,6 @@ const TEMPLATE_DIRS = [join("assets", "governance")];
 // `npm install` and every alias npm accepts for it. `ci` is deliberately absent:
 // it is the form this gate exists to require.
 const INSTALL_VERBS = new Set(["install", "i", "in", "ins", "inst", "insta", "instal", "isntall", "add"]);
-
-// Flags that make an install global. Global installs are out of scope (header).
-const GLOBAL_FLAGS = /^(?:-g|--global|--location=global)$/;
 
 // An exact version: no caret, tilde, range, tag, URL or git ref.
 // At most ONE prerelease run and at most ONE build run, deliberately: a
@@ -411,7 +405,6 @@ for (const file of scanned) {
         if (tokens.length === 0) continue;
 
         if (tokens[0] === "npm" && INSTALL_VERBS.has(tokens[1] ?? "")) {
-          if (tokens.some((t) => GLOBAL_FLAGS.test(t))) continue; // out of scope, see header
           findings.push({
             where,
             command,

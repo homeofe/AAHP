@@ -201,7 +201,7 @@ for pattern in "${SECRET_PATTERNS[@]}"; do
     # a line that merely mentions .aiignore was dropped and the gate printed
     # "No secrets detected". Excluding at the source means no content can
     # subvert the exclusion, because nothing downstream reads the match.
-    MATCHES=$(grep -rn --exclude='.aiignore' "$pattern" "$HANDOFF_DIR" 2>/dev/null | cut -d: -f1,2 || true)
+    MATCHES=$(grep -rn --exclude='.aiignore' -- "$pattern" "$HANDOFF_DIR" 2>/dev/null | cut -d: -f1,2 || true)
     if [ -n "$MATCHES" ]; then
         echo -e "  ${RED}✗ Possible secret pattern '$pattern' found in:${NC}"
         echo "    $MATCHES"

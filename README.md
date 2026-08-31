@@ -2,13 +2,16 @@
 
 [![CI](https://github.com/homeofe/AAHP/actions/workflows/ci.yml/badge.svg)](https://github.com/homeofe/AAHP/actions/workflows/ci.yml)
 [![AAHP Verify](https://github.com/homeofe/AAHP/actions/workflows/aahp-verify.yml/badge.svg)](https://github.com/homeofe/AAHP/actions/workflows/aahp-verify.yml)
+[![AAHP Govern](https://img.shields.io/badge/AAHP_Govern-available-blue)](assets/governance/aahp-govern.yml)
 [![AAHP Lint](https://github.com/homeofe/AAHP/actions/workflows/aahp-lint.yml/badge.svg)](https://github.com/homeofe/AAHP/actions/workflows/aahp-lint.yml)
 [![AAHP Manifest](https://github.com/homeofe/AAHP/actions/workflows/aahp-manifest.yml/badge.svg)](https://github.com/homeofe/AAHP/actions/workflows/aahp-manifest.yml)
 [![AAHP Archive](https://github.com/homeofe/AAHP/actions/workflows/aahp-archive.yml/badge.svg)](https://github.com/homeofe/AAHP/actions/workflows/aahp-archive.yml)
 [![AAHP PII Allowlist](https://github.com/homeofe/AAHP/actions/workflows/aahp-pii-allowlist.yml/badge.svg)](https://github.com/homeofe/AAHP/actions/workflows/aahp-pii-allowlist.yml)
 [![Security](https://github.com/homeofe/AAHP/actions/workflows/codeql.yml/badge.svg)](https://github.com/homeofe/AAHP/actions/workflows/codeql.yml)
 [![npm](https://img.shields.io/npm/v/@elvatis_com/aahp.svg)](https://www.npmjs.com/package/@elvatis_com/aahp)
+[![Node.js](https://img.shields.io/node/v/@elvatis_com/aahp.svg)](package.json)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![supply-chain-guard](https://img.shields.io/badge/supply--chain--guard-enabled-blue)](https://github.com/homeofe/supply-chain-guard)
 
 > A file-based protocol for sequential context handoff between AI agents. Optimized for token efficiency, safety hardening, and failure recovery.
 
@@ -811,6 +814,13 @@ If a class of change genuinely does not need the handoff gate, put that exemptio
 INSIDE the gate, keyed on the change, where it is visible and testable. Do not put
 it around the step, keyed on who pushed it.
 
+To remediate a `bypassable` result, remove `if:` and `continue-on-error` from the
+job that hosts the gate and from the gate step itself. Ensure at least one
+unconditional step runs `aahp verify --level ci`; for the governance workflow,
+ensure both `aahp check` and `aahp doctor` run unconditionally. Keep
+`verifyWorkflow.enforce` opt-in: it decides whether the reported finding blocks,
+not whether the unsafe workflow shape is reported.
+
 AAHP ships no runtime dependencies, so this gate carries a small block-YAML reader
 rather than importing a parser. A hand-written parser that quietly disagrees with
 real YAML would be the worst possible engine for a security gate, so
@@ -1537,6 +1547,14 @@ Open ready/in_progress tasks:
 The report covers `project`, the resolved `path`, and the `last_session` block (phase, agent, timestamp, session id, commit); the recorded line counts for `MANIFEST.json` and `NEXT_ACTIONS.md` (a `?` means the manifest does not record that file's line count, which is the normal case for `MANIFEST.json` itself); a `Task counts` roll-up printed in priority order (`ready`, `in_progress`, `blocked`, `done`, `cancelled`, `other`, or `none` when there are no tasks); the `quick_context` string; and up to five open `ready`/`in_progress` tasks. It reads only `MANIFEST.json`, so it reflects the last regeneration, not uncommitted edits to other handoff files.
 
 Exit codes: `0` on success; `1` when `MANIFEST.json` is missing (it prints a hint to run `aahp init` or `aahp manifest` first) or cannot be parsed as JSON.
+
+Repositories that regenerated a manifest before v3.9.2 may already have an
+incorrect `project` value copied from a CI or worktree directory name. Compare
+`.ai/handoff/MANIFEST.json` `project` with the repository name from
+`git remote get-url origin`. If it is wrong, edit `project` once to the intended
+stable name and run `aahp manifest` again. Current versions preserve that recorded
+value; regeneration can prevent future clobbering but cannot infer that an already
+committed value is wrong.
 
 ### 7.2 Checksums cover entire files
 

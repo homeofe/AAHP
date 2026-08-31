@@ -99,16 +99,9 @@ teardown() {
 
     run bash "$SCRIPTS_DIR/lint-handoff.sh" "$TEST_TMPDIR"
 
-    # Note: the pattern "-----BEGIN.*PRIVATE KEY" starts with "--" which some grep
-    # implementations interpret as option flags. The lint script uses `|| true` so
-    # this may silently fail. If it does detect it, verify the output.
-    if [ "$status" -eq 1 ]; then
-        [[ "$output" == *"secret pattern"* ]]
-    else
-        # grep treated the pattern as flags -known limitation.
-        # The script should use `grep -- "$pattern"` to fix this.
-        skip "grep interprets leading dashes in pattern as options (known lint script limitation)"
-    fi
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"secret pattern"* ]]
+    [[ "$output" == *"-----BEGIN.*PRIVATE KEY"* ]]
 }
 
 @test "detects secret patterns: Bearer token" {
@@ -388,21 +381,19 @@ unmanaged edit
     [ -n "$py" ] || skip "no working python interpreter"
     real_py="$(command -v "$py")"
 
-    # A wrapper that behaves exactly like the real interpreter except for the
-    # checksum verifier, which it kills with an unexpected exit code. Both
-    # names are wrapped because the detection helper may select either.
-    local fake="$TEST_TMPDIR/fakebin" name
-    mkdir -p "$fake"
-    for name in python python3; do
-        cat > "$fake/$name" <<WRAP
-#!/usr/bin/env bash
-for a in "\$@"; do case "\$a" in *hashlib*) exit 9 ;; esac; done
-exec "$real_py" "\$@"
+    # BASH_ENV functions avoid an extension-precedence difference on Windows,
+    # where Git Bash can select a later python.exe ahead of an extensionless
+    # wrapper script. Both names behave exactly like the real interpreter except
+    # for the checksum verifier, which returns an unexpected exit code.
+    cat > "$TEST_TMPDIR/fail-checksum.bash" <<WRAP
+python() {
+    for a in "\$@"; do case "\$a" in *hashlib*) return 9 ;; esac; done
+    command "$real_py" "\$@"
+}
+python3() { python "\$@"; }
 WRAP
-        chmod +x "$fake/$name"
-    done
 
-    PATH="$fake:$PATH" run bash "$SCRIPTS_DIR/lint-handoff.sh" "$TEST_TMPDIR"
+    BASH_ENV="$TEST_TMPDIR/fail-checksum.bash" run bash "$SCRIPTS_DIR/lint-handoff.sh" "$TEST_TMPDIR"
     [ "$status" -eq 1 ]
     [[ "$output" == *"Could not verify indexed files"* ]]
     [[ "$output" == *"violation(s) found"* ]]

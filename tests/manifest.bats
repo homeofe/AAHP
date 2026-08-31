@@ -1,6 +1,8 @@
 #!/usr/bin/env bats
 # manifest.bats -Tests for scripts/aahp-manifest.sh
 
+bats_require_minimum_version 1.5.0
+
 setup() {
     load test_helper
     setup
@@ -349,40 +351,31 @@ _detect_python() {
     # the warning lives inside the `command -v node` guard. Before the remote
     # fallback existed, the name then became the directory basename with no
     # diagnostic at all. git alone is enough to get it right.
-    # Drop EVERY PATH entry that holds a node executable, rather than building
-    # a shim directory of symlinked binaries. A shim needs copies of bash and
-    # git, which is not portable to Windows, and a test that can only ever
-    # `skip` proves nothing. Dropping only the first such entry is not enough
-    # either: a CI runner commonly has two node installs (a system one and a
-    # toolcache one), and stripping one leaves the branch untested while the
-    # test still reports on it.
-    stripped_path=""
-    saved_ifs="$IFS"
-    set -f
-    IFS=':'
-    for entry in $PATH; do
-        if [ -z "$entry" ]; then continue; fi
-        if [ -x "$entry/node" ] || [ -x "$entry/node.exe" ]; then continue; fi
-        stripped_path="${stripped_path}${stripped_path:+:}$entry"
-    done
-    IFS="$saved_ifs"
-    set +f
+    # Simulate a missing node through BASH_ENV instead of deleting PATH entries.
+    # On many Linux systems node, git, bash, sed, and coreutils all live in
+    # /usr/bin, so removing every directory that contains node also removes the
+    # tools the manifest generator legitimately needs. The child shell below
+    # makes both the guard and an accidental direct invocation fail while
+    # preserving the real platform PATH.
+    cat > "$TEST_TMPDIR/no-node.bash" <<'EOF'
+node() { return 127; }
+command() {
+    if [ "${1:-}" = "-v" ] && [ "${2:-}" = "node" ]; then return 1; fi
+    builtin command "$@"
+}
+EOF
 
-    # Assert the CONSEQUENCE of the isolation, not its configuration: node must
-    # actually fail to EXECUTE under this PATH, and git and bash must actually
-    # run. `env` performs a real execvp, so unlike `command -v` it cannot be
-    # satisfied by a shell hash-table entry or by builtin lookup order. Failing
-    # here beats skipping: a test that cannot fire is indistinguishable from a
-    # passing one.
-    run env PATH="$stripped_path" node --version
+    run env BASH_ENV="$TEST_TMPDIR/no-node.bash" bash -c 'command -v node'
     [ "$status" -ne 0 ]
-    run env PATH="$stripped_path" git --version
+    run -127 env BASH_ENV="$TEST_TMPDIR/no-node.bash" bash -c 'node --version'
+    [ "$status" -eq 127 ]
+    run env BASH_ENV="$TEST_TMPDIR/no-node.bash" git --version
     [ "$status" -eq 0 ]
-    run env PATH="$stripped_path" bash -c 'exit 7'
+    run env BASH_ENV="$TEST_TMPDIR/no-node.bash" bash -c 'exit 7'
     [ "$status" -eq 7 ]
 
     dir_name="$(basename "$TEST_TMPDIR")"
-    run env PATH="$stripped_path" bash "$SCRIPTS_DIR/aahp-manifest.sh" "$TEST_TMPDIR" --quiet
+    run env BASH_ENV="$TEST_TMPDIR/no-node.bash" bash "$SCRIPTS_DIR/aahp-manifest.sh" "$TEST_TMPDIR" --quiet
     [ "$status" -eq 0 ]
 
     # Read the value back explicitly so a regression reports the name that was

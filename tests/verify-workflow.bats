@@ -197,6 +197,7 @@ EOF
     [ "$status" -eq 1 ]
     [[ "$output" == *"Conformance FAILED"* ]]
     [[ "$output" == *"verify-workflow"* ]]
+    [[ "$output" == *"REMEDIATION: remove if: and continue-on-error"* ]]
 }
 
 @test "doctor: the SAME workflow is reported and not blocking without enforce" {
@@ -209,6 +210,7 @@ EOF
     [[ "$output" == *'"verify-workflow": "advisory"'* ]]
     [[ "$output" != *'"verify-workflow": "pass"'* ]]
     [[ "$output" == *"ci-step-conditional"* ]]
+    [[ "$output" == *"REMEDIATION: remove if: and continue-on-error"* ]]
     [[ "$output" == *"NOT ENFORCED"* ]]
 }
 

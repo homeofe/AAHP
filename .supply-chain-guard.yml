@@ -1,0 +1,7 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/homeofe/supply-chain-guard/2ba749d08e19b4d5c75c71467233987748f8e8c7/policy-schema.json
+# Reviewed findings may be suppressed only by exact rule id and with an
+# audit-trail reason. This empty object means no suppressions. In v6.0.8 the
+# published schema accepts `suppress: []`, but the runtime parser rejects that
+# inline form; `{}` is accepted by both and preserves the intended empty policy.
+
+{}

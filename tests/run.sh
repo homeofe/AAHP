@@ -11,34 +11,24 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
-# Detect bats: prefer local npx, fall back to global
-if command -v bats &>/dev/null; then
-    BATS="bats"
-elif command -v npx &>/dev/null; then
-    BATS="npx bats"
-else
-    echo "Error: bats not found. Install with: npm install -g bats" >&2
-    echo "  Or:  brew install bats-core" >&2
-    exit 1
-fi
+# Use the repository's locked Bats dependency and the same cross-platform Bash
+# resolution as `npm test`. This avoids an unpinned global install and prevents
+# Windows from selecting the WSL launcher for a Git-Bash-shaped path.
+RUNNER="$SCRIPT_DIR/../scripts/run-bats.mjs"
 
 if [ $# -gt 0 ]; then
     # Run a specific test suite
     suite="$1"
-    case "$suite" in
-        manifest|lint|migrate|migrate-grounding|archive|verify|handoff-impact|propagate|cli|gates|doctor|anti-entropy|check|init-gates|gates-portability|nonnpm-root|acceptance-criteria)
-            echo "Running $suite tests..."
-            $BATS "$SCRIPT_DIR/${suite}.bats"
-            ;;
-        *)
-            echo "Unknown suite: $suite" >&2
-            echo "Available: manifest, lint, migrate, migrate-grounding, archive, verify, handoff-impact, propagate, cli, gates, doctor, anti-entropy, check, init-gates, gates-portability, nonnpm-root, acceptance-criteria" >&2
-            exit 1
-            ;;
-    esac
+    suite_file="$SCRIPT_DIR/${suite}.bats"
+    if [ ! -f "$suite_file" ]; then
+        echo "Unknown suite: $suite" >&2
+        exit 1
+    fi
+    echo "Running $suite tests..."
+    node "$RUNNER" "$suite_file"
 else
     # Run all test suites
     echo "Running all AAHP bats tests..."
     echo ""
-    $BATS "$SCRIPT_DIR"/*.bats
+    node "$RUNNER" "$SCRIPT_DIR"
 fi

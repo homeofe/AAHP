@@ -848,6 +848,10 @@ function gateVerifyWorkflow(targetPath) {
   const first = result.findings[0]
   const more = result.findings.length > 1 ? ` (+${result.findings.length - 1} more)` : ''
   const detail = `the gate can be skipped [${first.id}] ${first.detail}${more}`
+  const remediation =
+    ' REMEDIATION: remove if: and continue-on-error from the hosting job and gate step; ' +
+    'run aahp verify --level ci unconditionally (and run both aahp check and aahp doctor ' +
+    'unconditionally in a governance workflow).'
 
   // OPT-IN, on the pattern trustTtl.enforce establishes in this same release.
   //
@@ -864,11 +868,11 @@ function gateVerifyWorkflow(targetPath) {
     return {
       status: 'advisory',
       reason:
-        `${detail} NOT ENFORCED: set verifyWorkflow.enforce in aahp.config.json to make ` +
+        `${detail}${remediation} NOT ENFORCED: set verifyWorkflow.enforce in aahp.config.json to make ` +
         'this a failing gate.',
     }
   }
-  return { status: 'fail', reason: detail }
+  return { status: 'fail', reason: detail + remediation }
 }
 
 // Absent config, absent section, or enforce:false all mean NOT enforced, so a

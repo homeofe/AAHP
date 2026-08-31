@@ -21,6 +21,30 @@ teardown() {
     teardown
 }
 
+@test "the portable Bats launcher can run a test through the resolved bash" {
+    cat > "$TEST_TMPDIR/launcher-smoke.bats" <<'EOF'
+#!/usr/bin/env bats
+@test "launcher smoke" { true; }
+EOF
+
+    run node "$AAHP_ROOT/scripts/run-bats.mjs" --filter "launcher smoke" "$TEST_TMPDIR/launcher-smoke.bats"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"ok 1 launcher smoke"* ]]
+}
+
+@test "npm test uses the portable Bats launcher" {
+    run node -e 'process.stdout.write(require(process.argv[1]).scripts.test)' "$AAHP_ROOT/package.json"
+    [ "$status" -eq 0 ]
+    [ "$output" = "node scripts/run-bats.mjs" ]
+}
+
+@test "the shell test entry point delegates to the portable Bats launcher" {
+    run grep -F 'node "$RUNNER"' "$AAHP_ROOT/tests/run.sh"
+    [ "$status" -eq 0 ]
+    run grep -F 'npx bats' "$AAHP_ROOT/tests/run.sh"
+    [ "$status" -ne 0 ]
+}
+
 # ─── Helper ─────────────────────────────────────────────────
 
 # Run bin/aahp.js with node, capturing output and exit code.
@@ -109,7 +133,7 @@ _aahp() {
 
 @test "aahp --version matches package.json version" {
     _aahp --version
-    pkg_version="$(node -e "process.stdout.write(require('$AAHP_ROOT/package.json').version)")"
+    pkg_version="$(node -e 'process.stdout.write(require(process.argv[1]).version)' "$AAHP_ROOT/package.json")"
     [ "$output" = "$pkg_version" ]
 }
 
@@ -236,6 +260,9 @@ _aahp() {
 }
 
 @test "aahp init fails with permission error on read-only directory" {
+    case "$(uname -s)" in
+        MINGW*|MSYS*|CYGWIN*) skip "chmod does not model Windows directory ACLs" ;;
+    esac
     local readonly_dir="$TEST_TMPDIR/readonly"
     mkdir -p "$readonly_dir"
     chmod 444 "$readonly_dir"
@@ -339,7 +366,9 @@ _aahp() {
     _aahp status
     cd "$orig_dir"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"Path: $TEST_TMPDIR/project-sub"* ]]
+    local expected_path
+    expected_path="$(node -e 'process.stdout.write(require("node:path").resolve(process.argv[1]))' "$TEST_TMPDIR/project-sub")"
+    [[ "$output" == *"Path: $expected_path"* ]]
 }
 
 # ─── archive command (behavior covered in archive.bats) ──────
@@ -547,5 +576,3 @@ _lint_status_line() {
     [ "$status" -eq 0 ]
     [[ "$output" == *"Phase: documentation"* ]]
 }
-
-

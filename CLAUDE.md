@@ -8,7 +8,7 @@
 
 ## Tech Stack
 
-- Node.js 18+ with ESM for [`bin/aahp.js`](bin/aahp.js).
+- Node.js 22+ with ESM for [`bin/aahp.js`](bin/aahp.js).
 - Bash for the core tooling in [`scripts/`](scripts/).
 - No runtime npm dependencies; core behavior must keep working with Node + bash + standard system tools.
 - Bats is used for automated tests.
@@ -28,11 +28,11 @@
 npm test
 bash tests/run.sh
 
-# Run a single test file
-npx bats tests/cli.bats
-npx bats tests/manifest.bats
-npx bats tests/lint.bats
-npx bats tests/migrate.bats
+# Run a single test file (portable across Linux, macOS, and Windows)
+node scripts/run-bats.mjs tests/cli.bats
+node scripts/run-bats.mjs tests/manifest.bats
+node scripts/run-bats.mjs tests/lint.bats
+node scripts/run-bats.mjs tests/migrate.bats
 
 # Lint handoff files
 bash scripts/lint-handoff.sh .

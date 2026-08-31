@@ -189,11 +189,9 @@ if (!ci?.jobs?.["runtime-matrix"]) {
 // empty; the assertion below now proves the two conditions are identical, and that
 // re-adding any operand requires editing this file and ADR-019 in the same commit.
 //
-// It is a CHANGE DETECTOR, not a policy. It does not decide whether a manual
-// publish path should exist; that question is recorded as open in ADR-019 in
-// README.md. What it does is pin both conditions to the state this repository has
-// recorded, so changing either one becomes a two-part edit - the workflow and the
-// record below - that a reviewer meets in a single diff.
+// It is a CHANGE DETECTOR for the settled policy. It pins both conditions to the
+// state this repository recorded, so changing either one becomes a two-part edit -
+// the workflow and ADR-019 - that a reviewer meets in a single diff.
 //
 // It reads the PARSED condition from the YAML, never a substring of the file, so
 // reformatting the workflow cannot turn the assertion green or red on its own.
@@ -210,12 +208,6 @@ const RELEASE_REF_CONDITION =
 // is not a release tag, so this list is deliberately literal: no patterns, no
 // wildcard entry, and an empty list is a meaningful state rather than "unchecked".
 //
-// One entry today, and it is an OPEN owner decision rather than a settled one.
-// A manual run publishes from whatever ref it was started on, producing no tag and
-// no GitHub Release; none of this workflow's 147 runs, measured 2026-08-22, was a
-// manual dispatch. The options for settling it, and what each one requires, are in
-// ADR-019. Adopting any of them means editing ci.yml and this list in the same
-// commit, which is the entire point of the list.
 // Settled as ADR-019 option A on 2026-08-23: the operand is gone and the two
 // conditions are identical, so there is nothing beyond the release definition to
 // record. The list stays, and stays asserted in both directions, because it is what

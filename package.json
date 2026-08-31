@@ -59,7 +59,7 @@
     "check": "npm run check:changelog && npm run check:changelog-format && npm run check:version-sync && npm run check:claims && npm run check:forbidden-patterns && npm run check:schema-doc-sync && npm run check:doc-links && npm run check:doc-shape && npm run check:runtime-support && npm run check:workflow-pinning && npm run check:handoff",
     "criteria": "node bin/aahp.js criteria .",
     "doctor": "node bin/aahp.js doctor .",
-    "test": "npx bats tests/",
+    "test": "node scripts/run-bats.mjs",
     "prepublishOnly": "npm run check && npm run doctor && npm test"
   },
   "devDependencies": {

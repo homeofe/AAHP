@@ -113,6 +113,22 @@ jobs:
       - name: Run bats tests
         run: npm test
 
+  supply-chain-guard:
+    name: Supply chain guard
+    if: github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Scan dependencies and workflows
+        uses: homeofe/supply-chain-guard@2ba749d08e19b4d5c75c71467233987748f8e8c7 # v6.0.8
+        with:
+          comment-on-pr: false
+
   runtime-matrix:
     # Exercise the WHOLE range engines.node publishes, not just its floor.
     # scripts/check-runtime-support.mjs binds this matrix directly: emptying
@@ -159,22 +175,9 @@ jobs:
     # Both gates, so a release cannot ship past a red runtime matrix.
     needs: [lint-and-validate, runtime-matrix]
     runs-on: ubuntu-latest
-    # Release authorization. This condition has two top-level operands and they
-    # are different kinds of thing.
-    #
-    # The first is the shared definition of "this ref is a release". It is
-    # byte-identical to the `release` job's condition below, and
-    # tests/assert-repo-ci-shape.mjs holds the two together, so they cannot
-    # drift apart unnoticed the way they did before.
-    #
-    # The second is a standing permission to publish on something that is not a
-    # release: a manual run publishes from whichever ref it was started on, with
-    # no tag and no GitHub Release. Whether that path should exist at all is an
-    # OPEN owner decision, recorded with its options in ADR-019 in README.md and
-    # tracked at https://github.com/homeofe/AAHP/issues/69. Until it is settled,
-    # the same assertion pins this condition exactly as written, so any edit to
-    # it must update the record in the same commit.
-    # Identical to the `release` job's condition below, on purpose. These two are
+    # Release authorization. Identical to the `release` job's condition below,
+    # on purpose. tests/assert-repo-ci-shape.mjs holds the two together, so they
+    # cannot drift apart unnoticed. These two are
     # the release-critical pair and they used to disagree: this one additionally
     # accepted `workflow_dispatch`, an operand constraining no ref, so a manual run
     # from any ref reached `npm publish` while the GitHub Release stayed tag-only.
@@ -196,15 +199,14 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          # Node 24: OIDC trusted publishing needs a recent npm, and npm@latest
-          # (>=12) requires Node >=22. Node 20 broke the upgrade step below.
+          # Trusted publishing needs npm >=11.5.1 and Node >=22.14.0. The
+          # current Node 24 line includes a qualifying npm, so no unpinned
+          # package-manager install is needed in this privileged job.
           node-version: '24'
           registry-url: 'https://registry.npmjs.org'
           cache: 'npm'
       - run: npm ci
       - run: npm run build --if-present
-      - name: Upgrade npm for OIDC trusted publishing
-        run: npm install -g npm@latest
       - name: Publish to npm (OIDC trusted publishing, no token)
         run: npm publish --access public --provenance
 

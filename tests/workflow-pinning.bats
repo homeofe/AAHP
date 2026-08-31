@@ -167,12 +167,10 @@ EOF
     [[ "$output" == *"installs packages outside the committed lockfile"* ]]
 }
 
-@test "a global install is deliberately NOT a finding of this gate" {
-    # Scope, recorded in the gate header and on
-    # https://github.com/homeofe/AAHP/issues/68: `npm install -g` is a different
-    # risk class with an owner decision still open on it. This test exists so the
-    # exemption is a stated property with a test behind it rather than an
-    # accident of the regex, and so it fails loudly if the scope ever changes.
+@test "a global install is red, including npm@latest in the publish job" {
+    # The former publish step ran this immediately before npm publish while the
+    # job held id-token: write. Node 24 already carries a qualifying npm, so the
+    # step is gone and this mutation proves it cannot quietly return.
     write_good_fixture
     cat >> "$(wf_dir)/ci.yml" <<'EOF'
       - name: Upgrade npm
@@ -180,7 +178,8 @@ EOF
 EOF
 
     run node "$GATE" "$TEST_TMPDIR"
-    [ "$status" -eq 0 ]
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"installs packages outside the committed lockfile"* ]]
 }
 
 # ─── Rule B: npx must carry --no-install ────────────────────────────────────
@@ -672,6 +671,37 @@ EOF
     run grep -c 'package-ecosystem: "github-actions"' "$AAHP_ROOT/.github/dependabot.yml"
     [ "$status" -eq 0 ]
     [ "$output" -ge 1 ]
+}
+
+@test "the supply-chain scanner is least-privilege and its policy starts empty" {
+    run node --input-type=module -e '
+      import { readFileSync } from "node:fs";
+      import { join } from "node:path";
+      import YAML from "yaml";
+      const root = process.argv[1];
+      const workflow = YAML.parse(readFileSync(join(root, ".github/workflows/ci.yml"), "utf8"));
+      const job = workflow.jobs?.["supply-chain-guard"];
+      if (!job) throw new Error("supply-chain-guard job is missing");
+      if (JSON.stringify(job.permissions) !== JSON.stringify({ contents: "read" })) {
+        throw new Error("scanner permissions are not exactly contents: read");
+      }
+      const checkout = job.steps?.find((step) => String(step.uses ?? "").startsWith("actions/checkout@"));
+      if (checkout?.with?.["persist-credentials"] !== false) {
+        throw new Error("scanner checkout persists credentials");
+      }
+      const scan = job.steps?.find((step) => String(step.uses ?? "").startsWith("homeofe/supply-chain-guard@"));
+      if (scan?.uses !== "homeofe/supply-chain-guard@2ba749d08e19b4d5c75c71467233987748f8e8c7") {
+        throw new Error("scanner is not pinned to the reviewed v6.0.8 release commit");
+      }
+      if (scan.with?.["comment-on-pr"] !== false || Object.hasOwn(scan.with ?? {}, "policy")) {
+        throw new Error("scanner inputs do not match the action contract");
+      }
+      const policy = YAML.parse(readFileSync(join(root, ".supply-chain-guard.yml"), "utf8"));
+      if (!policy || Array.isArray(policy) || Object.keys(policy).length !== 0) {
+        throw new Error("initial scanner policy is not an empty object");
+      }
+    ' "$AAHP_ROOT"
+    [ "$status" -eq 0 ]
 }
 
 # ─── The gate has to actually RUN ───────────────────────────────────────────

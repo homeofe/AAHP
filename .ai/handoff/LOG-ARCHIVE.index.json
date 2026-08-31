@@ -2,6 +2,10 @@
   "version": 1,
   "entries": [
     {
+      "sha256": "419d61ba6f72eb44155a1110d8da9ad02dbae606a41bfe607932b1cd20725642",
+      "title": "## [2026-06-26] Codex: LOG archive flow and reusable badge workflows"
+    },
+    {
       "sha256": "5af1b96bfb8c2200e1c0d34b05cc3414b14f933d760553456c2db92eb330cf4e",
       "title": "## [2026-06-26] Codex: Reviewed, expiring PII allowlist (issue #21)"
     },

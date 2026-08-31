@@ -9,6 +9,52 @@ independently of the npm version).
 > disabled, so `3.3.0` and `3.4.0` were developed in the repository but never published.
 > `3.5.0` is the first npm release since `3.2.1` and ships everything below it.
 
+## [3.12.0] - 2026-08-31
+
+### Added
+
+- A least-privilege supply-chain-guard CI job for pull requests and pushes to `main`,
+  pinned to the signed v6.0.8 release commit. Its reviewed root policy starts with no
+  suppressions, checkout credentials are not persisted, and the job has only
+  `contents: read`.
+- A portable Node launcher for the repository's locked Bats dependency. `npm test` and
+  `tests/run.sh` no longer depend on a global Bats installation or an opportunistic
+  registry download, and the same entry point works on Windows and Linux.
+- README badges for the enabled supply-chain scanner, the shipped AAHP Govern template,
+  and the package's dynamically reported Node compatibility. The existing live AAHP
+  Verify workflow badge remains in place.
+- Explicit adopter remediation for a bypassable verify workflow and for incorrect
+  MANIFEST project names written by versions before 3.9.2.
+
+### Changed
+
+- The three CodeQL actions advance from v4.37.7 to v4.37.8 at the immutable commit from
+  Dependabot PR #109.
+- Project guidance now states the published Node 22 floor, and workflow-pinning coverage
+  treats global npm installs as unpinned installs rather than exempting them.
+- Release lockfile metadata is synchronized with the package version again; it had
+  remained at 3.10.0 through the 3.11.0 release.
+
+### Fixed
+
+- Secret scanning now passes `--` before grep patterns, so a private-key header beginning
+  with hyphens is detected instead of being parsed as a command-line option.
+- Windows-specific assumptions in CLI, lint, and manifest tests were replaced with
+  portable path, interpreter, and permission handling while retaining their Linux
+  assertions.
+- Contradictory stale comments around release authorization and trusted publishing were
+  removed from the workflow and its shape assertion.
+- Python bytecode and `__pycache__` directories are explicitly excluded from the npm
+  package. A local validation run had compiled the PII validator before packing and
+  exposed that the broad `scripts/` inclusion otherwise published the generated `.pyc`.
+
+### Security
+
+- Removed the unpinned `npm install -g npm@latest` immediately before OIDC publishing.
+  Node 24 already supplies an npm version that meets trusted publishing's minimum, so
+  the privileged job no longer replaces its package manager from a mutable registry
+  target.
+
 ## [3.11.0] - 2026-08-23
 
 ### Added
@@ -1147,7 +1193,8 @@ independently of the npm version).
 
 - Relicensed to Apache-2.0 (earlier commits carried MIT, then CC BY 4.0, headers).
 
-[Unreleased]: https://github.com/homeofe/AAHP/compare/v3.11.0...HEAD
+[Unreleased]: https://github.com/homeofe/AAHP/compare/v3.12.0...HEAD
+[3.12.0]: https://github.com/homeofe/AAHP/compare/v3.11.0...v3.12.0
 [3.11.0]: https://github.com/homeofe/AAHP/compare/v3.10.0...v3.11.0
 [3.10.0]: https://github.com/homeofe/AAHP/compare/v3.9.2...v3.10.0
 [3.9.2]: https://github.com/homeofe/AAHP/compare/v3.9.1...v3.9.2

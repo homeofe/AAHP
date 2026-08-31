@@ -89,6 +89,7 @@ fails CI rather than printing into the wall.
 |----------|--------|------------|---------------|-------|-----|---------|-------|
 | No secrets in source | assumed | - | 2026-08-03 | grok-4.5 | 7d | 2026-08-10 | Downgraded 2026-08-23: TTL lapsed on 2026-08-10 and nothing re-ran it. `assumed` is what this register's own table calls an unverified claim; a fresh date would have been a verdict nobody produced |
 | LICENSE matches declared license | verified | source_verified | 2026-08-23 | cli-tool | 30d | 2026-09-22 | Re-verified 2026-08-23: package.json declares `"license": "Apache-2.0"` and LICENSE opens `Apache License / Version 2.0, January 2004`. 30d for the same reason as the row above |
+| Supply-chain scanner workflow passes | verified | runtime_observed | 2026-08-31 | codex | 30d | 2026-09-30 | GitHub Actions job `Supply chain guard` passed on PR #110 at run 33385292682 with the v6.0.8 action pinned to commit `2ba749d08e19b4d5c75c71467233987748f8e8c7`; the same release scanned the isolated Linux tree with 0 findings and risk 0. |
 | README.md is single source of truth | assumed | - | 2026-08-03 | grok-4.5 | 7d | 2026-08-10 | Downgraded 2026-08-23: TTL lapsed on 2026-08-10 and nothing re-ran it. `assumed` is what this register's own table calls an unverified claim; a fresh date would have been a verdict nobody produced |
 
 ---

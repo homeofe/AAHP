@@ -1,16 +1,15 @@
 # AAHP: Current Status
 
 Last updated: 2026-08-31
-Current package version: 3.11.0
+Current package version: 3.12.0
 Protocol version: 3.0
-Working state: implementation complete on `codex/prompt-audit-supply-chain-guard`, not released
+Working state: release candidate on `codex/release-3.12.0`, pending release PR and tag
 
 ## Current objective
 
-Audit the repository against the supplied third-party review prompt, correct stale or
-unsafe recommendations, implement the valid findings, and verify the result on Windows
-and Linux. No commit, push, merge, tag, npm publish, or GitHub issue mutation is part of
-this working state.
+Release the completed repository audit and supply-chain hardening as v3.12.0. PR #110
+is merged; the remaining sequence is a green release PR, merge to main, an exact tag on
+the reviewed merge commit, and verification of the automated npm and GitHub releases.
 
 ## Implemented in this working tree
 
@@ -73,12 +72,18 @@ release workflow (OIDC publishing and secret-bearing upload behavior). At the co
 high threshold the repository is clean. These are not suppressed in policy because the
 empty policy keeps future findings visible.
 
-## Pull request state
+## Pull request and release state
 
-- Dependabot PR #109's exact CodeQL changes are integrated in this branch. The old PR can
-  be closed as superseded after the replacement pull request exists.
+- PR #110 is merged at `fff9de375e798e742f266a77ed06f39f98368ffa`; every check,
+  including the first real supply-chain-guard run, passed.
+- Dependabot PR #109 was closed as superseded after its exact CodeQL changes landed in
+  #110.
+- The release candidate moves package and lockfile metadata to 3.12.0 and adds the
+  corresponding changelog entry and compare links.
+- Python bytecode and `__pycache__` output are now excluded from source control and the
+  npm package after a release dry-run exposed the broad `scripts/` inclusion.
 - No open GitHub issues were found during this audit.
-- No tag, release, package publication, or merge was performed.
+- The v3.12.0 tag, GitHub Release, and npm publication do not exist yet.
 
 ## Owner decisions and follow-up
 
@@ -93,8 +98,8 @@ These are decisions, not ready autonomous tasks, so the MANIFEST task graph rema
    action-only.
 3. Decide whether old adopter copies of the governance workflow need doctor detection or
    a targeted force-upgrade path beyond release-note remediation.
-4. After the first real scanner CI run, decide whether to add a time-bounded `verified`
-   TRUST row and make the scanner a required status check.
+4. Decide whether the now-proven scanner job should become a required status check. Its
+   first real CI success is recorded as a time-bounded `verified` TRUST row.
 5. Track replacement of `ajv-cli@5.0.0`. Its current transitive tree emits deprecation
    warnings for `glob@7.2.3` and `inflight@1.0.6`, although npm reports no vulnerability
    and no newer `ajv-cli` release is available.
@@ -103,6 +108,6 @@ These are decisions, not ready autonomous tasks, so the MANIFEST task graph rema
 
 - Preserve the scanner job's read-only permissions and immutable pins.
 - Do not add a broad scanner suppression merely to make low-severity output empty.
-- Do not merge the replacement pull request or cut a release until all required checks are
-  green and the owner authorizes the external mutation.
+- Tag only the reviewed v3.12.0 merge commit. Verify both npm and GitHub publication after
+  the tag workflow completes.
 - Regenerate MANIFEST.json after every handoff-file change.

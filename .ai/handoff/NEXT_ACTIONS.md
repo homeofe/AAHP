@@ -3,7 +3,7 @@
 > The MANIFEST task graph is authoritative. Owner decisions below are not autonomous
 > tasks and therefore do not appear as ready or blocked task entries.
 
-Current version: **v3.11.0**
+Current version: **v3.12.0**
 
 ---
 
@@ -18,6 +18,13 @@ Current version: **v3.11.0**
 ---
 
 ## Recently Completed
+
+### 2026-08-31: v3.12.0 release candidate
+
+- Merged fully green PR #110 and closed Dependabot PR #109 as superseded.
+- Prepared the 3.12.0 changelog, package metadata, lockfile metadata, and handoff state.
+- Excluded generated Python bytecode from git and npm package contents.
+- Recorded the first successful supply-chain-guard GitHub Actions run in TRUST.md.
 
 ### 2026-08-31: PR #109 integration and scanner v6.0.8 refresh
 
@@ -80,7 +87,7 @@ Current version: **v3.11.0**
 - Reconcile the full-ASCII wording with the implemented U+2014-only gate.
 - Choose manual repair or bot-authored handoff updates for future Dependabot action bumps.
 - Choose whether legacy governance workflows need doctor detection or forced migration.
-- After a real CI run, consider a scanner TRUST row and required status check.
+- Consider making the now-proven scanner job a required status check.
 - Plan a future replacement for the deprecated transitive dependencies of ajv-cli 5.
 
 ---

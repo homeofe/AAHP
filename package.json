@@ -1,6 +1,6 @@
 {
   "name": "@elvatis_com/aahp",
-  "version": "3.11.0",
+  "version": "3.12.0",
   "description": "AI-to-AI Handoff Protocol - CLI tools for managing agent handoff files",
   "author": "Elvatis <emre.kohler@elvatis.com>",
   "bin": {
@@ -28,6 +28,9 @@
   "files": [
     "bin/",
     "scripts/",
+    "!scripts/**/__pycache__/",
+    "!scripts/**/*.pyc",
+    "!scripts/**/*.pyo",
     "!scripts/ROLLOUT.md",
     ".github/workflows/aahp-verify.yml",
     "assets/",

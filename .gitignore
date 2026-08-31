@@ -5,6 +5,9 @@ node_modules/
 dist/
 build/
 out/
+**/__pycache__/
+**/*.pyc
+**/*.pyo
 
 # Secrets & Local Config
 .env

@@ -690,8 +690,8 @@ EOF
         throw new Error("scanner checkout persists credentials");
       }
       const scan = job.steps?.find((step) => String(step.uses ?? "").startsWith("homeofe/supply-chain-guard@"));
-      if (scan?.uses !== "homeofe/supply-chain-guard@2ba749d08e19b4d5c75c71467233987748f8e8c7") {
-        throw new Error("scanner is not pinned to the reviewed v6.0.8 release commit");
+      if (scan?.uses !== "homeofe/supply-chain-guard@013febcb8447107bcf9d82e400d5b492d44bb10f") {
+        throw new Error("scanner is not pinned to the reviewed v6.3.1 release commit");
       }
       if (scan.with?.["comment-on-pr"] !== false || Object.hasOwn(scan.with ?? {}, "policy")) {
         throw new Error("scanner inputs do not match the action contract");

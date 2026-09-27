@@ -19,6 +19,15 @@ Current version: **v3.12.0**
 
 ## Recently Completed
 
+### 2026-09-28: Dependabot integration and scanner v6.3.1
+
+- Integrated #112, #113, #115 and #117 unchanged in one replacement pull request; to be
+  closed as superseded after merge together with #118.
+- Moved supply-chain-guard to the signed v6.3.1 release commit (current release) instead
+  of #118's v6.2.0, with the pinned bats contract and policy schema anchor.
+- Re-verified the two TRUST rows whose expiry on 2026-09-22 had turned `aahp-verify` red
+  on every pull request.
+
 ### 2026-08-31: v3.12.0 release candidate
 
 - Merged fully green PR #110 and closed Dependabot PR #109 as superseded.
@@ -89,6 +98,8 @@ Current version: **v3.12.0**
 - Choose whether legacy governance workflows need doctor detection or forced migration.
 - Consider making the now-proven scanner job a required status check.
 - Plan a future replacement for the deprecated transitive dependencies of ajv-cli 5.
+- Decide how an enforced TRUST-TTL should behave in an idle repository, where it turns a
+  required check red on a calendar date with no code change.
 
 ---
 

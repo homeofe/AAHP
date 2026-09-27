@@ -125,7 +125,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Scan dependencies and workflows
-        uses: homeofe/supply-chain-guard@2ba749d08e19b4d5c75c71467233987748f8e8c7 # v6.0.8
+        uses: homeofe/supply-chain-guard@013febcb8447107bcf9d82e400d5b492d44bb10f # v6.3.1
         with:
           comment-on-pr: false
 

@@ -6,6 +6,37 @@
 
 ---
 
+## [2026-09-28] claude-opus-5.5: five Dependabot PRs integrated; scanner to v6.3.1
+
+**Agent:** claude-opus-5.5
+**Phase:** implementation
+**Branch:** chore/deps-2026-09
+**Tasks:** owner request to integrate the open pull requests
+
+### What was done
+
+- Found all five open pull requests (#112, #113, #115, #117, #118) red on the required
+  `aahp-verify` check, some for four weeks. Two causes, both measured: Layer 2 because
+  Dependabot writes no handoff state, and Layer 4 because two `verified` TRUST rows had
+  expired on 2026-09-22, which fails every pull request, not only Dependabot's.
+- #118 additionally failed `tests/workflow-pinning.bats` (line 704), the contract that pins the
+  scanner to a reviewed commit. That is the gate doing its job, not a defect.
+- Cherry-picked #112, #113, #115 and #117 unchanged. Checked each lockfile integrity hash
+  against the registry and the CodeQL pin against its tag.
+- Moved supply-chain-guard to v6.3.1 (owner pointed out it is current) rather than #118's
+  v6.2.0, after resolving the signed tag and diffing `action.yml` and
+  `policy-schema.json` against v6.0.8. Mutation-proved the moved bats contract.
+- Re-verified the two expired TRUST rows against the tree before resetting their dates.
+
+### Decision
+
+- One replacement pull request instead of five handoff commits on five Dependabot
+  branches: one CI run, one handoff entry, no back-to-back merges, and the three
+  lockfile bumps would otherwise have needed sequential rebases. Same pattern as
+  #109 / #110. Layer 2 was not weakened.
+
+---
+
 ## [2026-08-31] codex: v3.12.0 release candidate after green PR #110
 
 **Agent:** codex
@@ -234,30 +265,3 @@
 - Fixed `schema/aahp-manifest.schema.json` so MANIFEST file entries can include AAHP-owned JSON handoff files.
 - Allowed `pii-allowlist.json` and `LOG-ARCHIVE.index.json` while keeping unknown JSON files rejected.
 - Reproduced the GitHub Actions `AAHP Manifest` validation locally with `ajv-cli` and confirmed `.ai/handoff/MANIFEST.json valid`.
-
----
-
-## [2026-06-26] Codex: Gemini review fixes for AAHP PR #13
-
-**Agent:** Codex
-**Phase:** fix
-**Branch:** codex/issue-21-pii-allowlist
-**Tasks:** AAHP PR #13 review follow-up
-
-### What was done
-
-- Fixed `bin/aahp.js` top-of-file help syntax so the CLI no longer crashes on parse.
-- Registered the `archive` command in CLI dispatch.
-- Hardened the Node CLI wrapper on Windows to prefer Git Bash over the WSL `bash.exe` shim when available.
-- Adjusted LOG archive rendering to preserve clean separators and newest-first archive order.
-- Kept allowlist TSV stdout clean by separating validator stderr from successful parser output.
-
-### Validation
-
-- `node --check bin/aahp.js`
-- `node bin/aahp.js --help`
-- `bash scripts/aahp-archive.sh . --verify`
-- `bash scripts/lint-handoff.sh .`
-- `bash node_modules/bats/bin/bats tests/archive.bats tests/lint.bats tests/manifest.bats tests/verify.bats` (68 checks; 2 pre-existing manifest skips)
-- `bash scripts/verify-handoff.sh . --level full`
-- `git diff --check`

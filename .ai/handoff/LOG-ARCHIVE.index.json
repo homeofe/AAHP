@@ -2,6 +2,10 @@
   "version": 1,
   "entries": [
     {
+      "sha256": "a6a72b8a483910e8f7eab37502f1f2a0a06e2de53e03564d5907da7b6659e8ec",
+      "title": "## [2026-06-26] Codex: Gemini review fixes for AAHP PR #13"
+    },
+    {
       "sha256": "419d61ba6f72eb44155a1110d8da9ad02dbae606a41bfe607932b1cd20725642",
       "title": "## [2026-06-26] Codex: LOG archive flow and reusable badge workflows"
     },

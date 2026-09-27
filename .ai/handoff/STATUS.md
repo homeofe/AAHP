@@ -1,89 +1,74 @@
 # AAHP: Current Status
 
-Last updated: 2026-08-31
+Last updated: 2026-09-28
 Current package version: 3.12.0
 Protocol version: 3.0
-Working state: release candidate on `codex/release-3.12.0`, pending release PR and tag
+Working state: v3.12.0 released; dependency integration on `chore/deps-2026-09`, pending CI and merge
 
 ## Current objective
 
-Release the completed repository audit and supply-chain hardening as v3.12.0. PR #110
-is merged; the remaining sequence is a green release PR, merge to main, an exact tag on
-the reviewed merge commit, and verification of the automated npm and GitHub releases.
+Integrate the five Dependabot pull requests that had been open for up to four weeks
+(#112, #113, #115, #117, #118) through one replacement pull request, and restore
+`aahp-verify`, which was failing on every pull request for two independent reasons.
+
+## Why aahp-verify was red on every pull request
+
+1. **Layer 2 (content drift), Dependabot only.** Dependabot does not write handoff
+   state, so each of its pull requests changes a tracked file outside `.ai/handoff/`
+   without moving STATUS.md and MANIFEST.json. The gate is correct; this is the
+   recurring case first recorded for #97, and the owner decision on it is still open
+   (item 2 below).
+2. **Layer 4 (TRUST-TTL), every pull request.** Two `verified` rows in TRUST.md expired
+   on 2026-09-22 and `trustTtl.enforce` is on, so from that day the required check
+   failed on any pull request regardless of its content. Measured on 2026-09-28 with
+   `bash scripts/verify-handoff.sh . --level ci`: "2 of 3 'verified' trust entr(ies)
+   expired". The third row, the scanner, would have expired on 2026-09-30.
 
 ## Implemented in this working tree
 
-- Added a pull-request and main-branch supply-chain scan to CI, pinned to the peeled
-  supply-chain-guard v6.0.8 commit. The job has read-only contents permission, disables
-  checkout credential persistence, and does not request PR comment permission.
-- Added `.supply-chain-guard.yml`. The v6.0.8 runtime rejects the schema-valid
-  `suppress: []` spelling, so the effective empty policy is `{}` with the incompatibility
-  documented in comments.
-- Removed the unpinned global `npm install -g npm@latest` from trusted publishing. The
-  existing Node 24 / npm 11 toolchain already meets npm's trusted-publishing minimum.
-- Made the repository test entry point portable: `npm test` now uses the locked local
-  Bats dependency through the new Node launcher; `tests/run.sh` delegates to the same
-  runner and no longer depends on global Bats or `npx` downloads.
-- Fixed Windows-specific assumptions in CLI, lint, and manifest tests while preserving
-  the Linux behavior they exercise.
-- Fixed private-key detection in `scripts/lint-handoff.sh`: grep now receives `--`
-  before a pattern beginning with hyphens. The previous command could parse a real
-  private-key header as an option instead of detecting it.
-- Strengthened workflow pinning tests so global npm installs are rejected too, and added
-  exact tests for the scanner job, permissions, immutable references, policy, and event
-  scope.
-- Expanded doctor and README remediation for bypassable adopter verify workflows, and
-  documented how adopters can detect and repair a project name written by versions
-  before 3.9.2.
-- Corrected project guidance from Node 18+ to Node 22+ and removed stale, contradictory
-  trusted-publishing comments.
-- Integrated Dependabot PR #109's three CodeQL action updates from v4.37.7 to v4.37.8,
-  retaining immutable commit pins.
-- Confirmed the `aahp-verify` workflow badge is already present in the README. Added an
-  honest `AAHP Govern - available` badge linked to the shipped consumer template instead
-  of inventing a workflow status, plus a dynamic Node compatibility badge.
-
-## Prompt reconciliation
-
-Several recommendations in the supplied prompt were already complete or stale:
-
-- `fast-json-patch` is already overridden to 3.1.1 and `npm audit` reports zero
-  vulnerabilities.
-- Handoff document paths, the hardened governance template, immutable action pins, and
-  Dependabot's GitHub Actions lane already exist.
-- The TRUST register had already been reviewed; unverifiable assertions were previously
-  downgraded to `assumed`.
-- Issues 68 and 71 are closed, and project-name preservation shipped in 3.9.2.
-- The root scanner policy must not be added to `MANIFEST.json.files`; that index is the
-  handoff integrity set, not a repository-wide file inventory.
-- A TRUST `verified` row for the scanner would be premature until the workflow has run
-  in GitHub Actions.
+- Cherry-picked unchanged, keeping Dependabot as author: `yaml` 2.9.0 to 2.9.1 (#117),
+  `js-yaml` 3.15.1 to 3.15.2 (#115), the CodeQL `init`/`autobuild`/`analyze` group
+  v4.37.8 to v4.37.9 (#113), and `fast-uri` 3.1.5 to 3.1.7 (#112). All three lockfile
+  integrity hashes equal `npm view <pkg>@<version> dist.integrity`, and the CodeQL pin
+  `cdf488f595d80d6e07e03d4674febd5ab45fa938` is the commit the v4.37.9 tag resolves to.
+- Advanced supply-chain-guard from v6.0.8 to v6.3.1 instead of #118's v6.2.0, because
+  v6.3.1 is the current release (2026-09-26). The signed annotated tag v6.3.1
+  (`verified=true`) resolves to `013febcb8447107bcf9d82e400d5b492d44bb10f`. The
+  `action.yml` diff from v6.0.8 adds one optional input, `refresh-catalog` (default
+  `"false"`); `comment-on-pr` is unchanged and there is still no `policy` input. The
+  `policy-schema.json` diff adds only an optional `catalog` key, so the empty `{}` policy
+  stays valid. Workflow pin, policy schema anchor and the pinned bats contract moved
+  together.
+- Re-verified both expired TRUST rows against the tree instead of re-stamping their
+  dates: `templates/` holds exactly the 12 listed files (tracked and on disk), and
+  `package.json` still declares `Apache-2.0`, matching LICENSE.
+- Re-anchored the scanner TRUST row (due 2026-09-30) to this pull request's own
+  `Supply chain guard` run 36356352306 on v6.3.1: risk 10/100 (LOW), the two known
+  medium heuristics on the release workflow, bundled indicators only.
 
 ## Validation
 
-Windows validation covers dependency installation, schemas, all deterministic checks,
-doctor, package packing, the repository test suites, the policy schema, and a clean
-snapshot scan. Linux validation runs from a fresh clone under `/tmp` on `openclaw` with
-the same working-tree patch, ShellCheck, Python compilation, schemas, deterministic
-checks, doctor, npm audit, supply-chain-guard, and the complete Bats suite.
+Run locally on Windows in this worktree:
 
-The scanner's low-severity mode reports two expected medium heuristic findings in the
-release workflow (OIDC publishing and secret-bearing upload behavior). At the configured
-high threshold the repository is clean. These are not suppressed in policy because the
-empty policy keeps future findings visible.
+- `npm ci` resolves `yaml@2.9.1`, `js-yaml@3.15.2` and `fast-uri@3.1.7`.
+- `node scripts/check-workflow-pinning.mjs` exits 0.
+- Mutation proof for the scanner contract, with only that bats test selected: the new
+  pin passes; reverting `ci.yml` to the v6.0.8 pin fails it at
+  `tests/workflow-pinning.bats` (line 704); restoring it passes again.
+
+NOT run locally: the full bats suite (80+ minutes on this machine) and ShellCheck (no
+shell script changed). The Linux CI run on the replacement pull request is the full-suite
+verdict: every check on #119 at `fb51113` passed, including both runtime-matrix legs, `aahp-verify`
+and `Supply chain guard`.
 
 ## Pull request and release state
 
-- PR #110 is merged at `fff9de375e798e742f266a77ed06f39f98368ffa`; every check,
-  including the first real supply-chain-guard run, passed.
-- Dependabot PR #109 was closed as superseded after its exact CodeQL changes landed in
-  #110.
-- The release candidate moves package and lockfile metadata to 3.12.0 and adds the
-  corresponding changelog entry and compare links.
-- Python bytecode and `__pycache__` output are now excluded from source control and the
-  npm package after a release dry-run exposed the broad `scripts/` inclusion.
-- No open GitHub issues were found during this audit.
-- The v3.12.0 tag, GitHub Release, and npm publication do not exist yet.
+- v3.12.0 is released: tag `v3.12.0` is `a56df50`, the GitHub Release was published
+  2026-08-31T11:27:06Z, and npm reports 3.12.0 as the current version.
+- Dependabot #112, #113, #115, #117 and #118 are to be closed as superseded once the
+  replacement pull request is merged, following the #109 / #110 precedent.
+- No release is planned for this change. Every bump is a devDependency or a CI workflow
+  pin, so the published package's behavior does not change.
 
 ## Owner decisions and follow-up
 
@@ -95,7 +80,8 @@ These are decisions, not ready autonomous tasks, so the MANIFEST task graph rema
    claiming full ASCII and enforcing only one character are inconsistent.
 2. Decide whether future Dependabot action bumps should be repaired manually or receive
    a bot-authored handoff update. Do not bypass Layer 2 merely because a change is
-   action-only.
+   action-only. Still open: #112 to #118 were again repaired by hand, after sitting red
+   for up to four weeks.
 3. Decide whether old adopter copies of the governance workflow need doctor detection or
    a targeted force-upgrade path beyond release-note remediation.
 4. Decide whether the now-proven scanner job should become a required status check. Its
@@ -103,11 +89,15 @@ These are decisions, not ready autonomous tasks, so the MANIFEST task graph rema
 5. Track replacement of `ajv-cli@5.0.0`. Its current transitive tree emits deprecation
    warnings for `glob@7.2.3` and `inflight@1.0.6`, although npm reports no vulnerability
    and no newer `ajv-cli` release is available.
+6. Decide how an enforced TRUST-TTL should behave in an idle repository. With
+   `trustTtl.enforce` on, a required check turns red on a calendar date with no code
+   change, as it did here on 2026-09-22. Rows whose verification is a deterministic
+   command (template count, license match) could be re-verified by the gate itself.
 
 ## Constraints for the next agent
 
 - Preserve the scanner job's read-only permissions and immutable pins.
 - Do not add a broad scanner suppression merely to make low-severity output empty.
-- Tag only the reviewed v3.12.0 merge commit. Verify both npm and GitHub publication after
-  the tag workflow completes.
+- Re-verify a TRUST row against the tree before moving its date; a new date without a
+  new check is a verdict nobody produced.
 - Regenerate MANIFEST.json after every handoff-file change.

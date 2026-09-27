@@ -4,6 +4,33 @@
 
 ---
 
+## [2026-06-26] Codex: Gemini review fixes for AAHP PR #13
+
+**Agent:** Codex
+**Phase:** fix
+**Branch:** codex/issue-21-pii-allowlist
+**Tasks:** AAHP PR #13 review follow-up
+
+### What was done
+
+- Fixed `bin/aahp.js` top-of-file help syntax so the CLI no longer crashes on parse.
+- Registered the `archive` command in CLI dispatch.
+- Hardened the Node CLI wrapper on Windows to prefer Git Bash over the WSL `bash.exe` shim when available.
+- Adjusted LOG archive rendering to preserve clean separators and newest-first archive order.
+- Kept allowlist TSV stdout clean by separating validator stderr from successful parser output.
+
+### Validation
+
+- `node --check bin/aahp.js`
+- `node bin/aahp.js --help`
+- `bash scripts/aahp-archive.sh . --verify`
+- `bash scripts/lint-handoff.sh .`
+- `bash node_modules/bats/bin/bats tests/archive.bats tests/lint.bats tests/manifest.bats tests/verify.bats` (68 checks; 2 pre-existing manifest skips)
+- `bash scripts/verify-handoff.sh . --level full`
+- `git diff --check`
+
+---
+
 ## [2026-06-26] Codex: LOG archive flow and reusable badge workflows
 
 **Agent:** Codex

@@ -42,6 +42,9 @@ Integrate the five Dependabot pull requests that had been open for up to four we
 - Re-verified both expired TRUST rows against the tree instead of re-stamping their
   dates: `templates/` holds exactly the 12 listed files (tracked and on disk), and
   `package.json` still declares `Apache-2.0`, matching LICENSE.
+- Re-anchored the scanner TRUST row (due 2026-09-30) to this pull request's own
+  `Supply chain guard` run 36356352306 on v6.3.1: risk 10/100 (LOW), the two known
+  medium heuristics on the release workflow, bundled indicators only.
 
 ## Validation
 
@@ -55,7 +58,8 @@ Run locally on Windows in this worktree:
 
 NOT run locally: the full bats suite (80+ minutes on this machine) and ShellCheck (no
 shell script changed). The Linux CI run on the replacement pull request is the full-suite
-verdict.
+verdict: every check on #119 at `fb51113` passed, including both runtime-matrix legs, `aahp-verify`
+and `Supply chain guard`.
 
 ## Pull request and release state
 

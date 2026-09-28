@@ -39,12 +39,17 @@ bash scripts/lint-handoff.sh .
 
 # Schema validation. ajv-cli and ajv-formats are pinned devDependencies, so
 # `npm ci` installs them from the lockfile - THAT is what keeps this off the
-# registry. --no-install does NOT: npx is npm exec, which has no such option and
-# ignores it silently (measured, npm 10.9.0 - it still issues a registry GET).
-# The flag is a marker of intent that check-workflow-pinning.mjs enforces, not a
-# guard. Where the resolution must be guaranteed, invoke the installed binary by
-# path, as the shipped governance workflow and the git hooks do.
-npm ci
+# registry: with the package placed, npx makes no request at all. --no-install
+# is the fail-closed half, not a network guard: npx rewrites it to --yes=false,
+# so a missing package costs one registry metadata request and then stops
+# instead of being downloaded and run (measured 2026-09-28 on npm 10.9.9,
+# 11.20.0 and 12.0.2; README ADR-013). `npm exec --no-install` is NOT the same:
+# npm 10 and 11 ignore the flag there and run the package. In workflows,
+# check-workflow-pinning.mjs requires `npm ci --ignore-scripts` before any npx in
+# the same job and `--no-install` on every npx, and rejects `npm exec`. Where
+# the resolution must be guaranteed, invoke the installed binary by path, as the
+# shipped governance workflow and the git hooks do.
+npm ci --ignore-scripts
 npx --no-install ajv-cli validate --spec=draft2020 -c ajv-formats \
   -s schema/aahp-manifest.schema.json \
   -d .ai/handoff/MANIFEST.json

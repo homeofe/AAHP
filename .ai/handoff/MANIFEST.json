@@ -3,42 +3,42 @@
   "project": "AAHP",
   "last_session": {
     "agent": "claude-opus-5.5",
-    "session_id": "cli-1790569102",
-    "timestamp": "2026-09-28T04:18:22Z",
-    "commit": "8b8de3c",
+    "session_id": "cli-1790570118",
+    "timestamp": "2026-09-28T04:35:18Z",
+    "commit": "cab3b0e",
     "phase": "implementation",
     "duration_minutes": 0
   },
   "files": {
     "STATUS.md": {
-      "checksum": "sha256:3cd8b6cf5139a904d8a321ae59d729f54cb6da15d785528cab92bc4302a5d402",
-      "updated": "2026-09-28T04:18:21Z",
-      "lines": 126,
-      "summary": "Working state: audit fix programme in progress; this change is the verify gate semantics (`fix/verify-gate-semantics`)"
+      "checksum": "sha256:b97f1846dd0ea357a0f1b165fb12b14bd6d37d211a913ebe2a30c4daaee8846e",
+      "updated": "2026-09-28T04:35:17Z",
+      "lines": 131,
+      "summary": "Working state: audit fix programme in progress; this change is CI, release and dependency automation (`fix/ci-release-automation`)"
     },
     "NEXT_ACTIONS.md": {
-      "checksum": "sha256:913723c37a4a7d57b1ec3bc43b01d46f661630d5e16b8be5937fc6ca6b7b3297",
-      "updated": "2026-09-28T04:10:52Z",
-      "lines": 97,
-      "summary": "TRUST rows can be check-backed and are re-proven on every run; dated rows get a 14-day grace period before blocking."
+      "checksum": "sha256:cdfc5b68f616f2ddf894dd7b76d2e75f9e91f6a4f6b7792fbd10a7c7c1e9186d",
+      "updated": "2026-09-28T04:31:33Z",
+      "lines": 98,
+      "summary": "The scanner gates publishing and runs on tags; the publish job refuses tags off `main` or off the package version and runs no third-party code..."
     },
     "LOG.md": {
-      "checksum": "sha256:93377773fc9f85272e41c026e39f2717f06f75db9ddffd84bc4a1e34ed9c4bd8",
-      "updated": "2026-09-28T04:18:21Z",
-      "lines": 306,
-      "summary": "Latest entry: [2026-09-28] claude-opus-5.5: verify gate semantics (audit fix programme, 5 of 8)"
+      "checksum": "sha256:a167f8356960fa19e6fb5b4151267cdce7ac9e54a8daedb314b4585f002d4d19",
+      "updated": "2026-09-28T04:31:35Z",
+      "lines": 309,
+      "summary": "Latest entry: [2026-09-28] claude-opus-5.5: CI, release and dependency automation (audit fix programme, 6 of 8)"
     },
     "LOG-ARCHIVE.md": {
-      "checksum": "sha256:d0fca2dd88539ddd47249ee340c65f2d76cd784c5ba5f77e7be42298b5b5d5ea",
-      "updated": "2026-09-28T04:10:53Z",
-      "lines": 348,
-      "summary": "Newest archived entry: [2026-07-18] claude-opus-4-8: Anti-entropy initiative (gates + constitution + ADR log, v3.7.0)"
+      "checksum": "sha256:3185ace0c6666c52551f74d7c620a91c10e3e4aa12b8f3fe3bffd3cf429627f1",
+      "updated": "2026-09-28T04:31:35Z",
+      "lines": 373,
+      "summary": "Newest archived entry: [2026-07-25] claude-opus-5: Trust register re-verification (10 rows re-established, 0 downgraded)"
     },
     "LOG-ARCHIVE.index.json": {
-      "checksum": "sha256:e1f28d6ce6fcfd26217e34eee58eb737e4e8d9478daa722457afe1c498676fdc",
-      "updated": "2026-09-28T04:10:53Z",
-      "lines": 61,
-      "summary": "LOG archive index: 14 entries."
+      "checksum": "sha256:ca6d45447e2c40e3a4ce3b88f5c00533cb97f58dbe7748b56278cbe029abe0ee",
+      "updated": "2026-09-28T04:31:35Z",
+      "lines": 65,
+      "summary": "LOG archive index: 15 entries."
     },
     "DASHBOARD.md": {
       "checksum": "sha256:e96e392db8dab2e9719e542dfa2a10c240d0be16ac6721298c460a22985cbdea",
@@ -77,11 +77,11 @@
       "summary": "PII allowlist: 0 entries."
     }
   },
-  "quick_context": "Audit fix programme 2026-09-28, workstream 5 of 8: verify gate semantics. Check-backed TRUST claims re-proven every run, 14-day grace for dated rows, content-based Layer 2 exemption for dev-only lockfile updates, Layer 3 OK after a committed handoff. v3.12.0 released; no release until the owner decides.",
+  "quick_context": "Audit fix programme 2026-09-28, workstream 6 of 8: CI, release and dependency automation. Scanner gates publish and runs on tags; publish guard (tag == version, reachable from main) with no third-party code under the OIDC token; grouped Dependabot with cooldown; includes Dependabot #123. v3.12.0 released; no release until the owner decides.",
   "token_budget": {
-    "manifest_only": 1433,
-    "manifest_plus_core": 4241,
-    "full_read": 21642
+    "manifest_only": 1457,
+    "manifest_plus_core": 4410,
+    "full_read": 22186
   },
   "next_task_id": 18,
   "tasks": {

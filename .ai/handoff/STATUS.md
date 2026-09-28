@@ -3,7 +3,7 @@
 Last updated: 2026-09-28
 Current package version: 3.12.0 (released 2026-08-31); unreleased changes: CHANGELOG.md `## [Unreleased]`
 Protocol version: 3.0
-Working state: audit fix programme in progress; this change is the verify gate semantics (`fix/verify-gate-semantics`)
+Working state: audit fix programme in progress; this change is CI, release and dependency automation (`fix/ci-release-automation`)
 
 ## Current objective
 
@@ -22,59 +22,54 @@ all fixes are in.
 | Test-suite integrity | vacuous assertions, fail-open skips, git isolation, fixture speed | merged, #121 (`1e3fd4a`) |
 | CLI | signal exit codes, doctor schema validation, migrate, help | merged, #122 (`d27db82`) |
 | Manifest, lint and shared lib | JSON generation, binary-safe scans, injection scan scope, template | merged, #122 (`d27db82`) |
-| Verify gate semantics | executable TRUST claims with grace, content-based Layer 2 exemption, Layer 3 | this change |
-| CI and release | scanner on tags, publish guard, Dependabot grouping and cooldown | ready, next |
-| Documentation | README split, ADR fixes, redaction of internal details | after the code workstreams |
+| Verify gate semantics | executable TRUST claims with grace, content-based Layer 2 exemption, Layer 3 | merged, #124 (`9416ed0`) |
+| CI and release | scanner on tags, publish guard, Dependabot grouping and cooldown | this change |
+| Documentation | README split, ADR fixes, redaction of internal details | next, after this change |
 | Full ASCII | replace non-ASCII in tracked text, widen the gate | last |
 
-## This change: verify gate semantics
+## This change: CI, release and dependency automation
 
-This change implements the owner decisions of 2026-09-28 on Layer 4 and Layer 2, and
-fixes Layer 3 and the verify messages.
-
-- Layer 4, executable claims: a `TRUST.md` row can name a check in a new `Check`
-  column. The built-in checks are `license-matches` and `manifest-integrity`; more are
-  declared as argv arrays in `aahp.config.json` `trustTtl.checks` (no shell, 120 s
-  limit). A check-backed `verified` row is judged by its check on every run, not by a
-  date. Nothing read from TRUST.md is ever executed.
-- Layer 4, grace period: a date-judged `verified` row warns from its expiry and blocks
-  under `trustTtl.enforce` only after `trustTtl.graceDays` (default 14). An empty or
-  all-`assumed` register stays as visible as before, and Layer 4 prints a census.
-- Layer 2, opt-in `handoffImpact.npmDevDependencyUpdates`: a lockfile-only change (plus
-  devDependency specifiers) is non-impacting when every changed entry is `dev: true`,
-  integrity-pinned, resolved from registry.npmjs.org and carries no install script. It
-  is decided by content, never by author, and needs a `supplyChainScan` assertion that
-  the gate re-proves on every run. Enabled here: the scanner job is a required check.
-- Layer 3 reports OK when the recorded commit is an ancestor of HEAD and everything since
-  changed only `.ai/handoff/`; before, it could never report OK after a commit.
-- Layer 2 in a project that sits in a subdirectory of its repository compared paths
-  from the repository root, so every change failed; paths are now project-relative.
-- Messages name the concrete regeneration command instead of `/handoff`, the footer
-  names the failing layer and its remedy, and a checksum mismatch advises inspecting
-  `git diff -- .ai/handoff` before regenerating, because regenerating re-baselines
-  tampering.
-- This repository's TRUST.md gains the `Check` column; the template, license and
-  checksum rows are now check-backed and carry no date. `tests/verify.bats` builds its
-  fixture once (about 36% faster on Linux) and its python skips use `require_tool`.
+- Supply-chain scan: the job now also runs on release tags and dispatches, and both
+  `publish` and `release` need it. It consults the historical threat catalog
+  (`refresh-catalog: true`; PR #119's run had used bundled indicators only). The
+  contract test asserts invariants instead of one literal SHA: a 40-hex pin with a
+  `# v6.x.y` comment, the policy `$schema` anchor on the same commit, least privilege, no
+  policy input. A v6 Dependabot bump no longer fails by construction; a v7 bump still
+  does, on purpose.
+- Publish guard: a new step refuses any ref that is not a `vMAJOR.MINOR.PATCH` tag equal
+  to the package.json version whose commit is reachable from `main`. The publish job
+  installs nothing, restores no cache and runs `npm publish --ignore-scripts`, so no
+  dependency or lifecycle code runs while it holds `id-token: write` (the tarball is
+  byte-identical without `node_modules`). `prepublishOnly` therefore no longer runs in
+  CI; the required jobs on the same commit run the same checks.
+- Required jobs install with `npm ci --ignore-scripts`, and ShellCheck is a pinned v0.9.0
+  release verified by sha256 instead of whatever apt ships with the runner image.
+- Dependabot (owner decision "group"): one grouped version-update PR per ecosystem with
+  a 7-day cooldown; security updates are neither grouped nor delayed.
+- `check-workflow-pinning.mjs` gains rules H (the shipped governance template pins the
+  same SHAs as the workflows), I (`npm ci --ignore-scripts`), J (an `npx` only after
+  `npm ci` in the same job) and K (grouped, cooled-down Dependabot lanes); rule B also
+  rejects `npm exec` and `npm x`.
+- `npx --no-install` documentation now matches the measurement on npm 10, 11 and 12:
+  `npx` sends one metadata request for a missing package and then refuses; `npm exec
+  --no-install` on npm 10 and 11 downloads and runs it. Corrected in ADR-013, README 2.1
+  and 11.1, CLAUDE.md, both hooks, both shipped workflow templates and a test comment.
+- The bats suite runs once per Node runtime per push instead of three times.
+- Includes Dependabot #123 unchanged (CodeQL v4.37.9 to v4.38.2; pin `2892aa5` is the
+  commit the v4.38.2 tag resolves to).
 
 ## Validation
 
-- Workstream tree on a Linux runner: `npm test` 648 of 648; 23 mutation proofs plus two
-  for the install-script rule, each red with its guard removed and green restored (two
-  inject a vulnerability instead: executing TRUST.md text, and running a declared check
-  through a shell).
-- Rebased onto `d27db82` by the integrator; the README Quickstart conflict with #120 was
-  resolved to the new Layer 3 text and then measured: the Quickstart run end to end from
-  a packed tarball in a fresh repository reports Layers 1, 2 and 3 OK and a Layer 4
-  WARN, exit 0.
-- Found during integration, on Windows only: the new `license-matches` check used
-  `grep -qiF`, and the GNU grep 3.0 of Git for Windows aborts (exit 134) on any
-  ignore-case plus fixed-string combination, so the check reported a correct LICENSE as
-  wrong. It now lower-cases both sides and uses `grep -qF`; a static test forbids the
-  flag combination in shipped scripts (mutation-proven). `verify --level ci` passes on
-  Windows with all three check-backed rows re-proven.
-- Not measured: macOS (bash 3.2). Portability is by construction: no mapfile, no
-  associative arrays, no awk intervals.
+- Workstream tree on a Linux runner: `npm test` 659 of 659; 26 mutation proofs, each red
+  with its fix reverted and green restored. npx behaviour measured against a logging
+  local registry on npm 10.9.9, 11.20.0 and 12.0.2.
+- Integrated onto `9416ed0` with #123 and the corrected comments: `CI=true npm test` 812
+  of 812 after the rebase, 0 skipped; `npm run check`, `doctor`, lint,
+  archive verify, ajv and the PII validator exit 0.
+- Only a real GitHub run proves: the ShellCheck download and its sha256 (the step fails
+  closed on a mismatch, so this pull request's own run is the proof), `refresh-catalog`
+  inside the Action, Dependabot accepting `groups` and `cooldown`, and the publish guard
+  on a real tag. No tag, release or publish was made.
 
 ## Owner decisions
 
@@ -115,6 +110,16 @@ Open:
    those repos be fixed before the release?
 9. Should lint's PII scan also read JSON string values (task notes, `assigned_to`)? It
    currently scans Markdown only, to avoid new failures in consumers.
+10. Publish environment: a GitHub environment (for example `npm-publish`) with a tag
+   deployment rule, bound in the npm trusted-publisher config, would also stop a workflow
+   that was edited at the tagged commit, which the new guard step cannot. Needs a
+   repository setting and the npm-side binding.
+11. `refresh-catalog: true` merges the scanner's live feed for 24 hours, so the required
+   scanner check can turn red with no AAHP diff when a new indicator matches. Keep it, or
+   pin the catalog?
+12. Upstream, for supply-chain-guard: its Action does not content-scan extensionless shell
+   files (the shipped git hooks) or `.bats` files, and installs
+   `supply-chain-guard@<version>` by version rather than by integrity.
 
 ## Constraints for the next agent
 

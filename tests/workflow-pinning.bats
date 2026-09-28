@@ -217,6 +217,171 @@ EOF
     [[ "$output" == *"without \`--no-install\`"* ]]
 }
 
+@test "npm exec is red even with --no-install, because npm exec ignores that flag" {
+    # Measured 2026-09-28 (rule B in the gate): `npm exec --no-install` on npm 10
+    # and 11 downloads and runs a missing package; only the `npx` binary rewrites
+    # the flag to --yes=false. The spelling that looks equally careful is the one
+    # that is not.
+    write_good_fixture
+    cat >> "$(wf_dir)/ci.yml" <<'EOF'
+      - name: Validate again
+        run: npm exec --no-install -- fx-tool validate
+EOF
+
+    run node "$GATE" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"runs \`npm exec\`, which has no \`--no-install\`"* ]]
+}
+
+@test "the npm x alias of npm exec is red too" {
+    write_good_fixture
+    cat >> "$(wf_dir)/ci.yml" <<'EOF'
+      - name: Validate again
+        run: npm x fx-tool validate
+EOF
+
+    run node "$GATE" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"runs \`npm exec\`"* ]]
+}
+
+# --- Rule I: npm ci runs no lifecycle script ---------------------------------
+
+@test "npm ci without --ignore-scripts is red" {
+    write_pkg
+    write_lock
+    mkdir -p "$(wf_dir)"
+    cat > "$(wf_dir)/ci.yml" <<'EOF'
+name: fx
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install dependencies
+        run: npm ci
+      - name: Validate
+        run: npx --no-install fx-tool validate -s schema.json -d data.json
+EOF
+
+    run node "$GATE" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"installs the locked closure with lifecycle scripts enabled"* ]]
+}
+
+@test "an npm ci alias without --ignore-scripts is red, and =false is not the flag" {
+    write_good_fixture
+    cat >> "$(wf_dir)/ci.yml" <<'EOF'
+      - name: Reinstall
+        run: npm clean-install
+EOF
+    run node "$GATE" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"npm clean-install"* ]]
+    [[ "$output" == *"lifecycle scripts enabled"* ]]
+
+    write_good_fixture
+    cat >> "$(wf_dir)/ci.yml" <<'EOF'
+      - name: Reinstall
+        run: npm ci --ignore-scripts=false
+EOF
+    run node "$GATE" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"lifecycle scripts enabled"* ]]
+}
+
+# --- Rule J: npx only after npm ci, in the same job ---------------------------
+
+@test "npx in a job that never ran npm ci is red" {
+    # --no-install is present, so rule B is satisfied; what is missing is the
+    # install that makes npx resolve locally instead of asking the registry.
+    write_pkg
+    write_lock
+    mkdir -p "$(wf_dir)"
+    cat > "$(wf_dir)/ci.yml" <<'EOF'
+name: fx
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate
+        run: npx --no-install fx-tool validate -s schema.json -d data.json
+EOF
+
+    run node "$GATE" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"has not run \`npm ci\` before it"* ]]
+}
+
+@test "npm ci AFTER the npx step is red: order matters" {
+    write_pkg
+    write_lock
+    mkdir -p "$(wf_dir)"
+    cat > "$(wf_dir)/ci.yml" <<'EOF'
+name: fx
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate
+        run: npx --no-install fx-tool validate -s schema.json -d data.json
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+EOF
+
+    run node "$GATE" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"has not run \`npm ci\` before it"* ]]
+}
+
+@test "npm ci in a DIFFERENT job does not count: jobs share no node_modules" {
+    write_pkg
+    write_lock
+    mkdir -p "$(wf_dir)"
+    cat > "$(wf_dir)/ci.yml" <<'EOF'
+name: fx
+on: [push]
+jobs:
+  install:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate
+        run: npx --no-install fx-tool validate -s schema.json -d data.json
+EOF
+
+    run node "$GATE" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"ci.yml:validate:Validate"* ]]
+    [[ "$output" == *"has not run \`npm ci\` before it"* ]]
+}
+
+@test "npm ci earlier in the same run block satisfies rule J" {
+    write_pkg
+    write_lock
+    mkdir -p "$(wf_dir)"
+    cat > "$(wf_dir)/ci.yml" <<'EOF'
+name: fx
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install and validate
+        run: npm ci --ignore-scripts && npx --no-install fx-tool validate -s schema.json -d data.json
+EOF
+
+    run node "$GATE" "$TEST_TMPDIR"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Workflow pinning OK"* ]]
+}
+
 # ─── Rule C: what npx executes must be declared here, at an exact version ───
 
 @test "executing a package this repository does not declare is red" {
@@ -337,7 +502,8 @@ EOF
 # because the rule-A-to-D fixtures have none and could never have detected this.
 
 # .github/dependabot.yml for a fixture project. With no argument it writes the
-# lane rule F requires; with one, that argument is the whole `updates:` body.
+# lane rule F requires, carrying the cooldown and the "*" group rule K requires;
+# with one, that argument is the whole `updates:` body.
 # Written as a branch rather than a defaulted variable on purpose: the default is
 # multi-line and contains quotes, and a `${1:-...}` carrying both is the kind of
 # expression that breaks silently and takes a test's meaning with it.
@@ -351,6 +517,13 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    cooldown:
+      default-days: 7
+    groups:
+      all:
+        applies-to: version-updates
+        patterns:
+          - "*"
 EOF
         return
     fi
@@ -548,6 +721,77 @@ EOF
     [[ "$output" == *"resolves the mutable ref \"v4\""* ]]
 }
 
+# --- Rule H: the shipped template moves with the workflows ------------------
+#
+# Dependabot reads only .github/workflows, so before rule H a bump moved every
+# workflow here and left the file adopters copy on the old commit, green.
+
+# A template using one action. $1 replaces the reference line; with no argument
+# it is the exact reference write_uses_workflow pins, so the fixture is green.
+write_govern_template() {
+    local ref='      - uses: actions/checkout@1111111111111111111111111111111111111111 # v4.2.2'
+    if [ "$#" -ge 1 ]; then
+        ref="$1"
+    fi
+    mkdir -p "$TEST_TMPDIR/assets/governance"
+    cat > "$TEST_TMPDIR/assets/governance/aahp-govern.yml" <<EOF
+name: govern
+on: [push]
+jobs:
+  govern:
+    runs-on: ubuntu-latest
+    steps:
+$ref
+EOF
+}
+
+@test "rule H: a template on the workflows' commit and version is green, and counted" {
+    write_pinned_fixture
+    write_govern_template
+
+    run node "$GATE" "$TEST_TMPDIR"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Template pins: 1 action reference(s) in shipped templates match"* ]]
+}
+
+@test "rule H: a template left on the old commit after a bump is red" {
+    # Exactly what a Dependabot bump of the workflows produced: the workflow
+    # moved, the template did not.
+    write_pinned_fixture
+    write_govern_template '      - uses: actions/checkout@2222222222222222222222222222222222222222 # v4.2.2'
+
+    run node "$GATE" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"has drifted from .github/workflows"* ]]
+    [[ "$output" == *"1111111111111111111111111111111111111111 # v4.2.2"* ]]
+}
+
+@test "rule H: the right commit with the wrong version comment is red" {
+    write_pinned_fixture
+    write_govern_template '      - uses: actions/checkout@1111111111111111111111111111111111111111 # v4.2.1'
+
+    run node "$GATE" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"has drifted from .github/workflows"* ]]
+}
+
+@test "rule H: an action only the template uses is red, because nothing moves it" {
+    write_pinned_fixture
+    write_govern_template '      - uses: actions/setup-node@3333333333333333333333333333333333333333 # v4.0.0'
+
+    run node "$GATE" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"is used by a shipped template and by no workflow"* ]]
+}
+
+@test "rule H: this repository's template matches its workflows" {
+    run node "$GATE" "$AAHP_ROOT"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Template pins: "*" action reference(s) in shipped templates match .github/workflows"* ]]
+    # And the count is not zero: a gate that compared nothing would print a pass.
+    [[ "$output" != *"Template pins: not asserted"* ]]
+}
+
 # ─── Rule F: the pins have to be able to move ───────────────────────────────
 
 @test "pinned actions with no Dependabot configuration at all is red" {
@@ -592,7 +836,13 @@ EOF
     directories:
       - "/"
     schedule:
-      interval: "weekly"'
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+    groups:
+      all:
+        patterns:
+          - "*"'
 
     run node "$GATE" "$TEST_TMPDIR"
     [ "$status" -eq 0 ]
@@ -628,6 +878,98 @@ EOF
     run node "$GATE" "$TEST_TMPDIR"
     [ "$status" -eq 2 ]
     [[ "$output" == *"no \`updates\` list"* ]]
+}
+
+# --- Rule K: every lane is grouped and cooled down ---------------------------
+
+@test "rule K: a lane with no cooldown is red" {
+    write_pinned_fixture
+    write_dependabot '  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      all:
+        patterns:
+          - "*"'
+
+    run node "$GATE" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"cooldown: default-days"* ]]
+    [[ "$output" == *"is missing, so this lane proposes a release the moment it is published"* ]]
+}
+
+@test "rule K: a zero-day cooldown is red, it is not a cooldown" {
+    write_pinned_fixture
+    write_dependabot '  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 0
+    groups:
+      all:
+        patterns:
+          - "*"'
+
+    run node "$GATE" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"is 0, so this lane proposes a release"* ]]
+}
+
+@test "rule K: a lane with no catch-all group is red" {
+    write_pinned_fixture
+    write_dependabot '  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7'
+
+    run node "$GATE" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"opens one pull request per dependency"* ]]
+}
+
+@test "rule K: a catch-all group for SECURITY updates only does not group version updates" {
+    write_pinned_fixture
+    write_dependabot '  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+    groups:
+      all:
+        applies-to: security-updates
+        patterns:
+          - "*"'
+
+    run node "$GATE" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"opens one pull request per dependency"* ]]
+}
+
+@test "rule K: it holds for the npm lane too, not only github-actions" {
+    write_pinned_fixture
+    write_dependabot '  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+    groups:
+      all:
+        patterns:
+          - "*"
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"'
+
+    run node "$GATE" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"updates[1] (npm)"* ]]
 }
 
 # ─── The finding itself, read off the repository rather than through the gate ─
@@ -673,35 +1015,355 @@ EOF
     [ "$output" -ge 1 ]
 }
 
-@test "the supply-chain scanner is least-privilege and its policy starts empty" {
+@test "this repository's Dependabot lanes are grouped and cooled down" {
+    # Read off the configuration directly, not through the gate, so weakening
+    # rule K cannot also silence this.
     run node --input-type=module -e '
       import { readFileSync } from "node:fs";
       import { join } from "node:path";
       import YAML from "yaml";
-      const root = process.argv[1];
-      const workflow = YAML.parse(readFileSync(join(root, ".github/workflows/ci.yml"), "utf8"));
-      const job = workflow.jobs?.["supply-chain-guard"];
-      if (!job) throw new Error("supply-chain-guard job is missing");
-      if (JSON.stringify(job.permissions) !== JSON.stringify({ contents: "read" })) {
-        throw new Error("scanner permissions are not exactly contents: read");
+      const cfg = YAML.parse(readFileSync(join(process.argv[1], ".github/dependabot.yml"), "utf8"));
+      const lanes = cfg.updates ?? [];
+      const names = lanes.map((l) => l["package-ecosystem"]).sort().join(",");
+      if (names !== "github-actions,npm") throw new Error("expected exactly the npm and github-actions lanes, got " + names);
+      for (const lane of lanes) {
+        const eco = lane["package-ecosystem"];
+        if (!(Number.isInteger(lane.cooldown?.["default-days"]) && lane.cooldown["default-days"] >= 1)) {
+          throw new Error(eco + " lane has no cooldown of at least one day");
+        }
+        const all = Object.values(lane.groups ?? {}).filter((g) =>
+          (g["applies-to"] ?? "version-updates") === "version-updates" && (g.patterns ?? []).includes("*"));
+        if (all.length !== 1) throw new Error(eco + " lane does not group every version update into one pull request");
+        if (String(lane.directory) !== "/") throw new Error(eco + " lane no longer covers /");
       }
-      const checkout = job.steps?.find((step) => String(step.uses ?? "").startsWith("actions/checkout@"));
-      if (checkout?.with?.["persist-credentials"] !== false) {
-        throw new Error("scanner checkout persists credentials");
-      }
-      const scan = job.steps?.find((step) => String(step.uses ?? "").startsWith("homeofe/supply-chain-guard@"));
-      if (scan?.uses !== "homeofe/supply-chain-guard@013febcb8447107bcf9d82e400d5b492d44bb10f") {
-        throw new Error("scanner is not pinned to the reviewed v6.3.1 release commit");
-      }
-      if (scan.with?.["comment-on-pr"] !== false || Object.hasOwn(scan.with ?? {}, "policy")) {
-        throw new Error("scanner inputs do not match the action contract");
-      }
-      const policy = YAML.parse(readFileSync(join(root, ".supply-chain-guard.yml"), "utf8"));
-      if (!policy || Array.isArray(policy) || Object.keys(policy).length !== 0) {
-        throw new Error("initial scanner policy is not an empty object");
-      }
+      console.log("dependabot lanes OK");
     ' "$AAHP_ROOT"
     [ "$status" -eq 0 ]
+    [[ "$output" == *"dependabot lanes OK"* ]]
+}
+
+# --- The supply-chain scanner: pinned by invariant, not by literal ------------
+#
+# This used to compare the action reference with one literal SHA, so every
+# Dependabot bump of the scanner was red by construction: #114, #116 and #118
+# (6.0.12, 6.0.19, 6.2.0) all failed on exactly that test and were closed. The contract below states what
+# has to stay true across bumps instead: an immutable ref, the v6 major (a v7
+# bump is red ON PURPOSE, because a major is a contract change to review), the
+# policy schema anchor on the same commit the scanner runs, least privilege, and
+# that the scanner gates both release jobs.
+#
+# It reads a ROOT, so every clause is mutation-tested below against a copy.
+scanner_contract() {
+    node --input-type=module -e '
+      import { readFileSync } from "node:fs";
+      import { join } from "node:path";
+      import YAML from "yaml";
+      const root = process.argv[1];
+      const problems = [];
+      const doc = YAML.parseDocument(readFileSync(join(root, ".github/workflows/ci.yml"), "utf8"));
+      const workflow = doc.toJS();
+      const job = workflow.jobs?.["supply-chain-guard"];
+      if (!job) { console.error("supply-chain-guard job is missing"); process.exit(1); }
+
+      // The scan step, and the trailing comment on its `uses:` scalar.
+      const steps = doc.getIn(["jobs", "supply-chain-guard", "steps"]);
+      const scanNode = (steps?.items ?? []).find((s) => String(s.get?.("uses") ?? "").startsWith("homeofe/supply-chain-guard@"));
+      const scan = scanNode ? scanNode.toJSON() : null;
+      const usesNode = scanNode ? scanNode.get("uses", true) : null;
+      const uses = String(scan?.uses ?? "");
+      const sha = (uses.match(/^homeofe\/supply-chain-guard@([0-9a-f]{40})$/) ?? [])[1];
+      if (!sha) problems.push("the scanner is not pinned to a 40-hex commit: " + JSON.stringify(uses));
+      const comment = String(usesNode?.comment ?? "").trim();
+      if (!/^v6\.\d+\.\d+$/.test(comment)) problems.push("the scanner version comment is not a v6.x.y release: " + JSON.stringify(comment));
+
+      // The editor schema anchor in the policy file names the same commit.
+      const policyText = readFileSync(join(root, ".supply-chain-guard.yml"), "utf8");
+      const anchor = (policyText.match(/\$schema=https:\/\/raw\.githubusercontent\.com\/homeofe\/supply-chain-guard\/([0-9a-f]{40})\/policy-schema\.json/) ?? [])[1];
+      if (!anchor || anchor !== sha) {
+        problems.push("the .supply-chain-guard.yml $schema anchor (" + anchor + ") is not the commit the scanner runs (" + sha + "); move it with the action and re-check that the policy still validates");
+      }
+
+      // Least privilege and the action contract.
+      if (JSON.stringify(job.permissions) !== JSON.stringify({ contents: "read" })) problems.push("scanner permissions are not exactly contents: read");
+      const checkout = (job.steps ?? []).find((s) => String(s.uses ?? "").startsWith("actions/checkout@"));
+      if (checkout?.with?.["persist-credentials"] !== false) problems.push("scanner checkout persists credentials");
+      if (scan?.with?.["comment-on-pr"] !== false) problems.push("scanner comment-on-pr is not false");
+      if (Object.hasOwn(scan?.with ?? {}, "policy")) problems.push("scanner has a policy input the action does not define");
+      if (scan?.with?.["refresh-catalog"] !== true) problems.push("scanner refresh-catalog is not true, so the historical catalog is not consulted");
+      const policy = YAML.parse(policyText);
+      if (!policy || Array.isArray(policy) || typeof policy !== "object" || Object.keys(policy).length !== 0) problems.push("scanner policy is not an empty object");
+
+      // It runs on release events and gates both release jobs.
+      if (Object.hasOwn(job, "if")) problems.push("the scanner job has an if: condition, so some event this workflow accepts is not scanned: " + JSON.stringify(job.if));
+      const needs = (j) => [].concat(workflow.jobs?.[j]?.needs ?? []);
+      if (!needs("publish").includes("supply-chain-guard")) problems.push("publish does not need supply-chain-guard");
+      if (!needs("release").includes("supply-chain-guard")) problems.push("release does not need supply-chain-guard");
+
+      for (const p of problems) console.error("  - " + p);
+      if (problems.length > 0) process.exit(1);
+      console.log("scanner contract OK (" + comment + ")");
+    ' "$1"
+}
+
+# Copy what the contract reads, so a mutation never touches the working tree.
+copy_scanner_shape() {
+    mkdir -p "$TEST_TMPDIR/.github/workflows"
+    cp "$AAHP_ROOT/.github/workflows/ci.yml" "$TEST_TMPDIR/.github/workflows/ci.yml"
+    cp "$AAHP_ROOT/.supply-chain-guard.yml" "$TEST_TMPDIR/.supply-chain-guard.yml"
+}
+
+# Replace the first line matching awk regex $3 inside job $2 of file $1 with $4
+# (awk -v expands \n, so $4 may be several lines; empty deletes the line). Exits
+# 3 when nothing matched, so a mutation that applied to nothing is never a green
+# test. Lines are compared with any trailing CR removed, for a CRLF checkout.
+mutate_in_job() {
+    local file="$1" job="$2" re="$3" repl="$4"
+    awk -v job="$job" -v re="$re" -v repl="$repl" '
+        {
+            line = $0
+            sub(/\r$/, "", line)
+            if (line ~ /^  [A-Za-z_][A-Za-z0-9_-]*:[[:space:]]*$/) injob = (line == "  " job ":")
+            if (injob && !done && line ~ re) {
+                done = 1
+                if (repl != "") print repl
+                next
+            }
+            print
+        }
+        END { if (!done) exit 3 }
+    ' "$file" > "$file.new" || { rm -f "$file.new"; return 3; }
+    mv "$file.new" "$file"
+}
+
+@test "scanner contract: this repository satisfies it" {
+    run scanner_contract "$AAHP_ROOT"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"scanner contract OK (v6."* ]]
+}
+
+@test "scanner contract: an untouched copy is green, so each mutation below starts there" {
+    copy_scanner_shape
+    run scanner_contract "$TEST_TMPDIR"
+    [ "$status" -eq 0 ]
+}
+
+@test "scanner contract: a Dependabot-style bump to another v6 commit stays green" {
+    # The case the old literal-SHA test got wrong: the SHA and the comment move,
+    # the anchor moves with them, and nothing else changes.
+    copy_scanner_shape
+    local new=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    sed -i "s|homeofe/supply-chain-guard@[0-9a-f]\{40\} # v6\.[0-9.]*|homeofe/supply-chain-guard@$new # v6.9.9|" \
+        "$TEST_TMPDIR/.github/workflows/ci.yml"
+    sed -i "s|supply-chain-guard/[0-9a-f]\{40\}/policy-schema|supply-chain-guard/$new/policy-schema|" \
+        "$TEST_TMPDIR/.supply-chain-guard.yml"
+    grep -q "supply-chain-guard@$new # v6.9.9" "$TEST_TMPDIR/.github/workflows/ci.yml"
+
+    run scanner_contract "$TEST_TMPDIR"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"(v6.9.9)"* ]]
+}
+
+@test "scanner contract: a tag instead of a commit is red" {
+    copy_scanner_shape
+    sed -i 's|homeofe/supply-chain-guard@[0-9a-f]\{40\}|homeofe/supply-chain-guard@v6|' "$TEST_TMPDIR/.github/workflows/ci.yml"
+    grep -q 'homeofe/supply-chain-guard@v6 ' "$TEST_TMPDIR/.github/workflows/ci.yml"
+
+    run scanner_contract "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"not pinned to a 40-hex commit"* ]]
+}
+
+@test "scanner contract: a major bump to v7 is red on purpose" {
+    copy_scanner_shape
+    sed -i '/homeofe\/supply-chain-guard@/s|# v6\.[0-9.]*|# v7.0.0|' "$TEST_TMPDIR/.github/workflows/ci.yml"
+    grep -q 'supply-chain-guard@[0-9a-f]* # v7.0.0' "$TEST_TMPDIR/.github/workflows/ci.yml"
+
+    run scanner_contract "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"not a v6.x.y release"* ]]
+}
+
+@test "scanner contract: a policy schema anchor on another commit is red" {
+    copy_scanner_shape
+    sed -i 's|supply-chain-guard/[0-9a-f]\{40\}/policy-schema|supply-chain-guard/0000000000000000000000000000000000000000/policy-schema|' \
+        "$TEST_TMPDIR/.supply-chain-guard.yml"
+    grep -q '/0000000000000000000000000000000000000000/policy-schema' "$TEST_TMPDIR/.supply-chain-guard.yml"
+
+    run scanner_contract "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"anchor"*"is not the commit the scanner runs"* ]]
+}
+
+@test "scanner contract: a write permission on the scanner job is red" {
+    copy_scanner_shape
+    mutate_in_job "$TEST_TMPDIR/.github/workflows/ci.yml" supply-chain-guard '^      contents: read$' '      contents: write'
+
+    run scanner_contract "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"not exactly contents: read"* ]]
+}
+
+@test "scanner contract: a persisted checkout credential is red" {
+    copy_scanner_shape
+    mutate_in_job "$TEST_TMPDIR/.github/workflows/ci.yml" supply-chain-guard 'persist-credentials: false' '          persist-credentials: true'
+
+    run scanner_contract "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"persists credentials"* ]]
+}
+
+@test "scanner contract: commenting on pull requests is red" {
+    copy_scanner_shape
+    mutate_in_job "$TEST_TMPDIR/.github/workflows/ci.yml" supply-chain-guard 'comment-on-pr: false' '          comment-on-pr: true'
+
+    run scanner_contract "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"comment-on-pr is not false"* ]]
+}
+
+@test "scanner contract: a policy input is red" {
+    copy_scanner_shape
+    mutate_in_job "$TEST_TMPDIR/.github/workflows/ci.yml" supply-chain-guard 'comment-on-pr: false' \
+        '          comment-on-pr: false\n          policy: .other-policy.yml'
+
+    run scanner_contract "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"policy input the action does not define"* ]]
+}
+
+@test "scanner contract: dropping refresh-catalog is red" {
+    copy_scanner_shape
+    mutate_in_job "$TEST_TMPDIR/.github/workflows/ci.yml" supply-chain-guard 'refresh-catalog: true' ''
+
+    run scanner_contract "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"refresh-catalog is not true"* ]]
+}
+
+@test "scanner contract: a non-empty policy is red" {
+    copy_scanner_shape
+    sed -i 's|^{}|ignore: ["tests/**"]|' "$TEST_TMPDIR/.supply-chain-guard.yml"
+    grep -q '^ignore:' "$TEST_TMPDIR/.supply-chain-guard.yml"
+
+    run scanner_contract "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"policy is not an empty object"* ]]
+}
+
+@test "scanner contract: restoring the old tag-skipping if: is red" {
+    copy_scanner_shape
+    mutate_in_job "$TEST_TMPDIR/.github/workflows/ci.yml" supply-chain-guard '^    name: Supply chain guard$' \
+        "    name: Supply chain guard\n    if: github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/main')"
+
+    run scanner_contract "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"has an if: condition"* ]]
+}
+
+@test "scanner contract: publish not needing the scanner is red" {
+    copy_scanner_shape
+    mutate_in_job "$TEST_TMPDIR/.github/workflows/ci.yml" publish '^    needs:' '    needs: [lint-and-validate, runtime-matrix]'
+
+    run scanner_contract "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"publish does not need supply-chain-guard"* ]]
+}
+
+@test "scanner contract: the GitHub Release not needing the scanner is red" {
+    copy_scanner_shape
+    mutate_in_job "$TEST_TMPDIR/.github/workflows/ci.yml" release '^    needs:' '    needs: publish'
+
+    run scanner_contract "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"release does not need supply-chain-guard"* ]]
+}
+
+# --- The required check's shellcheck is a pinned, verified release ------------
+
+@test "lint-and-validate installs shellcheck from a pinned, sha256-verified release" {
+    run node --input-type=module -e '
+      import { readFileSync } from "node:fs";
+      import { join } from "node:path";
+      import YAML from "yaml";
+      const job = YAML.parse(readFileSync(join(process.argv[1], ".github/workflows/ci.yml"), "utf8")).jobs["lint-and-validate"];
+      const runs = (job.steps ?? []).map((s) => String(s.run ?? ""));
+      const problems = [];
+      if (runs.some((r) => /apt(-get)?\s+install[^\n]*shellcheck/.test(r))) problems.push("shellcheck is installed from apt again");
+      if (!/^v\d+\.\d+\.\d+$/.test(String(job.env?.SHELLCHECK_VERSION))) problems.push("SHELLCHECK_VERSION is not an exact vX.Y.Z");
+      if (!/^[0-9a-f]{64}$/.test(String(job.env?.SHELLCHECK_SHA256))) problems.push("SHELLCHECK_SHA256 is not a sha256");
+      const install = runs.findIndex((r) => r.includes("SHELLCHECK_SHA256") && /sha256sum -c/.test(r));
+      const lint = runs.findIndex((r) => /shellcheck -x/.test(r));
+      if (install === -1) problems.push("no step verifies the downloaded shellcheck against SHELLCHECK_SHA256");
+      if (lint === -1 || lint < install) problems.push("the ShellCheck step does not run after the verified install");
+      if (lint !== -1 && !/command -v shellcheck/.test(runs[lint])) problems.push("the ShellCheck step does not prove it runs the pinned binary");
+      for (const p of problems) console.error("  - " + p);
+      process.exit(problems.length > 0 ? 1 : 0);
+    ' "$AAHP_ROOT"
+    [ "$status" -eq 0 ]
+}
+
+# The install step, extracted from the parsed workflow and run with `curl`
+# stubbed, so its fail-closed behaviour is tested without the network.
+shellcheck_install_step() {
+    node --input-type=module -e '
+      import { readFileSync } from "node:fs";
+      import { join } from "node:path";
+      import YAML from "yaml";
+      const job = YAML.parse(readFileSync(join(process.argv[1], ".github/workflows/ci.yml"), "utf8")).jobs["lint-and-validate"];
+      const step = job.steps.find((s) => String(s.run ?? "").includes("sha256sum -c"));
+      process.stdout.write(step.run);
+    ' "$AAHP_ROOT"
+}
+
+# A fake release asset laid out like the upstream one, and a `curl` that serves
+# it for any URL. Prints the asset path.
+stub_shellcheck_download() {
+    local stage="$TEST_TMPDIR/stage" bin="$TEST_TMPDIR/stubbin"
+    mkdir -p "$stage/shellcheck-v0.0.0" "$bin" "$TEST_TMPDIR/runner-temp"
+    printf '#!/bin/sh\necho "version: 0.0.0"\n' > "$stage/shellcheck-v0.0.0/shellcheck"
+    chmod +x "$stage/shellcheck-v0.0.0/shellcheck"
+    tar -cJf "$TEST_TMPDIR/fake.tar.xz" -C "$stage" shellcheck-v0.0.0
+    cat > "$bin/curl" <<EOF
+#!/bin/sh
+# Serve the fake asset to whatever -o names.
+while [ \$# -gt 0 ]; do
+    if [ "\$1" = "-o" ]; then cp "$TEST_TMPDIR/fake.tar.xz" "\$2"; fi
+    shift
+done
+EOF
+    chmod +x "$bin/curl"
+}
+
+@test "the shellcheck install fails closed on a hash mismatch, before extracting" {
+    command -v xz >/dev/null 2>&1 || skip "xz is not installed"
+    stub_shellcheck_download
+    shellcheck_install_step > "$TEST_TMPDIR/install.sh"
+    : > "$TEST_TMPDIR/github-path"
+
+    run env PATH="$TEST_TMPDIR/stubbin:$PATH" RUNNER_TEMP="$TEST_TMPDIR/runner-temp" \
+        GITHUB_PATH="$TEST_TMPDIR/github-path" SHELLCHECK_VERSION=v0.0.0 \
+        SHELLCHECK_SHA256=0000000000000000000000000000000000000000000000000000000000000000 \
+        bash --noprofile --norc -eo pipefail "$TEST_TMPDIR/install.sh"
+    [ "$status" -ne 0 ]
+    [ ! -s "$TEST_TMPDIR/github-path" ]
+    [ ! -e "$TEST_TMPDIR/runner-temp/shellcheck-bin/shellcheck" ]
+}
+
+@test "the shellcheck install extracts the verified binary and puts it first on PATH" {
+    command -v xz >/dev/null 2>&1 || skip "xz is not installed"
+    stub_shellcheck_download
+    shellcheck_install_step > "$TEST_TMPDIR/install.sh"
+    : > "$TEST_TMPDIR/github-path"
+    local sum
+    sum="$(sha256sum "$TEST_TMPDIR/fake.tar.xz" | cut -c1-64)"
+
+    run env PATH="$TEST_TMPDIR/stubbin:$PATH" RUNNER_TEMP="$TEST_TMPDIR/runner-temp" \
+        GITHUB_PATH="$TEST_TMPDIR/github-path" SHELLCHECK_VERSION=v0.0.0 SHELLCHECK_SHA256="$sum" \
+        bash --noprofile --norc -eo pipefail "$TEST_TMPDIR/install.sh"
+    [ "$status" -eq 0 ]
+    [ "$(cat "$TEST_TMPDIR/github-path")" = "$TEST_TMPDIR/runner-temp/shellcheck-bin" ]
+    run "$TEST_TMPDIR/runner-temp/shellcheck-bin/shellcheck"
+    [ "$output" = "version: 0.0.0" ]
 }
 
 # ─── The gate has to actually RUN ───────────────────────────────────────────

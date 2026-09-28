@@ -340,15 +340,15 @@ npx --no-install ajv-cli validate --spec=draft2020 -c ajv-formats \
 `npm ci --ignore-scripts` is what makes the pin load-bearing: it installs exactly
 the locked closure, so there is nothing left for the next line to resolve.
 
-**`--no-install` is not doing what its name suggests, and this README used to say
-it was.** `npx` is `npm exec`, which has no `--no-install` option; npm ignores
-the unknown flag without a warning. Measured on npm 10.9.0, in an empty directory:
-`npx --no-install <a name that does not exist>` still issues a `GET` to
-registry.npmjs.org and fails with E404. So the flag is a marker of intent, not a
-guard - if the install step above is ever edited, reordered or skipped, this line
-reaches the network. Prefer invoking the installed binary by path where the
-resolution has to be guaranteed, as the shipped governance workflow and the git
-hooks now do. Tightening this repository's own workflows is tracked separately.
+**`--no-install` keeps a missing package from being run, not from being looked up.**
+Measured 2026-09-28 on npm 10, 11 and 12 (ADR-013): when the package is not installed,
+`npx --no-install <name>` sends one metadata request to registry.npmjs.org and then stops
+with `npx canceled due to missing packages`. `npm exec --no-install` is a different
+command and, on npm 10 and 11, downloads and runs the package. An earlier version of this
+paragraph said `npx` ignores the flag, which is true of `npm exec` only. So the `npm ci`
+above is what keeps this line off the network, and `check-workflow-pinning.mjs` requires
+it earlier in the same job. Invoke the installed binary by path where the resolution has
+to be guaranteed, as the shipped workflows and the git hooks do.
 
 If the manifest doesn't conform, the pipeline rejects the commit. This prevents malformed handoffs from entering the repo.
 
@@ -1351,10 +1351,21 @@ and the same on every output path.
 **Why it recurs:** wiring a hook to one hard-coded path is the quick way. **Decision:**
 the hooks run `scripts/verify-handoff.sh` when it is vendored, else
 `node_modules/@elvatis_com/aahp/bin/aahp.js` when that file exists, and skip when neither
-resolves. The fallback is a filesystem test on an exact path, never `npx`: `npx` is
-`npm exec`, which has no `--no-install` option and ignores it silently, so the previous
-guard reached the public registry for the unscoped, unowned name `aahp` on every commit
-and every push. The local hook is a convenience; the required CI check is the off-machine
+resolves. The fallback is a filesystem test on an exact path, never `npx`: when the
+package is not installed, `npx --no-install aahp` still asks the registry about the
+unscoped, unowned name `aahp` before it refuses, so the previous guard sent that request
+on every commit and every push. **Measured 2026-09-28** (CI mode, no TTY, a logging
+registry on 127.0.0.1, npm 10.9.9, 11.20.0 and 12.0.2 on Node 24): the `npx` binary
+rewrites `--no-install` to `--yes=false`, so a missing package costs one metadata request
+and then stops with `npx canceled due to missing packages`, while the same line without
+the flag downloads the package and runs it. `npm exec --no-install` is not the same
+command: npm 10 ignores the flag silently and npm 11 with a warning, and both download and
+run the package; npm 12 rejects the flag. An earlier version of this ADR said `npx`
+ignores the flag, which is true of `npm exec` and not of `npx`. So in a workflow the flag
+on `npx` is the fail-closed half, and `npm ci` earlier in the same job is what keeps the
+line off the network (with the package placed, npx made zero requests);
+`scripts/check-workflow-pinning.mjs` requires both (rules B and J) and rejects `npm exec`.
+The local hook is a convenience; the required CI check is the off-machine
 authority after its evaluator paths receive the trusted-review protection described in
 Section 2.8.
 
@@ -1481,6 +1492,30 @@ tag-only, so npm and the Releases page can diverge) and the review a tag implies
 afterwards but does not prevent it. Whether the npm trusted-publisher configuration
 constrains the ref is a registry-side setting and was NOT read here.
 
+**The narrow check, added 2026-09-28.** The condition above is a DEFINITION and is
+deliberately loose: it admits any tag that starts with `v` and contains a dot (`v1.2`,
+`v1.2.3-rc.1`, or a correctly named tag on a commit that never reached `main`), and a
+manual dispatch against any such tag. The `publish` job's `Verify the release ref` step
+runs before `npm publish` and refuses unless the ref is a tag named exactly
+`vMAJOR.MINOR.PATCH`, that name is `v` plus the `package.json` version, the checked-out
+commit is the one the tag points at, and that commit is reachable from `main` as fetched
+from origin in the same step. `tests/workflow-hardening.bats` extracts that step from the
+parsed workflow and runs it against fixture repositories, one test per refusal. Both
+`publish` and `release` also need `supply-chain-guard`, which previously skipped tag
+pushes. The `publish` job installs nothing and runs `npm publish --ignore-scripts`: the
+tarball does not depend on `node_modules` (measured: identical shasum and 54 entries with
+and without it), and the gates `prepublishOnly` would repeat there already passed on the
+same commit in the unprivileged jobs it needs, so no devDependency code runs while the job
+can mint a publish token. `prepublishOnly` still guards a manual `npm publish`.
+Deliberately NOT run on the tag: `aahp verify --level ci`. It needs an explicit Layer 2
+base and a tag push has none (`github.event.before` is the all-zero SHA, which the gate
+rejects by design); the reachability check instead proves the commit is one `main`
+already carries, and `aahp-verify` ran on that commit's pull request and on its push to
+`main`. What the guard cannot stop is a workflow edited at the tagged commit itself: the
+tag ruleset on `refs/tags/v*` is the control for that today, and an `environment:` with a
+deployment rule, named in the npm trusted-publisher configuration, would be a stronger
+one. That is a settings change and was not made here.
+
 ### ADR-020: anything AAHP runs or ships declares its permissions and refuses the persisted checkout credential
 **Why it recurs:** a new workflow is copied from an existing one, and the existing one
 never had a `permissions:` block or `persist-credentials: false`, so neither does the
@@ -1566,12 +1601,24 @@ correct, it stops moving - including past the fix for whatever the pinned commit
 out to contain. And the absence of a lane is invisible from the outside: an ecosystem
 nobody scans and an ecosystem with nothing to update both produce zero pull requests.
 The thing to measure is therefore the ecosystem list, never the pull-request count.
-**Known gap, stated rather than left to be discovered:** for this ecosystem Dependabot
-reads `.github/workflows/` under the configured directory, so the lane does NOT cover
-`assets/governance/aahp-govern.yml`. That file's pins are held immutable by the gate and
-are moved by hand, or by the adopting repository's own lane once the file is copied into
-their `.github/workflows/`. Whether AAHP should instead ship that template with a
-different update path is open.
+**Known gap, now closed by a gate rather than a lane (2026-09-28):** for this ecosystem
+Dependabot reads `.github/workflows/` under the configured directory, so the lane does NOT
+cover `assets/governance/aahp-govern.yml`. Rule H of the gate now requires every action
+that template uses to sit on the same commit and version comment as the same action in
+`.github/workflows/`, and an action only the template uses is a finding because nothing
+would ever move it. A Dependabot pull request that moves one of those actions is
+therefore red until the template moves in the same pull request, which is the intent:
+before the rule the template stayed on the old commit and every check was green.
+**Lane settings (2026-09-28):** every lane groups its version updates into one pull
+request (a `"*"` group with `applies-to: version-updates`, so security updates are not
+held behind it) and declares `cooldown: default-days: 7`, which GitHub does not apply to
+security updates. Rule K asserts both on every lane. Two pins have to follow an action
+bump by hand, the governance template (rule H) and the `$schema` anchor in
+`.supply-chain-guard.yml`, which `tests/workflow-pinning.bats` holds to the scanner's
+commit; one grouped pull request takes that follow-up once rather than once per action.
+The scanner itself is held by invariants (a commit SHA, a `v6.x.y` comment, the anchor,
+least privilege) instead of one literal SHA, which had made every scanner bump red
+(#114, #116, #118); a `v7` bump stays red on purpose.
 **Consequence:** a reference added on a tag is a red required check. Staleness is
 explicitly NOT what the gate asserts - it proves a reference cannot be repointed, not
 that it is current, and those are different properties with different answers.
@@ -2375,8 +2422,12 @@ and the grammar is machine-checked by `aahp doctor` / `check:changelog-format`.
 3. Run the gates and conformance check: `npm run check && npm run doctor`.
 4. Regenerate handoff state: update `STATUS.md`, the `NEXT_ACTIONS.md` `Current version`
    line, and `MANIFEST.json` (`aahp manifest`).
-5. `npm test` (bats green), commit, and push the `vX.Y.Z` tag. CI publishes to npm (OIDC
-   trusted publishing) and creates the GitHub Release, which links to `CHANGELOG.md`.
+5. `npm test` (bats green), commit, and push the `vX.Y.Z` tag at a commit that is on
+   `main`, with `X.Y.Z` equal to the `package.json` version. CI runs the gates and the
+   supply-chain scan on the tagged commit, then publishes to npm (OIDC trusted
+   publishing) and creates the GitHub Release, which links to `CHANGELOG.md`. The publish
+   job refuses a tag that is not exactly `vX.Y.Z`, does not match `package.json`, or is
+   not reachable from `main` (ADR-019).
 
 This is distinct from the `/handoff` MANIFEST-regeneration ceremony: `/handoff` refreshes
 handoff state at the end of every session; a release additionally cuts a changelog entry
@@ -2425,8 +2476,8 @@ keyword it does not implement rather than skipping it, because a validator that 
 ignores what it cannot evaluate reports "valid" for a document it never examined.
 
 Run the gates two ways, invoking the pinned devDependency by path rather than by name -
-`npx --no-install <name>` does not prevent a registry fetch, because `npx` is `npm exec`,
-which has no such option and ignores it silently.
+`npx --no-install <name>` still asks the registry about a name that is not installed before
+it refuses (ADR-013).
 `node ./node_modules/@elvatis_com/aahp/bin/aahp.js check .` is the pass/fail RUN whose exit code
 gates CI: it aggregates every applicable gate and continues past failures so one run surfaces
 them all. The same binary with `doctor --json` emits the conformance RECORD a fleet

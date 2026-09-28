@@ -1,19 +1,18 @@
 #!/usr/bin/env bats
-# provenance-convention.bats - the two halves of ADR-021 (issue #86).
+# provenance-convention.bats - the two halves of ADR-022 (issue #86).
 #
 # README Section 2.4 used to open with "must include" and close by calling the
 # result an audit trail, and nothing enforced either. The decision recorded in
-# ADR-021 is to withdraw the promise rather than to build the gate, because
-# retroactive enforcement reddens every consumer over history none of them can
-# change: measured 2026-08-23 across the nine consumer repositories in this
-# estate, .ai/handoff/LOG.md holds 100 entries and 8 carry all five fields.
+# ADR-022 is to withdraw the promise rather than to build the gate, because
+# retroactive enforcement would redden every consumer over journal entries
+# written before the rule existed, which nobody can change.
 #
 # That decision needs two things held down, and this file holds both:
 #
 #   1. The NON-enforcement is real and stays real. If someone later wires a
 #      provenance requirement into lint, verify or doctor, the first test group
-#      goes red and they have to come back to ADR-021 and to the 92 entries the
-#      decision is about. This is the same shape as the acceptance-criteria
+#      goes red and they have to come back to ADR-022 and the history it is
+#      about. This is the same shape as the acceptance-criteria
 #      suite asserting that `aahp criteria` is absent from the gate list.
 #
 #   2. The shipped example and the stated recommendation agree. The templates
@@ -56,12 +55,12 @@ scaffold_provenance_sources() {
 EOF
 }
 
-# ─── 1. the non-enforcement, and a control proving the harness can fail ─────
+# --- 1. the non-enforcement, and a control proving the harness can fail -----
 
-@test "provenance: a handoff set with NO provenance passes lint (ADR-021)" {
+@test "provenance: a handoff set with NO provenance passes lint (ADR-022)" {
     # Delete every provenance line, then append an entry with none at all - the
     # reproduction from issue #86. Exit 0 here is the DECISION, not an oversight.
-    # If this goes red, a provenance requirement was added: read ADR-021 first.
+    # If this goes red, a provenance requirement was added: read ADR-022 first.
     create_full_handoff
     grep -v '\*\*Agent:\*\*' "$TEST_TMPDIR/.ai/handoff/LOG.md" > "$TEST_TMPDIR/log.tmp"
     mv "$TEST_TMPDIR/log.tmp" "$TEST_TMPDIR/.ai/handoff/LOG.md"
@@ -91,7 +90,7 @@ EOF
 }
 
 @test "provenance: no shipped script reads the four fields nothing generates" {
-    # The measurement behind ADR-021, kept executable. `Agent` is excluded: it is
+    # The measurement behind ADR-022, kept executable. `Agent` is excluded: it is
     # a common word and appears in prose all over the tree. The other four are
     # distinctive, and the only legitimate hit is bin/aahp.js printing a session
     # id that comes from MANIFEST.json, not from a LOG entry.
@@ -107,7 +106,7 @@ EOF
     [ "$status" -eq 0 ]
 }
 
-# ─── 2. the shipped example and the stated recommendation agree ─────────────
+# --- 2. the shipped example and the stated recommendation agree -------------
 
 @test "provenance CONTROL: the real README and templates are consistent" {
     scaffold_provenance_sources

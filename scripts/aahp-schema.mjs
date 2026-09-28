@@ -345,7 +345,8 @@ function validateNode(schema, data, path, errors, root = schema) {
     const props = schema.properties || {};
     const patternProps = Object.entries(schema.patternProperties || {}).map(([p, sub]) => [compilePattern(p), sub]);
     // A key is "additional" only when neither `properties` nor any
-    // `patternProperties` entry claims it (JSON Schema 2020-12, 10.3.2.3).
+    // `patternProperties` entry claims it (JSON Schema 2020-12 Core, the
+    // `additionalProperties` keyword).
     const claimedByPattern = (key) => patternProps.some(([re]) => re.test(key));
 
     if (Array.isArray(schema.required)) {

@@ -3,42 +3,42 @@
   "project": "AAHP",
   "last_session": {
     "agent": "claude-opus-5.5",
-    "session_id": "cli-1790573457",
-    "timestamp": "2026-09-28T05:30:57Z",
-    "commit": "f9b12ca",
-    "phase": "documentation",
+    "session_id": "cli-1790574972",
+    "timestamp": "2026-09-28T05:56:12Z",
+    "commit": "aa17c1f",
+    "phase": "implementation",
     "duration_minutes": 0
   },
   "files": {
     "STATUS.md": {
-      "checksum": "sha256:2a37de02d2b0ebc0b3b3072b03fac7ea89ec1421f50926255a1d8417e3461c28",
-      "updated": "2026-09-28T05:30:57Z",
-      "lines": 140,
-      "summary": "Working state: audit fix programme in progress; this change is the documentation workstream (branch docs/spec-split-and-redaction)"
+      "checksum": "sha256:0c56ae5b2b3b14df90d0f38bcae3393c82c2f4e3aa3518bb357b3a5856fff4d1",
+      "updated": "2026-09-28T05:56:12Z",
+      "lines": 137,
+      "summary": "Working state: audit fix programme in progress; this change is full ASCII (branch fix/full-ascii), the last workstream; with it the audit fix..."
     },
     "NEXT_ACTIONS.md": {
-      "checksum": "sha256:82039be13314054e0e16163c4291ce89fe5c0772f6697c777bec908cd79c45ca",
-      "updated": "2026-09-28T05:23:22Z",
-      "lines": 99,
-      "summary": "README is quickstart plus specification; the decision log lives in `docs/adr/`, the gate reference in `docs/governance.md`."
+      "checksum": "sha256:b366571ee5e5cb0b56dbc74ad22414461c70323d36e55ccb8160c66837c0b0d8",
+      "updated": "2026-09-28T05:48:19Z",
+      "lines": 100,
+      "summary": "Every tracked text file is ASCII, enforced by `check:ascii` in `npm run check`."
     },
     "LOG.md": {
-      "checksum": "sha256:f0f5872326c6c1643b0fa279bb1c866880ada705662bd9c006534ac6f7aef440",
-      "updated": "2026-09-28T05:23:23Z",
-      "lines": 307,
-      "summary": "Latest entry: [2026-09-28] claude-opus-5.5: documentation, spec split and redaction (audit fix programme, 7 of 8)"
+      "checksum": "sha256:fa5a4a712631ab243ec93cf729e280abca73abee791a9ce4a398cb7be3413d15",
+      "updated": "2026-09-28T05:48:20Z",
+      "lines": 289,
+      "summary": "Latest entry: [2026-09-28] claude-opus-5.5: full ASCII and remaining redaction (audit fix programme, 8 of 8)"
     },
     "LOG-ARCHIVE.md": {
-      "checksum": "sha256:a8d34a6cf475d264827b664a9b375a61a7af4c241436384387b59bb7316468bd",
-      "updated": "2026-09-28T05:23:23Z",
-      "lines": 406,
-      "summary": "Newest archived entry: [2026-07-26] claude-opus-5: Layer 1 catches deleted indexed files; lint raises its own exit code"
+      "checksum": "sha256:83bb3faa7d4e6167eeae8db55c8a46fa9dff90caa0713e228be6e8c25d7af156",
+      "updated": "2026-09-28T05:48:20Z",
+      "lines": 449,
+      "summary": "Newest archived entry: [2026-08-31] codex: [redacted] review and Windows/Linux hardening"
     },
     "LOG-ARCHIVE.index.json": {
-      "checksum": "sha256:9972f26546b71d8be6fa8d11dd3c6ea7210a6da9148a49d1eb3b4dc985147be0",
-      "updated": "2026-09-28T05:23:23Z",
-      "lines": 69,
-      "summary": "LOG archive index: 16 entries."
+      "checksum": "sha256:855c3c7b0c31ef9c27368582b3981ee09160c9bc9d8396b63f7f9de51a621f7f",
+      "updated": "2026-09-28T05:48:20Z",
+      "lines": 73,
+      "summary": "LOG archive index: 17 entries."
     },
     "DASHBOARD.md": {
       "checksum": "sha256:a4994a683eaac92e36e9d25456e3d091d82801a348f680647041664d441c13e6",
@@ -77,11 +77,11 @@
       "summary": "PII allowlist: 0 entries."
     }
   },
-  "quick_context": "Audit fix programme 2026-09-28, workstream 7 of 8: documentation. README is quickstart plus specification, decision log in docs/adr/, gate reference in docs/governance.md; internal names and estate figures redacted and guarded; STATUS.md is a snapshot, LOG.md the journal. v3.12.0 released; no release until the owner decides.",
+  "quick_context": "Audit fix programme 2026-09-28 complete with workstream 8 of 8: full ASCII enforced by check:ascii, remaining redaction in code, scanner false positive reworded. v3.12.0 released; the unreleased changes await the owner's release decision.",
   "token_budget": {
-    "manifest_only": 1448,
-    "manifest_plus_core": 4589,
-    "full_read": 23007
+    "manifest_only": 1410,
+    "manifest_plus_core": 4480,
+    "full_read": 23190
   },
   "next_task_id": 18,
   "tasks": {

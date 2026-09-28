@@ -91,7 +91,7 @@ in the Software without restriction.
 EOF
 }
 
-# ─── Happy path ──────────────────────────────────────────────
+# --- Happy path ----------------------------------------------
 
 @test "passes on a clean handoff repo at level full" {
     run bash "$SCRIPTS_DIR/verify-handoff.sh" "$TEST_TMPDIR" --level full
@@ -104,7 +104,7 @@ EOF
     [ "$status" -eq 0 ]
 }
 
-# ─── Layer 2: content-drift gate (the key check) ─────────────
+# --- Layer 2: content-drift gate (the key check) -------------
 
 @test "drift gate FAILS when code changes but handoff does not (precommit)" {
     echo "console.log('x')" > "$TEST_TMPDIR/feature.js"
@@ -149,7 +149,7 @@ EOF
     [[ "$output" == *"Drift gate not triggered"* ]]
 }
 
-# ─── Escape hatch ────────────────────────────────────────────
+# --- Escape hatch --------------------------------------------
 
 @test "AAHP_SKIP_VERIFY=1 skips local verification at precommit" {
     echo "console.log('x')" > "$TEST_TMPDIR/feature.js"
@@ -169,7 +169,7 @@ EOF
     [[ "$output" == *"Handoff-impacting files changed but handoff state did not"* ]]
 }
 
-# ─── Layer 1: checksum integrity ─────────────────────────────
+# --- Layer 1: checksum integrity -----------------------------
 
 @test "FAILS when a handoff file is modified outside the protocol (checksum mismatch)" {
     # Mutate STATUS.md without regenerating the manifest.
@@ -234,7 +234,7 @@ STUB
     [[ "$output" == *"Missing indexed file: NEXT_ACTIONS.md"* ]]
 }
 
-# ─── Layer 1 must not fail open when it cannot check ─────────
+# --- Layer 1 must not fail open when it cannot check ---------
 
 @test "Layer 1 FAILS with a named helper when _aahp-lib.sh is out of date" {
     # A partially synced repository: the gate scripts are new, the shared
@@ -519,11 +519,10 @@ EOF
 # --- Layer 4 must not report a clean register it could not read --------------
 #
 # The old reader printed nothing both when nothing was expired and when not one
-# row was parsed, and this layer called both of them clean. Measured 2026-08-23
-# across the nine consuming repositories in this estate, SIX have a TRUST.md in
-# which that reader saw zero decidable rows, and in one of them the register is a
-# real, populated table with an Expires column and no Status column, holding a
-# row 8 days past its expiry, reported as clean.
+# row was parsed, and this layer called both of them clean. A real, populated
+# register with an Expires column and no Status column is such a table: that
+# reader saw zero decidable rows in it, so a row past its expiry was reported
+# as clean.
 
 @test "Layer 4: a trust table with no Status column is NOT EVALUATED, not clean" {
     write_trust <<'EOF'
@@ -589,10 +588,9 @@ EOF
 
 # --- Layer 4 can fail, but only where a repository asked for it -------------
 #
-# Making it blocking for everyone was measured as the wrong fix. Two of the nine
-# consuming repositories hold registers with 24 of 25 and 20 of 21 rows already
-# expired, so a blocking Layer 4 turns them red for a file their pull requests
-# never touch. Hence opt-in, and hence pairs of tests: one proves it can fail,
+# Making it blocking for everyone is the wrong fix. A register whose rows have
+# mostly expired already would turn a repository red for a file its pull
+# requests never touch. Hence opt-in, and hence pairs of tests: one proves it can fail,
 # the other proves the default did not move.
 
 @test "Layer 4: trustTtl.enforce makes a row expired past the grace period BLOCKING, and says so" {

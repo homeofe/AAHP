@@ -2,7 +2,7 @@
 // assert-doc-shape-wired.mjs - the doc-shape gate has to actually RUN.
 //
 // A gate that exists but is never invoked protects nothing, and this one is easy
-// to orphan: it is deliberately NOT in CHECK_GATES in bin/aahp.js (see ADR-022,
+// to orphan: it is deliberately NOT in CHECK_GATES in bin/aahp.js (see ADR-023,
 // it is repository-local and no consumer should inherit it), so the ONLY thing
 // that executes it is the aggregate `check` chain in package.json, which the
 // required lint-and-validate job runs. If someone rebuilds that chain and drops

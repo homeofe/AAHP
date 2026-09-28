@@ -79,7 +79,7 @@ jobs:
 EOF
 }
 
-# ─── The load-bearing assertion: the real repository ────────────────────────
+# --- The load-bearing assertion: the real repository ------------------------
 
 @test "this repository's own workflows satisfy the runtime relation" {
     run node "$GATE" "$AAHP_ROOT"
@@ -110,7 +110,7 @@ EOF
     [ "$status" -eq 0 ]
 }
 
-# ─── Mutation: a runtime CI exercises that the package does not claim ───────
+# --- Mutation: a runtime CI exercises that the package does not claim -------
 
 @test "a CI pin below the published floor is a failure" {
     write_pkg ">=22"
@@ -188,7 +188,7 @@ EOF
     [[ "$output" == *"oldest runtime still receiving"* ]]
 }
 
-# ─── Mutation: the published floor goes end-of-life ─────────────────────────
+# --- Mutation: the published floor goes end-of-life -------------------------
 
 @test "an end-of-life published floor is a failure even when CI agrees with it" {
     # CI and engines are perfectly consistent here - consistently dead. This is
@@ -216,10 +216,10 @@ EOF
     [[ "$output" == *"still receiving"* ]]
 }
 
-# ─── Mutation: the vacuity trap this gate was shaped to avoid ───────────────
+# --- Mutation: the vacuity trap this gate was shaped to avoid ---------------
 
 @test "emptying the matrix is a failure even while standalone pins remain" {
-    # THE RECORDED TRAP. A sibling gate in this estate asserted only that the
+    # THE RECORDED TRAP. A vacuity guard of this kind once asserted only that the
     # GLOBAL pin list was non-empty. Removing the matrix left it green, because
     # the standalone `node-version:` pins in the other jobs kept that list
     # populated on their own - the multi-runtime coverage vanished silently.
@@ -280,7 +280,7 @@ EOF
     [[ "$output" == *"vacuously true"* ]]
 }
 
-# ─── Mutation: releasing on a runtime nothing tested ───────────────────────
+# --- Mutation: releasing on a runtime nothing tested -----------------------
 
 @test "a release runtime that no build job exercises is a failure" {
     # Every pin here satisfies engines and the matrix is intact, so this can only
@@ -327,7 +327,7 @@ EOF
     [[ "$output" == *"release path runs on Node 26, which no build or test job exercises"* ]]
 }
 
-# ─── Mutation: pins the gate cannot read must FAIL, never be skipped ────────
+# --- Mutation: pins the gate cannot read must FAIL, never be skipped --------
 
 @test "a non-matrix expression pin fails rather than being silently dropped" {
     write_pkg ">=22"
@@ -349,7 +349,7 @@ EOF
     [[ "$output" == *"node-version-file"* ]]
 }
 
-# ─── "I could not look" must never read as "I looked and it was fine" ──────
+# --- "I could not look" must never read as "I looked and it was fine" ------
 
 @test "a missing engines.node exits 2, not 0" {
     write_pkg
@@ -387,7 +387,7 @@ EOF
     [[ "$output" == *"not valid YAML"* ]]
 }
 
-# ─── The gate has to actually RUN, and the required check has to keep its name ─
+# --- The gate has to actually RUN, and the required check has to keep its name -
 
 @test "the gate is wired into the check chain, and the required check keeps its name" {
     # Both assertions live in tests/assert-repo-ci-shape.mjs - see the header
@@ -397,8 +397,8 @@ EOF
     [[ "$output" == *"repo CI shape OK"* ]]
 }
 
-# ─── Release authorization: one definition of a release, nothing beyond it that
-# ─── is not recorded (https://github.com/homeofe/AAHP/issues/69) ──────────────
+# --- Release authorization: one definition of a release, nothing beyond it that
+#     is not recorded (https://github.com/homeofe/AAHP/issues/69) --------------
 #
 # The third assertion in tests/assert-repo-ci-shape.mjs is the only thing in this
 # repository that reads either release-critical job condition. It is worth exactly
@@ -542,7 +542,7 @@ set_job_if() {
     [[ "$output" == *"jobs.publish.if could not be read"* ]]
 }
 
-# ─── Section 5: the code record and the DOCUMENTED record have to agree ─────
+# --- Section 5: the code record and the DOCUMENTED record have to agree -----
 #
 # Section 3 above holds ci.yml to a literal list inside assert-repo-ci-shape.mjs.
 # docs/adr/ADR-019.md is the record a person reads, and until section 5 nothing

@@ -15,7 +15,7 @@
 #   2. Copies the .aiignore template into .ai/handoff/ if none is present
 #
 # What it only REPORTS (manual steps; this script does not edit these files):
-#   - whether STATUS.md carries <!-- SECTION: --> markers (README section 1.2)
+#   - whether STATUS.md has the optional summary marker (README section 1.2)
 #   - whether LOG.md holds more than 10 entries; rotate them with `aahp archive`
 #     (README section 2.9)
 #   - whether TRUST.md has TTL columns (README section 2.5)
@@ -107,17 +107,22 @@ bash "$SCRIPT_DIR/aahp-manifest.sh" "$PROJECT_ROOT" \
 
 CHANGES+=("Generated MANIFEST.json")
 
-# --- Step 2: Report STATUS.md section markers (not edited) ------------------
+# --- Step 2: Report the optional STATUS.md summary marker (not edited) -------
+#
+# README section 1.2: markers are optional, and the only one AAHP reads is
+# `<!-- SECTION: summary -->`, from which aahp manifest takes the file's summary.
+# Any other section name is a convention AAHP never reads, so its presence says
+# nothing here. The pattern is the one scripts/aahp-manifest.sh matches.
 
-echo -e "${GREEN}[2/5]${NC} Checking STATUS.md for section markers (report only)..."
+echo -e "${GREEN}[2/5]${NC} Checking STATUS.md for the optional summary marker (report only)..."
 
 if [ -f "$HANDOFF_DIR/STATUS.md" ]; then
-    if ! grep -q "<!-- SECTION:" "$HANDOFF_DIR/STATUS.md"; then
-        echo -e "${YELLOW}  -> No section markers found. Not changed: adding them is a manual edit.${NC}"
-        echo "  -> See README.md section 1.2 for the marker format."
-        TODO+=("Add <!-- SECTION: name --> markers to STATUS.md (README section 1.2)")
+    if grep -Eiq '<!--[[:space:]]*SECTION:[[:space:]]*summary[[:space:]]*-->' "$HANDOFF_DIR/STATUS.md"; then
+        echo "  -> Summary marker present: aahp manifest reads the STATUS.md summary from it."
     else
-        echo "  -> Section markers already present."
+        echo -e "${YELLOW}  -> No <!-- SECTION: summary --> marker. Optional: without it, aahp manifest uses the first prose sentence.${NC}"
+        echo "  -> See README.md section 1.2. Other section names are a convention AAHP does not read."
+        TODO+=("Optional: add a <!-- SECTION: summary --> block to STATUS.md (README section 1.2)")
     fi
 else
     echo -e "${YELLOW}  -> STATUS.md not found. Skipping.${NC}"

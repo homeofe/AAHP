@@ -47,6 +47,40 @@ EOF
     [[ "$output" == *"no matches"* ]]
 }
 
+# --- this repository's no-estate-counts rule reads every tracked file --------
+# aahp.config.json widened the rule from Markdown to every tracked text file,
+# extensionless hooks included (owner decision: no figures about other
+# repositories anywhere in this public repository). These tests run the REAL
+# config. The planted phrases are assembled at runtime, so this file does not
+# match the rule it tests. Anchor: "include": ["*"] on that rule.
+
+estate_fixture() {
+    cp "$AAHP_ROOT/aahp.config.json" "$TEST_TMPDIR/aahp.config.json"
+    mkpkg
+    mkdir -p "$TEST_TMPDIR/scripts/hooks"
+    printf 'echo ok\n' > "$TEST_TMPDIR/scripts/run.sh"
+    printf '#!/bin/sh\nexit 0\n' > "$TEST_TMPDIR/scripts/hooks/pre-commit"
+}
+
+@test "forbidden-patterns: the real no-estate-counts rule is green on clean code files" {
+    estate_fixture
+    gadd
+    run node "$FP" "$TEST_TMPDIR"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Forbidden patterns OK"* ]]
+}
+
+@test "forbidden-patterns: the real no-estate-counts rule catches a figure in a script and in a hook" {
+    estate_fixture
+    printf '# measured across nine %s repositories\n' consuming >> "$TEST_TMPDIR/scripts/run.sh"
+    printf '# as seen %s this estate\n' across >> "$TEST_TMPDIR/scripts/hooks/pre-commit"
+    gadd
+    run node "$FP" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"scripts/run.sh:2 [no-estate-counts]"* ]]
+    [[ "$output" == *"scripts/hooks/pre-commit:3 [no-estate-counts]"* ]]
+}
+
 # --- schema-doc-sync ---------------------------------------------------------
 
 @test "schema-doc-sync: no config is a clean no-op" {

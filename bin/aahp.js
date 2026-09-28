@@ -491,7 +491,7 @@ function cmdStatus(targetPath) {
 // doctor command: conformance self-check emitting a machine-readable JSON record
 //
 // Asserts CONFORMANCE (not just drift) against the AAHP contract and emits a
-// record aahp-hub can ingest to render a fleet matrix. Implemented Node-native
+// record a dashboard can ingest to compare repositories. Implemented Node-native
 // (like status) because it must assemble JSON and stay cross-platform (the bash
 // path has documented MSYS/Windows fragility). Gate statuses:
 //   pass    conforms
@@ -672,18 +672,20 @@ function runGate(scriptName, targetPath) {
 // green line to imply otherwise, the same way scripts/lint-handoff.sh reports a
 // clean run whose MANIFEST integrity it could not verify.
 //
-// LIMIT OF THIS WORDING, deliberate, and the thing to know before relying on
-// it: only the DEFAULT human-readable `aahp doctor` output carries the reason.
-// `--json` carries gate statuses and no reasons, `--quiet` prints nothing for a
-// passing gate, and `--governance` marks this gate `skip` without evaluating
-// it. Those three are the invocations wired into CI and hooks
+// LIMIT OF THIS WORDING, and the thing to know before relying on it: the
+// reason is there to be read, and nothing forces anyone to read it. The default
+// human-readable `aahp doctor` output prints it, and the `--json` record
+// (schemaVersion 2) carries it as gateOutcomes["handoff-set"].reason, but the
+// `gates` object beside it holds only the token `pass`, `--quiet` prints nothing
+// for a passing gate, and `--governance` marks this gate `skip` without
+// evaluating it. Those are the invocations wired into CI and hooks
 // (.github/workflows/aahp-verify.yml and the adopter copy
-// assets/governance/aahp-verify.yml, assets/governance/aahp-govern.yml,
-// scripts/hooks/pre-push), so a repository that reads the schemaVersion 1
-// record as a handoff-integrity signal is told exactly what it was told before.
-// Holding that record byte-identical is a compatibility choice for dashboards
-// that already ingest it; changing it is a schemaVersion decision, not taken
-// here.
+// assets/governance/aahp-verify.yml run `--json`,
+// assets/governance/aahp-govern.yml runs `--governance --json`,
+// scripts/hooks/pre-push runs `--quiet`), so a reader that switches on
+// gates["handoff-set"] alone still takes a set-and-index pass for a
+// handoff-integrity signal. `gates` is kept unchanged for dashboards that
+// already ingest it (see the OUTCOME block below).
 //
 // The one configuration where that matters to an adopter: when the
 // `verify-workflow` gate reports `skip` (no workflow in this repository runs
@@ -886,15 +888,16 @@ function gateVerifyWorkflow(targetPath) {
 
   // OPT-IN, on the pattern trustTtl.enforce establishes in this same release.
   //
-  // Measured before choosing this: `aahp doctor . --json` is the exact command every
-  // consuming repository runs as a CI step, and this finding takes it from exit 0 to
-  // exit 1 in 8 of 10 of them with nothing changed on their side. There was no way
-  // to switch it off: --governance and `check: { only: [] }` both still exited 1.
+  // `aahp doctor . --json` is the exact command a consuming repository runs as a CI
+  // step, and this finding takes it from exit 0 to exit 1 with nothing changed on
+  // that repository's side. There was no way to switch it off: --governance and
+  // `check: { only: [] }` both still exited 1.
   //
-  // The finding is CORRECT in all eight, so it is still reported. What it must not do
-  // is red the fleet on day one for a deliberate, documented configuration that no
-  // pull-request author can clear from their own pull request. A gate that behaves
-  // that way gets switched off, and then it protects nobody.
+  // The finding is CORRECT wherever it fires, so it is still reported. What it must
+  // not do is turn consumers red on upgrade for a deliberate, documented
+  // configuration that no pull-request author can clear from their own pull
+  // request. A gate that behaves that way gets switched off, and then it protects
+  // nobody.
   if (!verifyWorkflowEnforced(targetPath)) {
     return {
       status: 'advisory',

@@ -92,6 +92,21 @@ A negative-only assertion (`[[ "$output" != *"finding"* ]]`) passes when the
 command crashed before printing anything. Pair it with the exit status and a
 positive line that proves the check ran.
 
+## Rule 5: test sources are ASCII; non-ASCII input is generated
+
+Every tracked text file is pure ASCII (`scripts/check-ascii.mjs`, run by
+`npm run check`), and that includes this directory. A test that needs a
+non-ASCII byte generates it at runtime with an octal escape, so the source stays
+ASCII and the behavior under test is unchanged:
+
+```bash
+printf 'caf\303\251\n' > "$TEST_TMPDIR/doc.md"   # U+00E9
+printf 'a \342\200\224 b\n'                       # U+2014, the em dash
+```
+
+In a `node -e` body use a JavaScript escape (`"\u00e9"`, `"\u{1F680}"`). Section
+rulers in comments are plain `# --- Title ---`.
+
 ## The fixture and git isolation
 
 `setup()` in `test_helper.bash` gives every test its own `TEST_TMPDIR` holding

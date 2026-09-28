@@ -1027,11 +1027,10 @@ if r.returncode != 0:
 # caller must never report as "no expired entries".
 #
 # WHY THE CENSUS MATTERS. An earlier reader printed nothing both when nothing was
-# expired and when not one row was parsed, and the gate called both clean.
-# Measured 2026-08-23 across the nine consuming repositories in this estate: SIX
-# had a TRUST.md in which that reader saw zero decidable rows, one of them a real
-# `| Property | Value | Verified | TTL | Expires | Provenance |` table (no Status
-# column) holding a row 8 days past its expiry, reported as clean.
+# expired and when not one row was parsed, and the gate called both clean. A
+# real register shaped `| Property | Value | Verified | TTL | Expires |
+# Provenance |` (no Status column) gave that reader zero decidable rows, so a
+# row past its expiry was reported as clean.
 #
 # PORTABILITY. No regex interval expressions (`{4}`): mawk before 1.3.4-20200120
 # (Debian and Ubuntu shipped 1.3.3 for years) treats the braces literally, so a

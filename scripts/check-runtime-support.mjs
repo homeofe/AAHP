@@ -7,17 +7,17 @@
 // ---------------------------------------------------------------------------
 // Measured 2026-08-21. AAHP published `engines.node: ">=18"` while Node 18 had
 // been end-of-life since 2025-04-30, and validated on Node 20, end-of-life since
-// 2026-04-30. Every repository in the estate consumes this package and inherits
-// that support claim, and the workflow this package PROPAGATES to consumers
+// 2026-04-30. Every consumer of this package inherits that support claim, and
+// the workflow this package PROPAGATES to consumers
 // (.github/workflows/aahp-verify.yml) pinned the same dead runtime, so the claim
 // spread on install. Nothing in CI could ever have gone red about it: the pins
 // were internally consistent, just uniformly dead.
 //
-// The same class of defect broke a release elsewhere in the estate on the same
-// day: a publish job ran `npm install -g npm@latest` on Node 20, npm 12 had
-// dropped Node 20, and the step that exists to make publishing possible was the
-// step that refused. Build was green on a newer runtime; publish died on the old
-// one; every check passed and nothing shipped.
+// The same class of defect breaks a release outright: a publish job that runs
+// `npm install -g npm@latest` on Node 20 fails once npm drops Node 20 (npm 12
+// did), so the step that exists to make publishing possible is the step that
+// refuses. Build is green on a newer runtime, publish dies on the old one, every
+// check passes and nothing ships.
 //
 // WHY THIS IS A RELATION AND NOT A LIST OF DEAD VERSIONS
 // ---------------------------------------------------------------------------
@@ -34,8 +34,8 @@
 //     check here is vacuously true over an empty pin list, so this one comes
 //     first.
 //
-//     THE TRAP THIS SHAPE AVOIDS, recorded because a sibling gate in this estate
-//     fell into it the same week: its vacuity guard asserted that the GLOBAL pin
+//     THE TRAP THIS SHAPE AVOIDS, recorded because a vacuity guard of this kind
+//     has fallen into it before: it asserted that the GLOBAL pin
 //     list was non-empty. Emptying the matrix left it GREEN, because the
 //     standalone `node-version:` pins in the other jobs kept the global list
 //     populated on their own. The multi-runtime coverage vanished and nothing
@@ -389,9 +389,9 @@ for (const { where, majors, shipped } of pins) {
 if (floor < SUPPORTED_FLOOR) {
   failures.push(
     `engines.node claims support from Node ${floor}, but the oldest runtime still receiving ` +
-      `security patches is ${SUPPORTED_FLOOR} (measured 2026-08-21). Every repository in the ` +
-      `estate consumes this package and inherits this claim, so publishing support for an ` +
-      `unpatched runtime advertises it fleet-wide.`,
+      `security patches is ${SUPPORTED_FLOOR} (measured 2026-08-21). Every consumer of this ` +
+      `package inherits this claim, so publishing support for an unpatched runtime ` +
+      `advertises it to every consumer.`,
   );
 }
 

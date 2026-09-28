@@ -282,7 +282,7 @@ EOF
     [[ "$output" == *"job 'analyze' no longer declares 'security-events: write'"* ]]
 }
 
-# ─── The shape gate is handed a ROOT, so it must survive a partial one ───
+# --- The shape gate is handed a ROOT, so it must survive a partial one ---
 #
 # tests/assert-repo-ci-shape.mjs takes the root to assert as argv[1]. `npm test`
 # passes this repository, which holds every workflow the gate records. Other

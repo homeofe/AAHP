@@ -10,7 +10,7 @@ teardown() {
     teardown
 }
 
-# ─── Clean pass ──────────────────────────────────────────────
+# --- Clean pass ----------------------------------------------
 
 @test "passes on clean handoff directory" {
     create_full_handoff
@@ -20,7 +20,7 @@ teardown() {
     [[ "$output" == *"All checks passed"* ]]
 }
 
-# ─── Prompt injection detection ──────────────────────────────
+# --- Prompt injection detection ------------------------------
 
 @test "detects prompt injection pattern: ignore all previous" {
     create_full_handoff
@@ -61,7 +61,7 @@ teardown() {
     [[ "$output" == *"Injection pattern"* ]]
 }
 
-# ─── Secret detection ────────────────────────────────────────
+# --- Secret detection ----------------------------------------
 
 @test "detects secret patterns: OpenAI-style key sk-abc123" {
     create_full_handoff
@@ -121,7 +121,7 @@ teardown() {
     [[ "$output" == *"No secrets detected"* ]]
 }
 
-# ─── PII / email detection (locale-robust, T-027) ────────────
+# --- PII / email detection (locale-robust, T-027) ------------
 
 @test "PII check fires on a real external email under empty LC_ALL" {
     create_full_handoff
@@ -159,7 +159,7 @@ teardown() {
     [[ "$output" != *"123456+Copilot@users.noreply.github.com"* ]]
 }
 
-# ─── PII line-granularity regressions (T-029) ────────────────
+# --- PII line-granularity regressions (T-029) ----------------
 # A real external email must still fire when it shares a single line with an
 # excluded token; the old line-level grep -v suppressed the whole line.
 
@@ -307,7 +307,7 @@ JSON
     [[ "$output" == *"Valid JSON"* ]]
 }
 
-# ─── Missing MANIFEST.json ──────────────────────────────────
+# --- Missing MANIFEST.json ----------------------------------
 
 @test "a missing MANIFEST.json is a violation, not a warning" {
     create_status_md
@@ -324,7 +324,7 @@ JSON
     [[ "$output" != *"All checks passed"* ]]
 }
 
-# ─── Stale HANDOFF.lock ─────────────────────────────────────
+# --- Stale HANDOFF.lock -------------------------------------
 
 @test "warns on stale HANDOFF.lock" {
     create_full_handoff
@@ -343,7 +343,7 @@ JSON
     [[ "$output" == *"No stale lock"* ]]
 }
 
-# ─── Indexed-file integrity (exit code, not just output) ────
+# --- Indexed-file integrity (exit code, not just output) ----
 
 @test "exits non-zero when an indexed file's checksum no longer matches" {
     create_full_handoff
@@ -447,7 +447,7 @@ PY
     [[ "$output" != *"All checks passed"* ]]
 }
 
-# ─── Missing handoff directory ───────────────────────────────
+# --- Missing handoff directory -------------------------------
 
 @test "errors when handoff directory does not exist" {
     local empty_dir
@@ -460,7 +460,7 @@ PY
     rm -rf "$empty_dir"
 }
 
-# ─── Multiple violations accumulate ─────────────────────────
+# --- Multiple violations accumulate -------------------------
 
 @test "counts multiple violations correctly" {
     create_full_handoff

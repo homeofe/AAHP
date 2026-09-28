@@ -45,7 +45,7 @@ EOF
     [ "$status" -ne 0 ]
 }
 
-# ─── Helper ─────────────────────────────────────────────────
+# --- Helper -------------------------------------------------
 
 # Run bin/aahp.js with node, capturing output and exit code.
 # bats `run` sets $output / $status automatically.
@@ -53,7 +53,7 @@ _aahp() {
     run node "$AAHP_BIN" "$@"
 }
 
-# ─── --help ─────────────────────────────────────────────────
+# --- --help -------------------------------------------------
 
 @test "aahp --help exits 0" {
     _aahp --help
@@ -135,7 +135,7 @@ _aahp() {
     [[ "$output" == *"AI-to-AI Handoff Protocol CLI"* ]]
 }
 
-# ─── --version ──────────────────────────────────────────────
+# --- --version ----------------------------------------------
 
 @test "aahp --version exits 0" {
     _aahp --version
@@ -160,7 +160,7 @@ _aahp() {
     [ "$output" = "$pkg_version" ]
 }
 
-# ─── Unknown command ─────────────────────────────────────────
+# --- Unknown command -----------------------------------------
 
 @test "unknown command exits non-zero" {
     # Bare status is sufficient here: the very next test asserts the message, and
@@ -179,7 +179,7 @@ _aahp() {
     [[ "$output" == *"--help"* ]]
 }
 
-# ─── init: basic invocation ──────────────────────────────────
+# --- init: basic invocation ----------------------------------
 
 @test "aahp init exits 0 in a clean directory" {
     _aahp init "$TEST_TMPDIR"
@@ -232,7 +232,7 @@ _aahp() {
     [ -d "$TEST_TMPDIR/.ai/handoff" ]
 }
 
-# ─── init: idempotency / skip behaviour ─────────────────────
+# --- init: idempotency / skip behaviour ---------------------
 
 @test "aahp init skips existing files without --force" {
     # First init
@@ -268,7 +268,7 @@ _aahp() {
     [[ "$output" == *"Already initialized"* ]]
 }
 
-# ─── init: error handling ────────────────────────────────────
+# --- init: error handling ------------------------------------
 
 @test "aahp init reports copy count in output" {
     _aahp init "$TEST_TMPDIR"
@@ -295,7 +295,7 @@ _aahp() {
     chmod 755 "$readonly_dir"  # cleanup
 }
 
-# ─── init: works from any cwd (Issue #6) ─────────────────────
+# --- init: works from any cwd (Issue #6) ---------------------
 
 @test "aahp init with absolute path works regardless of cwd" {
     local target="$TEST_TMPDIR/project-a"
@@ -411,7 +411,7 @@ _aahp() {
     [[ "$output" == *"Path: $expected_path"* ]]
 }
 
-# ─── archive command (behavior covered in archive.bats) ──────
+# --- archive command (behavior covered in archive.bats) ------
 
 @test "aahp archive is a recognized command (not Unknown command)" {
     # No LOG.md present, so the script errors, but dispatch must still route it.
@@ -500,7 +500,7 @@ _aahp() {
     [[ "$output" != *"terminated by signal"* ]]
 }
 
-# ─── next command (not built in - ensure helpful error) ──────
+# --- next command (not built in - ensure helpful error) ------
 
 @test "aahp next exits non-zero (unknown command)" {
     # Bare status is sufficient: `next` is not a command, so there is only one
@@ -509,7 +509,7 @@ _aahp() {
     [ "$status" -ne 0 ]
 }
 
-# ─── log command (not built in - ensure helpful error) ───────
+# --- log command (not built in - ensure helpful error) -------
 
 @test "aahp log exits non-zero (unknown command)" {
     # Bare status is sufficient: see the note on `aahp next` above.
@@ -517,7 +517,7 @@ _aahp() {
     [ "$status" -ne 0 ]
 }
 
-# ─── lint: basic smoke test via CLI ──────────────────────────
+# --- lint: basic smoke test via CLI --------------------------
 
 @test "aahp lint exits 0 on a clean handoff directory" {
     # Init scaffolds the files, then manifest records their checksums. Without
@@ -666,7 +666,7 @@ _INJECTION_CASES=(
     [ -z "$failures" ] || { printf '%s' "$failures"; echo "--- lint output ---"; echo "$output"; false; }
 }
 
-# ─── manifest: basic smoke test via CLI ──────────────────────
+# --- manifest: basic smoke test via CLI ----------------------
 
 @test "aahp manifest generates MANIFEST.json from handoff files" {
     create_status_md
@@ -695,7 +695,7 @@ _INJECTION_CASES=(
     grep -q '"phase": "review"' "$TEST_TMPDIR/.ai/handoff/MANIFEST.json"
 }
 
-# ─── status ─────────────────────────────────────────────────
+# --- status -------------------------------------------------
 
 @test "aahp status fails when MANIFEST.json is missing" {
     _aahp status "$TEST_TMPDIR"

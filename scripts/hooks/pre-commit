@@ -28,7 +28,7 @@ VERIFY="$REPO_ROOT/scripts/verify-handoff.sh"
 # stdout and stderr discarded. On a consumer with the hooks installed but no
 # local package, that guard asked registry.npmjs.org about the UNSCOPED name
 # `aahp`, which this project does not own, on every commit before npx refused
-# (measured on npm 10 to 12, README ADR-013). It stayed closed only because of
+# (measured on npm 10 to 12, AAHP docs/adr/ADR-013.md). It stayed closed only because of
 # how the `npx` binary maps `--no-install`; `npm exec --no-install` on npm 10
 # and 11 downloads and runs whatever the registry returns. A `[ -f ]`
 # test cannot reach the network and cannot resolve any name but the scoped one.

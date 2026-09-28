@@ -19,6 +19,12 @@ Current version: **v3.12.0**
 
 ## Recently Completed
 
+### 2026-09-28: Full ASCII and remaining redaction
+
+- Every tracked text file is ASCII, enforced by `check:ascii` in `npm run check`.
+- No figures about other repositories remain in any tracked file; the rule now covers them
+  all.
+
 ### 2026-09-28: Documentation, spec split and redaction
 
 - README is quickstart plus specification; the decision log lives in `docs/adr/`, the gate
@@ -46,12 +52,6 @@ Current version: **v3.12.0**
   scans bytes as text and covers every handoff file.
 - Doctor validates the full manifest schema; the CLI no longer exits 0 on a signal.
 
-### 2026-09-28: Test-suite integrity
-
-- Dead negations, fail-open skips and negative-only assertions now fail; a guard in `npm
-  run check` and a CI skip audit keep them out.
-- Tests are isolated from global git config and build their fixture once per run.
-
 ---
 
 ## Owner Decisions (not task registry entries)
@@ -76,6 +76,7 @@ Open:
 - Decide whether consumer manifests with template placeholder dates are fixed before the
   release.
 - Decide whether `docs/` ships to npm and whether `init --gates` writes `pinnedDep`.
+- Decide whether and when to release the unreleased changes, and the version number.
 
 ---
 

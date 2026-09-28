@@ -61,7 +61,8 @@ file-format version only if the on-disk contract actually changed.
    encoded in a Windows cp1252 console and raise `UnicodeEncodeError` in any tool that
    prints them there, while the em dash (encodable in cp1252 as 0x97) is banned for
    consistency with that rule and because it was the character that kept coming back.
-   (Enforced: the ASCII gate in `npm run check`, and the `em-dash` rule in
+   (Enforced: `scripts/check-ascii.mjs`, run as `check:ascii` in `npm run check`
+   over every tracked text file, and the `em-dash` rule in
    `forbiddenPatterns` in `aahp.config.json`.)
 
 8. **README is the single source of truth for protocol behavior.** When code and

@@ -12,7 +12,7 @@ teardown() {
     teardown
 }
 
-# ─── Helper: detect a working python command ─────────────────
+# --- Helper: detect a working python command -----------------
 # Returns 0 and sets PYTHON_CMD, or returns 1 if no python available.
 # We verify with an actual invocation to avoid Windows Store aliases.
 
@@ -26,7 +26,7 @@ _detect_python() {
     [ -n "$PYTHON_CMD" ]
 }
 
-# ─── Basic generation ────────────────────────────────────────
+# --- Basic generation ----------------------------------------
 
 @test "generates valid JSON output" {
     create_status_md
@@ -108,7 +108,7 @@ _detect_python() {
     [[ "$manifest_content" == *'"agent": "my-test-agent"'* ]]
 }
 
-# ─── CLI flag: --phase ───────────────────────────────────────
+# --- CLI flag: --phase ---------------------------------------
 
 @test "--phase flag sets phase in output" {
     create_status_md
@@ -132,7 +132,7 @@ _detect_python() {
     [[ "$output" == *"Invalid phase"* ]]
 }
 
-# ─── CLI flag: --context ─────────────────────────────────────
+# --- CLI flag: --context -------------------------------------
 
 @test "--context flag sets quick_context" {
     create_status_md
@@ -161,7 +161,7 @@ _detect_python() {
     [[ "$manifest_content" != *'"quick_context": "No handoff files found'* ]]
 }
 
-# ─── Task preservation on regeneration ───────────────────────
+# --- Task preservation on regeneration -----------------------
 # These three used to `skip` exactly when the field was NOT preserved, on the
 # theory that node could not resolve the tmpdir path on Windows. That turned
 # the regression they exist for into a green skip on every platform. The path
@@ -246,14 +246,14 @@ _manifest_value() {
     [[ "$manifest_content" == *"\"project\": \"$expected_name\""* ]]
 }
 
-# ─── Project name comes from repository identity, not from cwd ───
+# --- Project name comes from repository identity, not from cwd ---
 #
-# Every agent in this estate works in a `git worktree` whose directory is named
-# after the BRANCH, and CI unpacks into a workdir named after the job. A
+# An agent working in a `git worktree` often has a directory named after the
+# BRANCH, and CI unpacks into a workdir named after the job. A
 # cwd-derived project name therefore rewrites MANIFEST.json's "project" to the
 # checkout's name on every regeneration, and the rewrite is invisible unless
-# somebody re-reads the file afterwards. Two such values reached consumer main
-# branches before this was fixed. Each test below runs the generator from a
+# somebody re-reads the file afterwards, so such a value can reach a main
+# branch unnoticed. Each test below runs the generator from a
 # directory whose name is NOT the repository name.
 
 @test "derives project name from the git remote, not the directory it runs in" {
@@ -443,17 +443,31 @@ EOF
     # a TAB in the first content line, a quote and a backslash in --agent, and a
     # multi-byte character straddling the 150-character summary cut and the
     # 500-character quick_context cut (both were byte-based `cut -c`).
-    local pad118 pad499
-    pad118="$(printf 'a%.0s' $(seq 1 118))"
-    pad499="$(printf 'b%.0s' $(seq 1 499))"
-    printf '# Status\n\nBuild\tis "green" and C:\\path\\x %s\xc3\xbc\xc3\xbc\xc3\xbc tail\n' "$pad118" \
+    #
+    # The generator clips at max - 3 code points and appends "...", so the
+    # multi-byte run has to sit ACROSS that point, and the result is compared
+    # exactly. A length check alone cannot see a wrong cut: it yields a string
+    # that is still short enough and still decodes (a split U+00FC comes back as
+    # U+00C3 plus a stray byte, a split surrogate pair as U+FFFD). Summary: the
+    # 31-character prefix plus 101 'a' puts ten U+00FC at code points 133-142
+    # but at bytes 133-152, across the 147 cut (catches a byte-based cut).
+    # Context: 490 'b' puts ten U+1F680 at code points 491-500 but at UTF-16
+    # units 491-510 and bytes 491-530, across the 497 cut (catches a byte-based
+    # AND a UTF-16-unit cut). All non-ASCII bytes are generated here, so this
+    # file stays ASCII.
+    local pad101 pad490 uuml10 rocket10
+    pad101="$(printf 'a%.0s' $(seq 1 101))"
+    pad490="$(printf 'b%.0s' $(seq 1 490))"
+    uuml10="$(printf '\303\274%.0s' $(seq 1 10))"
+    rocket10="$(printf '\360\237\232\200%.0s' $(seq 1 10))"
+    printf '# Status\n\nBuild\tis "green" and C:\\path\\x %s%s tail end of the line\n' "$pad101" "$uuml10" \
         > "$TEST_TMPDIR/.ai/handoff/STATUS.md"
     create_next_actions_md
 
     local run_no
     for run_no in 1 2; do
         run bash "$SCRIPTS_DIR/aahp-manifest.sh" "$TEST_TMPDIR" --quiet \
-            --agent 'agent "quoted" \ back' --context "${pad499}$(printf '\xc3\xa9\xc3\xa9')"
+            --agent 'agent "quoted" \ back' --context "${pad490}${rocket10} end"
         [ "$status" -eq 0 ]
         run node -e '
             const buf = require("fs").readFileSync(process.argv[1]);
@@ -466,6 +480,10 @@ EOF
             if (!s.includes("\"green\"") || !s.includes("C:\\path")) throw new Error("summary: " + s);
             if (cps(s) > 200) throw new Error("summary too long: " + cps(s));
             if (cps(m.quick_context) > 500) throw new Error("quick_context too long: " + cps(m.quick_context));
+            const wantSummary = "Build is \"green\" and C:\\path\\x " + "a".repeat(101) + "\u00fc".repeat(10) + "...";
+            if (s !== wantSummary) throw new Error("summary cut is not by code point: " + JSON.stringify(s));
+            const wantContext = "b".repeat(490) + "\u{1F680}".repeat(7) + "...";
+            if (m.quick_context !== wantContext) throw new Error("quick_context cut is not by code point: " + JSON.stringify(m.quick_context.slice(485)));
             console.log("VALID");
         ' "$TEST_TMPDIR/.ai/handoff/MANIFEST.json"
         [ "$status" -eq 0 ]
@@ -695,7 +713,7 @@ try {
     [[ "$output" == *"valid"* ]]
 }
 
-# ─── File indexing ───────────────────────────────────────────
+# --- File indexing -------------------------------------------
 
 @test "indexes all present handoff files" {
     create_status_md
@@ -724,7 +742,7 @@ try {
     [[ "$manifest_content" == *'"summary":'* ]]
 }
 
-# ─── Error handling ──────────────────────────────────────────
+# --- Error handling ------------------------------------------
 
 @test "handles missing handoff directory gracefully" {
     # Use a path that has no .ai/handoff/

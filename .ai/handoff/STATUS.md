@@ -3,7 +3,7 @@
 Last updated: 2026-09-28
 Current package version: 3.12.0 (released 2026-08-31); unreleased changes: CHANGELOG.md `## [Unreleased]`
 Protocol version: 3.0
-Working state: audit fix programme in progress; this change is the documentation workstream (branch docs/spec-split-and-redaction)
+Working state: audit fix programme in progress; this change is full ASCII (branch fix/full-ascii), the last workstream; with it the audit fix programme is complete
 
 ## Current objective
 
@@ -24,53 +24,46 @@ all fixes are in.
 | Manifest, lint and shared lib | JSON generation, binary-safe scans, injection scan scope, template | merged, #122 (`d27db82`) |
 | Verify gate semantics | executable TRUST claims with grace, content-based Layer 2 exemption, Layer 3 | merged, #124 (`9416ed0`) |
 | CI and release | scanner on tags, publish guard, Dependabot grouping and cooldown | merged, #125 (`f9b12ca`) |
-| Documentation | README split, ADR fixes, redaction of internal details | this change |
-| Full ASCII | replace non-ASCII in tracked text, widen the gate | ready, next (its gate needs this change first) |
+| Documentation | README split, ADR fixes, redaction of internal details | merged, #126 (`aa17c1f`) |
+| Full ASCII | replace non-ASCII in tracked text, widen the gate | this change |
 
-## This change: documentation, specification split and redaction
+## This change: full ASCII and the remaining redaction in code
 
-Implements the owner's documentation decisions of 2026-09-28 and corrects the docs to
-what the code does after #119 to #125.
+Implements the owner decision "full ASCII + gate" of 2026-09-28 and finishes the
+redaction in files the documentation change did not own.
 
-- README split: README keeps the quickstart and the normative specification (sections 1
-  to 10, numbers unchanged because code and templates cite them). The decision log moved
-  to `docs/adr/` (one file per ADR plus an index), the governance-gate reference to
-  `docs/governance.md`, and the release ceremony to CONTRIBUTING.md. Moved text is
-  verbatim except for the corrections below. `docs/` is not shipped to npm (open item).
-- STATUS.md is a bounded snapshot and LOG.md the only journal: README, templates and
-  ADR-023 agree, merge rules are stated, and `.gitattributes` no longer sets
-  `merge=union` for STATUS.md.
-- Redaction: an internal hostname and figures about other repositories were removed
-  from README, ADRs, CHANGELOG history and LOG.md (redacted in place, with a header note;
-  LOG entries are otherwise never rewritten). New forbidden-pattern rules
-  `no-internal-hostnames` (all text files) and `no-estate-counts` (Markdown), and a
-  CONSTITUTION section on what public files may record.
-- Claims without a mechanism or measurement removed or corrected: the schema as a "hard
-  security boundary", a structural HTML-comment check, a nonexistent hook path, vendor
-  pricing and reduction percentages, HANDOFF.lock "enforcing" single-writer access,
-  "the counter increments automatically", `/handoff` as an AAHP command.
-- CONSTITUTION marks each rule Enforced (naming its gate or test) or Convention, with
-  the corrected ASCII rationale. CONTRIBUTING explains the per-PR handoff update,
-  Dependabot handling and how to run tests. CHANGELOG discloses the versions never
-  tagged or published, and its reference links now resolve.
-- ADR cross-references corrected (provenance ADR-022, doc paths ADR-023) and guarded by a
-  new `check:adr-refs` gate. Templates are ASCII and match the spec.
-- Integrator: the scanner TRUST row is re-anchored to the push run on main at `f9b12ca`
-  (catalog consulted); MANIFEST task notes are ASCII.
+- New gate `scripts/check-ascii.mjs`, run as `check:ascii` at the end of `npm run check`:
+  every tracked text file must be pure ASCII (no code point above U+007F, no byte order
+  mark). It reports `file:line:column` and the code point, exempts binary files (NUL
+  byte), ignores untracked files, and exits 2 when it cannot assess. It is repository
+  local, not one of the gates consumers inherit. The whole tree passes: 169 tracked text
+  files.
+- About 2,550 non-ASCII characters removed from scripts and tests, almost all box-drawing
+  rulers in comments. `lint-handoff.sh` prints `OK`, `x` and `!` instead of check marks,
+  crosses and a warning sign; message text is unchanged. Tests that exercise Unicode
+  already generated their bytes at runtime; the manifest truncation test now puts
+  multi-byte characters across the real cut point (before, a byte-based or UTF-16 cut
+  passed it).
+- A JSON Schema section number in a comment that the supply-chain scanner reported as a
+  private IPv4 address (a false positive since #122) is reworded.
+- Figures about other repositories removed from code comments, one printed message and
+  tests; the `no-estate-counts` rule now reads every tracked file, not only Markdown.
+- References to README ADR sections now point at the per-decision files in `docs/adr/` (in shipped
+  templates and hooks as "AAHP docs/adr/..."); provenance tests cite ADR-022 and doc-shape
+  tests ADR-023; `aahp migrate` reports only the `summary` section marker AAHP reads.
 
 ## Validation
 
-- Workstream tree on a Linux runner: `npm test` 822 of 822; `npm run check` (13 gates,
-  doc shape over 39 documents), `doctor`, lint and archive verify exit 0 once the two
-  integrator lines the new `no-estate-counts` rule flagged were rewritten (they are, in
-  this change). Every CHANGELOG release link returned HTTP 200 (20 of 20); behaviour
-  claims (pinned-dep, acceptance-criteria binding, lint, generator field handling, init
-  next steps) were checked by running the commands.
-- Integrated onto `f9b12ca`: `CI=true npm test` 822 of 822, 0 skipped; `npm run check`,
-  `doctor`, lint, archive verify, ajv and the PII validator exit 0.
-- Not done here: shipped scripts, tests and hooks still cite "README ADR-NNN" and carry a
-  few figures about other repositories in comments; they are corrected in the full-ASCII
-  change, which owns those files.
+- Workstream tree on a Linux runner (base `eaa6aac`, the tree of `aa17c1f`): `CI=true npm
+  test` 851 of 851, 0 skipped; `npm run check` with all 14 gates, `doctor`, lint,
+  archive verify and ShellCheck over every tracked shell file exit 0. Mutation proofs
+  for the gate (BOM, binary exemption, threshold, unreadable file, empty enumeration,
+  invalid UTF-8, git missing, the real tree), the widened estate rule, the doctor
+  reason assertion and the migrate marker check.
+- Integrated onto `aa17c1f`: `CI=true npm test` 851 of 851, 0 skipped; `npm run check`
+  (14 gates, 169 files ASCII), `doctor`, lint, archive verify, ajv and the PII validator
+  exit 0.
+- Not measured: macOS.
 
 ## Owner decisions
 
@@ -129,6 +122,10 @@ Open:
    entry. Confirm both as protocol rules.
 15. Should `aahp init --gates` write `"pinnedDep": {}` so the exact-pin advice is enforced
    by default? Today the pinned-dep gate reports skip until it is configured.
+16. Release: the programme is complete on main. Everything under CHANGELOG `##
+   [Unreleased]` is unreleased; whether and when to release (and which version: the
+   content includes breaking changes for adopters, see the Migration notes) is the owner's
+   decision.
 
 ## Constraints for the next agent
 

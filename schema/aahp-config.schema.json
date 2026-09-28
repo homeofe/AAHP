@@ -108,7 +108,7 @@
       "properties": {
         "log": {
           "type": "object",
-          "description": "Generate a LOG release journal from a CHANGELOG. Opt-in: omit to leave an append-only agent-journal LOG.md untouched.",
+          "description": "Generate a release journal from a CHANGELOG into its own file. Opt-in. The generator overwrites its target, so it refuses the append-only agent journal.",
           "properties": {
             "source": {
               "type": "string",
@@ -116,7 +116,7 @@
             },
             "target": {
               "type": "string",
-              "description": "Output path relative to the project root (default .ai/handoff/LOG.md)."
+              "description": "Output path relative to the project root, for example docs/RELEASES.md. Required when generate.log is set; the generator refuses .ai/handoff/LOG.md, LOG-ARCHIVE.md and LOG-ARCHIVE.index.json."
             },
             "title": {
               "type": "string",

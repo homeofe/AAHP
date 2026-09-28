@@ -5,13 +5,14 @@
 #        Defaults to current directory if no path given.
 #
 # Checks:
-#   1. Prompt injection patterns
-#   2. Secrets & API keys
-#   3. PII patterns (emails)
-#   4. MANIFEST.json schema (basic)
+#   1. Prompt injection patterns (every handoff file except .aiignore, plus the
+#      decoded string values of every JSON file)
+#   2. Secrets & API keys (same scope as check 1)
+#   3. PII patterns (emails, *.md)
+#   4. MANIFEST.json schema (basic) and checksum integrity
 #   5. HANDOFF.lock stale check
 #   6. Parallel agent detection (advisory)
-#   7. Git conflict markers in handoff files 
+#   7. Git conflict markers (tracked and unignored files, plus the handoff dir)
 #
 # Exit codes (this script DECIDES, it does not merely report):
 #   0 = all checks passed
@@ -37,6 +38,18 @@
 # bytes on disk, so blocking never depends on this script's exit code or on
 # its output text. The two implementations are deliberately different
 # (embedded Python here, shell plus sha256sum there) so they cross-check.
+#
+# CONTENT SCANS READ BYTES AS TEXT, AND A SCAN THAT COULD NOT RUN IS A FINDING.
+# Checks 1-3 grep with `-a` under LC_ALL=C. Without them, GNU grep 3.5 and
+# later treats a file holding one NUL byte as binary and suppresses every
+# matching line (its notice goes to stderr, which used to be discarded), and in
+# a UTF-8 locale it suppresses any output line holding an invalid byte.
+# Measured on Ubuntu 24.04 with grep 3.11: with one NUL in STATUS.md, a fake
+# `sk-` key and an email address both passed this lint with exit 0; with one
+# invalid byte on the line, the key passed. The patterns are ASCII, so the C
+# locale loses nothing. grep exit status 2 (an unreadable file, a vanished
+# file) is reported and counted as a violation instead of being folded into
+# "nothing found".
 
 set -euo pipefail
 
@@ -61,6 +74,39 @@ VIOLATIONS=0
 # Set when a check was skipped rather than passed, so the summary can say so
 # instead of printing "All checks passed" over an integrity check that never ran.
 INTEGRITY_UNVERIFIED=0
+# Same idea for the decoded scan of JSON string values in check 1.
+JSON_DECODE_UNVERIFIED=0
+
+# Scratch space for scan diagnostics and decoded JSON. Removed on every exit.
+SCAN_TMP="$(mktemp -d)"
+trap 'rm -rf "$SCAN_TMP"' EXIT
+JSON_DECODED_DIR="$SCAN_TMP/json"
+mkdir -p "$JSON_DECODED_DIR"
+
+# Print grep's diagnostics for a scan that exited 2 and count it. Reading "could
+# not scan" as "nothing found" is exactly the false green the text-mode switch
+# above exists to remove, one failure mode further out.
+# Usage: scan_failed <check-label> <grep-exit-status> <stderr-file>
+scan_failed() {
+    echo -e "  ${RED}x $1: grep could not scan every file (exit $2). This is NOT a clean result.${NC}"
+    if [ -s "$3" ]; then
+        sed 's/^/    /' "$3"
+    fi
+    VIOLATIONS=$((VIOLATIONS + 1))
+}
+
+# Map a path in the decoded-JSON scratch directory back to the handoff file it
+# came from, so a finding names the real file.
+display_path() {
+    case "$1" in
+        "$JSON_DECODED_DIR"/*)
+            # A line number in the decoded dump points nowhere real; drop it.
+            local rest="${1#"$JSON_DECODED_DIR"/}"
+            printf '%s/%s (decoded JSON string values)' "$HANDOFF_DIR" "${rest%%:*}"
+            ;;
+        *) printf '%s' "$1" ;;
+    esac
+}
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -95,16 +141,132 @@ INJECTION_PATTERNS=(
     "sudo mode"
 )
 
+# SCOPE: every file in the handoff directory, not only *.md. MANIFEST.json is
+# the file an incoming agent reads FIRST, and its quick_context and task text
+# were never scanned; neither were pii-allowlist.json or
+# LOG-ARCHIVE.index.json. JSON is scanned twice: as raw bytes, and as its
+# DECODED string values (keys included), because an agent reads
+# "ignore all previous" as "ignore all previous" while a byte grep does not.
+#
+# .aiignore is excluded, exactly as check 2 excludes it: the shipped template
+# LISTS these phrases as patterns (templates/.aiignore). Measured on 2026-09-28
+# across 13 local handoff directories that use AAHP: scanning every file flags
+# .aiignore in all 13 and nothing else, so including it would turn every
+# adopter red on its own ignore list.
+#
+# Decoding needs an interpreter (python, else node). With neither, the raw scan
+# still runs and the summary says the decoded scan did not; a JSON file that
+# cannot be decoded at all is a violation, since its escaped text was not read.
+IFS= read -r -d '' JSON_STRINGS_PY <<'PY' || true
+import json, os, sys
+src, dst = sys.argv[1], sys.argv[2]
+failed = []
+for base, dirs, names in os.walk(src):
+    dirs.sort()
+    for name in sorted(names):
+        if not name.endswith('.json'):
+            continue
+        path = os.path.join(base, name)
+        rel = os.path.relpath(path, src).replace(os.sep, '/')
+        try:
+            with open(path, encoding='utf-8') as handle:
+                doc = json.load(handle)
+        except Exception as exc:
+            failed.append('%s (%s)' % (rel, exc.__class__.__name__))
+            continue
+        out, stack = [], [doc]
+        while stack:
+            value = stack.pop()
+            if isinstance(value, str):
+                out.append(value)
+            elif isinstance(value, dict):
+                for key, item in value.items():
+                    out.append(key)
+                    stack.append(item)
+            elif isinstance(value, list):
+                stack.extend(value)
+        target = os.path.join(dst, rel.replace('/', '__'))
+        with open(target, 'w', encoding='utf-8', newline='\n') as handle:
+            handle.write('\n'.join(out) + '\n')
+for item in failed:
+    print(item)
+sys.exit(3 if failed else 0)
+PY
+IFS= read -r -d '' JSON_STRINGS_JS <<'JS' || true
+'use strict';
+const fs = require('fs');
+const path = require('path');
+const [src, dst] = process.argv.slice(1);
+const failed = [];
+function walk(dir) {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true }).sort((a, b) => (a.name < b.name ? -1 : 1))) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) { walk(full); continue; }
+    if (!entry.isFile() || !entry.name.endsWith('.json')) continue;
+    const rel = path.relative(src, full).split(path.sep).join('/');
+    let doc;
+    try { doc = JSON.parse(fs.readFileSync(full, 'utf8')); } catch (err) { failed.push(rel + ' (' + err.name + ')'); continue; }
+    const out = [];
+    const stack = [doc];
+    while (stack.length) {
+      const value = stack.pop();
+      if (typeof value === 'string') out.push(value);
+      else if (Array.isArray(value)) stack.push(...value);
+      else if (value && typeof value === 'object') {
+        for (const [key, item] of Object.entries(value)) { out.push(key); stack.push(item); }
+      }
+    }
+    fs.writeFileSync(path.join(dst, rel.split('/').join('__')), out.join('\n') + '\n');
+  }
+}
+walk(src);
+for (const item of failed) console.log(item);
+process.exitCode = failed.length ? 3 : 0;
+JS
+
+HAS_JSON=0
+for json_file in "$HANDOFF_DIR"/*.json; do
+    if [ -f "$json_file" ]; then HAS_JSON=1; break; fi
+done
+if [ "$HAS_JSON" -eq 1 ]; then
+    DECODE_RC=0
+    DECODE_OUT=""
+    if [ -n "$PYTHON_CMD" ]; then
+        DECODE_OUT=$("$PYTHON_CMD" -c "$JSON_STRINGS_PY" "$HANDOFF_DIR" "$JSON_DECODED_DIR") || DECODE_RC=$?
+    elif command -v node >/dev/null 2>&1; then
+        DECODE_OUT=$(node -e "$JSON_STRINGS_JS" "$HANDOFF_DIR" "$JSON_DECODED_DIR") || DECODE_RC=$?
+    else
+        JSON_DECODE_UNVERIFIED=1
+        echo -e "  ${YELLOW}! No python or node: JSON string values were scanned as raw bytes only.${NC}"
+        echo "    Escaped text such as \\u0069gnore in a .json file was NOT decoded and NOT scanned."
+    fi
+    if [ "$DECODE_RC" -eq 3 ]; then
+        echo -e "  ${RED}x Could not decode as JSON, so escaped text in it was not scanned:${NC}"
+        printf '%s\n' "$DECODE_OUT" | tr -d '\r' | sed 's/^/    /'
+        VIOLATIONS=$((VIOLATIONS + 1))
+    elif [ "$DECODE_RC" -ne 0 ]; then
+        echo -e "  ${RED}x Decoding the JSON string values failed (exit $DECODE_RC); they were not scanned.${NC}"
+        VIOLATIONS=$((VIOLATIONS + 1))
+    fi
+fi
+
+INJECTION_START=$VIOLATIONS
 for pattern in "${INJECTION_PATTERNS[@]}"; do
-    MATCHES=$(grep -rnil "$pattern" "$HANDOFF_DIR"/*.md 2>/dev/null || true)
+    SCAN_RC=0
+    MATCHES=$(LC_ALL=C grep -rila --exclude='.aiignore' -- "$pattern" "$HANDOFF_DIR" "$JSON_DECODED_DIR" 2>"$SCAN_TMP/grep.err") || SCAN_RC=$?
+    if [ "$SCAN_RC" -gt 1 ]; then
+        scan_failed "Injection scan for '$pattern'" "$SCAN_RC" "$SCAN_TMP/grep.err"
+    fi
     if [ -n "$MATCHES" ]; then
         echo -e "  ${RED}✗ Injection pattern '$pattern' found in:${NC}"
-        echo "    $MATCHES"
+        while IFS= read -r hit; do
+            echo "    $(display_path "$hit")"
+        done <<< "$MATCHES"
         VIOLATIONS=$((VIOLATIONS + 1))
     fi
 done
 
-if [ "$VIOLATIONS" -eq 0 ]; then
+if [ "$VIOLATIONS" -eq "$INJECTION_START" ]; then
     echo -e "  ${GREEN}✓ No injection patterns found.${NC}"
 fi
 
@@ -185,6 +347,7 @@ SECRET_PATTERNS=(
 )
 
 SECRET_FOUND=0
+SECRET_SCAN_FAILED=0
 for pattern in "${SECRET_PATTERNS[@]}"; do
     # `path:line`, never the matched text. A reader who goes red needs to reach
     # the line to judge it - a bare filename against a 4,000-line STATUS.md is
@@ -201,15 +364,28 @@ for pattern in "${SECRET_PATTERNS[@]}"; do
     # a line that merely mentions .aiignore was dropped and the gate printed
     # "No secrets detected". Excluding at the source means no content can
     # subvert the exclusion, because nothing downstream reads the match.
-    MATCHES=$(grep -rn --exclude='.aiignore' -- "$pattern" "$HANDOFF_DIR" 2>/dev/null | cut -d: -f1,2 || true)
+    #
+    # `-a` under LC_ALL=C reads every file as text (see the header); the exit
+    # status of grep itself is taken from PIPESTATUS inside the substitution, so
+    # a scan that could not run is not mistaken for one that found nothing. The
+    # decoded JSON string values from check 1 are scanned too, which is what
+    # finds a key hidden behind a JSON escape.
+    SCAN_RC=0
+    MATCHES=$(LC_ALL=C grep -rna --exclude='.aiignore' -- "$pattern" "$HANDOFF_DIR" "$JSON_DECODED_DIR" 2>"$SCAN_TMP/grep.err" | cut -d: -f1,2; exit "${PIPESTATUS[0]}") || SCAN_RC=$?
+    if [ "$SCAN_RC" -gt 1 ]; then
+        scan_failed "Secret scan for '$pattern'" "$SCAN_RC" "$SCAN_TMP/grep.err"
+        SECRET_SCAN_FAILED=1
+    fi
     if [ -n "$MATCHES" ]; then
         echo -e "  ${RED}✗ Possible secret pattern '$pattern' found in:${NC}"
-        echo "    $MATCHES"
+        while IFS= read -r hit; do
+            echo "    $(display_path "$hit")"
+        done <<< "$MATCHES"
         SECRET_FOUND=$((SECRET_FOUND + 1))
     fi
 done
 
-if [ "$SECRET_FOUND" -eq 0 ]; then
+if [ "$SECRET_FOUND" -eq 0 ] && [ "$SECRET_SCAN_FAILED" -eq 0 ]; then
     echo -e "  ${GREEN}✓ No secrets detected.${NC}"
 else
     VIOLATIONS=$((VIOLATIONS + SECRET_FOUND))
@@ -236,7 +412,7 @@ fi
 # is tracked as an owner decision; see README Section 2.6.
 AIIGNORE_FILE="$HANDOFF_DIR/.aiignore"
 if [ -f "$AIIGNORE_FILE" ]; then
-    AIIGNORE_RULES=$(grep -c -v -e '^[[:space:]]*#' -e '^[[:space:]]*$' "$AIIGNORE_FILE" || true)
+    AIIGNORE_RULES=$(LC_ALL=C grep -a -c -v -e '^[[:space:]]*#' -e '^[[:space:]]*$' "$AIIGNORE_FILE" || true)
     echo -e "  ${YELLOW}NOT ENFORCED: $AIIGNORE_FILE lists ${AIIGNORE_RULES} pattern(s); no gate reads them.${NC}"
     echo "    The enforced set is the ${#SECRET_PATTERNS[@]} built-in secret patterns above, plus the"
     echo "    injection patterns in check 1 and the PII patterns in check 3. A pattern you add"
@@ -289,7 +465,28 @@ PY
     fi
 fi
 
-EMAIL_MATCHES=$(LC_ALL=C.UTF-8 grep -rHnoE '[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}' "$HANDOFF_DIR"/*.md 2>/dev/null | awk -F: '{ addr=$NF; if (addr ~ /\.noreply\./ || addr ~ /^no-?reply@/ || index(addr,"example.com") || index(addr,"placeholder")) next; print }' || true)
+# The scan pins LC_ALL=C and reads bytes as text (-a). It used to pin
+# LC_ALL=C.UTF-8 without -a, which kept grep -E working under an empty locale
+# (T-027) but let one NUL byte anywhere in a file hide every address in it:
+# measured with GNU grep 3.11, the old invocation printed nothing and exited 0
+# for a file holding a NUL and an address. (An invalid UTF-8 byte did not hide
+# an address here, because -o prints only the ASCII match; it did hide the
+# secret-scan line in check 2.) The pattern is ASCII, so C matches exactly the
+# same addresses. An absent *.md set is not a scan failure; grep exit 2 is.
+MD_FILES=()
+for md_file in "$HANDOFF_DIR"/*.md; do
+    [ -f "$md_file" ] && MD_FILES+=("$md_file")
+done
+EMAIL_MATCHES=""
+PII_SCAN_FAILED=0
+if [ "${#MD_FILES[@]}" -gt 0 ]; then
+    SCAN_RC=0
+    EMAIL_MATCHES=$(LC_ALL=C grep -HnoEa '[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}' "${MD_FILES[@]}" 2>"$SCAN_TMP/grep.err" | awk -F: '{ addr=$NF; if (addr ~ /\.noreply\./ || addr ~ /^no-?reply@/ || index(addr,"example.com") || index(addr,"placeholder")) next; print }'; exit "${PIPESTATUS[0]}") || SCAN_RC=$?
+    if [ "$SCAN_RC" -gt 1 ]; then
+        scan_failed "PII scan" "$SCAN_RC" "$SCAN_TMP/grep.err"
+        PII_SCAN_FAILED=1
+    fi
+fi
 UNAPPROVED=""
 if [ -n "$EMAIL_MATCHES" ]; then
     while IFS= read -r match; do
@@ -310,7 +507,7 @@ if [ -n "$UNAPPROVED" ]; then
     echo -e "  ${YELLOW}Possible email addresses found:${NC}"
     echo "    $UNAPPROVED"
     VIOLATIONS=$((VIOLATIONS + 1))
-else
+elif [ "$PII_SCAN_FAILED" -eq 0 ]; then
     echo -e "  ${GREEN}OK No unapproved PII detected.${NC}"
 fi
 
@@ -330,18 +527,17 @@ if [ -f "$HANDOFF_DIR/MANIFEST.json" ]; then
         # Layer 1 does not already catch. The summary below must therefore not
         # claim that all checks passed, because this one did not run.
         INTEGRITY_UNVERIFIED=1
-    elif "$PYTHON_CMD" -c "import json; json.load(open('$HANDOFF_DIR/MANIFEST.json'))" 2>/dev/null; then
-        echo -e "  ${GREEN}✓ Valid JSON.${NC}"
-
-        # Check required fields
-        REQUIRED_FIELDS=("aahp_version" "project" "last_session" "files" "quick_context")
-        for field in "${REQUIRED_FIELDS[@]}"; do
-            if ! "$PYTHON_CMD" -c "import json; d=json.load(open('$HANDOFF_DIR/MANIFEST.json')); assert '$field' in d" 2>/dev/null; then
-                echo -e "  ${RED}✗ Missing required field: $field${NC}"
-                VIOLATIONS=$((VIOLATIONS + 1))
-            fi
-        done
-
+    else
+        # ONE interpreter pass for the whole check: JSON validity, required
+        # fields, and the integrity comparison. It used to start Python seven
+        # times to parse the same file (validity, one run per required field,
+        # then integrity), which is most of this check's wall time on Windows.
+        #
+        # The file is opened as UTF-8 explicitly. A bare open() decodes with
+        # the locale's code page, so on a Windows cp1252 console a valid UTF-8
+        # MANIFEST.json holding one non-ASCII character was reported as
+        # "Invalid JSON".
+        #
         # Verify the existence AND the checksum of every indexed file.
         #
         # Existence is asserted FIRST and reported separately. A deleted file
@@ -356,65 +552,98 @@ if [ -f "$HANDOFF_DIR/MANIFEST.json" ]; then
         # well: dropping its entry and rewriting the file would otherwise pass
         # both gates untouched.
         #
-        # Exit contract of the embedded script: 0 = clean, 3 = findings,
-        # anything else = the interpreter itself failed, and that ALSO counts
-        # as a violation. If the tool cannot tell whether the files match,
-        # integrity is unproven, and unproven must not print "All checks
-        # passed". stderr is deliberately not discarded so the real cause of
-        # an interpreter failure is visible in the gate log.
-        echo "  Verifying indexed files..."
-        CHECKSUM_RC=0
-        AAHP_CANONICAL_HANDOFF_FILES="${AAHP_HANDOFF_FILES[*]}" \
-        "$PYTHON_CMD" -c "
-import json, hashlib, os, sys
-sys.stdout.reconfigure(errors='replace')
-manifest = json.load(open('$HANDOFF_DIR/MANIFEST.json'))
+        # Exit contract of the embedded script:
+        #   0      = valid JSON, every required field present, integrity clean
+        #   4      = not valid JSON (or not a JSON object)
+        #   64+N   = valid JSON with N violations (one per missing required
+        #            field, plus one when the integrity comparison found anything)
+        #   other  = the interpreter itself failed, and that ALSO counts as a
+        #            violation. If the tool cannot tell whether the files match,
+        #            integrity is unproven, and unproven must not print "All
+        #            checks passed". stderr is deliberately not discarded so the
+        #            real cause of an interpreter failure is visible in the log.
+        IFS= read -r -d '' CHECK4_PY <<'PY' || true
+import hashlib, json, os, sys
+try:
+    sys.stdout.reconfigure(errors='replace')
+except Exception:
+    pass
+handoff, required, canonical = sys.argv[1], sys.argv[2].split(), sys.argv[3].split()
+try:
+    with open(os.path.join(handoff, 'MANIFEST.json'), encoding='utf-8') as handle:
+        manifest = json.load(handle)
+except (OSError, ValueError) as exc:
+    print('    %s' % exc)
+    sys.exit(4)
+if not isinstance(manifest, dict):
+    print('    the top level is not a JSON object')
+    sys.exit(4)
+violations = 0
+for field in required:
+    if field not in manifest:
+        print('  x Missing required field: %s' % field)
+        violations += 1
+print('  Verifying indexed files...')
 findings = 0
 indexed = manifest.get('files') or {}
+if not isinstance(indexed, dict):
+    indexed = {}
 if not indexed:
     print('  ! MANIFEST.json indexes no files.')
     print('    Nothing could be verified, so nothing is verified.')
     print('    Fix: regenerate the manifest (aahp manifest).')
-    sys.exit(3)
+    findings += 1
 for fname, meta in indexed.items():
-    fpath = os.path.join('$HANDOFF_DIR', fname)
+    fpath = os.path.join(handoff, fname)
     if not os.path.exists(fpath):
-        print(f'  ! Missing indexed file: {fname}')
+        print('  ! Missing indexed file: %s' % fname)
         print('    Indexed by MANIFEST.json but not present in the working tree.')
         print('    Fix: restore the file, or regenerate the manifest (aahp manifest).')
         findings += 1
         continue
-    actual = 'sha256:' + hashlib.sha256(open(fpath, 'rb').read().replace(b'\r', b'')).hexdigest()
-    expected = meta.get('checksum', '')
+    with open(fpath, 'rb') as handle:
+        actual = 'sha256:' + hashlib.sha256(handle.read().replace(b'\r', b'')).hexdigest()
+    expected = meta.get('checksum', '') if isinstance(meta, dict) else ''
     if actual != expected:
-        print(f'  ! Checksum mismatch: {fname}')
-        print(f'    Expected: {expected}')
-        print(f'    Actual:   {actual}')
+        print('  ! Checksum mismatch: %s' % fname)
+        print('    Expected: %s' % expected)
+        print('    Actual:   %s' % actual)
         findings += 1
     else:
-        print(f'  OK: {fname}')
-for fname in os.environ.get('AAHP_CANONICAL_HANDOFF_FILES', '').split():
-    if fname in indexed:
-        continue
-    if not os.path.exists(os.path.join('$HANDOFF_DIR', fname)):
-        continue
-    print(f'  ! Not indexed by MANIFEST.json: {fname}')
-    print('    The file is present but has no entry, so it was never compared.')
-    print('    Fix: regenerate the manifest (aahp manifest).')
-    findings += 1
-sys.exit(3 if findings else 0)
-" || CHECKSUM_RC=$?
-        if [ "$CHECKSUM_RC" -eq 3 ]; then
+        print('  OK: %s' % fname)
+if indexed:
+    for fname in canonical:
+        if fname in indexed or not os.path.exists(os.path.join(handoff, fname)):
+            continue
+        print('  ! Not indexed by MANIFEST.json: %s' % fname)
+        print('    The file is present but has no entry, so it was never compared.')
+        print('    Fix: regenerate the manifest (aahp manifest).')
+        findings += 1
+if findings:
+    violations += 1
+sys.exit(64 + min(violations, 63) if violations else 0)
+PY
+        REQUIRED_FIELDS=("aahp_version" "project" "last_session" "files" "quick_context")
+        CHECK4_RC=0
+        CHECK4_OUT=$("$PYTHON_CMD" -c "$CHECK4_PY" "$HANDOFF_DIR" "${REQUIRED_FIELDS[*]}" "${AAHP_HANDOFF_FILES[*]}") || CHECK4_RC=$?
+        if [ "$CHECK4_RC" -eq 4 ]; then
+            echo -e "  ${RED}✗ Invalid JSON.${NC}"
+            printf '%s\n' "$CHECK4_OUT" | tr -d '\r'
             VIOLATIONS=$((VIOLATIONS + 1))
-        elif [ "$CHECKSUM_RC" -ne 0 ]; then
-            echo -e "  ${RED}✗ Could not verify indexed files (verifier exited $CHECKSUM_RC).${NC}"
+        elif [ "$CHECK4_RC" -eq 0 ] || { [ "$CHECK4_RC" -ge 65 ] && [ "$CHECK4_RC" -le 127 ]; }; then
+            echo -e "  ${GREEN}✓ Valid JSON.${NC}"
+            printf '%s\n' "$CHECK4_OUT" | tr -d '\r'
+            if [ "$CHECK4_RC" -ne 0 ]; then
+                VIOLATIONS=$((VIOLATIONS + CHECK4_RC - 64))
+            fi
+        else
+            if [ -n "$CHECK4_OUT" ]; then
+                printf '%s\n' "$CHECK4_OUT" | tr -d '\r'
+            fi
+            echo -e "  ${RED}✗ Could not verify indexed files (verifier exited $CHECK4_RC).${NC}"
             echo "    Integrity is UNPROVEN. That counts as a violation, not a note."
             VIOLATIONS=$((VIOLATIONS + 1))
         fi
-
-    else
-        echo -e "  ${RED}✗ Invalid JSON.${NC}"
-        VIOLATIONS=$((VIOLATIONS + 1))
     fi
 else
     # A deleted manifest is the maximal "integrity unproven" state: there is
@@ -473,13 +702,30 @@ fi
 echo -e "${GREEN}[7/7]${NC} Checking for git conflict markers..."
 
 MARKER_RC=0
-# Prefer node (CI/Linux). On some Windows git-bash installs `node` is not on
-# PATH even though Node exists for the package; fall back to absolute `node.exe`
-# discovery is unnecessary - use the same interpreter helper pattern as _aahp-lib.
+MARKER_SCRIPT="$SCRIPT_DIR/check-conflict-markers.mjs"
+MARKER_NODE=""
 if command -v node &>/dev/null; then
-    node "$SCRIPT_DIR/check-conflict-markers.mjs" "$PROJECT_ROOT" || MARKER_RC=$?
+    MARKER_NODE="node"
 elif command -v node.exe &>/dev/null; then
-    node.exe "$SCRIPT_DIR/check-conflict-markers.mjs" "$PROJECT_ROOT" || MARKER_RC=$?
+    MARKER_NODE="node.exe"
+fi
+# The node gate is used only when it is actually next to this script.
+# scripts/propagate.sh copies this file into consumer repositories WITHOUT
+# check-conflict-markers.mjs; node then died with "Cannot find module", exit 1,
+# and exit 1 is this check's "markers found" code, so every such consumer got a
+# conflict-marker violation with no file named. A missing gate script is not a
+# reason to skip the check either: the shell fallback below runs instead.
+if [ -n "$MARKER_NODE" ] && [ -f "$MARKER_SCRIPT" ]; then
+    "$MARKER_NODE" "$MARKER_SCRIPT" "$PROJECT_ROOT" 2>"$SCAN_TMP/markers.err" || MARKER_RC=$?
+    if [ -s "$SCAN_TMP/markers.err" ]; then
+        cat "$SCAN_TMP/markers.err" >&2
+    fi
+    # Exit 1 means "markers found" ONLY together with the gate's own FAIL line.
+    # Node exits 1 for its own failures too (a crash, a module it cannot load),
+    # and those are "could not run", never a verdict about the tree.
+    if [ "$MARKER_RC" -eq 1 ] && ! grep -q 'check-conflict-markers: FAIL' "$SCAN_TMP/markers.err"; then
+        MARKER_RC=2
+    fi
 else
     # Pure-bash fallback: strip CR and match markers without node.
     #
@@ -488,21 +734,45 @@ else
     # three of six cases: node trims the line before testing and this anchored `^`,
     # so an INDENTED marker was caught there and missed here; and node uses
     # startsWith, so eight angle brackets matched there and not here. Measured, then
-    # aligned to node's predicate, because an indented marker is still a marker. It walks the whole tree rather than the handoff directory, and the
+    # aligned to node's predicate, because an indented marker is still a marker. The
     # `=======` alternative is gone: seven equals signs is a Markdown setext
     # underline and a Python docstring header, and it flipped 2 of 48 real adopter
     # roots red on files with no conflict in them.
+    #
+    # The file set matches the node gate: inside a git work tree, the tracked
+    # files plus the untracked files git does not ignore, plus everything in the
+    # handoff directory (scanned even if an adopter ignores it); outside one, a
+    # walk of the tree with .git and node_modules pruned.
+    if [ -z "$MARKER_NODE" ]; then
+        echo "  (node not found; using the shell fallback)"
+    else
+        echo "  (check-conflict-markers.mjs is not next to this script; using the shell fallback)"
+    fi
     MARKER_FOUND=0
-    while IFS= read -r f; do
-        [ -f "$f" ] || continue
-        if tr -d '\r' < "$f" | grep -E '^[[:space:]]*(<<<<<<<|>>>>>>>)' -q; then
-            echo -e "  ${RED}✗ Conflict markers present in: $f${NC}"
-            MARKER_FOUND=1
+    MARKER_LIST="$SCAN_TMP/marker-files"
+    MARKER_LIST_RC=0
+    if git -C "$PROJECT_ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+        {
+            git -C "$PROJECT_ROOT" ls-files -z -co --exclude-standard &&
+                git -C "$PROJECT_ROOT" ls-files -z -oi --exclude-standard -- "$HANDOFF_DIR"
+        } > "$MARKER_LIST" || MARKER_LIST_RC=$?
+    else
+        find "$PROJECT_ROOT" \( -name .git -o -name node_modules \) -prune \
+            -o -type f -print0 > "$MARKER_LIST" || MARKER_LIST_RC=$?
+    fi
+    if [ "$MARKER_LIST_RC" -ne 0 ]; then
+        MARKER_RC=2
+    else
+        while IFS= read -r -d '' f; do
+            if [ ! -f "$f" ] || [ -L "$f" ]; then continue; fi
+            if tr -d '\r' < "$f" | LC_ALL=C grep -a -E '^[[:space:]]*(<<<<<<<|>>>>>>>)' -q; then
+                echo -e "  ${RED}✗ Conflict markers present in: $f${NC}"
+                MARKER_FOUND=1
+            fi
+        done < "$MARKER_LIST"
+        if [ "$MARKER_FOUND" -eq 1 ]; then
+            MARKER_RC=1
         fi
-    done < <(find "$PROJECT_ROOT" \( -name .git -o -name node_modules \) -prune \
-        -o -type f -print 2>/dev/null)
-    if [ "$MARKER_FOUND" -eq 1 ]; then
-        MARKER_RC=1
     fi
 fi
 if [ "$MARKER_RC" -eq 1 ]; then
@@ -516,9 +786,14 @@ fi
 
 echo ""
 echo "========================================="
-if [ "$VIOLATIONS" -eq 0 ] && [ "$INTEGRITY_UNVERIFIED" -eq 1 ]; then
-    echo -e "  ${YELLOW}No violations found, but MANIFEST integrity was NOT verified here.${NC}"
-    echo "  Run 'aahp verify', which blocks when integrity cannot be established."
+if [ "$VIOLATIONS" -eq 0 ] && { [ "$INTEGRITY_UNVERIFIED" -eq 1 ] || [ "$JSON_DECODE_UNVERIFIED" -eq 1 ]; }; then
+    if [ "$INTEGRITY_UNVERIFIED" -eq 1 ]; then
+        echo -e "  ${YELLOW}No violations found, but MANIFEST integrity was NOT verified here.${NC}"
+        echo "  Run 'aahp verify', which blocks when integrity cannot be established."
+    fi
+    if [ "$JSON_DECODE_UNVERIFIED" -eq 1 ]; then
+        echo -e "  ${YELLOW}No violations found, but JSON string values were NOT decoded and scanned here.${NC}"
+    fi
     echo "========================================="
     exit 0
 elif [ "$VIOLATIONS" -eq 0 ]; then

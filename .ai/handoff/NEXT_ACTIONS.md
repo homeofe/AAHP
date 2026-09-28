@@ -19,6 +19,12 @@ Current version: **v3.12.0**
 
 ## Recently Completed
 
+### 2026-09-28: Manifest generator, lint and CLI
+
+- The manifest generator can no longer write invalid JSON or drop data silently; lint
+  scans bytes as text and covers every handoff file.
+- Doctor validates the full manifest schema; the CLI no longer exits 0 on a signal.
+
 ### 2026-09-28: Test-suite integrity
 
 - Dead negations, fail-open skips and negative-only assertions now fail; a guard in `npm
@@ -48,14 +54,6 @@ Current version: **v3.12.0**
 - Excluded generated Python bytecode from git and npm package contents.
 - Recorded the first successful supply-chain-guard GitHub Actions run in TRUST.md.
 
-### 2026-08-31: PR #109 integration and scanner v6.0.8 refresh
-
-- Integrated the three CodeQL v4.37.8 pins from Dependabot PR #109.
-- Updated supply-chain-guard to the signed v6.0.8 release commit and kept the policy
-  schema pinned to the same immutable source.
-- Confirmed the README already carries the `aahp-verify` workflow badge; added an
-  availability badge for the shipped governance template and a dynamic Node badge.
-
 ---
 
 ## Owner Decisions (not task registry entries)
@@ -72,6 +70,10 @@ Open:
 - Keep the dogfood verify workflow out of the npm package?
 - Choose whether legacy governance workflows need doctor detection or forced migration.
 - Plan a future replacement for the deprecated transitive dependencies of ajv-cli 5.
+- Coordinate the supply-chain-guard test that expects the old STATUS.md summary before its
+  next aahp bump.
+- Decide whether the three consumer manifests with template placeholder dates are fixed
+  before the release.
 
 ---
 

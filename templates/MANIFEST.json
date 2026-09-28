@@ -1,12 +1,12 @@
 {
-  "aahp_version": "2.0",
+  "aahp_version": "3.0",
   "project": "[PROJECT]",
   "last_session": {
     "agent": "[model-name]",
     "session_id": "[unique-session-id]",
     "timestamp": "[ISO-8601]",
     "commit": "[git-hash]",
-    "phase": "[research|architecture|implementation|review|fix]",
+    "phase": "[research|architecture|implementation|review|fix|idle|documentation]",
     "duration_minutes": 0
   },
   "files": {
@@ -71,15 +71,13 @@
       "title": "Example: Implement feature X",
       "status": "in_progress",
       "priority": "high",
-      "depends_on": [],
-      "created": "[ISO-8601]"
+      "depends_on": []
     },
     "T-002": {
       "title": "Example: Add tests for feature X",
       "status": "ready",
       "priority": "high",
-      "depends_on": ["T-001"],
-      "created": "[ISO-8601]"
+      "depends_on": ["T-001"]
     }
   }
 }

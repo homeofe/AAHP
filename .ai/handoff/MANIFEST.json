@@ -3,86 +3,139 @@
   "project": "AAHP",
   "last_session": {
     "agent": "claude-opus-5.5",
-    "session_id": "cli-1790554332",
-    "timestamp": "2026-09-28T00:12:12Z",
-    "commit": "3e8e8d7",
+    "session_id": "cli-1790555070",
+    "timestamp": "2026-09-28T00:24:30Z",
+    "commit": "1e3fd4a",
     "phase": "implementation",
     "duration_minutes": 0
   },
   "files": {
     "STATUS.md": {
-      "checksum": "sha256:e7e812f76e351bd920b6460961450c638e6c249a0c7c61c2043906d2787805a7",
-      "updated": "2026-09-28T00:12:12Z",
-      "lines": 107,
-      "summary": "Last updated: 2026-09-28"
+      "checksum": "sha256:bf8ab74ae1a58d02c118189e13cdfe50b3614d3658c0a6112c50fd3037f417ca",
+      "updated": "2026-09-28T00:24:28Z",
+      "lines": 128,
+      "summary": "Working state: audit fix programme in progress; this change is the manifest, lint and CLI workstreams (`fix/manifest-lint-cli`)"
     },
     "NEXT_ACTIONS.md": {
-      "checksum": "sha256:aaa2da047f7355e722e106548311856feebf5cc08bf14962e54c264c0a38a491",
-      "updated": "2026-09-28T00:08:12Z",
-      "lines": 95,
-      "summary": "Current version: **v3.12.0**"
+      "checksum": "sha256:452d540350d32568687544bf698cde206b58c10349b565b9cb91cb6a6914239c",
+      "updated": "2026-09-28T00:21:40Z",
+      "lines": 97,
+      "summary": "The manifest generator can no longer write invalid JSON or drop data silently; lint scans bytes as text and covers every handoff file."
     },
     "LOG.md": {
-      "checksum": "sha256:41d63dedb5de872e23008723b9da0a93d0b2696741741dfad99ac6624221edb4",
-      "updated": "2026-09-28T00:12:12Z",
-      "lines": 286,
-      "summary": "**Agent:** claude-opus-5.5"
+      "checksum": "sha256:b041fb550b7b4c685d45e6c4e9720cf091117062249dcf815fb4f0e4440037b1",
+      "updated": "2026-09-28T00:21:41Z",
+      "lines": 294,
+      "summary": "Latest entry: [2026-09-28] claude-opus-5.5: manifest, lint and CLI (audit fix programme, 3 of 8)"
     },
     "LOG-ARCHIVE.md": {
-      "checksum": "sha256:1d233b5cbe7d607ae196172e95eb4cfd51ed062086df796b1b9f725da070156b",
-      "updated": "2026-09-28T00:08:12Z",
-      "lines": 309,
-      "summary": "**Agent:** claude-opus-4-8"
+      "checksum": "sha256:540f7557dd556953ef6716171178aae0b1d099c7c6998a24a5ed3261ba30ae85",
+      "updated": "2026-09-28T00:21:41Z",
+      "lines": 327,
+      "summary": "Newest archived entry: [2026-07-18] claude-opus-4-8: Security hardening + doc-drift fixes (v3.6.1)"
     },
     "LOG-ARCHIVE.index.json": {
-      "checksum": "sha256:6408e9643fec7b8a8116d411dbe1e2e9d285d5e74d2917b600236a8bbc035ed0",
-      "updated": "2026-09-28T00:08:12Z",
-      "lines": 53,
-      "summary": "{"
+      "checksum": "sha256:d5e4d23e122007b4272eb8e93fedd40acf2b564d52fa4c46ebce5762bbd16b68",
+      "updated": "2026-09-28T00:21:41Z",
+      "lines": 57,
+      "summary": "LOG archive index: 13 entries."
     },
     "DASHBOARD.md": {
       "checksum": "sha256:e96e392db8dab2e9719e542dfa2a10c240d0be16ac6721298c460a22985cbdea",
       "updated": "2026-09-28T00:06:33Z",
       "lines": 96,
-      "summary": "| Name | Path | Build | Tests | Status | Notes |"
+      "summary": "Total: 48 tests, 48 passing"
     },
     "TRUST.md": {
       "checksum": "sha256:d3b79c9fee9268c855731d1462d4b05b771b2642defbee7f21dbfbdc59f22ccf",
       "updated": "2026-09-28T00:06:33Z",
       "lines": 110,
-      "summary": "| Level | Meaning |"
+      "summary": "Each table below carries a `Provenance` column recording HOW a claim was checked, orthogonal to Status."
     },
     "CONVENTIONS.md": {
       "checksum": "sha256:1c0150404d22c6e15e39139e8b2c991b0167ba1e095f579efafb85555dfe0d88",
       "updated": "2026-09-28T00:06:33Z",
       "lines": 93,
-      "summary": "The project motto (Asimov's Three Laws) and the **do no damage** principle live once, in README (## Our Motto: The Three Laws). Agents must never take"
+      "summary": "The project motto (Asimov's Three Laws) and the do no damage principle live once, in README (## Our Motto: The Three Laws)."
     },
     "WORKFLOW.md": {
       "checksum": "sha256:ef005f24e399791abb986b3a76403295c33ad3b28bb9b7dc777d1d0528b31151",
       "updated": "2026-09-28T00:06:33Z",
       "lines": 156,
-      "summary": "| Agent | Model | Role | Responsibility |"
+      "summary": "Authoritative source: MANIFEST.json `tasks` graph (README Section 8.4)."
     },
     "GROUNDING.md": {
       "checksum": "sha256:7ef8cece585dc5defb4285175b9ba560d5469675df553d4ce28ec9e7aec24343",
       "updated": "2026-09-28T00:06:33Z",
       "lines": 209,
-      "summary": "This register EXTENDS existing AAHP machinery; it does not fork or replace it. It"
+      "summary": "This register EXTENDS existing AAHP machinery; it does not fork or replace it."
     },
     "pii-allowlist.json": {
       "checksum": "sha256:7c1051f6e2bc3943b7c1dbe4da229694455681b8875a346c99279e555edb733f",
       "updated": "2026-09-28T00:06:33Z",
       "lines": 4,
-      "summary": "{"
+      "summary": "PII allowlist: 0 entries."
     }
   },
-  "quick_context": "Audit fix programme 2026-09-28, workstream 2 of 8: test-suite integrity. Dead negations, fail-open skips and negative-only assertions now fail; guards in npm run check and a CI skip audit keep them out; git-isolated build-once fixture. v3.12.0 released; no release until the owner decides.",
+  "quick_context": "Audit fix programme 2026-09-28, workstreams 3 of 8: manifest generator, lint and CLI. Node-built atomic MANIFEST.json, binary-safe lint covering every handoff file, doctor validates the full manifest schema, CLI signal exit fixed. v3.12.0 released; no release until the owner decides.",
   "token_budget": {
-    "manifest_only": 85,
-    "manifest_plus_core": 2023,
-    "full_read": 14600
+    "manifest_only": 1430,
+    "manifest_plus_core": 4190,
+    "full_read": 21122
+  },
+  "next_task_id": 18,
+  "tasks": {
+    "T-006": {
+      "title": "Publish npm package",
+      "status": "done",
+      "priority": "medium",
+      "depends_on": [],
+      "created": "2026-06-28T10:10:21.975Z",
+      "notes": "**AAHP Task:** `T-006`  \n**Status:** blocked  \n**Priority:** medium  \n\n\n\n\n---\n*Auto-created from AAHP manifest · project: AAHP*",
+      "github_issue": 18,
+      "github_repo": "homeofe/AAHP",
+      "completed": "2026-07-14T00:00:00Z"
+    },
+    "T-014": {
+      "title": "Add CLI integration tests for bin/aahp.js [high]",
+      "status": "done",
+      "priority": "high",
+      "depends_on": [],
+      "created": "2026-06-28T10:10:21.975Z",
+      "notes": "**AAHP Task:** `T-014`  \n**Status:** ready  \n**Priority:** high  \n\n\n\n\n---\n*Auto-created from AAHP manifest · project: AAHP*",
+      "github_issue": 14,
+      "github_repo": "homeofe/AAHP",
+      "completed": "2026-07-14T00:00:00Z"
+    },
+    "T-015": {
+      "title": "Add `aahp status` quick-look command [medium]",
+      "status": "done",
+      "priority": "medium",
+      "depends_on": [],
+      "created": "2026-06-28T10:10:21.978Z",
+      "github_issue": 22,
+      "github_repo": "homeofe/AAHP",
+      "completed": "2026-07-14T00:00:00Z"
+    },
+    "T-016": {
+      "title": "Add `aahp archive` command for LOG.md rotation [medium]",
+      "status": "done",
+      "priority": "medium",
+      "depends_on": [],
+      "created": "2026-06-28T10:10:21.979Z",
+      "github_issue": 23,
+      "github_repo": "homeofe/AAHP",
+      "completed": "2026-07-14T00:00:00Z"
+    },
+    "T-017": {
+      "title": "Add project-level CLAUDE.md [low]",
+      "status": "done",
+      "priority": "low",
+      "depends_on": [],
+      "created": "2026-06-28T10:10:21.979Z",
+      "github_issue": 24,
+      "github_repo": "homeofe/AAHP",
+      "completed": "2026-07-14T00:00:00Z"
+    }
   }
-  ,"next_task_id": 18
-  ,"tasks": {"T-006":{"title":"Publish npm package","status":"done","priority":"medium","depends_on":[],"created":"2026-06-28T10:10:21.975Z","notes":"**AAHP Task:** `T-006`  \n**Status:** blocked  \n**Priority:** medium  \n\n\n\n\n---\n*Auto-created from AAHP manifest · project: AAHP*","github_issue":18,"github_repo":"homeofe/AAHP","completed":"2026-07-14T00:00:00Z"},"T-014":{"title":"Add CLI integration tests for bin/aahp.js [high]","status":"done","priority":"high","depends_on":[],"created":"2026-06-28T10:10:21.975Z","notes":"**AAHP Task:** `T-014`  \n**Status:** ready  \n**Priority:** high  \n\n\n\n\n---\n*Auto-created from AAHP manifest · project: AAHP*","github_issue":14,"github_repo":"homeofe/AAHP","completed":"2026-07-14T00:00:00Z"},"T-015":{"title":"Add `aahp status` quick-look command [medium]","status":"done","priority":"medium","depends_on":[],"created":"2026-06-28T10:10:21.978Z","github_issue":22,"github_repo":"homeofe/AAHP","completed":"2026-07-14T00:00:00Z"},"T-016":{"title":"Add `aahp archive` command for LOG.md rotation [medium]","status":"done","priority":"medium","depends_on":[],"created":"2026-06-28T10:10:21.979Z","github_issue":23,"github_repo":"homeofe/AAHP","completed":"2026-07-14T00:00:00Z"},"T-017":{"title":"Add project-level CLAUDE.md [low]","status":"done","priority":"low","depends_on":[],"created":"2026-06-28T10:10:21.979Z","github_issue":24,"github_repo":"homeofe/AAHP","completed":"2026-07-14T00:00:00Z"}}
 }

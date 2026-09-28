@@ -111,10 +111,57 @@ teardown() {
 
 @test "prompts before overwriting existing MANIFEST.json" {
     create_full_handoff
+    cp "$TEST_TMPDIR/.ai/handoff/MANIFEST.json" "$TEST_TMPDIR/manifest.before"
 
     # Send 'n' to decline regeneration
     run bash -c "echo n | bash '$SCRIPTS_DIR/aahp-migrate-v2.sh' '$TEST_TMPDIR'"
+    [ "$status" -eq 0 ]
     [[ "$output" == *"already exists"* ]]
+    [[ "$output" == *"Aborted."* ]]
+    cmp -s "$TEST_TMPDIR/manifest.before" "$TEST_TMPDIR/.ai/handoff/MANIFEST.json"
+}
+
+# --- Non-interactive use (R11) -----------------------------------------------
+#
+# The prompt was a bare `read` under `set -e`. With no terminal and nothing
+# piped in, `read` hit end of input and the script exited 1 WITHOUT a word:
+# measured at 1917ca8, `aahp-migrate-v2.sh <dir> </dev/null` printed the
+# "already exists" line, then exit 1, and "Aborted." appeared 0 times.
+
+@test "no answer on stdin is an explicit error that names --yes, and changes nothing" {
+    create_full_handoff
+    cp "$TEST_TMPDIR/.ai/handoff/MANIFEST.json" "$TEST_TMPDIR/manifest.before"
+
+    run bash "$SCRIPTS_DIR/aahp-migrate-v2.sh" "$TEST_TMPDIR" </dev/null
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"no answer could be read from stdin"* ]]
+    [[ "$output" == *"--yes"* ]]
+    cmp -s "$TEST_TMPDIR/manifest.before" "$TEST_TMPDIR/.ai/handoff/MANIFEST.json"
+}
+
+@test "--yes regenerates an existing MANIFEST.json without reading stdin" {
+    create_full_handoff
+
+    run bash "$SCRIPTS_DIR/aahp-migrate-v2.sh" "$TEST_TMPDIR" --yes </dev/null
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Migration Summary"* ]]
+    grep -q '"agent": "migration-script"' "$TEST_TMPDIR/.ai/handoff/MANIFEST.json"
+}
+
+@test "-y is accepted before the path, too" {
+    create_full_handoff
+
+    run bash "$SCRIPTS_DIR/aahp-migrate-v2.sh" -y "$TEST_TMPDIR" </dev/null
+    [ "$status" -eq 0 ]
+    grep -q '"agent": "migration-script"' "$TEST_TMPDIR/.ai/handoff/MANIFEST.json"
+}
+
+@test "an unknown option is refused before anything is written" {
+    create_status_md
+    run bash "$SCRIPTS_DIR/aahp-migrate-v2.sh" "$TEST_TMPDIR" --bogus </dev/null
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"unknown option: --bogus"* ]]
+    [ ! -f "$TEST_TMPDIR/.ai/handoff/MANIFEST.json" ]
 }
 
 @test "regenerates MANIFEST.json when user confirms" {
@@ -141,7 +188,65 @@ teardown() {
 
     run bash -c "echo n | bash '$SCRIPTS_DIR/aahp-migrate-v2.sh' '$TEST_TMPDIR'"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"LOG.md has"* ]]
+    [[ "$output" == *"LOG.md has 1 entries"* ]]
+}
+
+@test "a LOG.md with zero entries is counted as 0, not as a broken integer" {
+    # grep -c prints 0 AND exits 1 on no match, so `$(grep -c ... || echo 0)`
+    # captured "0\n0". Measured at 1917ca8: "[: 0\n0: integer expression
+    # expected", then "LOG.md has 0" with a stray second 0 on the next line.
+    create_status_md
+    create_next_actions_md
+    printf '# TestProject: Agent Journal\n\nNo entries yet.\n' > "$TEST_TMPDIR/.ai/handoff/LOG.md"
+
+    run bash "$SCRIPTS_DIR/aahp-migrate-v2.sh" "$TEST_TMPDIR" </dev/null
+    [ "$status" -eq 0 ]
+    [[ "$output" != *"integer expression expected"* ]]
+    [[ "$output" == *"LOG.md has 0 entries. No rotation needed."* ]]
+}
+
+# --- It reports the manual steps; it does not perform them -------------------
+#
+# The header and README section 5 used to say this script "Splits LOG.md",
+# "Adds section markers" and adds a TTL column. It does none of the three: it
+# prints advice. These tests pin what it really does, so a future claim in
+# either place has an artifact to be checked against.
+
+@test "the manual steps are reported as TODO, and their files are left byte-identical" {
+    create_status_md          # no <!-- SECTION: --> markers
+    create_next_actions_md
+    {
+        printf '# TestProject: Agent Journal\n'
+        local i
+        for i in 01 02 03 04 05 06 07 08 09 10 11 12; do
+            printf '\n## [2025-06-%s] agent: entry %s\n\nbody\n' "$i" "$i"
+        done
+    } > "$TEST_TMPDIR/.ai/handoff/LOG.md"
+    printf '# Trust\n\n| Property | Status |\n|---|---|\n| build | verified |\n' > "$TEST_TMPDIR/.ai/handoff/TRUST.md"
+    local f
+    for f in STATUS.md LOG.md TRUST.md; do
+        cp "$TEST_TMPDIR/.ai/handoff/$f" "$TEST_TMPDIR/$f.before"
+    done
+
+    run bash "$SCRIPTS_DIR/aahp-migrate-v2.sh" "$TEST_TMPDIR" </dev/null
+    [ "$status" -eq 0 ]
+    for f in STATUS.md LOG.md TRUST.md; do
+        cmp -s "$TEST_TMPDIR/$f.before" "$TEST_TMPDIR/.ai/handoff/$f" || { echo "$f was modified"; false; }
+    done
+    [ ! -f "$TEST_TMPDIR/.ai/handoff/LOG-ARCHIVE.md" ]
+    [[ "$output" == *"LOG.md has 12 entries"* ]]
+    [[ "$output" == *"aahp archive"* ]]
+    # The summary keeps what was done apart from what was only recommended.
+    local changed todo
+    changed="$(printf '%s\n' "$output" | sed -n '/^Changed:/,/^Left for you/p')"
+    todo="$(printf '%s\n' "$output" | sed -n '/^Left for you/,/^Next steps:/p')"
+    [[ "$changed" == *"Generated MANIFEST.json"* ]]
+    [[ "$changed" != *"LOG.md"* ]]
+    [[ "$changed" != *"TTL"* ]]
+    [[ "$todo" == *"NOT changed"* ]]
+    [[ "$todo" == *"LOG.md has 12 entries"* ]]
+    [[ "$todo" == *"SECTION"* ]]
+    [[ "$todo" == *"TTL"* ]]
 }
 
 # ─── .aiignore handling ─────────────────────────────────────

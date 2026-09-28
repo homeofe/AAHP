@@ -2,6 +2,10 @@
   "version": 1,
   "entries": [
     {
+      "sha256": "ac4ec49dd181b4f50b0c9c9f99f2cfe18bb7e287d27a01555fcf7f7afb60e79c",
+      "title": "## [2026-07-18] claude-opus-4-8: Security hardening + doc-drift fixes (v3.6.1)"
+    },
+    {
       "sha256": "dae9c795617de74b3467dc9a68b6e26b0d6a055650a2954173f6a3c635aa6100",
       "title": "## [2026-07-18] claude-opus-4-8: Upstreaming release (aahp doctor + config-driven gates, v3.6.0)"
     },

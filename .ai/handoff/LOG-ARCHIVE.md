@@ -4,6 +4,24 @@
 
 ---
 
+## [2026-07-18] claude-opus-4-8: Security hardening + doc-drift fixes (v3.6.1)
+
+**Agent:** claude-opus-4-8
+**Phase:** fix
+**Branch:** fix/floorcmd-security-and-drift
+**Tasks:** anti-entropy audit follow-up (security + live drift bugs)
+
+### What was done
+
+- SECURITY: `check-claims.mjs` `floorCmd` now runs a repo-relative Node script via `execFileSync` (no shell), replacing `execSync` on an arbitrary config string. Closes a command-injection path from a PR-editable `aahp.config.json`. Schema + example updated; a path escaping the project root is rejected. New bats path-escape-rejection test.
+- Fixed live documentation drift found by the anti-entropy audit: README Section 4 canonical handoff-file list, Section 7.1 command table (+`doctor`), Section 8.3 task-status enum (+`cancelled`), removed the phantom `stale` bucket from `aahp status` (never in the schema), and stripped em dashes (U+2014) from the CONVENTIONS templates and CLAUDE.md.
+
+### Decisions
+
+- Scoped to the security fix + the four live drift bugs only. Deferred the broader anti-entropy strategy (constitution, ADR-log reframing, new deterministic gates, de-duplicating the 5x provenance scale, excising the rotted German runbook) to a separate initiative for maintainer review.
+
+---
+
 ## [2026-07-18] claude-opus-4-8: Upstreaming release (aahp doctor + config-driven gates, v3.6.0)
 
 **Agent:** claude-opus-4-8

@@ -174,7 +174,7 @@ console.log(fwd(got) === fwd('$TEST_TMPDIR/Programs/Git/bin/bash.exe') ? 'MATCH'
 
     echo '{ "name": "fx", "version": "1.0.0" }' > "$TEST_TMPDIR/package.json"
     cat > "$TEST_TMPDIR/aahp.config.json" <<'EOF'
-{ "generate": { "log": { "source": "CHANGELOG.md", "target": ".ai/handoff/LOG.md" } } }
+{ "generate": { "log": { "source": "CHANGELOG.md", "target": "docs/RELEASES.md" } } }
 EOF
     cat > "$TEST_TMPDIR/CHANGELOG.md" <<'EOF'
 # Changelog

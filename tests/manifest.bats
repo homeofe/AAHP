@@ -162,10 +162,22 @@ _detect_python() {
 }
 
 # ─── Task preservation on regeneration ───────────────────────
-# Note: aahp-manifest.sh uses node to read the existing MANIFEST.json for task
-# preservation. On some platforms (e.g. Windows Git Bash) the tmpdir paths may
-# not resolve correctly for node. We use grep-based checks and skip if tasks
-# were not preserved (indicating a path issue rather than a code bug).
+# These three used to `skip` exactly when the field was NOT preserved, on the
+# theory that node could not resolve the tmpdir path on Windows. That turned
+# the regression they exist for into a green skip on every platform. The path
+# is handed to node through MSYS argument conversion, so a platform that cannot
+# resolve it is a defect to fix, not a reason to pass.
+
+# Read one value out of MANIFEST.json with node, as JSON, so an assertion sees
+# the parsed value and its type rather than a substring of the text. The path
+# separator is "/" because handoff file names contain dots (files/STATUS.md/updated).
+_manifest_value() {
+    node -e '
+        const m = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
+        const v = process.argv[2].split("/").reduce((o, k) => (o == null ? o : o[k]), m);
+        process.stdout.write(JSON.stringify(v === undefined ? null : v));
+    ' "$TEST_TMPDIR/.ai/handoff/MANIFEST.json" "$1"
+}
 
 @test "preserves existing tasks field on regeneration" {
     create_status_md
@@ -176,17 +188,11 @@ _detect_python() {
     run bash "$SCRIPTS_DIR/aahp-manifest.sh" "$TEST_TMPDIR" --quiet
     [ "$status" -eq 0 ]
 
-    manifest_content=$(cat "$TEST_TMPDIR/.ai/handoff/MANIFEST.json")
-
-    # If node couldn't read the path (Windows tmpdir issue), tasks won't be preserved.
-    # Skip rather than fail in that case -it's a platform limitation, not a code bug.
-    if [[ "$manifest_content" != *'"tasks"'* ]]; then
-        skip "tasks not preserved (likely node cannot resolve tmpdir path on this platform)"
-    fi
-
-    [[ "$manifest_content" == *'"T-001"'* ]]
-    [[ "$manifest_content" == *'"T-002"'* ]]
-    [[ "$manifest_content" == *'"Implement feature X"'* ]]
+    run _manifest_value tasks
+    [ "$status" -eq 0 ]
+    [[ "$output" == *'"T-001"'* ]]
+    [[ "$output" == *'"T-002"'* ]]
+    [[ "$output" == *'"Implement feature X"'* ]]
 }
 
 @test "preserves next_task_id on regeneration" {
@@ -198,13 +204,10 @@ _detect_python() {
     run bash "$SCRIPTS_DIR/aahp-manifest.sh" "$TEST_TMPDIR" --quiet
     [ "$status" -eq 0 ]
 
-    manifest_content=$(cat "$TEST_TMPDIR/.ai/handoff/MANIFEST.json")
-
-    if [[ "$manifest_content" != *'"next_task_id"'* ]]; then
-        skip "next_task_id not preserved (likely node cannot resolve tmpdir path on this platform)"
-    fi
-
-    [[ "$manifest_content" == *'"next_task_id": 3'* ]]
+    # A number, not the string "3" (ADR-009).
+    run _manifest_value next_task_id
+    [ "$status" -eq 0 ]
+    [ "$output" = "3" ]
 }
 
 @test "preserves existing project name on regeneration" {
@@ -219,13 +222,9 @@ _detect_python() {
     run bash "$SCRIPTS_DIR/aahp-manifest.sh" "$TEST_TMPDIR" --quiet
     [ "$status" -eq 0 ]
 
-    manifest_content=$(cat "$TEST_TMPDIR/.ai/handoff/MANIFEST.json")
-
-    if [[ "$manifest_content" != *'"project"'* ]]; then
-        skip "project field missing (likely node cannot resolve tmpdir path on this platform)"
-    fi
-
-    [[ "$manifest_content" == *'"project": "TestProject"'* ]]
+    run _manifest_value project
+    [ "$status" -eq 0 ]
+    [ "$output" = '"TestProject"' ]
 }
 
 @test "derives project name from directory basename on first generation" {
@@ -338,19 +337,18 @@ _detect_python() {
     [[ "$manifest_content" != *'"project": "some-other-repo"'* ]]
 }
 
-@test "project name survives regeneration when node is unavailable" {
+@test "without node, regeneration refuses and leaves MANIFEST.json byte-identical" {
     create_status_md
     create_next_actions_md
     create_log_md
-    create_manifest_json
+    create_manifest_with_tasks
     git -C "$TEST_TMPDIR" remote add origin https://github.com/homeofe/aahp-consumer.git
+    cp "$TEST_TMPDIR/.ai/handoff/MANIFEST.json" "$TEST_TMPDIR/manifest.before"
 
-    # Reading the recorded name needs node to parse MANIFEST.json. Where node
-    # is missing (a stripped hook PATH, a slim CI image) that whole block is
-    # skipped SILENTLY - not even the "could not read" warning prints, because
-    # the warning lives inside the `command -v node` guard. Before the remote
-    # fallback existed, the name then became the directory basename with no
-    # diagnostic at all. git alone is enough to get it right.
+    # Where node is missing (a stripped hook PATH, a slim CI image) the old
+    # generator skipped reading the existing manifest SILENTLY and rewrote it
+    # without tasks, next_task_id, cross_repo_ref and the recorded project name,
+    # exit 0. Node is now a hard requirement: no node means no write at all.
     # Simulate a missing node through BASH_ENV instead of deleting PATH entries.
     # On many Linux systems node, git, bash, sed, and coreutils all live in
     # /usr/bin, so removing every directory that contains node also removes the
@@ -374,16 +372,327 @@ EOF
     run env BASH_ENV="$TEST_TMPDIR/no-node.bash" bash -c 'exit 7'
     [ "$status" -eq 7 ]
 
-    dir_name="$(basename "$TEST_TMPDIR")"
     run env BASH_ENV="$TEST_TMPDIR/no-node.bash" bash "$SCRIPTS_DIR/aahp-manifest.sh" "$TEST_TMPDIR" --quiet
-    [ "$status" -eq 0 ]
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Node.js was not found"* ]]
+    [[ "$output" == *"nothing was written"* ]]
+    # --force cannot talk it into writing either: there is nothing to write with.
+    run env BASH_ENV="$TEST_TMPDIR/no-node.bash" bash "$SCRIPTS_DIR/aahp-manifest.sh" "$TEST_TMPDIR" --quiet --force
+    [ "$status" -eq 1 ]
+    cmp "$TEST_TMPDIR/manifest.before" "$TEST_TMPDIR/.ai/handoff/MANIFEST.json"
+}
 
-    # Read the value back explicitly so a regression reports the name that was
-    # actually written instead of only that a glob did not match.
-    run sed -n 's/.*"project": "\([^"]*\)".*/\1/p' "$TEST_TMPDIR/.ai/handoff/MANIFEST.json"
+# --- Refuse to drop data it cannot carry over (R5) ---
+
+@test "an unparseable MANIFEST.json is not overwritten without --force" {
+    create_status_md
+    create_next_actions_md
+    printf '{ "tasks": { "T-001": { "title": "keep me", ' > "$TEST_TMPDIR/.ai/handoff/MANIFEST.json"
+    cp "$TEST_TMPDIR/.ai/handoff/MANIFEST.json" "$TEST_TMPDIR/manifest.before"
+
+    # The old generator printed a warning on stderr, dropped tasks and the
+    # rest, and exited 0 - the half-written task registry was simply gone.
+    run bash "$SCRIPTS_DIR/aahp-manifest.sh" "$TEST_TMPDIR" --quiet
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"refusing to overwrite"* ]]
+    [[ "$output" == *"not valid JSON"* ]]
+    cmp "$TEST_TMPDIR/manifest.before" "$TEST_TMPDIR/.ai/handoff/MANIFEST.json"
+
+    # An explicit --force regenerates, says what it dropped, and writes JSON.
+    run bash "$SCRIPTS_DIR/aahp-manifest.sh" "$TEST_TMPDIR" --quiet --force
     [ "$status" -eq 0 ]
-    [ "$output" = "aahp-consumer" ]
-    [ "$output" != "$dir_name" ]
+    [[ "$output" == *"WARNING: --force"* ]]
+    node -e 'JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"))' "$TEST_TMPDIR/.ai/handoff/MANIFEST.json"
+}
+
+@test "a field that cannot be carried over blocks regeneration without --force" {
+    create_status_md
+    create_manifest_json
+    local manifest="$TEST_TMPDIR/.ai/handoff/MANIFEST.json"
+
+    # A next_task_id that is not a whole number used to be dropped silently.
+    node -e '
+        const fs = require("fs"); const p = process.argv[1];
+        const m = JSON.parse(fs.readFileSync(p, "utf8"));
+        m.next_task_id = "seven"; m.handoff_notes = "agent-added";
+        fs.writeFileSync(p, JSON.stringify(m, null, 2));
+    ' "$manifest"
+    cp "$manifest" "$TEST_TMPDIR/manifest.before"
+
+    run bash "$SCRIPTS_DIR/aahp-manifest.sh" "$TEST_TMPDIR" --quiet
+    [ "$status" -eq 1 ]
+    [[ "$output" == *'next_task_id "seven" is not a whole number'* ]]
+    [[ "$output" == *"handoff_notes"* ]]
+    cmp "$TEST_TMPDIR/manifest.before" "$manifest"
+
+    run bash "$SCRIPTS_DIR/aahp-manifest.sh" "$TEST_TMPDIR" --quiet --force
+    [ "$status" -eq 0 ]
+    run _manifest_value next_task_id
+    [ "$output" = "null" ]
+    run _manifest_value handoff_notes
+    [ "$output" = "null" ]
+    # The recorded project name is still carried: only what could not be is dropped.
+    run _manifest_value project
+    [ "$output" = '"TestProject"' ]
+}
+
+# --- The document is built by JSON.stringify, not by heredoc (R3/R10) ---
+
+@test "hostile input still yields valid JSON and valid UTF-8, and regenerates cleanly" {
+    # Each of these wrote an unparseable or mis-encoded MANIFEST.json with exit 0:
+    # a TAB in the first content line, a quote and a backslash in --agent, and a
+    # multi-byte character straddling the 150-character summary cut and the
+    # 500-character quick_context cut (both were byte-based `cut -c`).
+    local pad118 pad499
+    pad118="$(printf 'a%.0s' $(seq 1 118))"
+    pad499="$(printf 'b%.0s' $(seq 1 499))"
+    printf '# Status\n\nBuild\tis "green" and C:\\path\\x %s\xc3\xbc\xc3\xbc\xc3\xbc tail\n' "$pad118" \
+        > "$TEST_TMPDIR/.ai/handoff/STATUS.md"
+    create_next_actions_md
+
+    local run_no
+    for run_no in 1 2; do
+        run bash "$SCRIPTS_DIR/aahp-manifest.sh" "$TEST_TMPDIR" --quiet \
+            --agent 'agent "quoted" \ back' --context "${pad499}$(printf '\xc3\xa9\xc3\xa9')"
+        [ "$status" -eq 0 ]
+        run node -e '
+            const buf = require("fs").readFileSync(process.argv[1]);
+            const text = new TextDecoder("utf-8", { fatal: true }).decode(buf);
+            const m = JSON.parse(text);
+            const cps = (s) => Array.from(s).length;
+            if (m.last_session.agent !== "agent \"quoted\" \\ back") throw new Error("agent: " + m.last_session.agent);
+            const s = m.files["STATUS.md"].summary;
+            if (/\t/.test(s)) throw new Error("tab survived in summary");
+            if (!s.includes("\"green\"") || !s.includes("C:\\path")) throw new Error("summary: " + s);
+            if (cps(s) > 200) throw new Error("summary too long: " + cps(s));
+            if (cps(m.quick_context) > 500) throw new Error("quick_context too long: " + cps(m.quick_context));
+            console.log("VALID");
+        ' "$TEST_TMPDIR/.ai/handoff/MANIFEST.json"
+        [ "$status" -eq 0 ]
+        [ "$output" = "VALID" ]
+    done
+}
+
+@test "quick_context is escaped once, not twice" {
+    create_next_actions_md
+    printf '# Status\n\nThe "fast" path now handles a C:\\temp path correctly.\n' > "$TEST_TMPDIR/.ai/handoff/STATUS.md"
+
+    run bash "$SCRIPTS_DIR/aahp-manifest.sh" "$TEST_TMPDIR" --quiet
+    [ "$status" -eq 0 ]
+    run node -e '
+        const m = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
+        process.stdout.write(m.quick_context);
+    ' "$TEST_TMPDIR/.ai/handoff/MANIFEST.json"
+    [[ "$output" == 'The "fast" path now handles a C:\temp path correctly.'* ]]
+    [[ "$output" != *'\"'* ]]
+
+    run bash "$SCRIPTS_DIR/aahp-manifest.sh" "$TEST_TMPDIR" --quiet --context 'say "hi" \ now'
+    [ "$status" -eq 0 ]
+    run _manifest_value quick_context
+    [ "$output" = '"say \"hi\" \\ now"' ]
+}
+
+@test "--duration must be a whole number of minutes" {
+    create_status_md
+    run bash "$SCRIPTS_DIR/aahp-manifest.sh" "$TEST_TMPDIR" --quiet --duration soon
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Invalid duration"* ]]
+    [ ! -f "$TEST_TMPDIR/.ai/handoff/MANIFEST.json" ]
+
+    run bash "$SCRIPTS_DIR/aahp-manifest.sh" "$TEST_TMPDIR" --quiet --duration 45
+    [ "$status" -eq 0 ]
+    run _manifest_value last_session/duration_minutes
+    [ "$output" = "45" ]
+}
+
+# --- A failure mid-generation never writes (R4) ---
+
+@test "a checksum that cannot be computed aborts and leaves MANIFEST.json untouched" {
+    create_status_md
+    create_next_actions_md
+    run bash "$SCRIPTS_DIR/aahp-manifest.sh" "$TEST_TMPDIR" --quiet
+    [ "$status" -eq 0 ]
+    cp "$TEST_TMPDIR/.ai/handoff/MANIFEST.json" "$TEST_TMPDIR/manifest.before"
+
+    # The old path ran aahp_checksum inside $(...) and carried on, so an empty
+    # digest became `"checksum": ""` and the run still printed "checksums
+    # current" with exit 0. Simulate a hash that yields nothing.
+    cat > "$TEST_TMPDIR/empty-digest.cjs" <<'CJS'
+const crypto = require('crypto');
+const real = crypto.createHash;
+crypto.createHash = function (...args) {
+  const hash = real.apply(this, args);
+  hash.digest = () => '';
+  return hash;
+};
+CJS
+    echo "changed" >> "$TEST_TMPDIR/.ai/handoff/STATUS.md"
+    NODE_OPTIONS="--require $TEST_TMPDIR/empty-digest.cjs" run bash "$SCRIPTS_DIR/aahp-manifest.sh" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"could not compute a SHA-256 checksum for STATUS.md"* ]]
+    [[ "$output" != *"checksums current"* ]]
+    cmp "$TEST_TMPDIR/manifest.before" "$TEST_TMPDIR/.ai/handoff/MANIFEST.json"
+}
+
+@test "generator checksums agree with aahp_checksum on a CRLF file" {
+    # CONSTITUTION rule 4: whole-file SHA-256 with CR stripped. The generator now
+    # hashes in node and Layer 1 hashes with aahp_checksum; the two must agree.
+    printf '# Status\r\n\r\nLine one with CRLF.\r\n' > "$TEST_TMPDIR/.ai/handoff/STATUS.md"
+    run bash "$SCRIPTS_DIR/aahp-manifest.sh" "$TEST_TMPDIR" --quiet
+    [ "$status" -eq 0 ]
+    expected="$(bash -c "source '$SCRIPTS_DIR/_aahp-lib.sh'; aahp_checksum '$TEST_TMPDIR/.ai/handoff/STATUS.md'")"
+    run _manifest_value files/STATUS.md
+    [[ "$output" == *"\"checksum\":\"$expected\""* ]]
+}
+
+# --- files.*.updated survives a checkout ---
+
+@test "updated keeps the recorded date while the content is unchanged" {
+    create_status_md
+    create_next_actions_md
+    touch -t 200101010000 "$TEST_TMPDIR/.ai/handoff/STATUS.md"
+    run bash "$SCRIPTS_DIR/aahp-manifest.sh" "$TEST_TMPDIR" --quiet
+    [ "$status" -eq 0 ]
+    run _manifest_value files/STATUS.md/updated
+    first="$output"
+    [[ "$first" == '"2000-12-3'* || "$first" == '"2001-01-01'* ]]
+
+    # A fresh checkout gives every file a new mtime with identical bytes. That
+    # used to re-date every unchanged file on the next regeneration.
+    touch -t 203001010000 "$TEST_TMPDIR/.ai/handoff/STATUS.md"
+    run bash "$SCRIPTS_DIR/aahp-manifest.sh" "$TEST_TMPDIR" --quiet
+    [ "$status" -eq 0 ]
+    run _manifest_value files/STATUS.md/updated
+    [ "$output" = "$first" ]
+
+    # A real change takes the file's own modification time.
+    echo "new line" >> "$TEST_TMPDIR/.ai/handoff/STATUS.md"
+    run bash "$SCRIPTS_DIR/aahp-manifest.sh" "$TEST_TMPDIR" --quiet
+    [ "$status" -eq 0 ]
+    run _manifest_value files/STATUS.md/updated
+    [ "$output" != "$first" ]
+    [[ "$output" != '"2030-'* ]]
+}
+
+# --- Summaries and token budget (D5) ---
+
+@test "summaries skip tables, JSON punctuation, bookkeeping labels and comments" {
+    local h="$TEST_TMPDIR/.ai/handoff"
+    cat > "$h/TRUST.md" <<'EOF'
+# Trust Register
+
+> Tracks verification status.
+
+## Confidence Levels
+
+| Level | Meaning |
+|-------|---------|
+| verified | An agent ran it |
+
+Each claim here carries a provenance token. More text follows.
+EOF
+    cat > "$h/STATUS.md" <<'EOF'
+# Status
+
+<!--
+  generated block, not content
+-->
+Last updated: 2026-09-28
+**Agent:** codex
+**Phase:** implementation
+
+Auth service deployed; CORS fix is next.
+EOF
+    cat > "$h/LOG.md" <<'EOF'
+# Journal
+
+> Append-only.
+
+## [2026-09-28] codex: auth middleware landed
+
+**Agent:** codex
+
+- did things
+EOF
+    cat > "$h/DASHBOARD.md" <<'EOF'
+# Dashboard
+
+| Service | State |
+|---------|-------|
+| api | green |
+EOF
+    printf '{\n  "version": 1,\n  "entries": []\n}\n' > "$h/pii-allowlist.json"
+
+    run bash "$SCRIPTS_DIR/aahp-manifest.sh" "$TEST_TMPDIR" --quiet
+    [ "$status" -eq 0 ]
+    run _manifest_value files/TRUST.md/summary
+    [ "$output" = '"Each claim here carries a provenance token."' ]
+    run _manifest_value files/STATUS.md/summary
+    [ "$output" = '"Auth service deployed; CORS fix is next."' ]
+    run _manifest_value files/LOG.md/summary
+    [ "$output" = '"Latest entry: [2026-09-28] codex: auth middleware landed"' ]
+    # A file that is only a table still gets a summary, not "(no summary available)".
+    run _manifest_value files/DASHBOARD.md/summary
+    [ "$output" = '"Table with columns: Service, State"' ]
+    run _manifest_value files/pii-allowlist.json/summary
+    [ "$output" = '"PII allowlist: 0 entries."' ]
+}
+
+@test "manifest_only is the estimate of the generated file itself" {
+    create_status_md
+    create_next_actions_md
+    create_log_md
+    create_manifest_with_tasks
+
+    run bash "$SCRIPTS_DIR/aahp-manifest.sh" "$TEST_TMPDIR" --quiet
+    [ "$status" -eq 0 ]
+    # Same estimator the generator documents: max(1.3 x words, UTF-8 bytes / 4),
+    # CR stripped. It used to be the constant 85 whatever the file held.
+    run node -e '
+        const buf = require("fs").readFileSync(process.argv[1]);
+        const lf = Buffer.from(buf.toString("latin1").replace(/\r/g, ""), "latin1");
+        const words = (lf.toString("utf8").match(/\S+/g) || []).length;
+        const est = Math.max(Math.ceil(words * 13 / 10), Math.ceil(lf.length / 4));
+        const b = JSON.parse(buf.toString("utf8")).token_budget;
+        if (b.manifest_only !== est) throw new Error("manifest_only " + b.manifest_only + " != estimate " + est);
+        if (!(b.manifest_plus_core > b.manifest_only && b.full_read >= b.manifest_plus_core)) throw new Error(JSON.stringify(b));
+        console.log("OK " + est);
+    ' "$TEST_TMPDIR/.ai/handoff/MANIFEST.json"
+    [ "$status" -eq 0 ]
+    [[ "$output" == "OK "* ]]
+    [ "$output" != "OK 85" ]
+}
+
+# --- The shipped template round-trips through the schema (D2) ---
+
+@test "aahp init then aahp manifest produces a schema-valid MANIFEST.json" {
+    # templates/MANIFEST.json shipped example tasks with "created": "[ISO-8601]".
+    # The generator carries tasks over verbatim, so every fresh adopter got a
+    # manifest that fails the schema (format date-time) while verify and doctor
+    # stayed green.
+    local entry
+    entry="$(cd "$AAHP_ROOT" && node -e '
+try {
+  const path = require("path");
+  const pkg = require("ajv-cli/package.json");
+  const dir = path.dirname(require.resolve("ajv-cli/package.json"));
+  const bin = typeof pkg.bin === "string" ? pkg.bin : pkg.bin.ajv;
+  process.stdout.write(path.resolve(dir, bin));
+} catch (e) {}
+' 2>/dev/null)"
+    # Not a skip: ajv-cli is a pinned devDependency, so a missing one is a broken
+    # install, and skipping here would hide exactly the regression this guards.
+    [ -n "$entry" ] || { echo "ajv-cli is not installed; run npm ci"; false; }
+
+    run node "$AAHP_ROOT/bin/aahp.js" init "$TEST_TMPDIR"
+    [ "$status" -eq 0 ]
+    run bash "$SCRIPTS_DIR/aahp-manifest.sh" "$TEST_TMPDIR" --quiet
+    [ "$status" -eq 0 ]
+    run node "$entry" validate --spec=draft2020 -c ajv-formats \
+        -s "$AAHP_ROOT/schema/aahp-manifest.schema.json" \
+        -d "$TEST_TMPDIR/.ai/handoff/MANIFEST.json"
+    [ "$status" -eq 0 ] || { echo "$output"; false; }
+    [[ "$output" == *"valid"* ]]
 }
 
 # ─── File indexing ───────────────────────────────────────────

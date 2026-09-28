@@ -44,42 +44,18 @@ aahp_checksum() {
     echo "sha256:$hash"
 }
 
-# Get file modification time in ISO 8601 UTC
-aahp_file_mtime() {
-    local filepath="$1"
-    date -r "$filepath" -u +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null ||
-        stat -c '%y' "$filepath" 2>/dev/null | head -c 19
-}
-
 # Get line count
 aahp_line_count() {
     wc -l < "$1" | tr -d ' '
 }
 
-# Extract a one-line summary from a handoff file (first non-header, non-empty line)
-aahp_auto_summary() {
-    local filepath="$1"
-    local summary
-    # Look past title/blockquote/header chrome (handoff files often start with
-    # # headings and > rules). First 40 content lines is enough for a one-liner.
-    summary=$(head -40 "$filepath" \
-        | tr -d '\r' \
-        | grep -v '^#' | grep -v '^>' | grep -v '^---' | grep -v '^$' \
-        | grep -v '^<!--' | grep -v '^|[-:| ]*$' \
-        | head -1 | cut -c1-150 || true)
-    [ -z "$summary" ] && summary="(no summary available)"
-    # Escape double quotes and backslashes for JSON safety
-    summary=$(echo "$summary" | sed 's/\\/\\\\/g; s/"/\\"/g')
-    echo "$summary"
-}
-
-# Estimate token count from a file (rough: word_count * 1.3)
-aahp_estimate_tokens() {
-    local filepath="$1"
-    local words
-    words=$(wc -w < "$filepath" | tr -d ' ')
-    echo $(( (words * 13 + 9) / 10 ))
-}
+# The per-file MANIFEST helpers that used to live here (aahp_file_mtime,
+# aahp_auto_summary, aahp_estimate_tokens, aahp_file_entry_json) are gone.
+# Their only consumer was the old heredoc generator, and between them they
+# built JSON by string concatenation: a failed checksum became
+# `"checksum": ""` with exit 0, a TAB or a quote produced invalid JSON, and a
+# byte-based `cut` split multi-byte characters. scripts/aahp-manifest.sh now
+# builds the whole document in one node process.
 
 # Detect a working Python interpreter (python3 preferred, then python).
 # The Windows Store python3 alias passes `command -v` but does not run, so we
@@ -115,7 +91,7 @@ aahp_manifest_field() {
     if [ -n "$py" ]; then
         "$py" -c "
 import json, sys
-m = json.load(open(sys.argv[1]))
+m = json.load(open(sys.argv[1], encoding='utf-8'))
 cur = m
 for k in sys.argv[2].split('.'):
     if isinstance(cur, dict) and k in cur:
@@ -619,26 +595,4 @@ aahp_trust_census() {
         /^[ \t]*$/ { status_col = 0; expires_col = 0 }
         END { print decidable + 0, candidate + 0 }
     ' "$trust_file"
-}
-
-# Generate a JSON file entry block for MANIFEST.json
-# Outputs raw JSON (no trailing comma -caller handles commas)
-aahp_file_entry_json() {
-    local file="$1"
-    local filepath="$2"
-    local checksum updated lines summary
-
-    checksum=$(aahp_checksum "$filepath")
-    updated=$(aahp_file_mtime "$filepath")
-    lines=$(aahp_line_count "$filepath")
-    summary=$(aahp_auto_summary "$filepath")
-
-    cat <<ENTRY
-    "$file": {
-      "checksum": "$checksum",
-      "updated": "$updated",
-      "lines": $lines,
-      "summary": "$summary"
-    }
-ENTRY
 }

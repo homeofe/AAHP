@@ -7,9 +7,17 @@
 //   1. LOG release-journal generator (config.generate.log): renders a Markdown
 //      release table from CHANGELOG.md into a target file, using the SINGLE
 //      grammar in changelog-grammar.mjs (so generator and validator cannot
-//      diverge). Opt-in on purpose: AAHP's own .ai/handoff/LOG.md is an
-//      append-only agent journal, NOT a release journal, so AAHP does not
+//      diverge). Opt-in on purpose: .ai/handoff/LOG.md is the append-only agent
+//      journal, NOT a release journal (README ADR-004), so AAHP does not
 //      configure log generation and its journal is left untouched.
+//
+//      The target is REQUIRED and may never be the agent journal. It used to
+//      default to .ai/handoff/LOG.md, and aahp.config.example.json pointed it
+//      there too, so an adopter who copied the example had every session entry
+//      replaced by a release table on the first handoff-refresh (writeFileSync,
+//      no merge). resolveLogTarget() now refuses LOG.md, LOG-ARCHIVE.md and
+//      LOG-ARCHIVE.index.json in both modes, and an unset target, before any
+//      file is read or written.
 //   2. NEXT_ACTIONS current-version freshness gate: the hand-curated backlog's
 //      stated "Current version: **vX.Y.Z**" must equal package.json. This is the
 //      ungated hand-doc drift that lets a backlog sit on an old version while the
@@ -29,15 +37,15 @@
 //
 // Config (aahp.config.json):
 //   "generate": {
-//     "log": { "source": "CHANGELOG.md", "target": ".ai/handoff/LOG.md",
+//     "log": { "source": "CHANGELOG.md", "target": "docs/RELEASES.md",
 //              "title": "My Project: Release Journal" },
 //     "freshness": { "file": ".ai/handoff/NEXT_ACTIONS.md" }
 //   }
 
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { basename, dirname, join } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { resolveRoot, loadPkg, loadConfig, resolveBash, toBashPath } from "./aahp-config.mjs";
 import { parseReleases } from "./changelog-grammar.mjs";
 
@@ -69,6 +77,59 @@ try {
 
 const gen = config.generate || {};
 const norm = (s) => s.replace(/\r/g, ""); // CRLF-agnostic (Windows working tree)
+
+// --- where the release journal may be written ---------------------------------
+
+// The agent journal and its archive. Overwriting any of them destroys session
+// history that exists nowhere else (README ADR-004 and section 2.9).
+const REFUSED_TARGETS = [".ai/handoff/LOG.md", ".ai/handoff/LOG-ARCHIVE.md", ".ai/handoff/LOG-ARCHIVE.index.json"];
+
+// Same file? Compared case-insensitively on the resolved path (Windows and
+// macOS default to case-insensitive filesystems, so "log.md" IS "LOG.md"
+// there), and through realpath when both exist, so a symlink or a directory
+// alias cannot smuggle the journal past the check.
+function sameFile(a, b) {
+  const key = (p) => p.replace(/\\/g, "/").toLowerCase();
+  if (key(a) === key(b)) return true;
+  try {
+    return realpathSync(a) === realpathSync(b);
+  } catch {
+    return false;
+  }
+}
+
+// Returns { rel, abs } for a permitted target, or { error } for a refused one.
+function resolveLogTarget(logCfg) {
+  const rel = logCfg.target;
+  if (typeof rel !== "string" || rel.trim() === "") {
+    return {
+      error:
+        "generate.log.target is not set. It used to default to .ai/handoff/LOG.md, the append-only " +
+        "agent journal, which this generator must never overwrite (README ADR-004). Set " +
+        'generate.log.target to a separate file, for example "docs/RELEASES.md".',
+    };
+  }
+  const abs = resolve(root, rel);
+  const hit = REFUSED_TARGETS.find((r) => sameFile(resolve(root, r), abs));
+  if (hit) {
+    return {
+      error:
+        `generate.log.target "${rel}" is ${hit}, part of the append-only agent journal, and this ` +
+        "generator overwrites its target, so it refuses to write there (README ADR-004). Point " +
+        'generate.log.target at a separate file, for example "docs/RELEASES.md".',
+    };
+  }
+  return { rel, abs };
+}
+
+let logTarget = null;
+if (gen.log) {
+  logTarget = resolveLogTarget(gen.log);
+  if (logTarget.error) {
+    console.error(`  handoff generator: ${logTarget.error}`);
+    process.exit(1);
+  }
+}
 
 // --- render the LOG release journal from CHANGELOG (if configured) ----------
 
@@ -116,7 +177,7 @@ if (isCheck) {
   const problems = [];
 
   if (gen.log) {
-    const target = join(root, gen.log.target || ".ai/handoff/LOG.md");
+    const target = logTarget.abs;
     let expected;
     try {
       expected = renderLog(gen.log);
@@ -126,7 +187,7 @@ if (isCheck) {
     }
     const current = existsSync(target) ? readFileSync(target, "utf8") : "";
     if (norm(current) !== norm(expected)) {
-      problems.push(`${gen.log.target || ".ai/handoff/LOG.md"} is stale - run the handoff-refresh step to regenerate it from CHANGELOG.md.`);
+      problems.push(`${logTarget.rel} is stale - run the handoff-refresh step to regenerate it from CHANGELOG.md.`);
     }
   }
 
@@ -143,7 +204,7 @@ if (isCheck) {
   }
 
   const parts = [];
-  parts.push(gen.log ? "LOG.md in sync with CHANGELOG.md" : "no LOG generation configured");
+  parts.push(gen.log ? `${logTarget.rel} in sync with ${gen.log.source || "CHANGELOG.md"}` : "no LOG generation configured");
   parts.push(
     fresh.status === "pass"
       ? "NEXT_ACTIONS current-version matches package.json"
@@ -155,7 +216,7 @@ if (isCheck) {
     console.log("Handoff generator: no generate.log configured; nothing to write.");
     process.exit(0);
   }
-  const target = join(root, gen.log.target || ".ai/handoff/LOG.md");
+  const target = logTarget.abs;
   let content;
   try {
     content = renderLog(gen.log);
@@ -163,8 +224,18 @@ if (isCheck) {
     console.error(`  handoff generator: ${err.message}`);
     process.exit(1);
   }
-  writeFileSync(target, content);
-  // Regenerate MANIFEST.json so its checksums match the file we just wrote.
+  try {
+    // The target is now a separate file (docs/RELEASES.md in the example), so
+    // its directory may not exist yet.
+    mkdirSync(dirname(target), { recursive: true });
+    writeFileSync(target, content);
+  } catch (err) {
+    console.error(`  handoff generator: could not write ${logTarget.rel}: ${err.message}`);
+    process.exit(1);
+  }
+  // Regenerate MANIFEST.json so its checksums match the file we just wrote
+  // (unchanged behaviour: it runs whatever the target, and a target outside
+  // .ai/handoff/ is simply not indexed).
   // Delegate to the canonical writer (sibling script), overridable via AAHP_BASH.
   //
   // The interpreter and both path arguments go through the helpers rather than
@@ -189,11 +260,11 @@ if (isCheck) {
     );
   } catch (err) {
     console.error(
-      `\n  ${gen.log.target || ".ai/handoff/LOG.md"} was written, but MANIFEST.json regen failed:\n` +
+      `\n  ${logTarget.rel} was written, but MANIFEST.json regen failed:\n` +
         `  ${err.message}\n` +
         `  Run manually: aahp manifest . --quiet\n`,
     );
     process.exit(1);
   }
-  console.log(`handoff-refresh OK: regenerated ${gen.log.target || ".ai/handoff/LOG.md"} + MANIFEST.json.`);
+  console.log(`handoff-refresh OK: regenerated ${logTarget.rel} + MANIFEST.json.`);
 }

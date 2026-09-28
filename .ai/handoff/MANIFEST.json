@@ -3,42 +3,42 @@
   "project": "AAHP",
   "last_session": {
     "agent": "claude-opus-5.5",
-    "session_id": "cli-1790555070",
-    "timestamp": "2026-09-28T00:24:30Z",
-    "commit": "1e3fd4a",
+    "session_id": "cli-1790569102",
+    "timestamp": "2026-09-28T04:18:22Z",
+    "commit": "8b8de3c",
     "phase": "implementation",
     "duration_minutes": 0
   },
   "files": {
     "STATUS.md": {
-      "checksum": "sha256:bf8ab74ae1a58d02c118189e13cdfe50b3614d3658c0a6112c50fd3037f417ca",
-      "updated": "2026-09-28T00:24:28Z",
-      "lines": 128,
-      "summary": "Working state: audit fix programme in progress; this change is the manifest, lint and CLI workstreams (`fix/manifest-lint-cli`)"
+      "checksum": "sha256:3cd8b6cf5139a904d8a321ae59d729f54cb6da15d785528cab92bc4302a5d402",
+      "updated": "2026-09-28T04:18:21Z",
+      "lines": 126,
+      "summary": "Working state: audit fix programme in progress; this change is the verify gate semantics (`fix/verify-gate-semantics`)"
     },
     "NEXT_ACTIONS.md": {
-      "checksum": "sha256:452d540350d32568687544bf698cde206b58c10349b565b9cb91cb6a6914239c",
-      "updated": "2026-09-28T00:21:40Z",
+      "checksum": "sha256:913723c37a4a7d57b1ec3bc43b01d46f661630d5e16b8be5937fc6ca6b7b3297",
+      "updated": "2026-09-28T04:10:52Z",
       "lines": 97,
-      "summary": "The manifest generator can no longer write invalid JSON or drop data silently; lint scans bytes as text and covers every handoff file."
+      "summary": "TRUST rows can be check-backed and are re-proven on every run; dated rows get a 14-day grace period before blocking."
     },
     "LOG.md": {
-      "checksum": "sha256:b041fb550b7b4c685d45e6c4e9720cf091117062249dcf815fb4f0e4440037b1",
-      "updated": "2026-09-28T00:21:41Z",
-      "lines": 294,
-      "summary": "Latest entry: [2026-09-28] claude-opus-5.5: manifest, lint and CLI (audit fix programme, 3 of 8)"
+      "checksum": "sha256:93377773fc9f85272e41c026e39f2717f06f75db9ddffd84bc4a1e34ed9c4bd8",
+      "updated": "2026-09-28T04:18:21Z",
+      "lines": 306,
+      "summary": "Latest entry: [2026-09-28] claude-opus-5.5: verify gate semantics (audit fix programme, 5 of 8)"
     },
     "LOG-ARCHIVE.md": {
-      "checksum": "sha256:540f7557dd556953ef6716171178aae0b1d099c7c6998a24a5ed3261ba30ae85",
-      "updated": "2026-09-28T00:21:41Z",
-      "lines": 327,
-      "summary": "Newest archived entry: [2026-07-18] claude-opus-4-8: Security hardening + doc-drift fixes (v3.6.1)"
+      "checksum": "sha256:d0fca2dd88539ddd47249ee340c65f2d76cd784c5ba5f77e7be42298b5b5d5ea",
+      "updated": "2026-09-28T04:10:53Z",
+      "lines": 348,
+      "summary": "Newest archived entry: [2026-07-18] claude-opus-4-8: Anti-entropy initiative (gates + constitution + ADR log, v3.7.0)"
     },
     "LOG-ARCHIVE.index.json": {
-      "checksum": "sha256:d5e4d23e122007b4272eb8e93fedd40acf2b564d52fa4c46ebce5762bbd16b68",
-      "updated": "2026-09-28T00:21:41Z",
-      "lines": 57,
-      "summary": "LOG archive index: 13 entries."
+      "checksum": "sha256:e1f28d6ce6fcfd26217e34eee58eb737e4e8d9478daa722457afe1c498676fdc",
+      "updated": "2026-09-28T04:10:53Z",
+      "lines": 61,
+      "summary": "LOG archive index: 14 entries."
     },
     "DASHBOARD.md": {
       "checksum": "sha256:e96e392db8dab2e9719e542dfa2a10c240d0be16ac6721298c460a22985cbdea",
@@ -47,9 +47,9 @@
       "summary": "Total: 48 tests, 48 passing"
     },
     "TRUST.md": {
-      "checksum": "sha256:d3b79c9fee9268c855731d1462d4b05b771b2642defbee7f21dbfbdc59f22ccf",
-      "updated": "2026-09-28T00:06:33Z",
-      "lines": 110,
+      "checksum": "sha256:9b984fb6b6afdd229b0f35ba8e1866fe8631e3f33b75ad5aa45a38c5ebdc8d8f",
+      "updated": "2026-09-28T04:09:56Z",
+      "lines": 117,
       "summary": "Each table below carries a `Provenance` column recording HOW a claim was checked, orthogonal to Status."
     },
     "CONVENTIONS.md": {
@@ -77,11 +77,11 @@
       "summary": "PII allowlist: 0 entries."
     }
   },
-  "quick_context": "Audit fix programme 2026-09-28, workstreams 3 of 8: manifest generator, lint and CLI. Node-built atomic MANIFEST.json, binary-safe lint covering every handoff file, doctor validates the full manifest schema, CLI signal exit fixed. v3.12.0 released; no release until the owner decides.",
+  "quick_context": "Audit fix programme 2026-09-28, workstream 5 of 8: verify gate semantics. Check-backed TRUST claims re-proven every run, 14-day grace for dated rows, content-based Layer 2 exemption for dev-only lockfile updates, Layer 3 OK after a committed handoff. v3.12.0 released; no release until the owner decides.",
   "token_budget": {
-    "manifest_only": 1430,
-    "manifest_plus_core": 4190,
-    "full_read": 21122
+    "manifest_only": 1433,
+    "manifest_plus_core": 4241,
+    "full_read": 21642
   },
   "next_task_id": 18,
   "tasks": {

@@ -128,14 +128,15 @@ git add .ai/handoff/ && git commit -m "chore: init AAHP handoff files"
 aahp verify . --level prepush
 ```
 
-A first run straight after the commit above passes (exit 0) with Layers 1 and 2
-OK and two warnings. Layer 3 warns because the manifest was generated before the
-commit that contains it, so `last_session.commit` is one commit behind `HEAD`;
-that clears at the next `/handoff`. Layer 4 warns that `TRUST.md` holds rows but
-none it could classify as a dated `verified` entry, so TTL was NOT evaluated: the
-template's example rows carry no `Status` and `Expires` columns. That warning
-stays until your `TRUST.md` has such rows. Both layers warn; neither fails
-(ADR-007).
+A first run straight after the commit above reports Layers 1, 2 and 3 OK. Layer 3
+is OK because the manifest recorded the commit before the one that contains it,
+and everything since that commit changed only `.ai/handoff/` (a manifest can never
+record its own commit, so that is the rule, see Section 2.8). In a repository
+with no commit at all before `aahp manifest`, `last_session.commit` is unset and
+Layer 3 warns until the next regeneration. Layer 4 warns that TTL was NOT
+evaluated: every row of the template `TRUST.md` is `untested` or `assumed`, so
+there is nothing to judge until you verify one (Section 2.5). Layers 3 and 4 warn;
+they do not fail (ADR-007), unless you opt in to `trustTtl.enforce`.
 
 **5. Install the hooks and the CI check.**
 
@@ -444,17 +445,79 @@ In v1, a `(Verified)` status lives forever. In v2, trust has a TTL:
 ```
 
 **Rules:**
-- Expired `verified` automatically downgrades to `assumed`
-- High-churn properties (build, tests) get short TTLs (1–3 days)
+- An expired `verified` row counts as `assumed` when you read it. Nothing rewrites
+  the file for you: `aahp verify` is verify-only, so Layer 4 REPORTS the expired
+  row on every non-precommit run, and the row keeps its `verified` text until an
+  agent re-verifies it (new Last Verified and Expires) or downgrades it by hand
+- High-churn properties (build, tests) get short TTLs (1-3 days)
 - Stable properties (architecture, conventions) get long TTLs (30 days)
 - Any agent can re-verify and reset the TTL
+- A fact a machine can re-prove does not need a calendar: give the row a check
+  (below) and it is judged on every run instead of expiring
+
+**Executable claims.** A trust table may carry a `Check` column. A `verified` row
+whose Check cell names a check is judged by that check on every `aahp verify`, and
+its date is ignored; a row without one is a judgment row, judged by its Expires date.
+The cell is only a NAME. `TRUST.md` is agent-written data (CONSTITUTION 5), so
+nothing read from it is ever executed: the name is looked up in the built-in checks
+and in `trustTtl.checks` of `aahp.config.json`, which is reviewed configuration, and
+a name found in neither is a failed check. Rows without the column behave as before.
+
+```markdown
+| Property | Status | Verified | TTL | Expires | Check |
+|----------|--------|----------|-----|---------|-------|
+| LICENSE matches declared license | verified | 2026-09-28 | 30d | 2026-10-28 | license-matches |
+| Supply-chain scan passes | verified | 2026-09-28 | 30d | 2026-10-28 | - |
+```
+
+| Built-in check | Passes when |
+|----------------|-------------|
+| `license-matches` | `package.json` `license` is an SPDX id it recognises (MIT, Apache-2.0, ISC, BSD-2/3-Clause, GPL-2.0/3.0, LGPL-3.0, AGPL-3.0, MPL-2.0, Unlicense) and the root LICENSE file carries that license's canonical opening text |
+| `manifest-integrity` | Layer 1 passed in the same run |
+
+A repository declares its own checks as an argv, executed without a shell in the
+project root with a 120-second limit; exit 0 re-proves the row:
+
+```json
+{
+  "trustTtl": {
+    "checks": [
+      {
+        "id": "templates-present",
+        "run": ["git", "ls-files", "--error-unmatch", "--", "templates/STATUS.md", "templates/TRUST.md"],
+        "reason": "git exits non-zero when any listed template is not tracked."
+      }
+    ]
+  }
+}
+```
+
+A check runs with the same trust as the gate itself: `aahp.config.json` and any
+script a check invokes belong with the evaluator paths that need trusted review
+(Section 2.8).
+
+**Grace period.** A judgment row warns from the day after its Expires date. Under
+`trustTtl.enforce` it becomes a blocking failure only once it is more than
+`trustTtl.graceDays` past that date (default 14; 0 blocks from the first day). The
+measured reason: on 2026-09-22 two dated rows in this repository expired and every
+pull request turned red with no code change, while `main` stayed green because the
+workflow has no schedule. Fourteen days is two weekly Dependabot cycles, so even a
+quiet repository gets routine runs that print the expiry before it blocks. A failing
+check has no grace: the claim is false now, whatever its date says.
+
+**No silent green.** Layer 4 prints a census of what it read (rows, and how many
+`verified` rows are check-backed, dated, or neither). A register with no row it can
+judge (no trust table, no Status column, or only `assumed` and `untested` rows)
+is reported as NOT EVALUATED, and under enforcement that fails: downgrading every
+row must not be a quieter way to switch enforcement off than editing the config.
 
 
 **Making decay bite.** A TTL that nothing enforces records staleness without acting
 on it: eight of this repository's own ten `verified` rows once sat expired, one by 16
-days, with every gate green. `trustTtl.enforce` in `aahp.config.json` turns expired
-rows into a blocking finding, and under it a register this reader cannot classify
-fails too, since an unreadable register is not a clean one.
+days, with every gate green. `trustTtl.enforce` in `aahp.config.json` turns a failing
+check, and a judgment row expired past its grace period, into a blocking finding, and
+under it a register this reader cannot classify fails too, since an unreadable
+register is not a clean one.
 
 It is opt-in and the default did not move, because blocking everywhere was measured
 as the wrong trade: across the nine consuming repositories, two hold registers with
@@ -546,20 +609,39 @@ up to 4 layers:
    Anything that leaves integrity unproven fails too: no JSON interpreter, an
    unparseable manifest, an index that lists no files, or a missing checksum
    tool. `lint-handoff.sh` still runs for the checks this layer does not cover
-   (injection, secrets, PII, stale lock) and its non-zero exit still blocks.
+   (injection, secrets, PII, stale lock) and its non-zero exit still blocks. On
+   a checksum mismatch the gate tells you to inspect `git diff -- .ai/handoff`
+   BEFORE regenerating, because regenerating re-baselines whatever changed,
+   tampering included.
 2. **Content-drift gate (the key check)** - if the change set touches any
    handoff-impacting file OUTSIDE `.ai/handoff/`, it MUST also include
    `STATUS.md` AND a regenerated `MANIFEST.json`. Otherwise it HARD-FAILS with:
-   `Handoff-impacting files changed but handoff state did not. Run /handoff.`
+   `Handoff-impacting files changed but handoff state did not.`
    Every outside file is impacting by default. A repository may classify an
    exact regular tracked file as non-impacting under `handoffImpact` in a regular
    tracked `aahp.config.json`, but only a content-only modification (`M`) whose
    Git file mode is unchanged uses that reviewed exception. Additions, deletions,
    renames, copies, type changes, config edits,
    handoff edits, and any mixed source change remain impacting. The gate logs
-   every applied classification with its required review reason.
-3. **Commit-pointer freshness** - `MANIFEST.last_session.commit` vs HEAD.
-4. **TRUST-TTL expiry** - reports expired `verified` rows. Advisory by default; blocking in a repository that sets `trustTtl.enforce` (see 2.5).
+   every applied classification with its required review reason. Paths are
+   relative to the PROJECT root: in a project that lives in a subdirectory of its
+   repository, only changes inside that directory are in the change set.
+3. **Commit-pointer freshness** - `MANIFEST.last_session.commit` vs HEAD. A
+   manifest cannot record the commit that contains it, so the rule is: OK when
+   the recorded commit is an ancestor of HEAD and HEAD differs from it only under
+   `.ai/handoff/` (the flow commit code, regenerate, commit the handoff); WARN
+   when code changed since, or when the pointer is not in HEAD's history (a
+   squash-merge or rebase-merge orphans a branch-local pointer). Advisory: it
+   never fails except when `MANIFEST.json` is missing.
+4. **TRUST-TTL** - judges every `verified` row of `TRUST.md`: by its check when
+   the row names one, otherwise by its Expires date with a grace period. Advisory
+   by default; blocking in a repository that sets `trustTtl.enforce` (see 2.5).
+
+When the gate fails, its summary names the failing layer(s) and each layer's own
+remedy, and names the command that regenerates the manifest as it runs in that
+repository (`aahp manifest`, or `bash scripts/aahp-manifest.sh .` where the script
+is vendored). It never suggests `npx aahp`: npx resolves the unscoped name from the
+public registry when the package is not installed (ADR-013).
 
 ```bash
 ./scripts/verify-handoff.sh [path] --level precommit   # fast: layers 1-2
@@ -627,8 +709,62 @@ directories, untracked paths, symlinks, gitlinks, mode changes,
 `aahp.config.json`, duplicates, and prefix-like ambiguity. An absent section
 preserves the original all-files-impacting behavior.
 
+**Content-verified npm devDependency updates (opt-in).** A dependency-bot pull
+request that only bumps a development tool changes `package-lock.json` and
+nothing a handoff describes, yet the drift gate fails it until someone rewrites
+`STATUS.md`. `handoffImpact.npmDevDependencyUpdates` classifies such a change by
+its CONTENT, never by its author (an actor, bot-name or author exemption stays
+forbidden, see `scripts/ROLLOUT.md`):
+
+```json
+{
+  "handoffImpact": {
+    "npmDevDependencyUpdates": {
+      "reason": "Registry-pinned devDependency lockfile updates change no shipped file and no runtime dependency.",
+      "supplyChainScan": { "workflow": ".github/workflows/ci.yml", "job": "supply-chain-guard" }
+    }
+  }
+}
+```
+
+The change set is non-impacting only when ALL of the following hold, compared
+between the diff base and the inspected snapshot (the index):
+
+- the only files outside `.ai/handoff/` are a content modification (`M`, mode
+  unchanged) of `package-lock.json`, optionally with `package.json`; any other
+  file, a workflow or a reviewed non-impacting file included, keeps the whole
+  change impacting;
+- at least one installed-package entry (`node_modules/...`) changed, and every
+  changed entry is `dev: true` before and after (a removed one must have been),
+  is not a link, carries a sha256/384/512 `integrity`, and is `resolved` under
+  `https://registry.npmjs.org/`;
+- no added or modified entry carries `"hasInstallScript": true`, whether the
+  update introduces the install script or keeps one the old version had. An
+  install script runs on every `npm ci` without `--ignore-scripts`, developer
+  machines included, so an update that ships one needs a handoff record;
+- every other top-level lock key is unchanged (lockfile version 3; a version 1
+  or 2 lock, whose legacy `dependencies` map also moves, stays impacting);
+- `package.json` and the lock root entry differ, if at all, only in
+  `devDependencies` values that are plain registry version specifiers on both
+  sides (same package names, same order). Runtime `dependencies`, `files`,
+  `scripts`, `overrides` and every other key must be unchanged.
+
+The owner tied the exemption to a supply-chain scanner being a required check, so
+`supplyChainScan` is mandatory, and on EVERY run the gate proves against the
+inspected snapshot that the workflow (relative to the repository top level) is a
+regular tracked file triggered by `pull_request`, that it defines the job, that a
+job-level `if:` names `pull_request`, and that the job is not `continue-on-error`.
+Deleting or disabling the scanner while the opt-in stays fails in that very change.
+What it cannot prove, stated so the green is not over-read: that the job is a
+REQUIRED status check (a branch-protection setting the gate cannot read); what a
+job-level `if:` expression evaluates to; and step-level conditions. `paths:`
+filters are not evaluated either, but a required check that never reports leaves
+the pull request pending, which fails closed. The lockfile parse needs Node;
+without it the exemption is not applied and the change stays impacting.
+
 **Verify-only.** The gate never regenerates `MANIFEST.json`. Regeneration stays a
-separate `/handoff` step. The gate only detects drift and tells you to run it.
+separate step (`aahp manifest`). The gate only detects drift and names the command
+that fixes it.
 
 **Escape hatch.** `AAHP_SKIP_VERIFY=1` skips LOCAL verification only. The CI-level
 invocation ignores the hatch. This prevents the environment-variable bypass, but the
@@ -1278,6 +1414,13 @@ or force-push cannot select HEAD as its own merge base. Layer 1 runs for every a
 **Consequence:** narrow
 maintenance changes avoid unrelated handoff churn without creating an identity bypass,
 path-pattern bypass, or vacuous required check.
+**Amended 2026-09-28 (owner decision, "group + content-based exemption"):** one
+opt-in classification is decided by the change's CONTENT rather than by an exact
+file list: `handoffImpact.npmDevDependencyUpdates`, for lockfile-only devDependency
+updates in which every changed entry is dev-only, registry-resolved and
+integrity-pinned (Section 2.8). It is still not an identity exemption, it never reads
+who made the change, and it is only accepted together with a `supplyChainScan`
+assertion the gate re-proves on every run.
 
 ### ADR-019: one release definition, and publish authorization is machine-asserted
 **Why it recurs:** `.github/workflows/ci.yml` has two release-critical jobs: `publish`,
@@ -1694,6 +1837,16 @@ the reviewed config. This repository sets it to true.
 `precommit`, so no local commit is blocked, and the pull request that refreshes the
 register carries the refreshed rows, so CI reads a clean one. It heals through the
 ordinary route.
+**Amended 2026-09-28 (owner decision, "executable claims + grace"):** the heal-through
+argument held, but a calendar date still turned a required check red with no code
+change: from 2026-09-22 every pull request here failed on two expired rows while
+`main`, which the workflow does not re-run on a schedule, stayed green. Two changes.
+A row whose verification is mechanical names a check (built-in, or declared in the
+reviewed `trustTtl.checks`; never a command read from `TRUST.md`) and is judged by
+it on every run, not by its date. A judgment row warns from its expiry and blocks
+under enforcement only after `trustTtl.graceDays` (default 14). An empty or
+all-`assumed` register stays exactly as visible, and as failing under enforcement,
+as before (Section 2.5).
 
 ## 8. v3 -Task IDs and Dependency Graphs
 
@@ -2238,13 +2391,16 @@ pins capability numbers across surfaces, `forbiddenPatterns` denylists text (for
 em-dash ban), `docSync` keeps duplicated value-sets in step, `docLinks` checks internal
 Markdown links, and `generate` drives an optional LOG release-journal plus a
 `NEXT_ACTIONS.md` current-version freshness gate. `handoffImpact` carries the reviewed,
-exact-file, M-only Layer 2 classifications described in Section 2.8. Two selection keys
+exact-file, M-only Layer 2 classifications (`nonImpactingModifiedFiles`) and the opt-in,
+content-verified npm devDependency classification (`npmDevDependencyUpdates`, with its
+mandatory `supplyChainScan`) described in Section 2.8. Two selection keys
 tune the surface:
 `check` (`only`/`skip`) chooses which gates `aahp check` runs, and `pinnedDep`
 (`name`/`location`/`allowRange`) opts the `doctor` pinned-dep gate in (absent, it is a clean
 skip). `trustTtl` (`enforce`) opts verify Layer 4 in the same way: absent or false, expired
 `verified` rows warn and the run still passes, which is what every existing repository
-gets; true, and they fail it. `acceptanceCriteria` (`include`/`manifest`) supplies the input paths for the
+gets; true, and a failing check or a row expired past `graceDays` (default 14) fails it.
+`trustTtl.checks` declares the executable checks a `TRUST.md` row may name (Section 2.5). `acceptanceCriteria` (`include`/`manifest`) supplies the input paths for the
 advisory `aahp criteria` report of Section 8.7; it configures no gate, because that report
 is not one. Every section is optional.
 

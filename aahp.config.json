@@ -119,8 +119,42 @@
     ],
     "manifest": ".ai/handoff/MANIFEST.json"
   },
+  "handoffImpact": {
+    "npmDevDependencyUpdates": {
+      "reason": "A lockfile-only update of devDependencies, every entry dev-only, resolved from registry.npmjs.org and integrity-pinned, changes no shipped file and no runtime dependency, so it cannot stale the handoff. The supply-chain-guard job scans it on the pull request.",
+      "supplyChainScan": {
+        "workflow": ".github/workflows/ci.yml",
+        "job": "supply-chain-guard"
+      }
+    }
+  },
   "trustTtl": {
-    "enforce": true
+    "enforce": true,
+    "graceDays": 14,
+    "checks": [
+      {
+        "id": "templates-present",
+        "run": [
+          "git",
+          "ls-files",
+          "--error-unmatch",
+          "--",
+          "templates/.aiignore",
+          "templates/CONVENTIONS.md",
+          "templates/DASHBOARD.md",
+          "templates/GROUNDING.md",
+          "templates/LOG-ARCHIVE.md",
+          "templates/LOG.md",
+          "templates/MANIFEST.json",
+          "templates/NEXT_ACTIONS.md",
+          "templates/STATUS.md",
+          "templates/TRUST.md",
+          "templates/WORKFLOW.md",
+          "templates/pii-allowlist.json"
+        ],
+        "reason": "The 12 files aahp init copies are tracked. git exits non-zero when any one is missing, so the TRUST.md row is re-proven on every verify instead of expiring on a date."
+      }
+    ]
   },
   "verifyWorkflow": {
     "enforce": true

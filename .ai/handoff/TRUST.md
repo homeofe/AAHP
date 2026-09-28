@@ -46,51 +46,53 @@ the TTL is a backstop. A fact a gate recomputes on every run does not need a cal
 all: `Checksums match file contents` carries 3d and Layer 1 proves it continuously, so the
 short interval reads as a stronger claim than it is and the row stays `assumed`.
 
-`trustTtl.enforce` is on for this repository (ADR-024), so an expired `verified` row now
-fails CI rather than printing into the wall.
-| Property | Status | Provenance | Last Verified | Agent | TTL | Expires | Notes |
-|----------|--------|------------|---------------|-------|-----|---------|-------|
-| aahp-manifest.sh generates valid JSON | assumed | - | 2026-08-03 | grok-4.5 | 7d | 2026-08-10 | Downgraded 2026-08-23: TTL lapsed on 2026-08-10 and nothing re-ran it. `assumed` is what this register's own table calls an unverified claim; a fresh date would have been a verdict nobody produced |
-| aahp-migrate-v2.sh delegates correctly | assumed | - | 2026-07-25 | claude-opus-5 | 7d | 2026-08-10 | Deferred full migrate.bats this session; prior test_verified evidence kept as assumed after TTL |
-| lint-handoff.sh runs all 7 checks | assumed | - | 2026-08-03 | grok-4.5 | 7d | 2026-08-10 | Downgraded 2026-08-23: TTL lapsed on 2026-08-10 and nothing re-ran it. `assumed` is what this register's own table calls an unverified claim; a fresh date would have been a verdict nobody produced |
-| verify-handoff.sh runs all 4 layers | assumed | - | 2026-08-03 | grok-4.5 | 7d | 2026-08-10 | Downgraded 2026-08-23: TTL lapsed on 2026-08-10 and nothing re-ran it. `assumed` is what this register's own table calls an unverified claim; a fresh date would have been a verdict nobody produced |
-| Content-drift gate hard-fails | assumed | - | 2026-07-25 | claude-opus-5 | 7d | 2026-08-10 | Deferred throwaway-repo re-proof this session; prior behavioral proof retained as assumed |
-| Config gates + aahp doctor pass | assumed | - | 2026-08-03 | grok-4.5 | 7d | 2026-08-10 | Downgraded 2026-08-23: TTL lapsed on 2026-08-10 and nothing re-ran it. `assumed` is what this register's own table calls an unverified claim; a fresh date would have been a verdict nobody produced |
-| Escape hatch ignored at level ci | assumed | - | 2026-07-25 | claude-opus-5 | 30d | 2026-08-24 | Prior behavioral proof; TTL still valid on 30d row |
-| _aahp-lib.sh functions portable | assumed | - | 2026-08-03 | grok-4.5 | 7d | 2026-08-10 | Exercised on Windows + Git Bash this session; not re-proven on macOS/Linux host here |
-| Scripts pass shellcheck | assumed | - | 2026-08-03 | grok-4.5 | 7d | 2026-08-10 | shellcheck not installable offline here; CI shellcheck job remains the authority |
+`trustTtl.enforce` is on for this repository (ADR-024), so an expired `verified` row fails
+CI once it is more than 14 days past expiry (`graceDays`); before that it warns.
+Check-backed rows are re-proven on every run and carry no date.
+
+| Property | Status | Provenance | Last Verified | Agent | TTL | Expires | Check | Notes |
+|----------|--------|------------|---------------|-------|-----|---------|-------|-------|
+| aahp-manifest.sh generates valid JSON | assumed | - | 2026-08-03 | grok-4.5 | 7d | 2026-08-10 | - | Downgraded 2026-08-23: TTL lapsed on 2026-08-10 and nothing re-ran it. `assumed` is what this register's own table calls an unverified claim; a fresh date would have been a verdict nobody produced |
+| aahp-migrate-v2.sh delegates correctly | assumed | - | 2026-07-25 | claude-opus-5 | 7d | 2026-08-10 | - | Deferred full migrate.bats this session; prior test_verified evidence kept as assumed after TTL |
+| lint-handoff.sh runs all 7 checks | assumed | - | 2026-08-03 | grok-4.5 | 7d | 2026-08-10 | - | Downgraded 2026-08-23: TTL lapsed on 2026-08-10 and nothing re-ran it. `assumed` is what this register's own table calls an unverified claim; a fresh date would have been a verdict nobody produced |
+| verify-handoff.sh runs all 4 layers | assumed | - | 2026-08-03 | grok-4.5 | 7d | 2026-08-10 | - | Downgraded 2026-08-23: TTL lapsed on 2026-08-10 and nothing re-ran it. `assumed` is what this register's own table calls an unverified claim; a fresh date would have been a verdict nobody produced |
+| Content-drift gate hard-fails | assumed | - | 2026-07-25 | claude-opus-5 | 7d | 2026-08-10 | - | Deferred throwaway-repo re-proof this session; prior behavioral proof retained as assumed |
+| Config gates + aahp doctor pass | assumed | - | 2026-08-03 | grok-4.5 | 7d | 2026-08-10 | - | Downgraded 2026-08-23: TTL lapsed on 2026-08-10 and nothing re-ran it. `assumed` is what this register's own table calls an unverified claim; a fresh date would have been a verdict nobody produced |
+| Escape hatch ignored at level ci | assumed | - | 2026-07-25 | claude-opus-5 | 30d | 2026-08-24 | - | Prior behavioral proof; TTL still valid on 30d row |
+| _aahp-lib.sh functions portable | assumed | - | 2026-08-03 | grok-4.5 | 7d | 2026-08-10 | - | Exercised on Windows + Git Bash this session; not re-proven on macOS/Linux host here |
+| Scripts pass shellcheck | assumed | - | 2026-08-03 | grok-4.5 | 7d | 2026-08-10 | - | shellcheck not installable offline here; CI shellcheck job remains the authority |
 
 ---
 
 ## Schema & Validation
 
-| Property | Status | Provenance | Last Verified | Agent | TTL | Expires | Notes |
-|----------|--------|------------|---------------|-------|-----|---------|-------|
-| aahp-manifest.schema.json valid JSON Schema | assumed | - | 2026-08-03 | grok-4.5 | 30d | 2026-09-02 | Stable; doctor manifest-schema structural check green |
-| Generated MANIFEST.json passes schema | assumed | - | 2026-08-03 | grok-4.5 | 7d | 2026-08-10 | Downgraded 2026-08-23: TTL lapsed on 2026-08-10 and nothing re-ran it. `assumed` is what this register's own table calls an unverified claim; a fresh date would have been a verdict nobody produced |
-| Checksums match file contents | assumed | - | 2026-08-03 | grok-4.5 | 3d | 2026-08-06 | Downgraded 2026-08-23: TTL lapsed and nothing re-ran it. Left `assumed` deliberately after the 2026-08-23 TTL review: Layer 1 recomputes this on EVERY run, so a calendar interval records nothing the gate is not already proving continuously, and a short interval here reads as a stronger claim than it is |
-| aahp-config.schema.json valid JSON Schema | assumed | - | 2026-08-03 | grok-4.5 | 30d | 2026-09-02 | Consumed by config-driven gates; check suite green |
+| Property | Status | Provenance | Last Verified | Agent | TTL | Expires | Check | Notes |
+|----------|--------|------------|---------------|-------|-----|---------|-------|-------|
+| aahp-manifest.schema.json valid JSON Schema | assumed | - | 2026-08-03 | grok-4.5 | 30d | 2026-09-02 | - | Stable; doctor manifest-schema structural check green |
+| Generated MANIFEST.json passes schema | assumed | - | 2026-08-03 | grok-4.5 | 7d | 2026-08-10 | - | Downgraded 2026-08-23: TTL lapsed on 2026-08-10 and nothing re-ran it. `assumed` is what this register's own table calls an unverified claim; a fresh date would have been a verdict nobody produced |
+| Checksums match file contents | verified | tool_verified | 2026-09-28 | claude-opus-5.5 | - | - | manifest-integrity | Re-proven on every verify: Layer 1 recomputes every indexed checksum and the built-in check reads that verdict, so no calendar interval applies |
+| aahp-config.schema.json valid JSON Schema | assumed | - | 2026-08-03 | grok-4.5 | 30d | 2026-09-02 | - | Consumed by config-driven gates; check suite green |
 
 ---
 
 ## Templates
 
-| Property | Status | Provenance | Last Verified | Agent | TTL | Expires | Notes |
-|----------|--------|------------|---------------|-------|-----|---------|-------|
-| All 12 templates present | verified | source_verified | 2026-09-28 | claude-opus-5.5 | 30d | 2026-10-28 | Re-verified 2026-09-28 after the row expired on 2026-09-22 and turned Layer 4 red on every PR: `git ls-files templates` and `ls -A templates` both return exactly 12 entries (.aiignore, CONVENTIONS.md, DASHBOARD.md, GROUNDING.md, LOG-ARCHIVE.md, LOG.md, MANIFEST.json, NEXT_ACTIONS.md, STATUS.md, TRUST.md, WORKFLOW.md, pii-allowlist.json). 30d because this only moves when a tracked file moves, and Layer 2 already fails a commit that moves one without handoff state |
-| Templates match v2/v3 spec | assumed | - | 2026-08-03 | grok-4.5 | 30d | 2026-09-02 | WORKFLOW task-selection updated to MANIFEST authority this session |
-| .aiignore covers OWASP patterns | assumed | - | 2026-02-26 | Claude Opus 4.6 | 30d | 2026-09-02 | Comprehensive but not formally audited this session; TTL refreshed only for bookkeeping |
+| Property | Status | Provenance | Last Verified | Agent | TTL | Expires | Check | Notes |
+|----------|--------|------------|---------------|-------|-----|---------|-------|-------|
+| All 12 templates present | verified | tool_verified | 2026-09-28 | claude-opus-5.5 | - | - | templates-present | Re-proven on every verify by the reviewed trustTtl.checks entry templates-present in aahp.config.json: git ls-files --error-unmatch over the 12 files aahp init copies |
+| Templates match v2/v3 spec | assumed | - | 2026-08-03 | grok-4.5 | 30d | 2026-09-02 | - | WORKFLOW task-selection updated to MANIFEST authority this session |
+| .aiignore covers OWASP patterns | assumed | - | 2026-02-26 | Claude Opus 4.6 | 30d | 2026-09-02 | - | Comprehensive but not formally audited this session; TTL refreshed only for bookkeeping |
 
 ---
 
 ## Repository
 
-| Property | Status | Provenance | Last Verified | Agent | TTL | Expires | Notes |
-|----------|--------|------------|---------------|-------|-----|---------|-------|
-| No secrets in source | assumed | - | 2026-08-03 | grok-4.5 | 7d | 2026-08-10 | Downgraded 2026-08-23: TTL lapsed on 2026-08-10 and nothing re-ran it. `assumed` is what this register's own table calls an unverified claim; a fresh date would have been a verdict nobody produced |
-| LICENSE matches declared license | verified | source_verified | 2026-09-28 | claude-opus-5.5 | 30d | 2026-10-28 | Re-verified 2026-09-28 (expired 2026-09-22): `node -p "require('./package.json').license"` prints `Apache-2.0` and LICENSE opens `Apache License / Version 2.0, January 2004`. 30d for the same reason as the templates row |
-| Supply-chain scanner workflow passes | verified | runtime_observed | 2026-09-28 | claude-opus-5.5 | 30d | 2026-10-28 | GitHub Actions job `Supply chain guard` passed on PR #119 at run 36356352306 with the v6.3.1 action pinned to commit `013febcb8447107bcf9d82e400d5b492d44bb10f`: risk score 10/100 (LOW), two medium findings (`GHA_OIDC_WRITE_PERM` on the publish job, `WORKFLOW_SECRET_TO_UPLOAD_PATH` on ci.yml), which are the release workflow's known heuristics. Bundled indicators only (the downloadable catalog was not consulted, `refresh-catalog: false`); 100 of 132 files scanned. Previous anchor: PR #110, run 33385292682, v6.0.8. |
-| README.md is single source of truth | assumed | - | 2026-08-03 | grok-4.5 | 7d | 2026-08-10 | Downgraded 2026-08-23: TTL lapsed on 2026-08-10 and nothing re-ran it. `assumed` is what this register's own table calls an unverified claim; a fresh date would have been a verdict nobody produced |
+| Property | Status | Provenance | Last Verified | Agent | TTL | Expires | Check | Notes |
+|----------|--------|------------|---------------|-------|-----|---------|-------|-------|
+| No secrets in source | assumed | - | 2026-08-03 | grok-4.5 | 7d | 2026-08-10 | - | Downgraded 2026-08-23: TTL lapsed on 2026-08-10 and nothing re-ran it. `assumed` is what this register's own table calls an unverified claim; a fresh date would have been a verdict nobody produced |
+| LICENSE matches declared license | verified | tool_verified | 2026-09-28 | claude-opus-5.5 | - | - | license-matches | Re-proven on every verify by the built-in license-matches check: package.json declares Apache-2.0 and LICENSE carries the Apache License Version 2.0 text |
+| Supply-chain scanner workflow passes | verified | runtime_observed | 2026-09-28 | claude-opus-5.5 | 30d | 2026-10-28 | - | GitHub Actions job `Supply chain guard` passed on PR #119 at run 36356352306 with the v6.3.1 action pinned to commit `013febcb8447107bcf9d82e400d5b492d44bb10f`: risk score 10/100 (LOW), two medium findings (`GHA_OIDC_WRITE_PERM` on the publish job, `WORKFLOW_SECRET_TO_UPLOAD_PATH` on ci.yml), which are the release workflow's known heuristics. Bundled indicators only (the downloadable catalog was not consulted, `refresh-catalog: false`); 100 of 132 files scanned. Previous anchor: PR #110, run 33385292682, v6.0.8. |
+| README.md is single source of truth | assumed | - | 2026-08-03 | grok-4.5 | 7d | 2026-08-10 | - | Downgraded 2026-08-23: TTL lapsed on 2026-08-10 and nothing re-ran it. `assumed` is what this register's own table calls an unverified claim; a fresh date would have been a verdict nobody produced |
 
 ---
 
@@ -99,7 +101,12 @@ fails CI rather than printing into the wall.
 - Change `untested` -> `verified` only after **running actual code/tests**
 - Change `assumed` -> `verified` after direct confirmation
 - Never downgrade `verified` without explaining why in `LOG.md`
-- Expired `verified` automatically downgrades to `assumed`
+- An expired `verified` row counts as `assumed` when you read it, but nothing rewrites it:
+  `aahp verify` Layer 4 reports it. Re-verify it (new Last Verified and Expires) or
+  downgrade it yourself
+- A row a machine can re-prove names a check in the Check column (`license-matches`,
+  `manifest-integrity`, or an id from `trustTtl.checks` in aahp.config.json) and is
+  judged on every verify instead of by its date
 - High-churn properties (scripts, checksums): 1-3 day TTL
 - Stable properties (schema, templates, architecture): 30 day TTL
 - Record `Provenance` for every row; only a grounded anchor supports `verified`

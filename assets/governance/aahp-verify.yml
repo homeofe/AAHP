@@ -17,7 +17,8 @@
 #   Layer 1: MANIFEST checksum integrity
 #   Layer 2: content-drift gate (code changed => STATUS.md + MANIFEST.json must change)
 #   Layer 3: commit-pointer freshness
-#   Layer 4: TRUST-TTL expiry (advisory unless trustTtl.enforce is set)
+#   Layer 4: TRUST-TTL: check-backed rows re-proven, dated rows judged by expiry
+#            (blocking under trustTtl.enforce only after the grace period)
 # then `aahp doctor`, whose verify-workflow gate reports whether THIS file can
 # skip the gate. Do not wrap either step, or the job, in an `if:`.
 #

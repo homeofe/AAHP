@@ -2,6 +2,10 @@
   "version": 1,
   "entries": [
     {
+      "sha256": "b85a1e4630c4c476ecb9cce4084d642092ff8e6209fb8df3606f6fe10d0ea42c",
+      "title": "## [2026-07-18] claude-opus-4-8: Anti-entropy initiative (gates + constitution + ADR log, v3.7.0)"
+    },
+    {
       "sha256": "ac4ec49dd181b4f50b0c9c9f99f2cfe18bb7e287d27a01555fcf7f7afb60e79c",
       "title": "## [2026-07-18] claude-opus-4-8: Security hardening + doc-drift fixes (v3.6.1)"
     },

@@ -33,6 +33,19 @@ independently of the npm version).
   MANIFEST.json.
 - `aahp --help` and README document archive's Python 3 requirement, `--keep N`,
   `--verify`, lint options and every `verify --level`.
+- Verify Layer 4 executable trust claims: a `TRUST.md` `Check` column names a built-in
+  check (`license-matches`, `manifest-integrity`) or a reviewed `trustTtl.checks` entry
+  (argv, no shell, 120 s limit). A check-backed `verified` row is judged by its check on
+  every run, not by its date. Nothing read from `TRUST.md` is ever executed.
+- `trustTtl.graceDays` (default 14): a date-judged `verified` row warns from its expiry
+  and blocks under `trustTtl.enforce` only after the grace period. Layer 4 prints a census
+  of the rows it read.
+- Opt-in `handoffImpact.npmDevDependencyUpdates`: for Layer 2, a change touching only
+  `package-lock.json` (optionally with devDependency specifier changes in `package.json`)
+  is non-impacting when every changed entry is `dev: true`, integrity-pinned, resolved
+  from registry.npmjs.org and carries no install script. It is decided by content, never
+  by author, and requires a `supplyChainScan` assertion that the gate re-proves on every
+  run.
 
 ### Changed
 
@@ -61,6 +74,15 @@ independently of the npm version).
 - Migration: a `generate.log` config with no `target`, or with a target on the agent
   journal, now fails; point `generate.log.target` at a separate file such as
   `docs/RELEASES.md`.
+- Layer 3 reports OK when `last_session.commit` is an ancestor of HEAD and HEAD differs
+  from it only under `.ai/handoff/`.
+- Verify messages name the concrete regeneration command instead of `/handoff`; the
+  summary names the failing layer(s) and each layer's remedy, and a checksum mismatch
+  advises inspecting `git diff -- .ai/handoff` before regenerating.
+- The `trustTtl` config reader refuses duplicate JSON keys and unknown `trustTtl` keys;
+  `handoffImpact` needs `nonImpactingModifiedFiles` or `npmDevDependencyUpdates`;
+  `templates/TRUST.md` tables gain a `Check` column.
+- `tests/verify.bats` builds its fixture once (about 36% faster on Linux).
 
 ### Removed
 
@@ -135,6 +157,18 @@ independently of the npm version).
 - Tests: the manifest preservation tests fail instead of skipping when tasks,
   `next_task_id` or `project` are lost, and the injection-pattern test proves each pattern
   on its own phrase.
+- Layer 2 for a project in a subdirectory of its repository: paths are now
+  project-relative; before, every change failed.
+- The docs claimed an expired `verified` row automatically downgrades to `assumed`; no
+  code did this, and the docs now describe the implemented behaviour.
+- Layer 4 date parsing no longer uses awk interval expressions, which old mawk reads
+  literally, and Layer 3 never passes a non-SHA `last_session.commit` to git.
+- The workflow and pre-push hook headers no longer describe Layer 4 as advisory, and three
+  python prerequisite skips in `tests/verify.bats` fail on CI instead of passing silently.
+- Portability: no shipped script combines grep's ignore-case and fixed-string flags any
+  more. The GNU grep 3.0 of Git for Windows aborts on that combination (exit 134), which
+  made the new `license-matches` check reject a correct LICENSE on Windows; a test in
+  `tests/bash-portability.bats` now forbids it.
 
 ## [3.12.0] - 2026-08-31
 

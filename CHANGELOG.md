@@ -165,6 +165,10 @@ independently of the npm version).
   literally, and Layer 3 never passes a non-SHA `last_session.commit` to git.
 - The workflow and pre-push hook headers no longer describe Layer 4 as advisory, and three
   python prerequisite skips in `tests/verify.bats` fail on CI instead of passing silently.
+- Portability: no shipped script combines grep's ignore-case and fixed-string flags any
+  more. The GNU grep 3.0 of Git for Windows aborts on that combination (exit 134), which
+  made the new `license-matches` check reject a correct LICENSE on Windows; a test in
+  `tests/bash-portability.bats` now forbids it.
 
 ## [3.12.0] - 2026-08-31
 

@@ -25,6 +25,9 @@
 - A fix agent implemented this in an isolated worktree; the integrator required dev
   entries with install scripts to stay impacting, converted this repository's TRUST.md,
   aligned the workflow and hook headers, and wrote the handoff state.
+- A local Windows run of Layer 4 exposed that Git for Windows' grep 3.0 aborts on
+  `grep -qiF`, which failed the license check on a correct LICENSE. Replaced it with a
+  portable lower-case comparison and a static guard against the flag combination.
 
 ### Decision
 

@@ -153,6 +153,14 @@ console.log(fwd(got) === fwd('$TEST_TMPDIR/Programs/Git/bin/bash.exe') ? 'MATCH'
 # the CLI knew about relative paths and the /c/ form, the dashboard call site
 # knew neither, and neither knew about the other. Both now share one
 # implementation, and this test fails if a copy is reintroduced.
+@test "no shipped script combines grep -i with -F (Git for Windows grep 3.0 aborts on it)" {
+    # Measured 2026-09-28 on Git Bash (GNU grep 3.0): `grep -qiF PATTERN FILE`
+    # exits 134 (SIGABRT) for any pattern, also under LC_ALL=C, while -qi, -qiE and
+    # -qF work. Linux CI never sees it, so this static check is the only guard.
+    run grep -rnE 'grep( +-[A-Za-z]+)* +-[A-Za-z]*(i[A-Za-z]*F|F[A-Za-z]*i)|grep( +-[A-Za-z]+)* +-[A-Za-z]*i[A-Za-z]*( +-[A-Za-z]+)* +-[A-Za-z]*F|grep( +-[A-Za-z]+)* +-[A-Za-z]*F[A-Za-z]*( +-[A-Za-z]+)* +-[A-Za-z]*i'         "$AAHP_ROOT/scripts" "$AAHP_ROOT/bin"
+    [ "$status" -eq 1 ] || { echo "$output"; false; }
+}
+
 @test "bin/aahp.js does not reimplement bash resolution" {
     run grep -nE "function (findBashExecutable|toBashScriptArg)" "$AAHP_ROOT/bin/aahp.js"
     [ "$status" -ne 0 ]

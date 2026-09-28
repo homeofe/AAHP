@@ -67,6 +67,12 @@ fixes Layer 3 and the verify messages.
   resolved to the new Layer 3 text and then measured: the Quickstart run end to end from
   a packed tarball in a fresh repository reports Layers 1, 2 and 3 OK and a Layer 4
   WARN, exit 0.
+- Found during integration, on Windows only: the new `license-matches` check used
+  `grep -qiF`, and the GNU grep 3.0 of Git for Windows aborts (exit 134) on any
+  ignore-case plus fixed-string combination, so the check reported a correct LICENSE as
+  wrong. It now lower-cases both sides and uses `grep -qF`; a static test forbids the
+  flag combination in shipped scripts (mutation-proven). `verify --level ci` passes on
+  Windows with all three check-backed rows re-proven.
 - Not measured: macOS (bash 3.2). Portability is by construction: no mapfile, no
   associative arrays, no awk intervals.
 

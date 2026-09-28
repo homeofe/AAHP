@@ -3,17 +3,17 @@
   "project": "AAHP",
   "last_session": {
     "agent": "claude-opus-5.5",
-    "session_id": "cli-1790568654",
-    "timestamp": "2026-09-28T04:10:54Z",
-    "commit": "d27db82",
+    "session_id": "cli-1790569102",
+    "timestamp": "2026-09-28T04:18:22Z",
+    "commit": "8b8de3c",
     "phase": "implementation",
     "duration_minutes": 0
   },
   "files": {
     "STATUS.md": {
-      "checksum": "sha256:ed3b1279d18ec72e9769a3f6edf0cd786e54542732c321ec8aa30dc6e0465991",
-      "updated": "2026-09-28T04:10:52Z",
-      "lines": 120,
+      "checksum": "sha256:3cd8b6cf5139a904d8a321ae59d729f54cb6da15d785528cab92bc4302a5d402",
+      "updated": "2026-09-28T04:18:21Z",
+      "lines": 126,
       "summary": "Working state: audit fix programme in progress; this change is the verify gate semantics (`fix/verify-gate-semantics`)"
     },
     "NEXT_ACTIONS.md": {
@@ -23,9 +23,9 @@
       "summary": "TRUST rows can be check-backed and are re-proven on every run; dated rows get a 14-day grace period before blocking."
     },
     "LOG.md": {
-      "checksum": "sha256:0b7cd3999f16ef6e1d08937b09dd2ea686eee7d7de0cbc429d46cb4c103c3f67",
-      "updated": "2026-09-28T04:10:53Z",
-      "lines": 303,
+      "checksum": "sha256:93377773fc9f85272e41c026e39f2717f06f75db9ddffd84bc4a1e34ed9c4bd8",
+      "updated": "2026-09-28T04:18:21Z",
+      "lines": 306,
       "summary": "Latest entry: [2026-09-28] claude-opus-5.5: verify gate semantics (audit fix programme, 5 of 8)"
     },
     "LOG-ARCHIVE.md": {
@@ -80,8 +80,8 @@
   "quick_context": "Audit fix programme 2026-09-28, workstream 5 of 8: verify gate semantics. Check-backed TRUST claims re-proven every run, 14-day grace for dated rows, content-based Layer 2 exemption for dev-only lockfile updates, Layer 3 OK after a committed handoff. v3.12.0 released; no release until the owner decides.",
   "token_budget": {
     "manifest_only": 1433,
-    "manifest_plus_core": 4122,
-    "full_read": 21460
+    "manifest_plus_core": 4241,
+    "full_read": 21642
   },
   "next_task_id": 18,
   "tasks": {

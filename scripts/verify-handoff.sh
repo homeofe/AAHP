@@ -937,15 +937,23 @@ if [ "$LEVEL" != "precommit" ]; then
                 return
                 ;;
         esac
+        # Case-insensitive fixed-string search by lower-casing both sides: the GNU
+        # grep 3.0 shipped with Git for Windows aborts (SIGABRT, exit 134) when the
+        # ignore-case and fixed-string flags are combined, which this check would
+        # read as "not contained" (tests/bash-portability.bats guards it).
+        lic_contains() {
+            tr '[:upper:]' '[:lower:]' < "$lic" |
+                grep -qF -- "$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')"
+        }
         for f in "$must1" "$must2"; do
             [ -n "$f" ] || continue
-            if ! grep -qiF -- "$f" "$lic"; then
+            if ! lic_contains "$f"; then
                 TC_VERDICT="fail"; TC_DETAIL="package.json says $spdx but $lic does not contain \"$f\""; return
             fi
         done
         for f in "$not1" "$not2"; do
             [ -n "$f" ] || continue
-            if grep -qiF -- "$f" "$lic"; then
+            if lic_contains "$f"; then
                 TC_VERDICT="fail"; TC_DETAIL="package.json says $spdx but $lic contains \"$f\""; return
             fi
         done

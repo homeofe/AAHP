@@ -6,6 +6,32 @@
 
 ---
 
+## [2026-09-28] claude-opus-5.5: manifest, lint and CLI (audit fix programme, 3 of 8)
+
+**Agent:** claude-opus-5.5
+**Phase:** implementation
+**Branch:** fix/manifest-lint-cli
+**Tasks:** owner request of 2026-09-28 to fix every audit finding
+
+### What was done
+
+- Rebuilt the manifest generator on a single node process and `JSON.stringify`, made
+  every failure exit 1 with the file unchanged, and kept `updated` dates stable.
+- Made lint binary-safe and widened its injection scan to every handoff file and the
+  decoded JSON values; fixed the MANIFEST template so a fresh adopter validates.
+- Fixed the CLI's signal exit code, made doctor validate the whole manifest schema, and
+  corrected migrate, the release-journal generator and the help text.
+- Two fix agents implemented these in isolated worktrees; the integrator combined them,
+  added `--force` to the help text and corrected the config schema's description of
+  `generate.log.target`, and wrote the handoff state.
+
+### Decision
+
+- The two workstreams land together: shipping the stricter doctor gate without the
+  template fix would turn every freshly initialised repository red.
+
+---
+
 ## [2026-09-28] claude-opus-5.5: test-suite integrity (audit fix programme, 2 of 8)
 
 **Agent:** claude-opus-5.5
@@ -266,21 +292,3 @@
 
 - Per the strategy, deliberately did NOT build a separate governance system/command, a docs/adr/ directory (README Section 7 IS the log), any per-PR LLM gate, or the swarm self-governance runtime. Gates extend the existing deterministic machinery.
 - Deferred AAHP's own `claims` config (prose capability numbers are false-positive-prone) and aggressive README/CLAUDE de-dup (kept operational how-to; the constitution is the invariant index).
-
----
-
-## [2026-07-18] claude-opus-4-8: Security hardening + doc-drift fixes (v3.6.1)
-
-**Agent:** claude-opus-4-8
-**Phase:** fix
-**Branch:** fix/floorcmd-security-and-drift
-**Tasks:** anti-entropy audit follow-up (security + live drift bugs)
-
-### What was done
-
-- SECURITY: `check-claims.mjs` `floorCmd` now runs a repo-relative Node script via `execFileSync` (no shell), replacing `execSync` on an arbitrary config string. Closes a command-injection path from a PR-editable `aahp.config.json`. Schema + example updated; a path escaping the project root is rejected. New bats path-escape-rejection test.
-- Fixed live documentation drift found by the anti-entropy audit: README Section 4 canonical handoff-file list, Section 7.1 command table (+`doctor`), Section 8.3 task-status enum (+`cancelled`), removed the phantom `stale` bucket from `aahp status` (never in the schema), and stripped em dashes (U+2014) from the CONVENTIONS templates and CLAUDE.md.
-
-### Decisions
-
-- Scoped to the security fix + the four live drift bugs only. Deferred the broader anti-entropy strategy (constitution, ADR-log reframing, new deterministic gates, de-duplicating the 5x provenance scale, excising the rotted German runbook) to a separate initiative for maintainer review.

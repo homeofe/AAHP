@@ -255,6 +255,193 @@ EOF
     [[ "$output" == *"FAIL"* ]]
 }
 
+# --- manifest-schema: the WHOLE schema, not a structural subset ---------------
+#
+# The gate used to hand-check a subset (required keys, the phase enum, the
+# checksum pattern) and print "structural checks against
+# aahp-manifest.schema.json pass". Measured at 1917ca8: `aahp init` followed by
+# `aahp manifest` leaves the template's example tasks with
+# "created": "[ISO-8601]" in MANIFEST.json, doctor printed that PASS line, and
+# ajv (what CI runs against the same schema) rejected the file with
+# 'must match format "date-time"'.
+
+# Merge JSON $1 into the fixture's MANIFEST.json (shallow, top level).
+_manifest_merge() {
+    node -e '
+      const fs = require("fs");
+      const p = process.argv[1];
+      const m = JSON.parse(fs.readFileSync(p, "utf8"));
+      Object.assign(m, JSON.parse(process.argv[2]));
+      fs.writeFileSync(p, JSON.stringify(m, null, 2) + "\n");
+    ' "$TEST_TMPDIR/.ai/handoff/MANIFEST.json" "$1"
+}
+
+@test "doctor: manifest-schema FAILS a task date left as the template placeholder" {
+    scaffold_conformant
+    _manifest_merge '{ "next_task_id": 2, "tasks": { "T-001": { "title": "t", "status": "ready", "created": "[ISO-8601]" } } }'
+    run node "$AAHP" doctor "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"FAIL     manifest-schema: /tasks/T-001/created"* ]]
+    [[ "$output" == *"unreplaced template placeholder"* ]]
+    [[ "$output" == *"Conformance FAILED: manifest-schema."* ]]
+}
+
+@test "doctor: manifest-schema FAILS a task priority outside the schema enum" {
+    scaffold_conformant
+    _manifest_merge '{ "tasks": { "T-001": { "title": "t", "status": "ready", "priority": "urgent" } } }'
+    run node "$AAHP" doctor "$TEST_TMPDIR" --json
+    [ "$status" -eq 1 ]
+    [[ "$output" == *'"manifest-schema": "fail"'* ]]
+    [[ "$output" == *"/tasks/T-001/priority"* ]]
+}
+
+@test "doctor: manifest-schema FAILS an unknown top-level key (additionalProperties)" {
+    scaffold_conformant
+    _manifest_merge '{ "project_name": "typo of project" }'
+    run node "$AAHP" doctor "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *'unknown key "project_name"'* ]]
+}
+
+@test "doctor: manifest-schema PASSES valid tasks and says it checked the whole schema" {
+    scaffold_conformant
+    _manifest_merge '{ "next_task_id": 3, "tasks": {
+        "T-001": { "title": "a", "status": "done", "priority": "high", "created": "2026-01-01T00:00:00Z", "completed": "2026-01-02T10:30:00.5+02:00" },
+        "T-002": { "title": "b", "status": "ready", "depends_on": ["T-001"], "created": "2026-01-03t00:00:00z" } } }'
+    run node "$AAHP" doctor "$TEST_TMPDIR"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"PASS     manifest-schema: MANIFEST.json validates against schema/aahp-manifest.schema.json"* ]]
+    [[ "$output" != *"structural checks"* ]]
+}
+
+@test "doctor: the text header reads 'aahp doctor: conformance for', not '-conformance'" {
+    scaffold_conformant
+    run node "$AAHP" doctor "$TEST_TMPDIR"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"aahp doctor: conformance for "* ]]
+    [[ "$output" != *"doctor -conformance"* ]]
+}
+
+@test "manifest validator: same verdict as ajv (CI's validator) on every case in the corpus" {
+    # The doctor gate and `ajv validate` in CI read the same schema. If they
+    # could disagree, doctor would be green on a manifest CI rejects (or the
+    # reverse). This runs both over the same corpus and fails on any split.
+    [ -d "$AAHP_ROOT/node_modules/ajv" ] || { echo "ajv devDependency missing: run npm ci"; false; }
+    run node -e '
+      const path = require("path");
+      const fs = require("fs");
+      const url = require("url");
+      const root = process.argv[1];
+      const Ajv2020 = require(path.join(root, "node_modules/ajv/dist/2020")).default;
+      const addFormats = require(path.join(root, "node_modules/ajv-formats")).default;
+      const schema = JSON.parse(fs.readFileSync(path.join(root, "schema/aahp-manifest.schema.json"), "utf8"));
+      const ajv = new Ajv2020({ allErrors: true, strict: false });
+      addFormats(ajv);
+      const ajvValid = ajv.compile(schema);
+      const sum = "sha256:" + "a".repeat(64);
+      const file = { checksum: sum, updated: "2026-01-01T00:00:00Z", lines: 1, summary: "s" };
+      const base = () => ({
+        aahp_version: "3.0", project: "p",
+        last_session: { agent: "a", timestamp: "2026-01-01T00:00:00Z", phase: "idle" },
+        files: { "STATUS.md": { ...file }, "pii-allowlist.json": { ...file } },
+        quick_context: "q", next_task_id: 2,
+        tasks: { "T-001": { title: "t", status: "ready", created: "2026-01-01T00:00:00Z" } },
+      });
+      const cases = {
+        baseline: (m) => m,
+        placeholderCreated: (m) => { m.tasks["T-001"].created = "[ISO-8601]"; },
+        dateOnly: (m) => { m.tasks["T-001"].created = "2026-01-01"; },
+        noOffset: (m) => { m.tasks["T-001"].created = "2026-01-01T00:00:00"; },
+        offsetNoColon: (m) => { m.tasks["T-001"].created = "2026-01-01T00:00:00+0100"; },
+        offsetHoursOnly: (m) => { m.tasks["T-001"].created = "2026-01-01T00:00:00+01"; },
+        spaceSeparator: (m) => { m.tasks["T-001"].created = "2026-01-01 00:00:00Z"; },
+        lowercase: (m) => { m.tasks["T-001"].created = "2026-01-01t00:00:00z"; },
+        fraction: (m) => { m.tasks["T-001"].created = "2026-01-01T00:00:00.123456Z"; },
+        leapSecondUtc: (m) => { m.tasks["T-001"].created = "2016-12-31T23:59:60Z"; },
+        leapSecondOffset: (m) => { m.tasks["T-001"].created = "2016-12-31T15:59:60-08:00"; },
+        leapSecondWrongHour: (m) => { m.tasks["T-001"].created = "2016-12-31T22:59:60Z"; },
+        feb29Leap: (m) => { m.tasks["T-001"].created = "2024-02-29T00:00:00Z"; },
+        feb29NonLeap: (m) => { m.tasks["T-001"].created = "2023-02-29T00:00:00Z"; },
+        feb29Century: (m) => { m.tasks["T-001"].created = "1900-02-29T00:00:00Z"; },
+        month13: (m) => { m.tasks["T-001"].created = "2026-13-01T00:00:00Z"; },
+        hour24: (m) => { m.tasks["T-001"].created = "2026-01-01T24:00:00Z"; },
+        tzHour24: (m) => { m.tasks["T-001"].created = "2026-01-01T00:00:00+24:00"; },
+        timestampWords: (m) => { m.last_session.timestamp = "yesterday"; },
+        fileUpdatedPlaceholder: (m) => { m.files["STATUS.md"].updated = "[ISO-8601]"; },
+        badStatus: (m) => { m.tasks["T-001"].status = "todo"; },
+        badPriority: (m) => { m.tasks["T-001"].priority = "urgent"; },
+        badPhase: (m) => { m.last_session.phase = "coding"; },
+        badTaskId: (m) => { m.tasks["T-1"] = { title: "x", status: "ready" }; },
+        badDependsOn: (m) => { m.tasks["T-001"].depends_on = ["task-1"]; },
+        extraTaskKeyAllowed: (m) => { m.tasks["T-001"].notes = "free text"; },
+        titleTooLong: (m) => { m.tasks["T-001"].title = "x".repeat(201); },
+        titleAtLimit: (m) => { m.tasks["T-001"].title = "x".repeat(200); },
+        quickContextTooLong: (m) => { m.quick_context = "q".repeat(501); },
+        summaryAstralAtLimit: (m) => { m.files["STATUS.md"].summary = "\u{1F600}".repeat(200); },
+        unknownTopKey: (m) => { m.project_name = "x"; },
+        missingProject: (m) => { delete m.project; },
+        fileNotMdOrJson: (m) => { m.files["notes.txt"] = { ...file }; },
+        otherJsonFile: (m) => { m.files["other.json"] = { ...file }; },
+        fileMissingSummary: (m) => { delete m.files["STATUS.md"].summary; },
+        badChecksum: (m) => { m.files["STATUS.md"].checksum = "sha256:[hash]"; },
+        negativeLines: (m) => { m.files["STATUS.md"].lines = -1; },
+        nextTaskIdString: (m) => { m.next_task_id = "2"; },
+        nextTaskIdZero: (m) => { m.next_task_id = 0; },
+        crossRepoOk: (m) => { m.cross_repo_ref = { repo: "o/r", commit: "abc", relation: "extends" }; },
+        crossRepoMissingRelation: (m) => { m.cross_repo_ref = { repo: "o/r", commit: "abc" }; },
+        crossRepoBadRelation: (m) => { m.cross_repo_ref = { repo: "o/r", commit: "abc", relation: "copies" }; },
+        tokenBudgetNegative: (m) => { m.token_budget = { full_read: -1 }; },
+        durationFloat: (m) => { m.last_session.duration_minutes = 1.5; },
+      };
+      import(url.pathToFileURL(path.join(root, "scripts/aahp-schema.mjs")).href).then((mod) => {
+        let splits = 0, accepted = 0, rejected = 0;
+        for (const [name, mutate] of Object.entries(cases)) {
+          const m = base();
+          mutate(m);
+          const a = ajvValid(m);
+          const mine = mod.validateManifestObject(m).length === 0;
+          if (a !== mine) { splits++; console.log("SPLIT " + name + ": ajv=" + a + " in-repo=" + mine); }
+          if (a) accepted++; else rejected++;
+        }
+        console.log("cases=" + Object.keys(cases).length + " accepted=" + accepted + " rejected=" + rejected + " splits=" + splits);
+        process.exit(splits === 0 ? 0 : 1);
+      });
+    ' "$AAHP_ROOT"
+    echo "$output"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"splits=0"* ]]
+    # Both verdicts are exercised, so agreement is not agreement on "all valid".
+    [[ "$output" != *"accepted=0 "* ]]
+    [[ "$output" != *"rejected=0 "* ]]
+}
+
+@test "manifest validator: a schema format it does not implement is refused, never skipped" {
+    run node -e '
+      const url = require("url");
+      import(url.pathToFileURL(process.argv[1]).href).then(function (m) {
+        try {
+          m.assertSupported({ type: "object", properties: { a: { type: "string", format: "email" } } });
+          console.error("assertSupported accepted an unimplemented format");
+          process.exit(1);
+        } catch (e) {
+          if (e.code !== "AAHP_SCHEMA_UNSUPPORTED") { console.error("wrong code " + e.code); process.exit(1); }
+          console.log("refused-format");
+        }
+        try {
+          m.assertSupported({ type: "object", properties: { a: { $ref: "https://example.com/s.json" } } });
+          console.error("assertSupported accepted a remote $ref");
+          process.exit(1);
+        } catch (e) {
+          if (e.code !== "AAHP_SCHEMA_UNSUPPORTED") { console.error("wrong code " + e.code); process.exit(1); }
+          console.log("refused-ref");
+        }
+      });
+    ' "$AAHP_ROOT/scripts/aahp-schema.mjs"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"refused-format"* ]]
+    [[ "$output" == *"refused-ref"* ]]
+}
+
 @test "doctor: --quiet prints only failing gates" {
     scaffold_conformant
     # Fail grounding only (no Provenance column). Do not delete an indexed file:

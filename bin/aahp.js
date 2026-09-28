@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-// aahp -AI-to-AI Handoff Protocol CLI
+// aahp: AI-to-AI Handoff Protocol CLI
 // Usage: aahp <command> [path] [options]
 // (as `aahp` when installed; the unscoped public name `aahp` is not owned
 // by this project, so it must never be invoked by that unscoped name.)
@@ -14,11 +14,10 @@
 //   migrate-grounding [path]  Add the Grounded Reflection Layer to an existing project
 //   verify [path]     Run the canonical handoff gate (checksum + drift + TTL)
 //   check [path]      Run the config-driven governance gates as one aggregate
+//   criteria [path]   Advisory acceptance-criteria report (never a gate)
 //   archive [path]    Rotate or verify LOG.md -> LOG-ARCHIVE.md
-
 //   status [path]     Show a quick state summary from MANIFEST.json
 //   doctor [path]     Conformance self-check; emits a JSON conformance record
-
 //
 // Options:
 //   --help, -h        Show this help message
@@ -28,8 +27,9 @@ import { fileURLToPath } from 'node:url'
 import { dirname, join, resolve } from 'node:path'
 import { existsSync, mkdirSync, copyFileSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { spawn, spawnSync } from 'node:child_process'
+import { constants as osConstants } from 'node:os'
 import { resolveBash, toBashPath } from '../scripts/aahp-config.mjs'
-import { validateConfigObject, formatConfigErrors } from '../scripts/aahp-schema.mjs'
+import { validateConfigObject, formatConfigErrors, validateManifestObject } from '../scripts/aahp-schema.mjs'
 import { audit as auditVerifyWorkflow } from '../scripts/check-verify-workflow.mjs'
 
 const __filename = fileURLToPath(import.meta.url)
@@ -49,7 +49,7 @@ function getVersion() {
 function printHelp() {
   const version = getVersion()
   console.log(`
-aahp v${version} -AI-to-AI Handoff Protocol CLI
+aahp v${version}: AI-to-AI Handoff Protocol CLI
 
 Usage:
   aahp <command> [path] [options]
@@ -58,17 +58,21 @@ Commands:
   init [path]       Initialize .ai/handoff/ directory with AAHP templates
   manifest [path]   (Re)generate MANIFEST.json from existing handoff files
   lint [path]       Validate handoff files for safety violations
-  migrate [path]    Migrate an AAHP v1 project to v2/v3
+  migrate [path]    Migrate an AAHP v1 project to v2/v3 (generates MANIFEST.json;
+                    reports the remaining manual steps, changes nothing else)
   migrate-grounding [path]  Add the Grounded Reflection Layer to an existing project
-  verify [path]     Run the canonical handoff gate (checksum + drift + TTL)
+  verify [path]     Run the canonical handoff gate (checksum + drift + pointer + TTL)
   check [path]      Run the config-driven governance gates as one aggregate
   criteria [path]   ADVISORY report on the acceptance-criteria lifecycle.
                     Not a gate: it is not part of the check command and always
                     exits 0 unless the report itself cannot run. A clean report
                     is not proof; see the blind spots in README Section 8.7.
-  archive [path]    Rotate or verify LOG.md -> LOG-ARCHIVE.md
+  archive [path]    Rotate or verify LOG.md -> LOG-ARCHIVE.md (requires Python 3)
   status [path]     Show a quick state summary from MANIFEST.json
   doctor [path]     Conformance self-check; emits a JSON conformance record
+
+manifest, lint, migrate, migrate-grounding, verify and archive run bash scripts
+(on Windows: Git Bash or WSL).
 
 Init options:
   --gates           Scaffold governance-only config (aahp.config.json + a
@@ -86,13 +90,35 @@ Manifest options:
   --session-id ID   Session identifier (default: auto-generated)
   --phase PHASE     Pipeline phase: research|architecture|implementation|review|fix|idle|documentation
   --context "TEXT"  Quick context string
-  --duration MIN    Session duration in minutes
+  --duration MIN    Session duration in whole minutes
+  --force           Regenerate even when the existing MANIFEST.json cannot be
+                    read or has fields that cannot be carried over (they are lost)
   --quiet           Suppress output except errors
+  (manifest needs Node.js and replaces MANIFEST.json atomically)
+
+Lint options:
+  (none)            Takes only [path]. Its MANIFEST checksum comparison needs
+                    Python 3 (python3 or python on PATH). The handoff
+                    integrity gate is aahp verify, not lint.
 
 Verify options:
-  --level LEVEL     Layers to run: precommit|prepush|full|ci (default: full)
+  --level LEVEL     Layers to run (default: full):
+                      precommit  layers 1-2: checksum integrity + drift gate
+                      prepush    layers 1-4: adds commit pointer + TRUST TTL
+                      full       the same layers as prepush (the default)
+                      ci         layers 1-4 and ignores AAHP_SKIP_VERIFY
   --base SHA        Exact Layer 2 base commit (required at --level ci)
   --quiet           Suppress per-check OK output, keep failures
+
+Archive options (requires Python 3, as python3 or python on PATH):
+  --keep N          Keep the N newest LOG.md entries (default: 10)
+  --verify          Check LOG-ARCHIVE.md against its index and that LOG.md
+                    holds at most N entries; writes nothing
+
+Migrate options:
+  --yes, -y         Regenerate an existing MANIFEST.json without asking.
+                    Without it, the answer is read from stdin, and a stdin
+                    with no answer (not a terminal, nothing piped) is an error.
 
 Doctor options:
   --governance      Governance-only record; skips the 3 handoff gates without
@@ -112,10 +138,11 @@ unscoped name aahp is owned by nobody, so never invoke that.
   aahp init ./my-project       # Initialize in a specific project
   aahp manifest --phase implementation --agent claude-sonnet
   aahp lint ./my-project
-  aahp migrate
+  aahp migrate --yes           # Non-interactive (CI, scripts)
   aahp migrate-grounding       # Add the Grounded Reflection Layer to an existing project
-  aahp verify --level ci      # CI gate (no escape hatch)
-  aahp archive --verify       # Verify LOG archive integrity
+  aahp verify --level ci       # CI gate (no escape hatch)
+  aahp archive --keep 20       # Rotate, keeping the 20 newest LOG.md entries
+  aahp archive --verify        # Verify LOG archive integrity
 `)
 }
 
@@ -155,7 +182,7 @@ function extractPathAndFlags(rest) {
       targetPath = arg
       pathFound = true
     } else {
-      // Extra positional arg -pass through as-is
+      // Extra positional arg: pass through as-is
       flags.push(arg)
     }
   }
@@ -164,7 +191,7 @@ function extractPathAndFlags(rest) {
 }
 
 // ---------------------------------------------------------------------------
-// init command -implemented in Node.js
+// init command, implemented in Node.js
 // ---------------------------------------------------------------------------
 
 function cmdInit(targetPath, flags) {
@@ -372,8 +399,10 @@ function cmdStatus(targetPath) {
   }
 
   let manifest
+  let manifestText
   try {
-    manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
+    manifestText = readFileSync(manifestPath, 'utf8')
+    manifest = JSON.parse(manifestText)
   } catch (err) {
     console.error(`Error: MANIFEST.json parse failed: ${err.message}`)
     process.exit(1)
@@ -412,7 +441,11 @@ function cmdStatus(targetPath) {
     }
   }
 
-  const manifestPathLines = files['MANIFEST.json']?.lines
+  // MANIFEST.json cannot index itself (the generator never writes a
+  // files['MANIFEST.json'] entry), so reading the count from files{} printed
+  // `?` on every manifest. It is counted from the file just read instead, with
+  // the same newline-count semantics as `wc -l` in aahp_line_count.
+  const manifestPathLines = (manifestText.match(/\n/g) || []).length
   const nextActionsLines = files['NEXT_ACTIONS.md']?.lines
 
   let previewTasks = Object.entries(tasks)
@@ -452,17 +485,17 @@ function cmdStatus(targetPath) {
 }
 
 // ---------------------------------------------------------------------------
-// doctor command -conformance self-check emitting a machine-readable JSON record
+// doctor command: conformance self-check emitting a machine-readable JSON record
 //
 // Asserts CONFORMANCE (not just drift) against the AAHP contract and emits a
 // record aahp-hub can ingest to render a fleet matrix. Implemented Node-native
 // (like status) because it must assemble JSON and stay cross-platform (the bash
 // path has documented MSYS/Windows fragility). Gate statuses:
-//   pass    -conforms
-//   fail    -present but wrong
-//   missing -a required thing is absent (e.g. an unpinned/absent dep)
-//   skip    -not applicable here (e.g. no CHANGELOG.md, no versionSites)
-//   self    -this repo IS @elvatis_com/aahp, so it does not pin itself
+//   pass    conforms
+//   fail    present but wrong
+//   missing a required thing is absent (e.g. an unpinned/absent dep)
+//   skip    not applicable here (e.g. no CHANGELOG.md, no versionSites)
+//   self    this repo IS @elvatis_com/aahp, so it does not pin itself
 // ---------------------------------------------------------------------------
 
 function readJsonSafe(path) {
@@ -693,43 +726,36 @@ function gateHandoffSet(handoffDir) {
   }
 }
 
+// manifest-schema gate: MANIFEST.json against the WHOLE of
+// schema/aahp-manifest.schema.json.
+//
+// This gate used to hand-check a structural subset (required keys, the phase
+// enum, the checksum pattern) and then print "structural checks against
+// aahp-manifest.schema.json pass". The subset had no formats, no task status or
+// priority enums, no lengths and no additionalProperties, so a manifest whose
+// task says `"created": "[ISO-8601]"`, which is exactly what `aahp init` plus
+// `aahp manifest` leaves behind from the template, passed here while the ajv
+// run in CI rejects it. A pass line naming the schema was a claim the gate did
+// not check. It now runs the in-repo validator (scripts/aahp-schema.mjs, Node
+// built-ins only, ADR-002) over the full schema, and a schema keyword that
+// validator does not implement is an error, never a silent pass.
 function gateManifestSchema(handoffDir) {
   const manifest = readJsonSafe(join(handoffDir, 'MANIFEST.json'))
   if (!manifest) return { status: 'fail', reason: 'MANIFEST.json missing or invalid JSON' }
-  const isStr = (v) => typeof v === 'string'
-  const errs = []
-  if (!isStr(manifest.aahp_version) || !/^\d+\.\d+$/.test(manifest.aahp_version)) errs.push('aahp_version must match \\d+.\\d+')
-  if (!isStr(manifest.project) || !manifest.project) errs.push('project must be a non-empty string')
-  const ls = manifest.last_session
-  if (!ls || typeof ls !== 'object') {
-    errs.push('last_session missing')
-  } else {
-    if (!isStr(ls.agent)) errs.push('last_session.agent missing')
-    if (!isStr(ls.timestamp)) errs.push('last_session.timestamp missing')
-    if (!['research', 'architecture', 'implementation', 'review', 'fix', 'idle', 'documentation'].includes(ls.phase)) errs.push('last_session.phase invalid')
+  let errs
+  try {
+    errs = validateManifestObject(manifest)
+  } catch (err) {
+    return { status: 'fail', reason: `MANIFEST.json could not be validated: ${err.message}` }
   }
-  if (!isStr(manifest.quick_context)) errs.push('quick_context must be a string')
-  const files = manifest.files
-  if (!files || typeof files !== 'object') {
-    errs.push('files object missing')
-  } else {
-    for (const [name, e] of Object.entries(files)) {
-      if (!e || typeof e !== 'object') { errs.push(`files.${name} malformed`); continue }
-      if (!isStr(e.checksum) || !/^sha256:[a-f0-9]{64}$/.test(e.checksum)) errs.push(`files.${name}.checksum invalid`)
-      if (!isStr(e.updated)) errs.push(`files.${name}.updated missing`)
-      if (!Number.isInteger(e.lines) || e.lines < 0) errs.push(`files.${name}.lines invalid`)
-      if (!isStr(e.summary)) errs.push(`files.${name}.summary missing`)
-    }
+  if (errs.length) {
+    const shown = errs.slice(0, 5).map((e) => `${e.path === '' ? '(root)' : e.path}: ${e.message}`)
+    return { status: 'fail', reason: shown.join('; ') + (errs.length > 5 ? ` (+${errs.length - 5} more)` : '') }
   }
-  if ('next_task_id' in manifest && (!Number.isInteger(manifest.next_task_id) || manifest.next_task_id < 1)) errs.push('next_task_id must be an integer >= 1')
-  if (manifest.tasks && typeof manifest.tasks === 'object') {
-    for (const [id, t] of Object.entries(manifest.tasks)) {
-      if (!/^T-\d{3,}$/.test(id)) errs.push(`task id "${id}" invalid`)
-      else if (!t || !isStr(t.title) || !isStr(t.status)) errs.push(`task ${id} missing title/status`)
-    }
+  return {
+    status: 'pass',
+    reason: 'MANIFEST.json validates against schema/aahp-manifest.schema.json (every keyword, including enums and date-time formats)',
   }
-  if (errs.length) return { status: 'fail', reason: errs.slice(0, 5).join('; ') + (errs.length > 5 ? ` (+${errs.length - 5} more)` : '') }
-  return { status: 'pass', reason: 'structural checks against aahp-manifest.schema.json pass' }
 }
 
 function gateGrounding(handoffDir) {
@@ -990,7 +1016,7 @@ function cmdDoctor(targetPath, flags) {
       process.exit(1)
     }
     if (!quiet) {
-      console.log(`\naahp doctor -conformance for ${record.repo} (aahp v${record.aahpVersion})`)
+      console.log(`\naahp doctor: conformance for ${record.repo} (aahp v${record.aahpVersion})`)
       console.log('=========================================')
     }
     console.error(configProblem)
@@ -1057,7 +1083,7 @@ function cmdDoctor(targetPath, flags) {
 
   const labels = { pass: 'PASS', fail: 'FAIL', missing: 'MISSING', skip: 'SKIP', self: 'SELF' }
   if (!quiet) {
-    console.log(`\naahp doctor -conformance for ${record.repo} (aahp v${record.aahpVersion})`)
+    console.log(`\naahp doctor: conformance for ${record.repo} (aahp v${record.aahpVersion})`)
     console.log('=========================================')
   }
   for (const [k, v] of Object.entries(results)) {
@@ -1183,6 +1209,38 @@ function cmdCheck(targetPath, flags) {
   const knownGateIds = CHECK_GATES.map((g) => g.id)
   const unknownIds = [...(only || []), ...skip].filter((id) => !knownGateIds.includes(id))
   if (unknownIds.length > 0) {
+    // --json promises the record and nothing else on stdout. This branch used
+    // to print its plain-text refusal even under --json, so a dashboard reading
+    // the record got an unparseable line and no gate map. The record has the
+    // same shape as the invalid-config record above: every gate `unevaluated`,
+    // config.valid false, and the offending ids named in config.errors.
+    if (jsonOnly) {
+      const reason = `aahp.config.json selects gate id(s) that do not exist (${unknownIds.join(', ')}), so no gate ran`
+      const gates = {}
+      const gateOutcomes = {}
+      for (const gate of CHECK_GATES) {
+        gates[gate.id] = 'unevaluated'
+        gateOutcomes[gate.id] = { outcome: OUTCOME.UNEVALUATED, reason }
+      }
+      const errors = unknownIds.map((id) => ({
+        path: (only || []).includes(id) ? '/check/only' : '/check/skip',
+        message: `unknown gate id "${id}"; known gate ids: ${knownGateIds.join(', ')}`,
+      }))
+      const record = {
+        schemaVersion: 2,
+        command: 'check',
+        repo: deriveRepo(targetPath, pkg || {}),
+        aahpVersion: getVersion(),
+        config: { valid: false, errors },
+        gates,
+        gateOutcomes,
+        evaluated: 0,
+        total: CHECK_GATES.length,
+        checkedAt: new Date().toISOString(),
+      }
+      process.stdout.write(JSON.stringify(record, null, 2) + '\n')
+      process.exit(1)
+    }
     console.log('=========================================')
     console.log(
       `Governance NOT EVALUATED: aahp.config.json selects gate id(s) that do not exist: ${unknownIds.join(', ')}.`,
@@ -1305,7 +1363,7 @@ function cmdCriteria(targetPath) {
   process.exit(r.status ?? 1)
 }
 
-// Shell script commands -spawn bash scripts
+// Shell script commands: spawn bash scripts
 //
 // The bash scripts already handle their own argument parsing, including
 // the optional [path] first positional argument and all --flags.
@@ -1349,8 +1407,16 @@ function runScript(scriptName, rest) {
     process.exit(1)
   })
 
-  child.on('close', (code) => {
-    process.exit(code ?? 0)
+  // A child killed by a signal closes with code === null. `code ?? 0` turned
+  // that into exit 0, so an OOM-killed or SIGKILLed `aahp verify`, `lint` or
+  // `manifest` reported success, and the git hooks fall back to this entry
+  // point. It now exits 128 + the signal number, the shell convention (137 for
+  // SIGKILL), and says why; 1 if the number is unknown. Never 0.
+  child.on('close', (code, signal) => {
+    if (code !== null) process.exit(code)
+    console.error(`Error: ${scriptName} was terminated by signal ${signal ?? '(unknown)'}; treating it as a failure.`)
+    const signum = signal ? osConstants.signals[signal] : undefined
+    process.exit(Number.isInteger(signum) ? 128 + signum : 1)
   })
 }
 

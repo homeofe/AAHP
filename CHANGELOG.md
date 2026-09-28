@@ -27,6 +27,12 @@ independently of the npm version).
 - Red-control tests for `assert-pinning-gate-wired.mjs`, `assert-doc-shape-wired.mjs` and
   `assert-workflow-parser-parity.mjs`; `tests/README.md` with the suite's rules, covered
   by `tests/bats-hygiene.bats`.
+- `aahp manifest --force` regenerates even when the existing MANIFEST.json cannot be read
+  or holds fields that cannot be carried over (that data is dropped).
+- `aahp migrate --yes` / `-y` for non-interactive regeneration of an existing
+  MANIFEST.json.
+- `aahp --help` and README document archive's Python 3 requirement, `--keep N`,
+  `--verify`, lint options and every `verify --level`.
 
 ### Changed
 
@@ -40,6 +46,26 @@ independently of the npm version).
   `install-hooks.sh`.
 - The test fixture repository is built once per bats run and copied per test: setup cost
   per test drops from about 22 to 7 ms on Linux and from about 595 to 201 ms on Windows.
+- `aahp manifest` requires Node.js and builds MANIFEST.json in one node process;
+  generation for this repository on Windows went from 9.3 s to 0.8 s.
+- One token estimator for every tier (the larger of 1.3 tokens per word and 1 token per 4
+  bytes), and `token_budget.manifest_only` is measured from the generated file instead of
+  the constant 85.
+- `check-conflict-markers.mjs` scans git-listed files plus `.ai/handoff` and exits 2 when
+  it cannot run.
+- `aahp doctor`'s manifest-schema gate validates the whole
+  `schema/aahp-manifest.schema.json` (enums, lengths, additional keys, RFC 3339 dates).
+  Migration: a manifest with template placeholder dates such as `"[ISO-8601]"` now fails
+  doctor, as it already failed ajv; replace or remove leftover template tasks before
+  upgrading if doctor runs in CI or the pre-push hook.
+- Migration: a `generate.log` config with no `target`, or with a target on the agent
+  journal, now fails; point `generate.log.target` at a separate file such as
+  `docs/RELEASES.md`.
+
+### Removed
+
+- `_aahp-lib.sh` helpers `aahp_file_mtime`, `aahp_auto_summary`, `aahp_estimate_tokens`
+  and `aahp_file_entry_json`, used only by the old generator.
 
 ### Fixed
 
@@ -73,6 +99,42 @@ independently of the npm version).
 - Tests: the fixture repository is isolated from the machine's global and system git
   config, from repository variables leaked by git hooks, and from repositories above the
   temp directory (`GIT_CEILING_DIRECTORIES`).
+- `aahp manifest` no longer writes invalid JSON or invalid UTF-8 with exit 0 (a TAB, a
+  quote, a backslash or a multi-byte character at a truncation point); the file is
+  replaced atomically and any failure leaves it byte-identical.
+- `aahp manifest` no longer drops `tasks`, `next_task_id`, `cross_repo_ref` or `project`
+  silently when node is missing or the existing manifest is unreadable, and a checksum
+  failure is no longer written as an empty checksum.
+- `quick_context` is no longer escaped twice, `--duration` must be a whole number, and
+  `files.*.updated` keeps its date while the checksum is unchanged.
+- File summaries skip tables, JSON punctuation, bookkeeping labels, fenced code and HTML
+  comments.
+- `aahp lint` reads handoff bytes as text: one NUL byte no longer hides a secret or an
+  email address, an invalid UTF-8 byte no longer hides a secret, and a scan that cannot
+  complete is a violation.
+- `aahp lint` scans every handoff file for injection phrases, including MANIFEST.json,
+  LOG-ARCHIVE.index.json and pii-allowlist.json and their decoded JSON string values, and
+  opens MANIFEST.json as UTF-8 on any console code page.
+- A conflict-marker check that could not run is no longer reported as "markers found".
+- `templates/MANIFEST.json` validates against the schema after `aahp init` + `aahp
+  manifest`, with `aahp_version` 3.0 and the complete phase list.
+- `aahp verify`, `lint`, `manifest`, `migrate` and `archive` no longer exit 0 when their
+  bash process is killed by a signal; the CLI exits 128 plus the signal number and says
+  so.
+- `aahp check --json` emits only the JSON record, with every gate `unevaluated` and the
+  unknown ids in `config.errors`, when `config.check` names a gate that does not exist.
+- `aahp status` prints the real MANIFEST.json line count instead of `?`.
+- The release-journal generator refuses `.ai/handoff/LOG.md`, `LOG-ARCHIVE.md`,
+  `LOG-ARCHIVE.index.json` or an unset target, and `aahp.config.example.json` points it at
+  `docs/RELEASES.md` instead of the agent journal.
+- `aahp migrate`: a LOG.md with no entries no longer triggers `integer expression
+  expected`, a missing answer on stdin is a clear error, and the script, help and README
+  no longer claim it splits LOG.md or adds section markers or TTL columns.
+- The CLI help banner and doctor header read `aahp vX.Y.Z: AI-to-AI ...` and `aahp doctor:
+  conformance for ...` instead of broken ` -Word` text.
+- Tests: the manifest preservation tests fail instead of skipping when tasks,
+  `next_task_id` or `project` are lost, and the injection-pattern test proves each pattern
+  on its own phrase.
 
 ## [3.12.0] - 2026-08-31
 

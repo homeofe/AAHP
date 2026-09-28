@@ -282,19 +282,118 @@ EOF
     [[ "$output" == *"Current version"* ]]
 }
 
-@test "generator: writes a LOG release journal from CHANGELOG and --check agrees" {
+@test "generator: writes the release journal to its own file, --check agrees, LOG.md is untouched" {
     mkpkg "2.0.0"
     valid_changelog
     mkconfig <<'EOF'
-{ "generate": { "log": { "source": "CHANGELOG.md", "target": ".ai/handoff/LOG.md", "title": "Fx: Release Journal" } } }
+{ "generate": { "log": { "source": "CHANGELOG.md", "target": "docs/RELEASES.md", "title": "Fx: Release Journal" } } }
 EOF
     # aahp-manifest.sh regen needs the standard handoff files present.
     create_full_handoff "$TEST_TMPDIR/.ai/handoff"
+    cp "$TEST_TMPDIR/.ai/handoff/LOG.md" "$TEST_TMPDIR/journal.before"
     run node "$DASH" "$TEST_TMPDIR"
     [ "$status" -eq 0 ]
-    grep -q "Fx: Release Journal" "$TEST_TMPDIR/.ai/handoff/LOG.md"
-    grep -q "| v2.0.0 | 2026-02-01 | second |" "$TEST_TMPDIR/.ai/handoff/LOG.md"
-    grep -q "| v1.0.0 | 2026-01-01 | first |" "$TEST_TMPDIR/.ai/handoff/LOG.md"
+    # docs/ did not exist; the generator creates the directory.
+    grep -q "Fx: Release Journal" "$TEST_TMPDIR/docs/RELEASES.md"
+    grep -q "| v2.0.0 | 2026-02-01 | second |" "$TEST_TMPDIR/docs/RELEASES.md"
+    grep -q "| v1.0.0 | 2026-01-01 | first |" "$TEST_TMPDIR/docs/RELEASES.md"
+    cmp -s "$TEST_TMPDIR/journal.before" "$TEST_TMPDIR/.ai/handoff/LOG.md"
     run node "$DASH" "$TEST_TMPDIR" --check
     [ "$status" -eq 0 ]
+    [[ "$output" == *"docs/RELEASES.md in sync with CHANGELOG.md"* ]]
+}
+
+# --- generator: the agent journal is never a release-journal target (ADR-004) --
+#
+# The generator overwrites its target with writeFileSync. The target used to
+# default to .ai/handoff/LOG.md and aahp.config.example.json pointed it there,
+# so an adopter who copied the example lost every session entry in LOG.md on the
+# first handoff-refresh. Measured at 1917ca8 with that config: exit 0,
+# "handoff-refresh OK: regenerated .ai/handoff/LOG.md", journal sentinel gone.
+
+# $1 = the generate.log.target value, written into the config verbatim.
+_journal_target_fixture() {
+    mkpkg "2.0.0"
+    valid_changelog
+    create_full_handoff "$TEST_TMPDIR/.ai/handoff"
+    echo "SENTINEL-agent-journal-entry" >> "$TEST_TMPDIR/.ai/handoff/LOG.md"
+    printf '# Archived Agent Journal\n\nSENTINEL-archive\n' > "$TEST_TMPDIR/.ai/handoff/LOG-ARCHIVE.md"
+    printf '{ "generate": { "log": { "source": "CHANGELOG.md", "target": "%s" } } }\n' "$1" \
+        > "$TEST_TMPDIR/aahp.config.json"
+}
+
+@test "generator: refuses to write the release journal over LOG.md, and LOG.md survives" {
+    _journal_target_fixture ".ai/handoff/LOG.md"
+    run node "$DASH" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"refuses to write there"* ]]
+    [[ "$output" == *"ADR-004"* ]]
+    grep -q "SENTINEL-agent-journal-entry" "$TEST_TMPDIR/.ai/handoff/LOG.md"
+    # `! grep` alone never fails a bats test (errexit ignores a negated command).
+    if grep -q "Release Journal" "$TEST_TMPDIR/.ai/handoff/LOG.md"; then false; fi
+}
+
+@test "generator: --check refuses a LOG.md target too, instead of calling the journal stale" {
+    _journal_target_fixture ".ai/handoff/LOG.md"
+    run node "$DASH" "$TEST_TMPDIR" --check
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"refuses to write there"* ]]
+    [[ "$output" != *"is stale"* ]]
+}
+
+@test "generator: refuses LOG-ARCHIVE.md, LOG-ARCHIVE.index.json and spellings that reach LOG.md" {
+    local t
+    for t in ".ai/handoff/LOG-ARCHIVE.md" ".ai/handoff/LOG-ARCHIVE.index.json" \
+             "docs/../.ai/handoff/LOG.md" "./.ai/handoff/LOG.md" ".ai/handoff/log.md"; do
+        _journal_target_fixture "$t"
+        run node "$DASH" "$TEST_TMPDIR"
+        [ "$status" -eq 1 ] || { echo "target '$t' was not refused: $output"; false; }
+        [[ "$output" == *"refuses to write there"* ]] || { echo "target '$t': $output"; false; }
+        grep -q "SENTINEL-agent-journal-entry" "$TEST_TMPDIR/.ai/handoff/LOG.md"
+        grep -q "SENTINEL-archive" "$TEST_TMPDIR/.ai/handoff/LOG-ARCHIVE.md"
+    done
+}
+
+@test "generator: a symlink onto LOG.md is refused" {
+    _journal_target_fixture "docs/RELEASES.md"
+    mkdir -p "$TEST_TMPDIR/docs"
+    ln -s "../.ai/handoff/LOG.md" "$TEST_TMPDIR/docs/RELEASES.md" 2>/dev/null \
+        && [ -L "$TEST_TMPDIR/docs/RELEASES.md" ] || skip "symlinks are not available here"
+    run node "$DASH" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"refuses to write there"* ]]
+    grep -q "SENTINEL-agent-journal-entry" "$TEST_TMPDIR/.ai/handoff/LOG.md"
+}
+
+@test "generator: an unset target is refused; it no longer defaults to LOG.md" {
+    mkpkg "2.0.0"
+    valid_changelog
+    create_full_handoff "$TEST_TMPDIR/.ai/handoff"
+    echo "SENTINEL-agent-journal-entry" >> "$TEST_TMPDIR/.ai/handoff/LOG.md"
+    mkconfig <<'EOF'
+{ "generate": { "log": { "source": "CHANGELOG.md" } } }
+EOF
+    run node "$DASH" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"generate.log.target is not set"* ]]
+    grep -q "SENTINEL-agent-journal-entry" "$TEST_TMPDIR/.ai/handoff/LOG.md"
+}
+
+@test "generator: the shipped aahp.config.example.json release-journal target is accepted and spares LOG.md" {
+    # Binds the example to the guard: copying the example's generate.log block
+    # into a project must work, and must leave the agent journal alone.
+    mkpkg "2.0.0"
+    valid_changelog
+    create_full_handoff "$TEST_TMPDIR/.ai/handoff"
+    echo "SENTINEL-agent-journal-entry" >> "$TEST_TMPDIR/.ai/handoff/LOG.md"
+    node -e '
+      const fs = require("fs");
+      const ex = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+      fs.writeFileSync(process.argv[2], JSON.stringify({ generate: { log: ex.generate.log } }, null, 2) + "\n");
+    ' "$AAHP_ROOT/aahp.config.example.json" "$TEST_TMPDIR/aahp.config.json"
+    run node "$DASH" "$TEST_TMPDIR"
+    [ "$status" -eq 0 ]
+    grep -q "SENTINEL-agent-journal-entry" "$TEST_TMPDIR/.ai/handoff/LOG.md"
+    # `! grep` alone never fails a bats test (errexit ignores a negated command).
+    if grep -q "Release Journal" "$TEST_TMPDIR/.ai/handoff/LOG.md"; then false; fi
 }

@@ -275,6 +275,48 @@ EOF
     [[ "$output" != *"Governance OK"* ]]
 }
 
+@test "check --json: an unknown gate id in config.check still emits ONLY the JSON record" {
+    # R15. The unknown-id refusal printed its plain-text lines even under --json,
+    # so the one invocation a dashboard parses got "=====..." and no record.
+    # Measured at 1917ca8: exit 1, stdout not JSON ("Unexpected token '='").
+    cat > "$TEST_TMPDIR/aahp.config.json" <<'EOF'
+{
+  "forbiddenPatterns": [ { "id": "nope", "pattern": "z{99}", "message": "x" } ],
+  "check": { "only": ["forbidden-paterns"], "skip": ["doc-lnks"] }
+}
+EOF
+    gadd
+    # stdout and stderr are merged by run: any stray line on either breaks the parse.
+    run node "$AAHP" check "$TEST_TMPDIR" --json
+    [ "$status" -eq 1 ]
+    printf '%s' "$output" | node -e '
+      let s=""; process.stdin.on("data",d=>s+=d).on("end",()=>{
+        const r=JSON.parse(s);
+        if (r.schemaVersion!==2 || r.command!=="check") process.exit(2);
+        if (!r.config || r.config.valid!==false) process.exit(3);
+        const msgs=r.config.errors.map((e)=>e.path+" "+e.message).join("\n");
+        if (!msgs.includes("/check/only") || !msgs.includes("forbidden-paterns")) process.exit(4);
+        if (!msgs.includes("/check/skip") || !msgs.includes("doc-lnks")) process.exit(5);
+        if (Object.keys(r.gates).length!==8) process.exit(6);
+        if (Object.values(r.gates).some((g)=>g!=="unevaluated")) process.exit(7);
+        if (Object.values(r.gateOutcomes).some((o)=>o.outcome!=="unevaluated")) process.exit(8);
+        if (r.evaluated!==0 || r.total!==8) process.exit(9);
+      });
+    '
+}
+
+@test "check (text): an unknown gate id keeps its human-readable refusal" {
+    cat > "$TEST_TMPDIR/aahp.config.json" <<'EOF'
+{ "check": { "only": ["forbidden-paterns"] } }
+EOF
+    gadd
+    run node "$AAHP" check "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Governance NOT EVALUATED"* ]]
+    [[ "$output" == *"Known gate ids"* ]]
+    [[ "$output" != *'"schemaVersion"'* ]]
+}
+
 # --- config.check.only: run ONLY the named gate(s) --------------------------
 
 @test "check: config.check.only runs only the named gate; others are skipped" {

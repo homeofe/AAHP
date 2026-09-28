@@ -21,7 +21,7 @@
   "generate": {
     "log": {
       "source": "CHANGELOG.md",
-      "target": ".ai/handoff/LOG.md",
+      "target": "docs/RELEASES.md",
       "title": "My Project: Release Journal"
     },
     "freshness": {

@@ -320,7 +320,7 @@ commit_reviewed_file() {
     printf '%s\n' '{"handoffImpact":{"nonImpactingModifiedFiles":[{"file":"docs/sensitive.md","reason":"Policy reached through a symlink."}]}}' \
         > "$TEST_TMPDIR/policy.json"
     ln -s policy.json "$TEST_TMPDIR/aahp.config.json"
-    [ -L "$TEST_TMPDIR/aahp.config.json" ] || skip "requires filesystem symlink support"
+    require_tool "requires filesystem symlink support" [ -L "$TEST_TMPDIR/aahp.config.json" ]
     git -C "$TEST_TMPDIR" add docs/sensitive.md policy.json aahp.config.json
     git -C "$TEST_TMPDIR" commit -q -m "track a symlinked policy"
     printf 'modified\n' >> "$TEST_TMPDIR/docs/sensitive.md"
@@ -470,7 +470,7 @@ try {
   process.stdout.write(path.resolve(dir, bin));
 } catch (e) {}
 ' 2>/dev/null)"
-    [ -n "$entry" ] || skip "ajv-cli not installed"
+    require_tool "ajv-cli not installed" [ -n "$entry" ]
 
     run node "$entry" validate --spec=draft2020 -c ajv-formats \
         -s "$AAHP_ROOT/schema/aahp-config.schema.json" \
@@ -490,7 +490,7 @@ try {
   process.stdout.write(path.resolve(dir, bin));
 } catch (e) {}
 ' 2>/dev/null)"
-    [ -n "$entry" ] || skip "ajv-cli not installed"
+    require_tool "ajv-cli not installed" [ -n "$entry" ]
 
     local cases=(
         '{"handoffImpact":{"nonImpactingModifiedFiles":{}}}'

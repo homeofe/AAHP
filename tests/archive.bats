@@ -42,7 +42,11 @@ EOF
     run bash "$SCRIPTS_DIR/aahp-archive.sh" "$TEST_TMPDIR" --keep 1
     [ "$status" -eq 0 ]
     grep -q "newest" "$TEST_TMPDIR/.ai/handoff/LOG.md"
-    ! grep -q "middle" "$TEST_TMPDIR/.ai/handoff/LOG.md"
+    # Not `! grep`: bash exempts a negated command from errexit, so a bare `!`
+    # that is not the last line of a test can never fail it (tests/README.md).
+    # Status 1 is "read the file, no match"; 2 (unreadable) is a failure too.
+    run grep -q "middle" "$TEST_TMPDIR/.ai/handoff/LOG.md"
+    [ "$status" -eq 1 ]
     grep -q "middle" "$TEST_TMPDIR/.ai/handoff/LOG-ARCHIVE.md"
     grep -q "oldest" "$TEST_TMPDIR/.ai/handoff/LOG-ARCHIVE.md"
 }

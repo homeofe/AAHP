@@ -2,6 +2,10 @@
   "version": 1,
   "entries": [
     {
+      "sha256": "dae9c795617de74b3467dc9a68b6e26b0d6a055650a2954173f6a3c635aa6100",
+      "title": "## [2026-07-18] claude-opus-4-8: Upstreaming release (aahp doctor + config-driven gates, v3.6.0)"
+    },
+    {
       "sha256": "73dac2bd88e91886108df8a84478af1f11ca51bcffb7343bc01a40c641cff5af",
       "title": "## [2026-06-26] Codex: Fix manifest badge schema for AAHP JSON files"
     },

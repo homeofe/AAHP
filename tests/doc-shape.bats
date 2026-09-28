@@ -353,8 +353,8 @@ EOF
 
 @test "doc-shape: outside a git work tree the gate exits 2" {
     # Same technique as gates-portability.bats: setup() git-inits TEST_TMPDIR and
-    # the mktemp base has no git-repo ancestor, so removing .git puts the target
-    # genuinely outside any work tree. The sibling gates exit 1 there; this one
+    # exports GIT_CEILING_DIRECTORIES as the mktemp base, so removing .git puts
+    # the target genuinely outside any work tree. The sibling gates exit 1 there; this one
     # exits 2, because "I could not enumerate" is not "I enumerated and found
     # nothing wrong" and it is not "I found something wrong" either.
     seed_repo
@@ -403,6 +403,48 @@ EOF
     run node "$AAHP_ROOT/tests/assert-doc-shape-wired.mjs" "$AAHP_ROOT"
     [ "$status" -eq 0 ]
     [[ "$output" == *"doc-shape gate wiring OK"* ]]
+}
+
+# Red controls for the wiring assertion, which was only ever run green. Each
+# mutates ONE field of a copy of the real package.json / aahp.config.json via
+# node on parsed JSON, proves it landed, and expects exit 1.
+docshape_wiring_copy() {
+    cp "$AAHP_ROOT/package.json" "$AAHP_ROOT/aahp.config.json" "$TEST_TMPDIR/"
+}
+docshape_wiring_mutate() {
+    node -e '
+      const fs = require("fs"), p = process.argv[1] + "/" + process.argv[2];
+      const doc = JSON.parse(fs.readFileSync(p, "utf8"));
+      new Function("doc", process.argv[3])(doc);
+      fs.writeFileSync(p, JSON.stringify(doc, null, 2) + "\n");
+    ' "$TEST_TMPDIR" "$1" "$2"
+}
+
+@test "doc-shape wiring red control: the untouched copy is green" {
+    docshape_wiring_copy
+    run node "$AAHP_ROOT/tests/assert-doc-shape-wired.mjs" "$TEST_TMPDIR"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"doc-shape gate wiring OK"* ]]
+}
+
+@test "doc-shape wiring red control: dropping the gate from the check chain is red" {
+    docshape_wiring_copy
+    docshape_wiring_mutate package.json 'doc.scripts.check = doc.scripts.check.replace(" && npm run check:doc-shape", "")'
+    run grep -c "check:doc-shape" "$TEST_TMPDIR/package.json"
+    [ "$output" = "1" ]
+    run node "$AAHP_ROOT/tests/assert-doc-shape-wired.mjs" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"check:doc-shape is not part of the aggregate"* ]]
+}
+
+@test "doc-shape wiring red control: narrowing docPaths below docLinks is red" {
+    docshape_wiring_copy
+    docshape_wiring_mutate aahp.config.json 'doc.docPaths.include = doc.docPaths.include.filter((e) => e !== "CLAUDE.md")'
+    run node -e 'const c = require(process.argv[1]); process.exit(c.docPaths.include.includes("CLAUDE.md") ? 1 : 0)' "$TEST_TMPDIR/aahp.config.json"
+    [ "$status" -eq 0 ]
+    run node "$AAHP_ROOT/tests/assert-doc-shape-wired.mjs" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"docPaths must cover everything docLinks reads"*"CLAUDE.md"* ]]
 }
 
 @test "doc-shape dogfood: this repository passes its own gate" {

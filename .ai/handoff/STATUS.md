@@ -4,8 +4,8 @@ Last updated: 2026-09-28
 Current package version: 3.12.0 (released 2026-08-31); unreleased changes are listed under
 `## [Unreleased]` in CHANGELOG.md
 Protocol version: 3.0
-Working state: audit fix programme in progress; this change is the consumer install path
-(`fix/consumer-install-path`)
+Working state: audit fix programme in progress; this change is test-suite integrity
+(`fix/test-suite-integrity`)
 
 ## Current objective
 
@@ -20,47 +20,51 @@ all fixes are in.
 | Workstream | Scope | State |
 |------------|-------|-------|
 | Dependency integration | five Dependabot PRs, scanner v6.3.1, expired TRUST rows | merged, #119 (`1917ca8`) |
-| Consumer install path | adopter verify workflow, propagate, install-hooks | this change |
-| Test-suite integrity | vacuous assertions, fail-open skips, git isolation, fixture speed | ready, next |
-| CLI | signal exit codes, doctor schema validation, migrate, help | ready; lands with or after the manifest workstream (template dependency) |
-| Manifest, lint and shared lib | JSON generation, binary-safe scans, injection scan scope, template | in progress |
-| Verify gate semantics | executable TRUST claims with grace, content-based Layer 2 exemption, Layer 3 | in progress |
-| CI and release | scanner on tags, publish guard, Dependabot grouping and cooldown | in progress |
+| Consumer install path | adopter verify workflow, propagate, install-hooks | merged, #120 (`3e8e8d7`) |
+| Test-suite integrity | vacuous assertions, fail-open skips, git isolation, fixture speed | this change |
+| CLI | signal exit codes, doctor schema validation, migrate, help | ready; lands with the manifest workstream (template dependency) |
+| Manifest, lint and shared lib | JSON generation, binary-safe scans, injection scan scope, template | ready, next |
+| Verify gate semantics | executable TRUST claims with grace, content-based Layer 2 exemption, Layer 3 | ready |
+| CI and release | scanner on tags, publish guard, Dependabot grouping and cooldown | ready |
 | Documentation | README split, ADR fixes, redaction of internal details | after the code workstreams |
 | Full ASCII | replace non-ASCII in tracked text, widen the gate | last |
 
-## This change: consumer install path
+## This change: test-suite integrity
 
-The shipped verify workflow could not run in any consumer. Measured on 2026-09-28 across
-24 consumer repositories: none ran it unchanged. Each had replaced its steps, in three
-different ways, and six fetched the CLI at runtime without a lockfile.
+A read-only review of the bats suite found tests that could not fail. This change makes
+them fail, and adds guards so the patterns cannot come back.
 
-- New adopter workflow `assets/governance/aahp-verify.yml`: `npm ci --ignore-scripts`, then
-  the lockfile-pinned CLI by path for `verify --level ci` and `doctor`. AAHP's own
-  `.github/workflows/aahp-verify.yml` keeps running the working-tree gate, is no longer
-  shipped in the npm package, and a parity test holds the two files to the same shape.
-- `scripts/propagate.sh` installs the adopter workflow, vendors the complete helper
-  closure (`check-conflict-markers.mjs` and `validate-pii-allowlist.py` were missing, so
-  every vendored lint reported conflict markers), checks that closure after copying,
-  makes a failed baseline verification fatal, accepts linked worktrees, and exits 3 before
-  writing anything when the target does not lock `@elvatis_com/aahp`.
-- `scripts/install-hooks.sh` resolves the hooks directory with `git rev-parse --git-path
-  hooks` (hooks installed from a linked worktree were inert), strips CR, replaces a
-  symlinked hook instead of writing through it, and never overwrites an earlier backup.
-  `.gitattributes` checks out `scripts/hooks/*` with LF.
-- README Quickstart re-measured end to end; the global-install option is replaced by what
-  it loses.
+- Dead negations: in bats a bare `! cmd` that is not the last command of a test never
+  fails it. `tests/archive.bats` and two `tests/migrate-grounding.bats` preconditions
+  used it; they now assert the exit status. `npm run check` runs a new
+  `check:bats-negations` guard (`tests/assert-bats-negations.mjs`) over every test file.
+- Fail-open skips: prerequisite checks for ajv-cli, python and symlinks skipped when the
+  lookup broke, so a broken lookup looked green. `require_tool` skips locally and fails
+  when `CI` is set, and `scripts/run-bats.mjs` fails a CI run on any skip not in its
+  explicit allowlist.
+- Wiring checks that were only ever run green now have red controls.
+- Assertions that only checked for missing output also require exit 0 and a positive
+  result, so a crash cannot pass them.
+- Isolation: tests no longer read the machine's global or system git config, repository
+  variables leaked by git hooks, or repositories above the temp directory.
+- Speed: the git fixture is built once per run and copied per test (setup cost per test
+  about 22 to 7 ms on Linux, about 595 to 201 ms on Windows, measured by micro-benchmark).
+- `scripts/run-bats.mjs` refuses a first-on-PATH bash older than 4.1, where a failing
+  `[[ ]]` that is not the last command does not fail a test; `AAHP_ALLOW_OLD_BASH=1`
+  overrides.
 
 ## Validation
 
-- Workstream tree on a Linux runner: `npm test` 629 of 629 passed, 0 skipped; 20 mutation
-  proofs, each red with its fix reverted and green restored; ShellCheck clean on
-  propagate, install-hooks and both hooks; `npm pack --dry-run` lists the adopter
-  workflow and no longer the dogfood one.
-- New tests execute every `run:` step of the installed workflow in a real npm consumer
-  built from the packed tarball, green on an adopt commit and red on a drifted one.
-- Not measured: macOS (bash 3.2, BSD tools) and Windows Git Bash runs of the changed
-  scripts. The GitHub Actions run on this pull request is the CI verdict.
+- Workstream tree on a Linux runner: `npm test` 627 of 627 passed, 0 skipped; mutation
+  proofs for each item (the old tests stayed green against a mutated implementation, the
+  new ones went red).
+- Rebased onto `3e8e8d7`: the negation guard reported its only exemption, for
+  `tests/propagate.bats`, as stale (#120 fixed that line). With nothing left to exempt,
+  the exemption mechanism and its test were removed, so a dead negation can only be
+  fixed, never listed. It scans 28 files clean, including `tests/install-hooks.bats`.
+- Not measured: macOS. The full-suite wall time on the shared runner was dominated by
+  load from parallel work, so the speed claim rests on the micro-benchmarks. The GitHub
+  Actions run on this pull request is the CI verdict.
 
 ## Owner decisions
 
@@ -81,14 +85,17 @@ Decided on 2026-09-28:
 Open:
 
 1. `propagate.sh` now refuses a target that does not lock `@elvatis_com/aahp` (exit 3),
-   because the installed workflow cannot run without it. Is a non-npm consumer a
-   supported case?
+   because the installed workflow cannot run without it. Is a non-npm consumer a supported
+   case?
 2. Should `aahp init` gain an option to scaffold the adopter verify workflow?
 3. Keep the dogfood workflow out of the npm package (this change removes it)?
 4. Legacy adopter copies of the governance workflow: doctor detection or a force-upgrade
    path beyond the migration note.
 5. Replacement of `ajv-cli@5.0.0`, whose transitive tree emits deprecation warnings for
    `glob@7.2.3` and `inflight@1.0.6` (no vulnerability reported, no newer release).
+6. The test runner now refuses a first-on-PATH bash older than 4.1 (macOS `/bin/bash` is
+   3.2), because bats cannot fail a non-final `[[ ]]` there. Keep the refusal (override
+   `AAHP_ALLOW_OLD_BASH=1`), or convert assertions instead?
 
 ## Constraints for the next agent
 

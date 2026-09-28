@@ -714,3 +714,46 @@ EOF
     [ "$status" -eq 0 ]
     [[ "$output" == *"pinning gate wiring OK"* ]]
 }
+
+# Red controls for the assertion above. It was only ever run in the green
+# direction, so an assertion that always printed OK would have passed too. Each
+# test mutates ONE thing in a copy of the real package.json (node on parsed
+# JSON), proves the mutation landed, and expects exit 1.
+pinning_wiring_copy() {
+    cp "$AAHP_ROOT/package.json" "$AAHP_ROOT/package-lock.json" "$TEST_TMPDIR/"
+}
+pinning_wiring_mutate() {
+    node -e '
+      const fs = require("fs"), p = process.argv[1] + "/package.json";
+      const pkg = JSON.parse(fs.readFileSync(p, "utf8"));
+      new Function("pkg", process.argv[2])(pkg);
+      fs.writeFileSync(p, JSON.stringify(pkg, null, 2) + "\n");
+    ' "$TEST_TMPDIR" "$1"
+}
+
+@test "wiring red control: the untouched copy is green" {
+    pinning_wiring_copy
+    run node "$AAHP_ROOT/tests/assert-pinning-gate-wired.mjs" "$TEST_TMPDIR"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"pinning gate wiring OK"* ]]
+}
+
+@test "wiring red control: dropping the gate from the check chain is red" {
+    pinning_wiring_copy
+    pinning_wiring_mutate 'pkg.scripts.check = pkg.scripts.check.replace(" && npm run check:workflow-pinning", "")'
+    # Landed: only the script's own key still names the gate.
+    run grep -c "check:workflow-pinning" "$TEST_TMPDIR/package.json"
+    [ "$output" = "1" ]
+    run node "$AAHP_ROOT/tests/assert-pinning-gate-wired.mjs" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"is not part of the aggregate"* ]]
+}
+
+@test "wiring red control: a range instead of an exact ajv-cli pin is red" {
+    pinning_wiring_copy
+    pinning_wiring_mutate 'pkg.devDependencies["ajv-cli"] = "^" + pkg.devDependencies["ajv-cli"]'
+    grep -q '"ajv-cli": "\^' "$TEST_TMPDIR/package.json"
+    run node "$AAHP_ROOT/tests/assert-pinning-gate-wired.mjs" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"ajv-cli is declared as"*"not an exact version"* ]]
+}

@@ -478,6 +478,9 @@ install_npx_spy() {
     create_full_handoff
     rm -f "$TEST_TMPDIR/.ai/handoff/.aiignore"
     run bash "$AAHP_ROOT/scripts/lint-handoff.sh" "$TEST_TMPDIR"
+    # Positive half first: a lint that crashed would also print no notice.
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"All checks passed"* ]]
     [[ "$output" != *"NOT ENFORCED"* ]]
 }
 
@@ -794,5 +797,9 @@ write_only_config() {
     printf 'ghp_abcdefghijklmnopqrstuvwxyz012345\n' > "$TEST_TMPDIR/.ai/handoff/.aiignore"
     create_manifest_json
     run bash "$AAHP_ROOT/scripts/lint-handoff.sh" "$TEST_TMPDIR"
+    # Positive half first: a lint that crashed before the secret scan would
+    # also print no finding, so the scan must be seen to run and come up clean.
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"No secrets detected"* ]]
     [[ "$output" != *"Possible secret pattern"* ]]
 }

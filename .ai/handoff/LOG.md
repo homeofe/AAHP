@@ -6,6 +6,32 @@
 
 ---
 
+## [2026-09-28] claude-opus-5.5: test-suite integrity (audit fix programme, 2 of 8)
+
+**Agent:** claude-opus-5.5
+**Phase:** implementation
+**Branch:** fix/test-suite-integrity
+**Tasks:** owner request of 2026-09-28 to fix every audit finding
+
+### What was done
+
+- Replaced three dead bare `!` negations with exit-status assertions and added a guard to
+  `npm run check` so they cannot return.
+- Made prerequisite skips fail on CI (`require_tool`) and made the runner fail a CI run on
+  any unlisted skip.
+- Added red controls for three wiring checks, positive assertions for two negative-only
+  tests, git isolation for the fixture, and a build-once fixture.
+- A fix agent implemented this in an isolated worktree (627 of 627 on a Linux runner,
+  with mutation proofs); the integrator rebased it onto #120, removed the guard's exemption
+  list once #120 had fixed its only entry, and wrote the handoff state.
+
+### Decision
+
+- The negation guard has no exemption list: its only entry went stale when #120 fixed
+  the line, so the mechanism was removed rather than kept for future exemptions.
+
+---
+
 ## [2026-09-28] claude-opus-5.5: consumer install path (audit fix programme, 1 of 8)
 
 **Agent:** claude-opus-5.5
@@ -258,25 +284,3 @@
 ### Decisions
 
 - Scoped to the security fix + the four live drift bugs only. Deferred the broader anti-entropy strategy (constitution, ADR-log reframing, new deterministic gates, de-duplicating the 5x provenance scale, excising the rotted German runbook) to a separate initiative for maintainer review.
-
----
-
-## [2026-07-18] claude-opus-4-8: Upstreaming release (aahp doctor + config-driven gates, v3.6.0)
-
-**Agent:** claude-opus-4-8
-**Phase:** implementation
-**Branch:** feat/aahp-doctor-and-gates
-**Tasks:** AAHP upstreaming spec (aahp doctor + generic gates)
-
-### What was done
-
-- Added `aahp doctor`: a Node-native conformance self-check emitting a schemaVersion:1 JSON record across six gates (handoff-set, manifest-schema, grounding, pinned-dep, changelog-format, version-sync). Self-aware pinned-dep (returns `self` on this repo).
-- Added four config-driven release gates that ship in the package and run against any consumer via an optional `aahp.config.json`: check-version-sync, check-changelog, check-changelog-format, check-claims, plus the aahp-dashboard.mjs LOG-from-CHANGELOG generator and NEXT_ACTIONS current-version freshness gate. Every gate is a clean no-op when its config section is absent.
-- Extracted changelog-grammar.mjs as the single release-heading grammar imported by both the format validator and the LOG generator, so they cannot diverge (the divergence the upstreaming spec called out).
-- Wired gates + doctor into ci.yml, aahp-verify.yml, the pre-push hook, and npm scripts; added schema/aahp-config.schema.json, aahp.config.example.json, README 2.11 + Section 11.
-
-### Decisions
-
-- Verified npm latest was 3.5.0 (local checkout was 13 commits stale); reconciled onto origin/main and bumped 3.5.0 -> 3.6.0. An early 3.4.0 target would have collided with a published version.
-- REJECTED the SCG lint-handoff relative PII-path change: it is a Windows regression here (breaks lint.bats 20-24) and main correctly uses the absolute path. The Layer 3 warn fix was already merged on main (#27).
-- Kept AAHP's LOG.md as an append-only agent journal (did NOT point the LOG generator at it); the generator ships as an opt-in consumer capability.

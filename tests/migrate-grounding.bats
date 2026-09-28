@@ -69,7 +69,9 @@ EOF
 @test "adds a Provenance section to TRUST.md" {
     create_full_handoff
     _create_trust_md
-    ! grep -q "## Provenance" "$TEST_TMPDIR/.ai/handoff/TRUST.md"
+    # Precondition, as `run` + status: a bare `! grep` here could never fail.
+    run grep -q "## Provenance" "$TEST_TMPDIR/.ai/handoff/TRUST.md"
+    [ "$status" -eq 1 ]
 
     run bash "$SCRIPTS_DIR/aahp-migrate-grounding.sh" "$TEST_TMPDIR"
     [ "$status" -eq 0 ]
@@ -86,7 +88,8 @@ EOF
 |----------|--------|------------|-------|
 | build passes | untested | - | |
 EOF
-    ! grep -q "## Provenance" "$TEST_TMPDIR/.ai/handoff/TRUST.md"
+    run grep -q "## Provenance" "$TEST_TMPDIR/.ai/handoff/TRUST.md"
+    [ "$status" -eq 1 ]
 
     run bash "$SCRIPTS_DIR/aahp-migrate-grounding.sh" "$TEST_TMPDIR"
     [ "$status" -eq 0 ]

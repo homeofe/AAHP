@@ -96,7 +96,7 @@ try {
 
     local entry
     entry="$(_ajv_entry)"
-    [ -n "$entry" ] || skip "ajv-cli not installed"
+    require_tool "ajv-cli not installed" [ -n "$entry" ]
 
     run node "$entry" validate --spec=draft2020 -c ajv-formats \
         -s "$AAHP_ROOT/schema/aahp-config.schema.json" \

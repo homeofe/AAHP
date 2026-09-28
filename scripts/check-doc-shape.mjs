@@ -16,7 +16,7 @@
 // across the nine consumer checkouts in this estate: 9 of 9 carry
 // .github/workflows/aahp-verify.yml, so the neighbouring copy instruction was
 // right, and 0 of 9 carry an aahp-govern.yml at all. Reported at
-// https://github.com/homeofe/AAHP/issues/74. See ADR-022.
+// https://github.com/homeofe/AAHP/issues/74. See ADR-023.
 //
 // WHY THIS IS NOT A BLANKET RULE OVER EVERY BACKTICKED SPAN
 // ---------------------------------------------------------------------------

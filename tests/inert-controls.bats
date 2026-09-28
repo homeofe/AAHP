@@ -348,7 +348,7 @@ install_npx_spy() {
 }
 
 @test "82 no EXECUTABLE line in shipped code invokes npx" {
-    # The hooks and the govern workflow are COPIED into adopter repositories, so
+    # The hooks and both adopter workflows are COPIED into adopter repositories, so
     # the text is the artefact here: whatever these files say is what runs on
     # somebody else's machine, months after this repository was fixed.
     #
@@ -357,6 +357,7 @@ install_npx_spy() {
     # invocation would force the explanation out, and the explanation is the part
     # that stops someone reinstating the old line.
     cat "$AAHP_ROOT/assets/governance/aahp-govern.yml" \
+        "$AAHP_ROOT/assets/governance/aahp-verify.yml" \
         "$AAHP_ROOT/scripts/hooks/pre-commit" \
         "$AAHP_ROOT/scripts/hooks/pre-push" > "$TEST_TMPDIR/shipped.txt"
     grep -v '^[[:space:]]*#' "$TEST_TMPDIR/shipped.txt" > "$TEST_TMPDIR/shipped-code.txt" || true

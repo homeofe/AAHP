@@ -21,7 +21,20 @@
     {
       "id": "no-private-repo-names",
       "pattern": "\\belvatis-[a-z0-9-]+",
-      "message": "this repository is PUBLIC and ships to npm; naming a private repository here publishes the estate's repository inventory. Describe a consumer by role or by count instead. See ADR/CONSTITUTION on what may be recorded in public handoff state."
+      "message": "this repository is PUBLIC and ships to npm; naming a private repository here publishes the owner's repository inventory. Describe a consumer by role instead. See CONSTITUTION.md, 'What public handoff state and documentation may record'."
+    },
+    {
+      "id": "no-internal-hostnames",
+      "pattern": "\\bopen[c]law\\b",
+      "flags": "gim",
+      "message": "internal hostname; this repository is PUBLIC and ships to npm. Write 'a Linux test host' instead. See CONSTITUTION.md, 'What public handoff state and documentation may record'."
+    },
+    {
+      "id": "no-estate-counts",
+      "pattern": "\\b(?:\\d+|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|twenty|thirty)(?:-[a-z]+)?\\s+(?:consum(?:er|ing)|adopting|downstream)\\s+(?:repositor(?:y|ies)|repos?|checkouts?|manifests?|projects?)\\b|\\b(?:in|across|of)\\s+(?:this|the|our)\\s+(?:consumer\\s+)?estate\\b",
+      "flags": "gim",
+      "include": ["*.md"],
+      "message": "a count or posture figure about other repositories (for example 'nine consuming repositories', 'across this estate'); this repository is PUBLIC and ships to npm. State the rule, not the state of the repositories that consume it. See CONSTITUTION.md, 'What public handoff state and documentation may record'."
     }
   ],
   "docSync": [
@@ -75,6 +88,7 @@
       "CLAUDE.md",
       "CONTRIBUTING.md",
       "CONSTITUTION.md",
+      "docs/*.md",
       ".ai/handoff/*.md"
     ]
   },
@@ -84,6 +98,7 @@
       "CLAUDE.md",
       "CONTRIBUTING.md",
       "CONSTITUTION.md",
+      "docs/*.md",
       ".ai/handoff/*.md"
     ],
     "adopterPaths": [
@@ -95,12 +110,17 @@
       {
         "path": ".ai/handoff-agent-a",
         "occurrences": 1,
-        "reason": "Section 10 names it as an example of per-agent directory isolation in a non-git workflow. It is a path an adopter would create, and the same section says AAHP tooling does not officially support it."
+        "reason": "README Section 7.3 names it as an example of per-agent directory isolation in a non-git workflow. It is a path an adopter would create, and the same section says AAHP tooling does not officially support it."
       },
       {
         "path": ".ai/handoff-agent-b",
         "occurrences": 1,
-        "reason": "The second half of the same per-agent isolation example in Section 10."
+        "reason": "The second half of the same per-agent isolation example in README Section 7.3."
+      },
+      {
+        "path": "docs/RELEASES.md",
+        "occurrences": 1,
+        "reason": "docs/governance.md names it as the example release-journal target that aahp.config.example.json uses. It is a file in an ADOPTER's tree; this repository has no release journal, and docs/ became a tracked top-level entry here only when the decision log moved into it."
       }
     ],
     "requiredHeadings": [
@@ -108,8 +128,8 @@
         "id": "setup",
         "file": "README.md",
         "pattern": "^#{1,3} .*(Install|Quickstart|Getting Started|Setup)",
-        "before": "^## 7\\. Architectural Decision Log",
-        "note": "A new adopter has to find install, init and the first verify run before the rationale material, not at 58% depth inside it (issue #74)."
+        "before": "^## 1\\. ",
+        "note": "A new adopter has to find install, init and the first verify run before the specification begins (Section 1), not at 58% depth inside the rationale material (issue #74)."
       }
     ]
   },

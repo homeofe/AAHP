@@ -3,71 +3,71 @@
   "project": "AAHP",
   "last_session": {
     "agent": "claude-opus-5.5",
-    "session_id": "cli-1790570118",
-    "timestamp": "2026-09-28T04:35:18Z",
-    "commit": "cab3b0e",
-    "phase": "implementation",
+    "session_id": "cli-1790573457",
+    "timestamp": "2026-09-28T05:30:57Z",
+    "commit": "f9b12ca",
+    "phase": "documentation",
     "duration_minutes": 0
   },
   "files": {
     "STATUS.md": {
-      "checksum": "sha256:b97f1846dd0ea357a0f1b165fb12b14bd6d37d211a913ebe2a30c4daaee8846e",
-      "updated": "2026-09-28T04:35:17Z",
-      "lines": 131,
-      "summary": "Working state: audit fix programme in progress; this change is CI, release and dependency automation (`fix/ci-release-automation`)"
+      "checksum": "sha256:2a37de02d2b0ebc0b3b3072b03fac7ea89ec1421f50926255a1d8417e3461c28",
+      "updated": "2026-09-28T05:30:57Z",
+      "lines": 140,
+      "summary": "Working state: audit fix programme in progress; this change is the documentation workstream (branch docs/spec-split-and-redaction)"
     },
     "NEXT_ACTIONS.md": {
-      "checksum": "sha256:cdfc5b68f616f2ddf894dd7b76d2e75f9e91f6a4f6b7792fbd10a7c7c1e9186d",
-      "updated": "2026-09-28T04:31:33Z",
-      "lines": 98,
-      "summary": "The scanner gates publishing and runs on tags; the publish job refuses tags off `main` or off the package version and runs no third-party code..."
+      "checksum": "sha256:82039be13314054e0e16163c4291ce89fe5c0772f6697c777bec908cd79c45ca",
+      "updated": "2026-09-28T05:23:22Z",
+      "lines": 99,
+      "summary": "README is quickstart plus specification; the decision log lives in `docs/adr/`, the gate reference in `docs/governance.md`."
     },
     "LOG.md": {
-      "checksum": "sha256:a167f8356960fa19e6fb5b4151267cdce7ac9e54a8daedb314b4585f002d4d19",
-      "updated": "2026-09-28T04:31:35Z",
-      "lines": 309,
-      "summary": "Latest entry: [2026-09-28] claude-opus-5.5: CI, release and dependency automation (audit fix programme, 6 of 8)"
+      "checksum": "sha256:f0f5872326c6c1643b0fa279bb1c866880ada705662bd9c006534ac6f7aef440",
+      "updated": "2026-09-28T05:23:23Z",
+      "lines": 307,
+      "summary": "Latest entry: [2026-09-28] claude-opus-5.5: documentation, spec split and redaction (audit fix programme, 7 of 8)"
     },
     "LOG-ARCHIVE.md": {
-      "checksum": "sha256:3185ace0c6666c52551f74d7c620a91c10e3e4aa12b8f3fe3bffd3cf429627f1",
-      "updated": "2026-09-28T04:31:35Z",
-      "lines": 373,
-      "summary": "Newest archived entry: [2026-07-25] claude-opus-5: Trust register re-verification (10 rows re-established, 0 downgraded)"
+      "checksum": "sha256:a8d34a6cf475d264827b664a9b375a61a7af4c241436384387b59bb7316468bd",
+      "updated": "2026-09-28T05:23:23Z",
+      "lines": 406,
+      "summary": "Newest archived entry: [2026-07-26] claude-opus-5: Layer 1 catches deleted indexed files; lint raises its own exit code"
     },
     "LOG-ARCHIVE.index.json": {
-      "checksum": "sha256:ca6d45447e2c40e3a4ce3b88f5c00533cb97f58dbe7748b56278cbe029abe0ee",
-      "updated": "2026-09-28T04:31:35Z",
-      "lines": 65,
-      "summary": "LOG archive index: 15 entries."
+      "checksum": "sha256:9972f26546b71d8be6fa8d11dd3c6ea7210a6da9148a49d1eb3b4dc985147be0",
+      "updated": "2026-09-28T05:23:23Z",
+      "lines": 69,
+      "summary": "LOG archive index: 16 entries."
     },
     "DASHBOARD.md": {
-      "checksum": "sha256:e96e392db8dab2e9719e542dfa2a10c240d0be16ac6721298c460a22985cbdea",
-      "updated": "2026-09-28T00:06:33Z",
-      "lines": 96,
-      "summary": "Total: 48 tests, 48 passing"
+      "checksum": "sha256:a4994a683eaac92e36e9d25456e3d091d82801a348f680647041664d441c13e6",
+      "updated": "2026-09-28T05:20:36Z",
+      "lines": 45,
+      "summary": "Test counts are not kept here."
     },
     "TRUST.md": {
-      "checksum": "sha256:9b984fb6b6afdd229b0f35ba8e1866fe8631e3f33b75ad5aa45a38c5ebdc8d8f",
-      "updated": "2026-09-28T04:09:56Z",
-      "lines": 117,
+      "checksum": "sha256:1e3dec3cf3ba3f0c57d89d6ab8af1a05097d7ec715732f1dc132e0def666cd3a",
+      "updated": "2026-09-28T05:22:39Z",
+      "lines": 120,
       "summary": "Each table below carries a `Provenance` column recording HOW a claim was checked, orthogonal to Status."
     },
     "CONVENTIONS.md": {
-      "checksum": "sha256:1c0150404d22c6e15e39139e8b2c991b0167ba1e095f579efafb85555dfe0d88",
-      "updated": "2026-09-28T00:06:33Z",
-      "lines": 93,
+      "checksum": "sha256:3a8ff1e7d35827b2096341b9c769651a251cd5cb7e52114d87708a3f4629e9a1",
+      "updated": "2026-09-28T05:20:36Z",
+      "lines": 98,
       "summary": "The project motto (Asimov's Three Laws) and the do no damage principle live once, in README (## Our Motto: The Three Laws)."
     },
     "WORKFLOW.md": {
-      "checksum": "sha256:ef005f24e399791abb986b3a76403295c33ad3b28bb9b7dc777d1d0528b31151",
-      "updated": "2026-09-28T00:06:33Z",
-      "lines": 156,
+      "checksum": "sha256:d606e1a00b529ea24436502d188d465970a236a43c138740179fbd0962cb9a4e",
+      "updated": "2026-09-28T05:20:36Z",
+      "lines": 157,
       "summary": "Authoritative source: MANIFEST.json `tasks` graph (README Section 8.4)."
     },
     "GROUNDING.md": {
-      "checksum": "sha256:7ef8cece585dc5defb4285175b9ba560d5469675df553d4ce28ec9e7aec24343",
-      "updated": "2026-09-28T00:06:33Z",
-      "lines": 209,
+      "checksum": "sha256:1cafea16a5eb95ae5b1ffccbee2b44baf724bc485fb4ec71f550edc26c64b895",
+      "updated": "2026-09-28T05:20:36Z",
+      "lines": 223,
       "summary": "This register EXTENDS existing AAHP machinery; it does not fork or replace it."
     },
     "pii-allowlist.json": {
@@ -77,11 +77,11 @@
       "summary": "PII allowlist: 0 entries."
     }
   },
-  "quick_context": "Audit fix programme 2026-09-28, workstream 6 of 8: CI, release and dependency automation. Scanner gates publish and runs on tags; publish guard (tag == version, reachable from main) with no third-party code under the OIDC token; grouped Dependabot with cooldown; includes Dependabot #123. v3.12.0 released; no release until the owner decides.",
+  "quick_context": "Audit fix programme 2026-09-28, workstream 7 of 8: documentation. README is quickstart plus specification, decision log in docs/adr/, gate reference in docs/governance.md; internal names and estate figures redacted and guarded; STATUS.md is a snapshot, LOG.md the journal. v3.12.0 released; no release until the owner decides.",
   "token_budget": {
-    "manifest_only": 1457,
-    "manifest_plus_core": 4410,
-    "full_read": 22186
+    "manifest_only": 1448,
+    "manifest_plus_core": 4589,
+    "full_read": 23007
   },
   "next_task_id": 18,
   "tasks": {
@@ -91,7 +91,7 @@
       "priority": "medium",
       "depends_on": [],
       "created": "2026-06-28T10:10:21.975Z",
-      "notes": "**AAHP Task:** `T-006`  \n**Status:** blocked  \n**Priority:** medium  \n\n\n\n\n---\n*Auto-created from AAHP manifest · project: AAHP*",
+      "notes": "**AAHP Task:** `T-006`  \n**Status:** blocked  \n**Priority:** medium  \n\n\n\n\n---\n*Auto-created from AAHP manifest - project: AAHP*",
       "github_issue": 18,
       "github_repo": "homeofe/AAHP",
       "completed": "2026-07-14T00:00:00Z"
@@ -102,7 +102,7 @@
       "priority": "high",
       "depends_on": [],
       "created": "2026-06-28T10:10:21.975Z",
-      "notes": "**AAHP Task:** `T-014`  \n**Status:** ready  \n**Priority:** high  \n\n\n\n\n---\n*Auto-created from AAHP manifest · project: AAHP*",
+      "notes": "**AAHP Task:** `T-014`  \n**Status:** ready  \n**Priority:** high  \n\n\n\n\n---\n*Auto-created from AAHP manifest - project: AAHP*",
       "github_issue": 14,
       "github_repo": "homeofe/AAHP",
       "completed": "2026-07-14T00:00:00Z"

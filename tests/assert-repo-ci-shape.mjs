@@ -30,7 +30,7 @@
 //      on stderr as NOT asserted; see the comment above the loop in section 4.
 //   5. The list in section 3 and the ADR that DOCUMENTS it say the same thing.
 //      Section 3 pinned publish authorization to a literal list inside this test
-//      file; the record a reader actually reaches for is ADR-019 in README.md,
+//      file; the record a reader actually reaches for is docs/adr/ADR-019.md,
 //      and nothing compared the two. Either could be edited alone. Section 5
 //      compares them as SETS, in both directions, so a change to publish
 //      authorization is a three-part edit - the workflow, the list, the ADR -
@@ -545,7 +545,7 @@ for (const req of REQUIRED_JOB_PERMISSIONS) {
 // ─── 5. The code record and the DOCUMENTED record say the same thing ────────
 //
 // Section 3 holds ci.yml to PUBLISH_CONDITIONS_BEYOND_RELEASE, a literal list in
-// this test file. That is one record. The other is ADR-019 in README.md, which
+// this test file. That is one record. The other is docs/adr/ADR-019.md, which
 // is what a person reads when they want to know who may publish - and until this
 // section existed, nothing compared the two. Editing either one alone left the
 // repository stating two different publish policies with every check green.
@@ -561,19 +561,22 @@ for (const req of REQUIRED_JOB_PERMISSIONS) {
 // guessing where a sentence ends. `(none)` is how the empty set is written,
 // because a block with nothing in it cannot be told apart from a block someone
 // emptied by accident.
-const ADR_HEADING = "### ADR-019:";
+// ADR-019 lived in README.md until 2026-09-28, when the decision log moved to
+// docs/adr/ with one file per decision and the heading at level 1.
+const ADR_FILE = "docs/adr/ADR-019.md";
+const ADR_HEADING = "# ADR-019:";
 const ADR_MARKER = "**Recorded operands beyond the release definition.**";
 const ADR_EMPTY = "(none)";
 
-const readmeRead = readUnder("README.md", "README.md");
+const readmeRead = readUnder(ADR_FILE, "docs", "adr", "ADR-019.md");
 if (readmeRead.absent) {
-  // The root is an argument. A fixture that never had a README is not a
+  // The root is an argument. A fixture that never had the ADR file is not a
   // repository whose ADR was deleted, and this file does not guess between them.
   // It cannot hollow out the assertion: section 3 still holds ci.yml to the code
-  // record, and in this repository README.md is present, so the pair IS compared
+  // record, and in this repository the ADR file is present, so the pair IS compared
   // on every pull request.
   notAsserted.push(
-    `README.md is not present under ${root}, so ADR-019 cannot be compared with ` +
+    `${ADR_FILE} is not present under ${root}, so ADR-019 cannot be compared with ` +
       "PUBLISH_CONDITIONS_BEYOND_RELEASE.",
   );
 } else if (readmeRead.problem) {
@@ -583,18 +586,18 @@ if (readmeRead.absent) {
   const headingAt = lines.findIndex((l) => l.startsWith(ADR_HEADING));
   if (headingAt === -1) {
     problems.push(
-      `README.md has no '${ADR_HEADING}' section. That ADR is the documented half of publish ` +
+      `${ADR_FILE} has no '${ADR_HEADING}' section. That ADR is the documented half of publish ` +
         "authorization; deleting it leaves the recorded list in this file with nothing stating " +
         "what it means or why it is open.",
     );
   } else {
-    let endAt = lines.findIndex((l, i) => i > headingAt && l.startsWith("### "));
+    let endAt = lines.findIndex((l, i) => i > headingAt && l.startsWith("# "));
     if (endAt === -1) endAt = lines.length;
     const section = lines.slice(headingAt, endAt);
     const markerAt = section.findIndex((l) => l.startsWith(ADR_MARKER));
     if (markerAt === -1) {
       problems.push(
-        `ADR-019 in README.md no longer carries the line '${ADR_MARKER}'. That marker is what ` +
+        `ADR-019 in ${ADR_FILE} no longer carries the line '${ADR_MARKER}'. That marker is what ` +
           "locates the documented operand list; without it the ADR can say anything at all about " +
           "publish authorization and nothing here would disagree.",
       );
@@ -604,7 +607,7 @@ if (readmeRead.absent) {
         fenceAt === -1 ? -1 : section.findIndex((l, i) => i > fenceAt && l.trim() === "```");
       if (fenceAt === -1 || closeAt === -1) {
         problems.push(
-          "ADR-019 in README.md has the recorded-operands marker but no closed ``` block after " +
+          `ADR-019 in ${ADR_FILE} has the recorded-operands marker but no closed \`\`\` block after ` +
             "it. The block is the enumeration this assertion reads; prose cannot be compared as a set.",
         );
       } else {
@@ -627,7 +630,7 @@ if (readmeRead.absent) {
                   `not document: ${operand}\n` +
                   "      Every operand there is a standing permission to publish to npm without a " +
                   "release tag, and the ADR is where a reader looks for it. Add it to the recorded " +
-                  "operands block in README.md.",
+                  `operands block in ${ADR_FILE}.`,
               );
             }
           }
@@ -643,7 +646,7 @@ if (readmeRead.absent) {
           }
           if (!section.join(" ").replace(/\s+/g, " ").includes(RELEASE_REF_CONDITION)) {
             problems.push(
-              "ADR-019 in README.md no longer states the release definition verbatim.\n" +
+              `ADR-019 in ${ADR_FILE} no longer states the release definition verbatim.\n` +
                 `      recorded: ${RELEASE_REF_CONDITION}\n` +
                 "      The ADR and RELEASE_REF_CONDITION in this file are the two written records " +
                 "of what counts as a release. They have to agree.",

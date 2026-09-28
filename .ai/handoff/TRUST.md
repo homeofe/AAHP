@@ -33,18 +33,20 @@ anchor matrix and README section 2.10 for the doctrine.
 ## Scripts & Tooling
 
 
-**TTL review, 2026-08-23.** Intervals in use: 3d on 1 row, 7d on 11, 30d on 7. The defect this
-register showed was not the length of any interval. Eleven rows were stamped on one day
-with the same interval, so they expired on one day, and a wall of identical warnings is
-the state in which a new one goes unread. That is how eight rows sat expired for over two
-weeks while the control printed them on every run.
+**TTL review, 2026-08-23.** The defect this register showed was not the length of any
+interval. Eleven rows were stamped on one day with the same interval, so they expired on
+one day, and a wall of identical warnings is the state in which a new one goes unread.
+That is how eight rows sat expired for over two weeks while the control printed them on
+every run.
 
 Intervals are therefore set per row against how fast the underlying fact can change, not
 as a house cadence. A fact that only moves when a tracked file moves gets 30d, because
 Layer 2 already fails any commit that moves such a file without moving handoff state, so
-the TTL is a backstop. A fact a gate recomputes on every run does not need a calendar at
-all: `Checksums match file contents` carries 3d and Layer 1 proves it continuously, so the
-short interval reads as a stronger claim than it is and the row stays `assumed`.
+the TTL is a backstop. **Amended 2026-09-28:** a fact a machine can re-prove does not
+need a calendar at all. Such a row names a check in the Check column and carries no
+date: `Checksums match file contents` (built-in `manifest-integrity`), `All 12 templates
+present` (the reviewed `templates-present` check) and `LICENSE matches declared license`
+(built-in `license-matches`) are judged on every verify. TTLs remain for judgment rows.
 
 `trustTtl.enforce` is on for this repository (ADR-024), so an expired `verified` row fails
 CI once it is more than 14 days past expiry (`graceDays`); before that it warns.
@@ -91,7 +93,7 @@ Check-backed rows are re-proven on every run and carry no date.
 |----------|--------|------------|---------------|-------|-----|---------|-------|-------|
 | No secrets in source | assumed | - | 2026-08-03 | grok-4.5 | 7d | 2026-08-10 | - | Downgraded 2026-08-23: TTL lapsed on 2026-08-10 and nothing re-ran it. `assumed` is what this register's own table calls an unverified claim; a fresh date would have been a verdict nobody produced |
 | LICENSE matches declared license | verified | tool_verified | 2026-09-28 | claude-opus-5.5 | - | - | license-matches | Re-proven on every verify by the built-in license-matches check: package.json declares Apache-2.0 and LICENSE carries the Apache License Version 2.0 text |
-| Supply-chain scanner workflow passes | verified | runtime_observed | 2026-09-28 | claude-opus-5.5 | 30d | 2026-10-28 | - | GitHub Actions job `Supply chain guard` passed on PR #119 at run 36356352306 with the v6.3.1 action pinned to commit `013febcb8447107bcf9d82e400d5b492d44bb10f`: risk score 10/100 (LOW), two medium findings (`GHA_OIDC_WRITE_PERM` on the publish job, `WORKFLOW_SECRET_TO_UPLOAD_PATH` on ci.yml), which are the release workflow's known heuristics. Bundled indicators only (the downloadable catalog was not consulted, `refresh-catalog: false`); 100 of 132 files scanned. Previous anchor: PR #110, run 33385292682, v6.0.8. |
+| Supply-chain scanner workflow passes | verified | runtime_observed | 2026-09-28 | claude-opus-5.5 | 30d | 2026-10-28 | - | GitHub Actions job `Supply chain guard` passed on the push to main at f9b12ca (run 36378741428) with the v6.3.1 action pinned to `013febcb8447107bcf9d82e400d5b492d44bb10f` and `refresh-catalog: true`: historical catalog consulted (86,885 indicators beyond the bundled set), risk 15/100, three medium findings: `GHA_OIDC_WRITE_PERM` and `WORKFLOW_SECRET_TO_UPLOAD_PATH` on the release workflow (known), and `INTERNAL_PRIVATE_IP` on a JSON Schema section number in a comment (a scanner false positive; the comment is reworded in the full-ASCII change). 103 of 138 files scanned. |
 | README.md is single source of truth | assumed | - | 2026-08-03 | grok-4.5 | 7d | 2026-08-10 | - | Downgraded 2026-08-23: TTL lapsed on 2026-08-10 and nothing re-ran it. `assumed` is what this register's own table calls an unverified claim; a fresh date would have been a verdict nobody produced |
 
 ---
@@ -107,8 +109,9 @@ Check-backed rows are re-proven on every run and carry no date.
 - A row a machine can re-prove names a check in the Check column (`license-matches`,
   `manifest-integrity`, or an id from `trustTtl.checks` in aahp.config.json) and is
   judged on every verify instead of by its date
-- High-churn properties (scripts, checksums): 1-3 day TTL
-- Stable properties (schema, templates, architecture): 30 day TTL
+- A property a machine can re-prove gets a check, not a TTL
+- A judgment row gets a TTL set by how fast its fact changes: 7 days for something
+  that moves with most changes, 30 days for schema, templates and architecture
 - Record `Provenance` for every row; only a grounded anchor supports `verified`
 - Add new rows when new system properties become critical
 

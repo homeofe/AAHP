@@ -13,7 +13,7 @@
   The five fields above are the provenance block from README Section 2.4,
   rewritten with the rest of this file at the end of every session. It is a
   CONVENTION: no AAHP gate reads them, and no gate fails when they are absent
-  (ADR-021). Keep them if you want this file's state to be traceable to an
+  (ADR-022). Keep them if you want this file's state to be traceable to an
   agent and a session; nothing in AAHP will tell you when they go missing.
 -->
 
@@ -23,10 +23,10 @@
 
 | Check | Result | Notes |
 |-------|--------|-------|
-| `build` | ✅ / ❌ | |
-| `test` | ✅ / ❌ | X/X passing |
-| `lint` | ✅ / ❌ | |
-| `type-check` | ✅ / ❌ | |
+| `build` | pass / fail | |
+| `test` | pass / fail | X/X passing |
+| `lint` | pass / fail | |
+| `type-check` | pass / fail | |
 
 ---
 
@@ -34,9 +34,9 @@
 
 | Component | Location | State |
 |-----------|----------|-------|
-| Local dev stack | `docker-compose.yml` | ✅ Running / ⏳ Not started |
-| Staging | - | ⏳ Not deployed |
-| Production | - | ⏳ Not deployed |
+| Local dev stack | `docker-compose.yml` | Running / Not started |
+| Staging | - | Not deployed |
+| Production | - | Not deployed |
 
 ---
 
@@ -44,9 +44,9 @@
 
 | Service | Port | State | Notes |
 |---------|------|-------|-------|
-| service-a | 3000 | ✅ Implemented | |
-| service-b | 8080 | 🔵 Stubbed | Mock responses only |
-| service-c | - | ❌ Not started | |
+| service-a | 3000 | Implemented | |
+| service-b | 8080 | Stubbed | Mock responses only |
+| service-c | - | Not started | |
 
 ---
 

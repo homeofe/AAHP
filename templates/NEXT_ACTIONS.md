@@ -36,7 +36,7 @@ Current version: **v[VERSION]**
 
 ---
 
-## T-002: [Task Title] ⏳ Blocked
+## T-002: [Task Title] (Blocked)
 
 **Goal:** ...
 
@@ -54,7 +54,7 @@ Current version: **v[VERSION]**
 
 | Item | Resolution |
 |------|-----------|
-| Example task | Implemented in feat/example, 42/42 tests ✅ |
+| Example task | Implemented in feat/example, 42/42 tests passing |
 
 ---
 

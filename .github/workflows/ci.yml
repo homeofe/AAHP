@@ -68,10 +68,11 @@ jobs:
 
       - name: Install dependencies
         # --ignore-scripts: no lifecycle script of any locked package runs in
-        # the required check. Measured 2026-09-28: 28 locked packages, none
-        # with `hasInstallScript`, and the full suite passes on a tree installed
-        # this way, so nothing here needs them. npm still links the bins
-        # (bats, ajv); only lifecycle scripts are skipped.
+        # the required check. Measured 2026-09-28: 8 locked packages (28 before
+        # ajv-cli was replaced), none with `hasInstallScript`, and the full
+        # suite passes on a tree installed this way, so nothing here needs
+        # them. npm still links the bins (bats); only lifecycle scripts are
+        # skipped.
         # scripts/check-workflow-pinning.mjs rule I keeps every `npm ci` so.
         run: npm ci --ignore-scripts
 
@@ -118,18 +119,15 @@ jobs:
         run: bash scripts/lint-handoff.sh .
 
       - name: Validate MANIFEST.json against schema
-        # ajv-cli and ajv-formats are exact devDependencies, so the `npm ci`
-        # step above already placed the locked closure and this line makes no
-        # registry request at all. That `npm ci` is the guard against the
-        # network, and rule J of scripts/check-workflow-pinning.mjs requires it
-        # earlier in the same job. `--no-install` is the fail-closed half:
-        # `npx` rewrites it to `--yes=false`, so if the install were ever
-        # missing the line would stop with "npx canceled due to missing
-        # packages" after one registry metadata request, instead of
-        # downloading and running whatever the registry returned, which is what
-        # npx does without it in CI. Measured 2026-09-28 against a logging
-        # local registry on npm 10.9.9, 11.20.0 and 12.0.2 (ADR-013).
-        run: npx --no-install ajv-cli validate --spec=draft2020 -c ajv-formats -s schema/aahp-manifest.schema.json -d .ai/handoff/MANIFEST.json
+        # ajv and ajv-formats are exact devDependencies, placed by the `npm ci`
+        # step above, and scripts/validate-json-schema.mjs loads them from
+        # node_modules with `node`, not `npx`: there is no command here that
+        # could resolve a package from the registry. If the install were
+        # missing, the script exits 2 ("cannot load ajv") and this required
+        # check fails closed. It replaced `npx --no-install ajv-cli validate
+        # --spec=draft2020 -c ajv-formats` with the same ajv configuration;
+        # ajv-cli 5.0.0 pulled the deprecated glob@7.2.3 and inflight@1.0.6.
+        run: node scripts/validate-json-schema.mjs schema/aahp-manifest.schema.json .ai/handoff/MANIFEST.json
 
       - name: Validate aahp.config.json against schema
         # This repository ships schema/aahp-config.schema.json to adopters and
@@ -140,7 +138,7 @@ jobs:
         # ships inside the package and runs at gate time on a consumer machine
         # where AJV is not installed. A disagreement between them is itself a
         # finding, which is why both run rather than only the cheaper one.
-        run: npx --no-install ajv-cli validate --spec=draft2020 -c ajv-formats -s schema/aahp-config.schema.json -d aahp.config.json -d aahp.config.example.json
+        run: node scripts/validate-json-schema.mjs schema/aahp-config.schema.json aahp.config.json aahp.config.example.json
 
       - name: Syntax-check Node gates
         run: |
@@ -269,6 +267,17 @@ jobs:
     # tag starting with `v` and containing a dot. The narrow check is the
     # "Verify the release ref" step below, which runs before anything publishes.
     if: startsWith(github.ref, 'refs/tags/v') && contains(github.ref, '.')
+    # The approval step. The `npm-publish` environment (repository settings)
+    # carries a required reviewer and a deployment policy that admits `v*` tags
+    # only, so this job waits for the owner's approval before any step runs,
+    # and a ref outside that policy cannot deploy to it at all. The `if:` above
+    # is evaluated first, so a push to main or a pull request skips the job and
+    # never asks for an approval. The environment also becomes the `environment`
+    # claim of the OIDC token this job mints; binding the npm trusted publisher
+    # to that name on npmjs.com makes npm refuse a token from any job without
+    # it (ADR-019, amended 2026-09-28). tests/workflow-hardening.bats asserts
+    # the binding. `release` does not name it: see ADR-019.
+    environment: npm-publish
     permissions:
       contents: read
       id-token: write

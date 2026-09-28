@@ -521,6 +521,10 @@ publish_job_shape() {
       const setup = at((s) => String(s.uses ?? "").startsWith("actions/setup-node@"));
       const guard = at((s) => s.name === "Verify the release ref");
       const publish = at((s) => /\bnpm publish\b/.test(String(s.run ?? "")));
+      // The approval step (ADR-019, amended 2026-09-28). Either spelling GitHub
+      // accepts: `environment: npm-publish` or `environment: { name: npm-publish }`.
+      const env = typeof job.environment === "string" ? job.environment : job.environment?.name;
+      if (env !== "npm-publish") problems.push("the publish job is not bound to the npm-publish environment (found " + JSON.stringify(job.environment ?? null) + "), so a publish waits for no approval");
       if (guard === -1) problems.push("the release guard step is gone");
       if (publish === -1) problems.push("no npm publish step");
       if (guard !== -1 && publish !== -1 && guard > publish) problems.push("the release guard runs after npm publish");
@@ -611,4 +615,40 @@ mutate_publish() {
     run publish_job_shape "$TEST_TMPDIR"
     [ "$status" -eq 1 ]
     [[ "$output" == *"the release guard step is gone"* ]]
+}
+
+# The approval step. Without `environment: npm-publish` the job mints its OIDC
+# token and publishes the moment its needs are green; with it, the job waits for
+# the environment's required reviewer, and only a ref the environment's
+# deployment policy admits (`v*` tags) can deploy to it. ADR-019.
+@test "publish job: removing the npm-publish environment is red" {
+    copy_ci
+    mutate_publish '^    environment:' ''
+    # Landed: the publish job no longer names any environment.
+    run grep -c '^    environment:' "$TEST_TMPDIR/.github/workflows/ci.yml"
+    [ "$output" = "0" ]
+    run publish_job_shape "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"the publish job is not bound to the npm-publish environment (found null)"* ]]
+}
+
+@test "publish job: another environment name is red" {
+    # The npm trusted publisher can be bound to the environment NAME, and the
+    # protection rules live on that name, so a renamed environment is a
+    # different, unprotected one.
+    copy_ci
+    mutate_publish '^    environment:' '    environment: npm-publish-staging'
+    grep -q '^    environment: npm-publish-staging$' "$TEST_TMPDIR/.github/workflows/ci.yml"
+    run publish_job_shape "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *'not bound to the npm-publish environment (found "npm-publish-staging")'* ]]
+}
+
+@test "publish job: the long environment form naming npm-publish is accepted" {
+    copy_ci
+    mutate_publish '^    environment:' '    environment:\n      name: npm-publish\n      url: https://www.npmjs.com/package/@elvatis_com/aahp'
+    grep -q '^      name: npm-publish$' "$TEST_TMPDIR/.github/workflows/ci.yml"
+    run publish_job_shape "$TEST_TMPDIR"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"publish job shape OK"* ]]
 }

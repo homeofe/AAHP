@@ -3,42 +3,42 @@
   "project": "AAHP",
   "last_session": {
     "agent": "claude-opus-5.5",
-    "session_id": "cli-1790579690",
-    "timestamp": "2026-09-28T07:14:50Z",
-    "commit": "21a2ac7",
+    "session_id": "cli-1790583089",
+    "timestamp": "2026-09-28T08:11:29Z",
+    "commit": "f37a89a",
     "phase": "implementation",
     "duration_minutes": 0
   },
   "files": {
     "STATUS.md": {
-      "checksum": "sha256:f8a7fb9ea373abfde105e042f9fb387530b0ed51e833bc43dfad8862f85b500b",
-      "updated": "2026-09-28T07:14:48Z",
-      "lines": 128,
-      "summary": "Working state: audit fix programme in progress; this change implements the owner's follow-up decisions (branch fix/owner-decisions-followup)"
+      "checksum": "sha256:85b4124d01f8f8da7795309633aaa5144a45a221ea6d92fe1c5945edfd88b382",
+      "updated": "2026-09-28T08:11:28Z",
+      "lines": 105,
+      "summary": "Working state: audit fix programme in progress; pre-4.0.0 work; this change binds publishing to a protected environment and replaces ajv-cli..."
     },
     "NEXT_ACTIONS.md": {
-      "checksum": "sha256:5994dc01132fde542c4590109fc0119825fcc92a577b94f0b11608e4ce4dc85b",
-      "updated": "2026-09-28T07:11:04Z",
-      "lines": 94,
-      "summary": "`init --gates` scaffolds `pinnedDep` and the adopter verify workflow; lint's PII check reads JSON values."
+      "checksum": "sha256:581046737e8afbc1239a7e6b583343c4ffa68b90e298d138a9fa7f7c262c7483",
+      "updated": "2026-09-28T08:06:19Z",
+      "lines": 93,
+      "summary": "npm publishing waits for the owner's approval in the `npm-publish` environment (tags `v*` only, no admin bypass)."
     },
     "LOG.md": {
-      "checksum": "sha256:dd534d05105e7aa7fe4f57fa4f4a6d34c05b39ef6fcc24cbe9be50d578de1828",
-      "updated": "2026-09-28T07:11:04Z",
-      "lines": 288,
-      "summary": "Latest entry: [2026-09-28] claude-opus-5.5: owner follow-up decisions"
+      "checksum": "sha256:492477ba5f54767539664aa8c6d8652eaa6db3c3e9724e5052adf60e7f47a095",
+      "updated": "2026-09-28T08:06:20Z",
+      "lines": 283,
+      "summary": "Latest entry: [2026-09-28] claude-opus-5.5: protected publish environment, ajv-cli replaced"
     },
     "LOG-ARCHIVE.md": {
-      "checksum": "sha256:dab1c6e167a9d00bf20dd682e226b99f3d9bb312885fa3b4a937573c4c8675f0",
-      "updated": "2026-09-28T07:11:04Z",
-      "lines": 478,
-      "summary": "Newest archived entry: [2026-08-31] codex: PR #109 integrated; scanner advanced to v6.0.8"
+      "checksum": "sha256:4ae131bd11fa94a03b3a1f1a5c03ad872351ff7e433669ec735807f4752935fa",
+      "updated": "2026-09-28T08:06:20Z",
+      "lines": 507,
+      "summary": "Newest archived entry: [2026-08-31] codex: v3.12.0 release candidate after green PR #110"
     },
     "LOG-ARCHIVE.index.json": {
-      "checksum": "sha256:1abbc732e583df32cd74732abe4815f6765d1a511740c2f43d3e3df2ffa89c97",
-      "updated": "2026-09-28T07:11:04Z",
-      "lines": 77,
-      "summary": "LOG archive index: 18 entries."
+      "checksum": "sha256:3c4481a49faab47fff3f717a10e2ac7f0b6255f424917118e2e7e687c52bb140",
+      "updated": "2026-09-28T08:06:20Z",
+      "lines": 81,
+      "summary": "LOG archive index: 19 entries."
     },
     "DASHBOARD.md": {
       "checksum": "sha256:a4994a683eaac92e36e9d25456e3d091d82801a348f680647041664d441c13e6",
@@ -77,11 +77,11 @@
       "summary": "PII allowlist: 0 entries."
     }
   },
-  "quick_context": "Owner follow-up decisions 2026-09-28: init --gates scaffolds pinnedDep and the adopter verify workflow; lint PII check reads JSON values; LOG redaction marker with aahp archive --reindex; propagate and old-bash refusals name their fix. supply-chain-guard#354 opened. Release awaits the owner.",
+  "quick_context": "Pre-4.0.0: npm publishing bound to the protected npm-publish environment (owner approval, v* tags, no admin bypass); ajv-cli replaced by scripts/validate-json-schema.mjs on the ajv library (28 to 8 locked packages, no deprecation warnings). Release awaits the owner.",
   "token_budget": {
-    "manifest_only": 1419,
-    "manifest_plus_core": 4116,
-    "full_read": 23228
+    "manifest_only": 1421,
+    "manifest_plus_core": 3805,
+    "full_read": 23190
   },
   "next_task_id": 18,
   "tasks": {

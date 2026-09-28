@@ -86,7 +86,58 @@ write_good_fixture() {
 # the test above: that one passes whenever the gate is satisfied, including if
 # the gate were later weakened. This one reads the workflow text itself, so it
 # still fails if the gate stops looking.
-@test "neither MANIFEST validation step can reach the registry" {
+# The schema-validation steps of ci.yml and aahp-manifest.yml, read from the
+# PARSED workflows under root $1 (comments cannot satisfy or break it). Every
+# step whose run text names a schema under schema/ must run the repository's
+# validator with `node`, after an `npm ci --ignore-scripts` in the same job, and
+# no step may run ajv-cli or npx at all. Asserted as a RELATION over every such
+# step, not as "there are exactly N": a fixed count is an anchor that a
+# legitimate new validation step breaks, and the obvious repair (raise the
+# number) exempts the new step from the property. That is what happened when
+# the aahp.config.json validation step was added.
+schema_steps_shape() {
+    node --input-type=module -e '
+      import { readFileSync } from "node:fs";
+      import { join } from "node:path";
+      import YAML from "yaml";
+      const root = process.argv[1];
+      const problems = [];
+      let checked = 0;
+      for (const file of ["ci.yml", "aahp-manifest.yml"]) {
+        const wf = YAML.parse(readFileSync(join(root, ".github/workflows", file), "utf8"));
+        let inFile = 0;
+        for (const [jobName, job] of Object.entries(wf.jobs ?? {})) {
+          let installed = false;
+          for (const step of job.steps ?? []) {
+            const run = typeof step.run === "string" ? step.run : "";
+            const where = file + ":" + jobName + ":" + (step.name ?? run);
+            if (/\bnpm (ci|clean-install)\b.*--ignore-scripts/.test(run)) installed = true;
+            if (/\bajv-cli\b/.test(run)) problems.push(where + " runs ajv-cli, which was replaced by scripts/validate-json-schema.mjs");
+            if (/(^|[\s;&|])npx\s/.test(run)) problems.push(where + " runs npx, which can resolve a package from the registry");
+            if (!/\bschema\/[\w.-]+\.schema\.json\b/.test(run)) continue;
+            inFile += 1;
+            checked += 1;
+            if (!/^node scripts\/validate-json-schema\.mjs schema\/[\w.-]+\.schema\.json( \S+)+$/.test(run.trim())) {
+              problems.push(where + " validates a schema with something other than `node scripts/validate-json-schema.mjs <schema> <data...>`: " + JSON.stringify(run.trim()));
+            }
+            if (!installed) problems.push(where + " validates before `npm ci --ignore-scripts` in the same job, so ajv is not installed there");
+          }
+        }
+        if (inFile === 0) problems.push(file + " has no schema-validation step at all");
+      }
+      for (const p of problems) console.error("  - " + p);
+      if (problems.length > 0) process.exit(1);
+      console.log("schema validation steps OK (" + checked + " step(s))");
+    ' "$1"
+}
+
+copy_schema_workflows() {
+    mkdir -p "$TEST_TMPDIR/.github/workflows"
+    cp "$AAHP_ROOT/.github/workflows/ci.yml" "$AAHP_ROOT/.github/workflows/aahp-manifest.yml" \
+        "$TEST_TMPDIR/.github/workflows/"
+}
+
+@test "no schema validation step can reach the registry" {
     local ci="$AAHP_ROOT/.github/workflows/ci.yml"
     local manifest="$AAHP_ROOT/.github/workflows/aahp-manifest.yml"
 
@@ -94,29 +145,49 @@ write_good_fixture() {
     run grep -c -- "--no-save" "$ci" "$manifest"
     [ "$status" -eq 1 ]
 
-    # The fix, in both host jobs. Asserted as a RELATION - every `ajv-cli
-    # validate` invocation carries `--no-install` - and not as "there is exactly
-    # one". A fixed count is an anchor that a legitimate second validation step
-    # breaks, and the obvious repair is to raise the number, which silently
-    # exempts the new step from the property the count existed to protect. That
-    # is what happened when the aahp.config.json validation step was added.
-    # Written this way the file may grow further validation steps and each one is
-    # still held to the rule; a step added WITHOUT the flag is red.
-    local total flagged
-    for f in "$ci" "$manifest"; do
-        total="$(grep -c -- "ajv-cli validate" "$f" || true)"
-        flagged="$(grep -c -- "npx --no-install ajv-cli validate" "$f" || true)"
-        [ "$total" -ge 1 ] || { echo "no ajv-cli validate step in $f"; false; }
-        [ "$flagged" -eq "$total" ] || {
-            echo "$f: $total ajv-cli validate step(s), only $flagged carry --no-install"
-            false
-        }
-    done
+    run schema_steps_shape "$AAHP_ROOT"
+    [ "$status" -eq 0 ] || { echo "$output"; false; }
+    # Three today: MANIFEST.json and the config pair in ci.yml, MANIFEST.json in
+    # aahp-manifest.yml. Printed, not pinned; see the comment above.
+    [[ "$output" == *"schema validation steps OK ("* ]]
 
-    # And the packages the two steps execute are declared here at exact versions.
+    # And the packages that validator loads are declared here at exact versions.
     run node "$AAHP_ROOT/tests/assert-pinning-gate-wired.mjs" "$AAHP_ROOT"
     [ "$status" -eq 0 ]
     [[ "$output" == *"pinning gate wiring OK"* ]]
+}
+
+@test "schema steps red control: the untouched copies are green" {
+    copy_schema_workflows
+    run schema_steps_shape "$TEST_TMPDIR"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"schema validation steps OK ("* ]]
+}
+
+@test "schema steps red control: putting the ajv-cli step back is red" {
+    copy_schema_workflows
+    local f="$TEST_TMPDIR/.github/workflows/aahp-manifest.yml"
+    sed 's#run: node scripts/validate-json-schema.mjs schema/aahp-manifest.schema.json .ai/handoff/MANIFEST.json#run: npx --no-install ajv-cli validate --spec=draft2020 -c ajv-formats -s schema/aahp-manifest.schema.json -d .ai/handoff/MANIFEST.json#' \
+        "$f" > "$f.new"
+    mv "$f.new" "$f"
+    # Landed: the old invocation is back as a run line.
+    grep -q 'run: npx --no-install ajv-cli validate' "$f"
+    run schema_steps_shape "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"aahp-manifest.yml:aahp-manifest:Validate MANIFEST schema runs ajv-cli"* ]]
+    [[ "$output" == *"runs npx"* ]]
+}
+
+@test "schema steps red control: validating before npm ci in the same job is red" {
+    copy_schema_workflows
+    local f="$TEST_TMPDIR/.github/workflows/aahp-manifest.yml"
+    sed 's#run: npm ci --ignore-scripts#run: echo no install#' "$f" > "$f.new"
+    mv "$f.new" "$f"
+    run grep -c 'run: npm ci' "$f"
+    [ "$output" = "0" ]
+    run schema_steps_shape "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"validates before \`npm ci --ignore-scripts\` in the same job"* ]]
 }
 
 @test "the baseline fixture is clean" {
@@ -1380,9 +1451,12 @@ EOF
 # Red controls for the assertion above. It was only ever run in the green
 # direction, so an assertion that always printed OK would have passed too. Each
 # test mutates ONE thing in a copy of the real package.json (node on parsed
-# JSON), proves the mutation landed, and expects exit 1.
+# JSON) or of the schema validator, proves the mutation landed, and expects
+# exit 1.
 pinning_wiring_copy() {
     cp "$AAHP_ROOT/package.json" "$AAHP_ROOT/package-lock.json" "$TEST_TMPDIR/"
+    mkdir -p "$TEST_TMPDIR/scripts"
+    cp "$AAHP_ROOT/scripts/validate-json-schema.mjs" "$TEST_TMPDIR/scripts/"
 }
 pinning_wiring_mutate() {
     node -e '
@@ -1411,11 +1485,42 @@ pinning_wiring_mutate() {
     [[ "$output" == *"is not part of the aggregate"* ]]
 }
 
-@test "wiring red control: a range instead of an exact ajv-cli pin is red" {
+@test "wiring red control: a range instead of an exact ajv pin is red" {
     pinning_wiring_copy
-    pinning_wiring_mutate 'pkg.devDependencies["ajv-cli"] = "^" + pkg.devDependencies["ajv-cli"]'
-    grep -q '"ajv-cli": "\^' "$TEST_TMPDIR/package.json"
+    pinning_wiring_mutate 'pkg.devDependencies["ajv"] = "^" + pkg.devDependencies["ajv"]'
+    grep -q '"ajv": "\^' "$TEST_TMPDIR/package.json"
     run node "$AAHP_ROOT/tests/assert-pinning-gate-wired.mjs" "$TEST_TMPDIR"
     [ "$status" -eq 1 ]
-    [[ "$output" == *"ajv-cli is declared as"*"not an exact version"* ]]
+    [[ "$output" == *"ajv is declared as"*"not an exact version"* ]]
+}
+
+@test "wiring red control: ajv-formats missing from package.json is red" {
+    pinning_wiring_copy
+    pinning_wiring_mutate 'delete pkg.devDependencies["ajv-formats"]'
+    run grep -c '"ajv-formats"' "$TEST_TMPDIR/package.json"
+    [ "$output" = "0" ]
+    run node "$AAHP_ROOT/tests/assert-pinning-gate-wired.mjs" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"ajv-formats is executed by a required status check but is not declared"* ]]
+}
+
+@test "wiring red control: the validator loading a package the list does not name is red" {
+    pinning_wiring_copy
+    local f="$TEST_TMPDIR/scripts/validate-json-schema.mjs"
+    node -e '
+      const fs = require("fs"), p = process.argv[1], anchor = "const require = createRequire(import.meta.url);";
+      fs.writeFileSync(p, fs.readFileSync(p, "utf8").replace(anchor, anchor + "\nconst extra = require(\"minimist\");"));
+    ' "$f"
+    grep -q '^const extra = require("minimist");' "$f"
+    run node "$AAHP_ROOT/tests/assert-pinning-gate-wired.mjs" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"loads minimist, which EXECUTED_IN_REQUIRED_CHECKS in this file does not list"* ]]
+}
+
+@test "wiring red control: a validator the assertion can no longer read is red, not green" {
+    pinning_wiring_copy
+    rm "$TEST_TMPDIR/scripts/validate-json-schema.mjs"
+    run node "$AAHP_ROOT/tests/assert-pinning-gate-wired.mjs" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"scripts/validate-json-schema.mjs cannot be read"* ]]
 }

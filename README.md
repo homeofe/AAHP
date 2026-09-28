@@ -371,31 +371,41 @@ and everything under `.ai/handoff/`, or walks the tree outside a git work tree; 
 `scripts/check-conflict-markers.mjs` is not next to `lint-handoff.sh`, a shell fallback
 with the same file set runs instead.
 
-To use AJV for strict schema validation in CI, declare it as an exact
-devDependency and run it from your lockfile rather than from the registry:
+To add AJV, the reference JSON Schema implementation, as a strict second validator in
+CI, declare `ajv` and `ajv-formats` as exact devDependencies beside
+`@elvatis_com/aahp` and run the validator the package ships, from your lockfile rather
+than from the registry:
 
 ```bash
 # once, and commit the resulting package-lock.json
-npm i -D -E ajv-cli ajv-formats
+npm i -D -E ajv ajv-formats
 
 # in CI
 npm ci --ignore-scripts
-npx --no-install ajv-cli validate --spec=draft2020 -c ajv-formats \
-  -s schema/aahp-manifest.schema.json -d .ai/handoff/MANIFEST.json
+node ./node_modules/@elvatis_com/aahp/scripts/validate-json-schema.mjs \
+  ./node_modules/@elvatis_com/aahp/schema/aahp-manifest.schema.json .ai/handoff/MANIFEST.json
 ```
 
-`npm ci --ignore-scripts` is what makes the pin load-bearing: it installs exactly
-the locked closure, so there is nothing left for the next line to resolve.
+`scripts/validate-json-schema.mjs` validates against JSON Schema draft 2020-12 with
+`ajv-formats` in its full mode and ajv's default strict mode, the configuration this
+repository's own CI uses. It exits `0` when every file is valid, `1` when one is not
+(each error listed with its JSON Pointer), and `2` when it cannot evaluate, for example
+because ajv is not installed. It loads ajv with `node` from `node_modules/`, so no part
+of it can fetch a package, and `npm ci --ignore-scripts` is what makes the pin
+load-bearing: it installs exactly the locked closure. This replaces the
+`ajv-cli validate --spec=draft2020 -c ajv-formats` recipe this section used to give:
+ajv-cli 5.0.0 depends on `glob@7.2.3` and `inflight@1.0.6`, both deprecated.
 
-**`--no-install` keeps a missing package from being run, not from being looked up.**
-Measured 2026-09-28 on npm 10, 11 and 12 (ADR-013): when the package is not installed,
-`npx --no-install <name>` sends one metadata request to registry.npmjs.org and then stops
-with `npx canceled due to missing packages`. `npm exec --no-install` is a different
-command and, on npm 10 and 11, downloads and runs the package. An earlier version of this
-paragraph said `npx` ignores the flag, which is true of `npm exec` only. So the `npm ci`
-above is what keeps this line off the network, and `check-workflow-pinning.mjs` requires
-it earlier in the same job. Invoke the installed binary by path where the resolution has
-to be guaranteed, as the shipped workflows and the git hooks do.
+**If you run a tool through `npx` instead, `--no-install` keeps a missing package from
+being run, not from being looked up.** Measured 2026-09-28 on npm 10, 11 and 12
+(ADR-013): when the package is not installed, `npx --no-install <name>` sends one
+metadata request to registry.npmjs.org and then stops with `npx canceled due to missing
+packages`. `npm exec --no-install` is a different command and, on npm 10 and 11,
+downloads and runs the package. An earlier version of this paragraph said `npx` ignores
+the flag, which is true of `npm exec` only. So an `npm ci` earlier in the same job is
+what keeps such a line off the network, and `check-workflow-pinning.mjs` requires it.
+Invoke the installed file by path where the resolution has to be guaranteed, as the
+recipe above, the shipped workflows and the git hooks do.
 
 Wired into CI like this, a manifest that does not conform fails the job. `aahp doctor`
 validates the whole schema as well (its `manifest-schema` gate), and the shipped

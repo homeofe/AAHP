@@ -323,20 +323,23 @@ _manifest_merge() {
 }
 
 @test "manifest validator: same verdict as ajv (CI's validator) on every case in the corpus" {
-    # The doctor gate and `ajv validate` in CI read the same schema. If they
+    # The doctor gate and the ajv validation in CI read the same schema. If they
     # could disagree, doctor would be green on a manifest CI rejects (or the
     # reverse). This runs both over the same corpus and fails on any split.
+    # The ajv side is createAjv() from scripts/validate-json-schema.mjs, the
+    # exact instance CI validates with (draft 2020-12, ajv-formats full mode,
+    # ajv's default strict mode), not a second hand-built copy of it.
     [ -d "$AAHP_ROOT/node_modules/ajv" ] || { echo "ajv devDependency missing: run npm ci"; false; }
     run node -e '
       const path = require("path");
       const fs = require("fs");
       const url = require("url");
       const root = process.argv[1];
-      const Ajv2020 = require(path.join(root, "node_modules/ajv/dist/2020")).default;
-      const addFormats = require(path.join(root, "node_modules/ajv-formats")).default;
+      const load = (rel) => import(url.pathToFileURL(path.join(root, rel)).href);
+      Promise.all([load("scripts/validate-json-schema.mjs"), load("scripts/aahp-schema.mjs")]).then(([ci, mod]) => {
+      const ajv = ci.createAjv();
+      console.log("oracle=" + ajv.constructor.name);
       const schema = JSON.parse(fs.readFileSync(path.join(root, "schema/aahp-manifest.schema.json"), "utf8"));
-      const ajv = new Ajv2020({ allErrors: true, strict: false });
-      addFormats(ajv);
       const ajvValid = ajv.compile(schema);
       const sum = "sha256:" + "a".repeat(64);
       const file = { checksum: sum, updated: "2026-01-01T00:00:00Z", lines: 1, summary: "s" };
@@ -393,7 +396,6 @@ _manifest_merge() {
         tokenBudgetNegative: (m) => { m.token_budget = { full_read: -1 }; },
         durationFloat: (m) => { m.last_session.duration_minutes = 1.5; },
       };
-      import(url.pathToFileURL(path.join(root, "scripts/aahp-schema.mjs")).href).then((mod) => {
         let splits = 0, accepted = 0, rejected = 0;
         for (const [name, mutate] of Object.entries(cases)) {
           const m = base();
@@ -409,6 +411,7 @@ _manifest_merge() {
     ' "$AAHP_ROOT"
     echo "$output"
     [ "$status" -eq 0 ]
+    [[ "$output" == *"oracle=Ajv2020"* ]]
     [[ "$output" == *"splits=0"* ]]
     # Both verdicts are exercised, so agreement is not agreement on "all valid".
     [[ "$output" != *"accepted=0 "* ]]

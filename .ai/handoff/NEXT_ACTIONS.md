@@ -19,6 +19,13 @@ Current version: **v3.12.0**
 
 ## Recently Completed
 
+### 2026-09-28: Protected publish environment, ajv-cli replaced
+
+- npm publishing waits for the owner's approval in the `npm-publish` environment (tags
+  `v*` only, no admin bypass).
+- Schema validation runs on the ajv library through `scripts/validate-json-schema.mjs`;
+  ajv-cli and its deprecated dependencies are gone.
+
 ### 2026-09-28: Owner follow-up decisions
 
 - `init --gates` scaffolds `pinnedDep` and the adopter verify workflow; lint's PII check
@@ -46,13 +53,6 @@ Current version: **v3.12.0**
 - Dependabot is grouped with a cooldown; ShellCheck and installs in required jobs are
   pinned and script-free.
 
-### 2026-09-28: Verify gate semantics
-
-- TRUST rows can be check-backed and are re-proven on every run; dated rows get a 14-day
-  grace period before blocking.
-- Dev-only, integrity-pinned lockfile updates without install scripts are exempt from
-  Layer 2 when a supply-chain scan is asserted; Layer 3 can report OK.
-
 ---
 
 ## Owner Decisions (not task registry entries)
@@ -65,12 +65,11 @@ snapshot; README split; redaction of internal details; the scanner as a required
 Open:
 
 - Choose whether legacy governance workflows need doctor detection or forced migration.
-- Plan a future replacement for the deprecated transitive dependencies of ajv-cli 5.
-- Decide on a protected publish environment bound in the npm trusted-publisher config.
 - Decide whether consumer manifests with template placeholder dates are fixed before the
   release.
 - Decide whether and when to release the unreleased changes, and the version number.
 - Track homeofe/supply-chain-guard#354 and its remaining follow-ups in that repository.
+- Owner: set the npm trusted-publisher Environment name to `npm-publish`.
 
 ---
 

@@ -460,38 +460,16 @@ EOF
 }
 
 @test "config example validates against the config schema" {
-    local entry
-    entry="$(cd "$AAHP_ROOT" && node -e '
-try {
-  const path = require("path");
-  const pkg = require("ajv-cli/package.json");
-  const dir = path.dirname(require.resolve("ajv-cli/package.json"));
-  const bin = typeof pkg.bin === "string" ? pkg.bin : pkg.bin.ajv;
-  process.stdout.write(path.resolve(dir, bin));
-} catch (e) {}
-' 2>/dev/null)"
-    require_tool "ajv-cli not installed" [ -n "$entry" ]
-
-    run node "$entry" validate --spec=draft2020 -c ajv-formats \
-        -s "$AAHP_ROOT/schema/aahp-config.schema.json" \
-        -d "$AAHP_ROOT/aahp.config.example.json"
+    # CI's ajv validator: exit 0 valid, 1 invalid, 2 could not evaluate (which
+    # includes ajv not being installed, so a broken install is red, not a skip).
+    run node "$SCRIPTS_DIR/validate-json-schema.mjs" \
+        "$AAHP_ROOT/schema/aahp-config.schema.json" \
+        "$AAHP_ROOT/aahp.config.example.json"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"valid"* ]]
+    [[ "$output" == *"aahp.config.example.json valid"* ]]
 }
 
 @test "config schema rejects malformed impact entries and unsafe path shapes" {
-    local entry
-    entry="$(cd "$AAHP_ROOT" && node -e '
-try {
-  const path = require("path");
-  const pkg = require("ajv-cli/package.json");
-  const dir = path.dirname(require.resolve("ajv-cli/package.json"));
-  const bin = typeof pkg.bin === "string" ? pkg.bin : pkg.bin.ajv;
-  process.stdout.write(path.resolve(dir, bin));
-} catch (e) {}
-' 2>/dev/null)"
-    require_tool "ajv-cli not installed" [ -n "$entry" ]
-
     local cases=(
         '{"handoffImpact":{"nonImpactingModifiedFiles":{}}}'
         '{"handoffImpact":{"nonImpactingModifiedFiles":[{"file":"docs/a.md"}]}}'
@@ -509,11 +487,13 @@ try {
     local value
     for value in "${cases[@]}"; do
         printf '%s\n' "$value" > "$TEST_TMPDIR/invalid-config.json"
-        run node "$entry" validate --spec=draft2020 -c ajv-formats \
-            -s "$AAHP_ROOT/schema/aahp-config.schema.json" \
-            -d "$TEST_TMPDIR/invalid-config.json"
-        [ "$status" -ne 0 ]
-        [[ "$output" == *"invalid"* ]]
+        run node "$SCRIPTS_DIR/validate-json-schema.mjs" \
+            "$AAHP_ROOT/schema/aahp-config.schema.json" \
+            "$TEST_TMPDIR/invalid-config.json"
+        # Exactly 1: a validator that crashed (2) has not rejected anything, and
+        # the file name itself contains "invalid", so the verdict line is matched.
+        [ "$status" -eq 1 ] || { echo "not rejected ($status): $value"; echo "$output"; false; }
+        [[ "$output" == *"invalid-config.json invalid"* ]]
     done
 }
 

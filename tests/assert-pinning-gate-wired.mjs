@@ -14,11 +14,16 @@
 //      chain, which is what the required lint-and-validate job runs. A gate that
 //      exists but never runs protects nothing, and nothing else in the
 //      repository would notice it had been dropped from the chain.
-//   2. The two packages the required checks execute are pinned the way the gate
-//      requires: declared at an exact version and locked with an integrity hash.
-//      The gate derives this from the workflow files; this derives it from the
-//      package names directly, so a change that stopped the gate from seeing
-//      those steps cannot also silence this.
+//   2. The packages the required checks execute are pinned the way the gate
+//      requires of an npx target: declared at an exact version and locked with
+//      an integrity hash. The required lint-and-validate and aahp-manifest
+//      checks run scripts/validate-json-schema.mjs with `node`, not `npx`, so
+//      the gate's rule C (which reads npx targets out of the workflows) no
+//      longer sees these packages at all; this is what holds them now. The list
+//      is written out below AND compared with the packages that script actually
+//      loads, in both directions: a new package in the validator is red until it
+//      is listed (and so pinned), and an extraction that found nothing cannot
+//      pass as "nothing to pin".
 
 import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -39,9 +44,55 @@ if (!pkg.scripts?.check?.includes("check:workflow-pinning")) {
   );
 }
 
-// The packages the required lint-and-validate and aahp-manifest checks execute.
-const EXECUTED_IN_REQUIRED_CHECKS = ["ajv-cli", "ajv-formats"];
+// The packages the required lint-and-validate and aahp-manifest checks execute,
+// through scripts/validate-json-schema.mjs.
+const EXECUTED_IN_REQUIRED_CHECKS = ["ajv", "ajv-formats"];
+const VALIDATOR = "scripts/validate-json-schema.mjs";
 const EXACT = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.]+)?$/;
+
+// The package part of a bare module specifier, or null for a builtin or a
+// relative path: `ajv/dist/2020` -> `ajv`, `@scope/name/x` -> `@scope/name`.
+function packageOf(specifier) {
+  if (specifier.startsWith("node:") || specifier.startsWith(".") || specifier.startsWith("/")) return null;
+  const parts = specifier.split("/");
+  return specifier.startsWith("@") ? parts.slice(0, 2).join("/") : parts[0];
+}
+
+let validatorText = null;
+try {
+  validatorText = readFileSync(join(root, VALIDATOR), "utf8");
+} catch (err) {
+  problems.push(`${VALIDATOR} cannot be read (${err.code ?? err.message}), so what it loads cannot be compared`);
+}
+if (validatorText !== null) {
+  // Code only: a module named in a comment is not loaded.
+  const code = validatorText
+    .split(/\r?\n/)
+    .filter((line) => !line.trim().startsWith("//"))
+    .join("\n");
+  const loaded = new Set();
+  const specifiers = /\brequire\(\s*["']([^"']+)["']\s*\)|\bimport\(\s*["']([^"']+)["']\s*\)|\bfrom\s+["']([^"']+)["']/g;
+  for (const m of code.matchAll(specifiers)) {
+    const name = packageOf(m[1] ?? m[2] ?? m[3]);
+    if (name !== null) loaded.add(name);
+  }
+  for (const name of loaded) {
+    if (!EXECUTED_IN_REQUIRED_CHECKS.includes(name)) {
+      problems.push(
+        `${VALIDATOR} loads ${name}, which EXECUTED_IN_REQUIRED_CHECKS in this file does not list, ` +
+          "so nothing asserts it is pinned. Add it here and declare it as an exact devDependency.",
+      );
+    }
+  }
+  for (const name of EXECUTED_IN_REQUIRED_CHECKS) {
+    if (!loaded.has(name)) {
+      problems.push(
+        `${VALIDATOR} no longer loads ${name}, which EXECUTED_IN_REQUIRED_CHECKS lists. Either the ` +
+          "list is stale or this file can no longer see what the validator loads.",
+      );
+    }
+  }
+}
 
 for (const name of EXECUTED_IN_REQUIRED_CHECKS) {
   const spec = pkg.devDependencies?.[name] ?? pkg.dependencies?.[name];

@@ -427,17 +427,9 @@ EOF
 }
 
 @test "the config schema agrees with the runtime parsers on the new keys" {
-    local entry
-    entry="$(cd "$AAHP_ROOT" && node -e '
-try {
-  const path = require("path");
-  const pkg = require("ajv-cli/package.json");
-  const dir = path.dirname(require.resolve("ajv-cli/package.json"));
-  const bin = typeof pkg.bin === "string" ? pkg.bin : pkg.bin.ajv;
-  process.stdout.write(path.resolve(dir, bin));
-} catch (e) {}
-' 2>/dev/null)"
-    [ -n "$entry" ] || skip "ajv-cli not installed"
+    # CI's ajv validator (scripts/validate-json-schema.mjs). It exits 2 when ajv
+    # is not installed, so a broken install is red here rather than a skip.
+    local validator="$SCRIPTS_DIR/validate-json-schema.mjs"
     local value
     local invalid=(
         '{"handoffImpact":{}}'
@@ -454,9 +446,8 @@ try {
     )
     for value in "${invalid[@]}"; do
         printf '%s\n' "$value" > "$TEST_TMPDIR/candidate.json"
-        run node "$entry" validate --spec=draft2020 -c ajv-formats \
-            -s "$AAHP_ROOT/schema/aahp-config.schema.json" -d "$TEST_TMPDIR/candidate.json"
-        [ "$status" -ne 0 ] || { echo "ajv accepted: $value"; false; }
+        run node "$validator" "$AAHP_ROOT/schema/aahp-config.schema.json" "$TEST_TMPDIR/candidate.json"
+        [ "$status" -eq 1 ] || { echo "ajv did not reject ($status): $value $output"; false; }
         # The zero-dependency validator doctor and check run must agree.
         run node --input-type=module -e '
 import { pathToFileURL } from "node:url";
@@ -483,9 +474,9 @@ if (errors.length) { console.log(JSON.stringify(errors)); process.exit(1); }
     done
     printf '%s\n' '{"handoffImpact":{"npmDevDependencyUpdates":{"reason":"r","supplyChainScan":{"workflow":".github/workflows/ci.yml","job":"supply-chain-guard"}}},"trustTtl":{"enforce":true,"graceDays":0,"checks":[{"id":"a-b","run":["git","status"],"reason":"Reviewed."}]}}' \
         > "$TEST_TMPDIR/candidate.json"
-    run node "$entry" validate --spec=draft2020 -c ajv-formats \
-        -s "$AAHP_ROOT/schema/aahp-config.schema.json" -d "$TEST_TMPDIR/candidate.json"
-    [ "$status" -eq 0 ]
+    run node "$validator" "$AAHP_ROOT/schema/aahp-config.schema.json" "$TEST_TMPDIR/candidate.json"
+    [ "$status" -eq 0 ] || { echo "$output"; false; }
+    [[ "$output" == *"candidate.json valid"* ]]
 }
 
 @test "workflow reader: this repository's own scanner and verify jobs are proven to run on pull_request" {

@@ -38,22 +38,19 @@ node scripts/run-bats.mjs tests/migrate.bats
 # Lint handoff files
 bash scripts/lint-handoff.sh .
 
-# Schema validation. ajv-cli and ajv-formats are pinned devDependencies, so
-# `npm ci` installs them from the lockfile - THAT is what keeps this off the
-# registry: with the package placed, npx makes no request at all. --no-install
-# is the fail-closed half, not a network guard: npx rewrites it to --yes=false,
-# so a missing package costs one registry metadata request and then stops
-# instead of being downloaded and run (measured 2026-09-28 on npm 10.9.9,
-# 11.20.0 and 12.0.2; docs/adr/ADR-013.md). `npm exec --no-install` is NOT the same:
-# npm 10 and 11 ignore the flag there and run the package. In workflows,
-# check-workflow-pinning.mjs requires `npm ci --ignore-scripts` before any npx in
-# the same job and `--no-install` on every npx, and rejects `npm exec`. Where
-# the resolution must be guaranteed, invoke the installed binary by path, as the
-# shipped governance workflow and the git hooks do.
+# Schema validation with ajv (draft 2020-12, ajv-formats in full mode, ajv's
+# default strict mode), the same command CI runs. ajv and ajv-formats are exact
+# devDependencies that `npm ci` places from the lockfile, and the script loads
+# them with `node`, never `npx`, so nothing here can reach the registry; without
+# the install it exits 2. Exit 0 valid, 1 invalid, 2 could not evaluate.
+# (It replaced ajv-cli 5.0.0, whose dependency tree is deprecated.) If you do
+# run npx in a workflow: check-workflow-pinning.mjs requires `npm ci
+# --ignore-scripts` before it in the same job and `--no-install` on it, and
+# rejects `npm exec`, which ignores that flag on npm 10 and 11
+# (docs/adr/ADR-013.md).
 npm ci --ignore-scripts
-npx --no-install ajv-cli validate --spec=draft2020 -c ajv-formats \
-  -s schema/aahp-manifest.schema.json \
-  -d .ai/handoff/MANIFEST.json
+node scripts/validate-json-schema.mjs schema/aahp-manifest.schema.json .ai/handoff/MANIFEST.json
+node scripts/validate-json-schema.mjs schema/aahp-config.schema.json aahp.config.json aahp.config.example.json
 
 # ShellCheck all shipped scripts before finishing shell changes
 shellcheck scripts/_aahp-lib.sh

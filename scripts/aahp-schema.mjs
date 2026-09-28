@@ -151,7 +151,8 @@ export function assertSupported(schema, pointer = "#", root = schema) {
 // a full-date and a full-time with a REQUIRED offset, separated by "T", "t" or
 // whitespace; calendar-valid days (leap years included); a leap second only at
 // 23:59:60 UTC. Kept deliberately identical to what CI's ajv accepts so the
-// doctor gate and `ajv validate` cannot disagree about the same manifest.
+// doctor gate and CI's scripts/validate-json-schema.mjs cannot disagree about
+// the same manifest.
 const DATE_RE = /^(\d\d\d\d)-(\d\d)-(\d\d)$/;
 const TIME_RE = /^(\d\d):(\d\d):(\d\d(?:\.\d+)?)(z|([+-])(\d\d)(?::?(\d\d))?)?$/i;
 const DAYS = [0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];

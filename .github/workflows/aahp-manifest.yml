@@ -45,14 +45,13 @@ jobs:
       - name: Install pinned dependencies
         run: npm ci --ignore-scripts
       - name: Validate MANIFEST schema
-        # The `npm ci` above is what keeps this line off the registry: with the
-        # locked package placed, npx makes no request at all. `--no-install` is
-        # the fail-closed half: npx rewrites it to `--yes=false`, so a miss stops
-        # with "npx canceled due to missing packages" after one metadata request
-        # instead of downloading and running what the registry returns, which is
-        # what npx does without it in CI (measured on npm 10, 11 and 12, see
-        # ADR-013). scripts/check-workflow-pinning.mjs rules B and J keep both.
-        run: npx --no-install ajv-cli validate --spec=draft2020 -c ajv-formats -s schema/aahp-manifest.schema.json -d .ai/handoff/MANIFEST.json
+        # ajv and ajv-formats come from the `npm ci` above, and
+        # scripts/validate-json-schema.mjs loads them with `node` from
+        # node_modules; nothing on this line can resolve a package from the
+        # registry. Without the install the script exits 2 and the job fails
+        # closed. Same ajv configuration as the `ajv-cli validate
+        # --spec=draft2020 -c ajv-formats` it replaced (see the script header).
+        run: node scripts/validate-json-schema.mjs schema/aahp-manifest.schema.json .ai/handoff/MANIFEST.json
       - name: Check MANIFEST generator
         run: |
           tmpdir="$(mktemp -d)"

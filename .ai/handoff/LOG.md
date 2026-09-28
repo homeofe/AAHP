@@ -6,6 +6,36 @@
 
 ---
 
+## [2026-09-28] claude-opus-5.5: verify gate semantics (audit fix programme, 5 of 8)
+
+**Agent:** claude-opus-5.5
+**Phase:** implementation
+**Branch:** fix/verify-gate-semantics
+**Tasks:** owner decisions of 2026-09-28 on TRUST-TTL and Dependabot
+
+### What was done
+
+- Layer 4: executable, check-backed TRUST claims and a grace period for dated rows, so a
+  calendar date alone no longer turns a required check red.
+- Layer 2: an opt-in, content-based exemption for dev-only lockfile updates, bound to a
+  re-proven supply-chain scan assertion; project-relative paths for subdirectory
+  projects.
+- Layer 3 can report OK after a committed handoff; verify messages name real commands
+  and the failing layer.
+- A fix agent implemented this in an isolated worktree; the integrator required dev
+  entries with install scripts to stay impacting, converted this repository's TRUST.md,
+  aligned the workflow and hook headers, and wrote the handoff state.
+
+### Decision
+
+- An update that introduces or keeps an install script is never exempt: install scripts
+  run on every `npm ci` without `--ignore-scripts`, developer machines included, which
+  is exactly the change a handoff record must explain.
+- Nothing in TRUST.md is executed. Checks are built in, or argv arrays in the
+  code-reviewed config.
+
+---
+
 ## [2026-09-28] claude-opus-5.5: manifest, lint and CLI (audit fix programme, 3 of 8)
 
 **Agent:** claude-opus-5.5
@@ -271,24 +301,3 @@
 - No row was downgraded, so no downgrade explanation is owed here. Every one of the 10 rows reached a real external anchor in this session.
 - TTL values were deliberately left unchanged. Recomputing Expires from an unchanged TTL is re-verification; lengthening a TTL because the warning is tiresome would be gaming the gate. The structural problem is real and is being raised for the maintainer instead of patched silently: six script rows on a 7-day TTL guarantee a Layer 4 warning every week, which is exactly the cadence that teaches readers to skim past it. Note also that this register's own policy puts script and checksum rows at a 1 to 3 day TTL, so the current 7-day values are already looser than the stated rule. Both halves of that tension belong to the maintainer, not to a passing agent.
 - Package version deliberately not bumped. This change touches only the handoff register, its log, and the status file.
-
----
-
-## [2026-07-18] claude-opus-4-8: Anti-entropy initiative (gates + constitution + ADR log, v3.7.0)
-
-**Agent:** claude-opus-4-8
-**Phase:** implementation
-**Branch:** feat/anti-entropy
-**Tasks:** anti-entropy strategy (steps 3-6)
-
-### What was done
-
-- Added 3 config-driven enforcement gates (no-op without config), wired into `npm run check`: check-forbidden-patterns.mjs (regex denylist over `git ls-files`; AAHP bans em dashes), check-schema-doc-sync.mjs (extract-and-compare value-sets across sources; AAHP pins the task-status + phase enums), check-doc-links.mjs (internal markdown file-link resolver). Config keys forbiddenPatterns/docSync/docLinks in the schema + example. 9 bats tests.
-- Added CONSTITUTION.md (12 non-negotiable invariants, each already enforced), linked from README + CLAUDE.md and tied into the doc-links + forbidden-patterns gates.
-- Reframed README Section 7 as an Architectural Decision Log (10 ADRs with stable anchors + the LOG-to-ADR promotion rule).
-- Free win: ci.yml shellcheck globs `git ls-files` (auto-covers new scripts). De-dup: removed the rotted German runbook from the CONVENTIONS template + dogfood; collapsed the duplicate Three Laws.
-
-### Decisions
-
-- Per the strategy, deliberately did NOT build a separate governance system/command, a docs/adr/ directory (README Section 7 IS the log), any per-PR LLM gate, or the swarm self-governance runtime. Gates extend the existing deterministic machinery.
-- Deferred AAHP's own `claims` config (prose capability numbers are false-positive-prone) and aggressive README/CLAUDE de-dup (kept operational how-to; the constitution is the invariant index).

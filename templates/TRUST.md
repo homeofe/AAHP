@@ -26,57 +26,67 @@ to strongest: `model_claim`, `self_reviewed`, `cross_model_reviewed`,
 only `source_verified` / `tool_verified` / `test_verified` / `runtime_observed` /
 `human_confirmed` can support `verified` (grounded). Record it in the Provenance column
 of the tables below, using `-` when unknown. TTL and expiry stay governed by the Trust
-Decay rule (README section 2.5). See GROUNDING.md for the task-type anchor matrix and
-README section 2.10 for the doctrine.
+Decay rule (README section 2.5), which also defines the optional Check column. See
+GROUNDING.md for the task-type anchor matrix and README section 2.10 for the doctrine.
 
 ---
 
 ## Build System
 
-| Property | Status | Provenance | Last Verified | Agent | TTL | Expires | Notes |
-|----------|--------|------------|---------------|-------|-----|---------|-------|
-| `build` passes | untested | - | - | - | - | - | |
-| `test` passes | untested | - | - | - | - | - | |
-| `lint` passes | untested | - | - | - | - | - | |
-| `type-check` passes | untested | - | - | - | - | - | |
+| Property | Status | Provenance | Last Verified | Agent | TTL | Expires | Check | Notes |
+|----------|--------|------------|---------------|-------|-----|---------|-------|-------|
+| `build` passes | untested | - | - | - | - | - | - | |
+| `test` passes | untested | - | - | - | - | - | - | |
+| `lint` passes | untested | - | - | - | - | - | - | |
+| `type-check` passes | untested | - | - | - | - | - | - | |
 
 ---
 
 ## Infrastructure
 
-| Property | Status | Provenance | Last Verified | Agent | TTL | Expires | Notes |
-|----------|--------|------------|---------------|-------|-----|---------|-------|
-| Local dev stack boots | untested | - | - | - | - | - | |
-| All health endpoints respond | untested | - | - | - | - | - | |
-| Database connection works | untested | - | - | - | - | - | |
-| Auth flow completes | untested | - | - | - | - | - | |
+| Property | Status | Provenance | Last Verified | Agent | TTL | Expires | Check | Notes |
+|----------|--------|------------|---------------|-------|-----|---------|-------|-------|
+| Local dev stack boots | untested | - | - | - | - | - | - | |
+| All health endpoints respond | untested | - | - | - | - | - | - | |
+| Database connection works | untested | - | - | - | - | - | - | |
+| Auth flow completes | untested | - | - | - | - | - | - | |
 
 ---
 
 ## Integrations
 
-| Property | Status | Provenance | Last Verified | Agent | TTL | Expires | Notes |
-|----------|--------|------------|---------------|-------|-----|---------|-------|
-| External API A reachable | untested | - | - | - | - | - | |
-| Webhook delivery confirmed | untested | - | - | - | - | - | |
+| Property | Status | Provenance | Last Verified | Agent | TTL | Expires | Check | Notes |
+|----------|--------|------------|---------------|-------|-----|---------|-------|-------|
+| External API A reachable | untested | - | - | - | - | - | - | |
+| Webhook delivery confirmed | untested | - | - | - | - | - | - | |
 
 ---
 
 ## Security
 
-| Property | Status | Provenance | Last Verified | Agent | TTL | Expires | Notes |
-|----------|--------|------------|---------------|-------|-----|---------|-------|
-| No secrets in source | assumed | - | - | - | - | - | Pre-commit hooks configured |
-| Auth tokens expire correctly | untested | - | - | - | - | - | |
-| PII not logged | untested | - | - | - | - | - | |
+| Property | Status | Provenance | Last Verified | Agent | TTL | Expires | Check | Notes |
+|----------|--------|------------|---------------|-------|-----|---------|-------|-------|
+| No secrets in source | assumed | - | - | - | - | - | - | Pre-commit hooks configured |
+| Auth tokens expire correctly | untested | - | - | - | - | - | - | |
+| PII not logged | untested | - | - | - | - | - | - | |
 
 ---
 
 ## Update Rules (for agents)
 
-- Change `untested` → `verified` only after **running actual code/tests**
-- Change `assumed` → `verified` after direct confirmation
+- Change `untested` -> `verified` only after **running actual code/tests**
+- Change `assumed` -> `verified` after direct confirmation
 - Never downgrade `verified` without explaining why in `LOG.md`
+- An expired `verified` row counts as `assumed` when you read it, but nothing
+  rewrites it for you: `aahp verify` REPORTS it (Layer 4). Re-verify it and reset
+  Last Verified and Expires, or downgrade it to `assumed` yourself
+- Where a machine can re-prove a row, name a check in the Check column instead of
+  relying on its date: a built-in (`license-matches`, `manifest-integrity`) or an
+  id declared in `trustTtl.checks` of `aahp.config.json`. The cell is a name, never
+  a command; use `-` for a judgment row. A check-backed row is judged on every
+  verify; a judgment row warns from its Expires date and, under
+  `trustTtl.enforce`, blocks once it is more than `trustTtl.graceDays` (default 14)
+  past it (README section 2.5)
 - Add new rows when new system properties become critical
 
 ---

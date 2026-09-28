@@ -183,8 +183,13 @@ This file defines no TTL tables of its own. Time-to-live and expiry are governed
 a single authority: the Trust Decay rule (README section 2.5) sets the day tiers
 (high-churn build/test properties get short TTLs; stable properties such as
 architecture and conventions get long TTLs) and the rule that an expired `verified`
-claim auto-downgrades to `assumed`. The per-row TTL and Expires columns in TRUST.md
-carry the actual values; the verify gate (README section 2.8) enforces TTL expiry.
+claim counts as `assumed` until it is re-verified. Nothing downgrades the row
+automatically: the verify gate (README section 2.8, Layer 4) reports it, and the
+agent re-verifies or downgrades it. The per-row TTL and Expires columns in TRUST.md
+carry the actual values, and an optional Check column lets a row be re-proven by a
+reviewed check on every run instead of by its date. Layer 4 is advisory by default;
+it blocks only in a repository that sets `trustTtl.enforce`, and then only for a
+failing check or a row more than `trustTtl.graceDays` (default 14) past its expiry.
 
 ---
 

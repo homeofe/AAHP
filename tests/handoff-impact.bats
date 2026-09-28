@@ -516,3 +516,58 @@ try {
         [[ "$output" == *"invalid"* ]]
     done
 }
+
+# A project that lives in a subdirectory of its repository. git reports diff
+# paths relative to the repository top level, so without --relative the gate
+# saw `app/.ai/handoff/STATUS.md`, never matched `.ai/handoff/STATUS.md`, and
+# failed every change however the handoff was updated. It also counted every
+# sibling project's change as this project's code.
+@test "a project in a repository subdirectory is gated relative to its own root" {
+    local proj="$TEST_TMPDIR/app"
+    mkdir -p "$proj/.ai/handoff"
+    create_full_handoff "$proj/.ai/handoff"
+    git -C "$TEST_TMPDIR" add -A
+    git -C "$TEST_TMPDIR" commit -q -m "seed nested handoff"
+    bash "$SCRIPTS_DIR/aahp-manifest.sh" "$proj" --quiet --phase implementation
+    git -C "$TEST_TMPDIR" add -A
+    git -C "$TEST_TMPDIR" commit -q -m "nested manifest"
+
+    # Code and handoff move together inside the project: pass.
+    printf 'code\n' > "$proj/feature.js"
+    printf '\n<!-- nested session note -->\n' >> "$proj/.ai/handoff/STATUS.md"
+    bash "$SCRIPTS_DIR/aahp-manifest.sh" "$proj" --quiet --phase implementation
+    git -C "$TEST_TMPDIR" add -A
+    run bash "$SCRIPTS_DIR/verify-handoff.sh" "$proj" --level precommit
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"changed with them"* ]]
+    git -C "$TEST_TMPDIR" commit -q -m "nested change with handoff"
+
+    # Code alone inside the project: fail, with the path relative to the project.
+    printf 'more code\n' >> "$proj/feature.js"
+    git -C "$TEST_TMPDIR" add -A
+    run bash "$SCRIPTS_DIR/verify-handoff.sh" "$proj" --level precommit
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"      - M feature.js"* ]]
+    [[ "$output" != *"app/feature.js"* ]]
+    git -C "$TEST_TMPDIR" reset -q --hard
+
+    # A sibling outside the project is not this project's code.
+    printf 'sibling\n' > "$TEST_TMPDIR/other.txt"
+    git -C "$TEST_TMPDIR" add other.txt
+    run bash "$SCRIPTS_DIR/verify-handoff.sh" "$proj" --level precommit
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Drift gate not triggered"* ]]
+
+    # And at level ci the base-to-HEAD diff is project-relative too.
+    local base
+    base="$(git -C "$TEST_TMPDIR" rev-parse HEAD)"
+    git -C "$TEST_TMPDIR" commit -q -m "sibling change"
+    printf 'ci code\n' >> "$proj/feature.js"
+    printf '\n<!-- nested ci note -->\n' >> "$proj/.ai/handoff/STATUS.md"
+    bash "$SCRIPTS_DIR/aahp-manifest.sh" "$proj" --quiet --phase implementation
+    git -C "$TEST_TMPDIR" add -A
+    git -C "$TEST_TMPDIR" commit -q -m "nested change for ci"
+    run bash "$SCRIPTS_DIR/verify-handoff.sh" "$proj" --level ci --base "$base"
+    [[ "$output" == *"Handoff-impacting files changed and handoff state (STATUS.md + MANIFEST.json) changed with them"* ]]
+    [[ "$output" != *"Handoff-impacting files changed but handoff state did not"* ]]
+}

@@ -4,6 +4,27 @@
 
 ---
 
+## [2026-07-18] claude-opus-4-8: Anti-entropy initiative (gates + constitution + ADR log, v3.7.0)
+
+**Agent:** claude-opus-4-8
+**Phase:** implementation
+**Branch:** feat/anti-entropy
+**Tasks:** anti-entropy strategy (steps 3-6)
+
+### What was done
+
+- Added 3 config-driven enforcement gates (no-op without config), wired into `npm run check`: check-forbidden-patterns.mjs (regex denylist over `git ls-files`; AAHP bans em dashes), check-schema-doc-sync.mjs (extract-and-compare value-sets across sources; AAHP pins the task-status + phase enums), check-doc-links.mjs (internal markdown file-link resolver). Config keys forbiddenPatterns/docSync/docLinks in the schema + example. 9 bats tests.
+- Added CONSTITUTION.md (12 non-negotiable invariants, each already enforced), linked from README + CLAUDE.md and tied into the doc-links + forbidden-patterns gates.
+- Reframed README Section 7 as an Architectural Decision Log (10 ADRs with stable anchors + the LOG-to-ADR promotion rule).
+- Free win: ci.yml shellcheck globs `git ls-files` (auto-covers new scripts). De-dup: removed the rotted German runbook from the CONVENTIONS template + dogfood; collapsed the duplicate Three Laws.
+
+### Decisions
+
+- Per the strategy, deliberately did NOT build a separate governance system/command, a docs/adr/ directory (README Section 7 IS the log), any per-PR LLM gate, or the swarm self-governance runtime. Gates extend the existing deterministic machinery.
+- Deferred AAHP's own `claims` config (prose capability numbers are false-positive-prone) and aggressive README/CLAUDE de-dup (kept operational how-to; the constitution is the invariant index).
+
+---
+
 ## [2026-07-18] claude-opus-4-8: Security hardening + doc-drift fixes (v3.6.1)
 
 **Agent:** claude-opus-4-8

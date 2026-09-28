@@ -3,7 +3,7 @@
 Last updated: 2026-09-28
 Current package version: 3.12.0 (released 2026-08-31); unreleased changes: CHANGELOG.md `## [Unreleased]`
 Protocol version: 3.0
-Working state: audit fix programme in progress; this change is the manifest, lint and CLI workstreams (`fix/manifest-lint-cli`)
+Working state: audit fix programme in progress; this change is the verify gate semantics (`fix/verify-gate-semantics`)
 
 ## Current objective
 
@@ -20,63 +20,55 @@ all fixes are in.
 | Dependency integration | five Dependabot PRs, scanner v6.3.1, expired TRUST rows | merged, #119 (`1917ca8`) |
 | Consumer install path | adopter verify workflow, propagate, install-hooks | merged, #120 (`3e8e8d7`) |
 | Test-suite integrity | vacuous assertions, fail-open skips, git isolation, fixture speed | merged, #121 (`1e3fd4a`) |
-| CLI | signal exit codes, doctor schema validation, migrate, help | this change (together with the manifest workstream) |
-| Manifest, lint and shared lib | JSON generation, binary-safe scans, injection scan scope, template | this change |
-| Verify gate semantics | executable TRUST claims with grace, content-based Layer 2 exemption, Layer 3 | ready, next |
-| CI and release | scanner on tags, publish guard, Dependabot grouping and cooldown | ready |
+| CLI | signal exit codes, doctor schema validation, migrate, help | merged, #122 (`d27db82`) |
+| Manifest, lint and shared lib | JSON generation, binary-safe scans, injection scan scope, template | merged, #122 (`d27db82`) |
+| Verify gate semantics | executable TRUST claims with grace, content-based Layer 2 exemption, Layer 3 | this change |
+| CI and release | scanner on tags, publish guard, Dependabot grouping and cooldown | ready, next |
 | Documentation | README split, ADR fixes, redaction of internal details | after the code workstreams |
 | Full ASCII | replace non-ASCII in tracked text, widen the gate | last |
 
-## This change: manifest generator, lint and CLI
+## This change: verify gate semantics
 
-Two workstreams in one pull request, because the stricter doctor gate below needs the
-corrected MANIFEST template to keep a fresh adopter green.
+This change implements the owner decisions of 2026-09-28 on Layer 4 and Layer 2, and
+fixes Layer 3 and the verify messages.
 
-Manifest and lint:
-
-- `aahp manifest` builds MANIFEST.json in one node process with `JSON.stringify` and
-  replaces it atomically. A TAB, a quote in `--agent` or a multi-byte character at a
-  truncation point used to write invalid JSON or invalid UTF-8 with exit 0. Checksum
-  failures, a missing node, and an existing manifest whose fields cannot be carried over
-  now exit 1 with the file unchanged (`--force` overrides the last case).
-- `files.*.updated` keeps its date while the checksum is unchanged; summaries skip
-  tables, JSON punctuation and labels; `token_budget.manifest_only` is measured instead of
-  the constant 85. Generation for this repository on Windows: 9.3 s to 0.8 s.
-- `aahp lint` scans bytes as text (`grep -a`, `LC_ALL=C`): one NUL byte used to hide a
-  secret and an email address from the scan on GNU grep 3.5 or later. A scan that cannot
-  complete is a violation. The injection scan covers every handoff file and the decoded
-  JSON string values, including MANIFEST.json, which agents read first.
-- The conflict-marker check reads git-listed files and exits 2 when it cannot run, which
-  lint no longer reports as "markers found".
-- `templates/MANIFEST.json` validates against the schema after `init` + `manifest`: the
-  example tasks lost their `"created": "[ISO-8601]"` placeholder, `aahp_version` is 3.0
-  and the phase list is complete.
-
-CLI:
-
-- A gate script killed by a signal made the CLI exit 0; it now exits 128 plus the signal
-  number.
-- `aahp doctor`'s manifest-schema gate validates the whole schema (enums, lengths, extra
-  keys, RFC 3339 dates) with the in-repo validator instead of a structural subset
-  reported as conformance; a parity test runs 45 manifests through ajv and the validator.
-- `check --json` stays JSON for an unknown gate id; `status` counts manifest lines;
-  `migrate` gains `--yes` and no longer claims to split LOG.md; the release-journal
-  generator refuses the agent journal and the example points at `docs/RELEASES.md`.
-- Help and README document archive's Python requirement, `--keep`, `--force` and every
-  `--level`.
+- Layer 4, executable claims: a `TRUST.md` row can name a check in a new `Check`
+  column. The built-in checks are `license-matches` and `manifest-integrity`; more are
+  declared as argv arrays in `aahp.config.json` `trustTtl.checks` (no shell, 120 s
+  limit). A check-backed `verified` row is judged by its check on every run, not by a
+  date. Nothing read from TRUST.md is ever executed.
+- Layer 4, grace period: a date-judged `verified` row warns from its expiry and blocks
+  under `trustTtl.enforce` only after `trustTtl.graceDays` (default 14). An empty or
+  all-`assumed` register stays as visible as before, and Layer 4 prints a census.
+- Layer 2, opt-in `handoffImpact.npmDevDependencyUpdates`: a lockfile-only change (plus
+  devDependency specifiers) is non-impacting when every changed entry is `dev: true`,
+  integrity-pinned, resolved from registry.npmjs.org and carries no install script. It
+  is decided by content, never by author, and needs a `supplyChainScan` assertion that
+  the gate re-proves on every run. Enabled here: the scanner job is a required check.
+- Layer 3 reports OK when the recorded commit is an ancestor of HEAD and everything since
+  changed only `.ai/handoff/`; before, it could never report OK after a commit.
+- Layer 2 in a project that sits in a subdirectory of its repository compared paths
+  from the repository root, so every change failed; paths are now project-relative.
+- Messages name the concrete regeneration command instead of `/handoff`, the footer
+  names the failing layer and its remedy, and a checksum mismatch advises inspecting
+  `git diff -- .ai/handoff` before regenerating, because regenerating re-baselines
+  tampering.
+- This repository's TRUST.md gains the `Check` column; the template, license and
+  checksum rows are now check-backed and carry no date. `tests/verify.bats` builds its
+  fixture once (about 36% faster on Linux) and its python skips use `require_tool`.
 
 ## Validation
 
-- Each workstream on a Linux runner: manifest 631 of 631 with mutation proofs M1 to M7;
-  CLI 635 of 635 with 22 of 22 mutation proofs.
-- Combined and rebased onto `1e3fd4a`, integrator run on a Linux runner: `CI=true npm
-  test` 709 of 709 after the rebase, 0 skipped; `npm run check`, `doctor`, lint, archive
-  verify, ajv and the PII validator exit 0.
-- This repository's MANIFEST.json is regenerated with the new generator in this change.
-- Estate impact, measured read-only on 30 consumer manifests: ajv and the new validator
-  agree on all 30; three manifests newly fail doctor because they still carry template
-  placeholder dates.
-- Not measured: macOS, and the rewritten `aahp-migrate-v2.sh` under bash 3.2.
+- Workstream tree on a Linux runner: `npm test` 648 of 648; 23 mutation proofs plus two
+  for the install-script rule, each red with its guard removed and green restored (two
+  inject a vulnerability instead: executing TRUST.md text, and running a declared check
+  through a shell).
+- Rebased onto `d27db82` by the integrator; the README Quickstart conflict with #120 was
+  resolved to the new Layer 3 text and then measured: the Quickstart run end to end from
+  a packed tarball in a fresh repository reports Layers 1, 2 and 3 OK and a Layer 4
+  WARN, exit 0.
+- Not measured: macOS (bash 3.2). Portability is by construction: no mapfile, no
+  associative arrays, no awk intervals.
 
 ## Owner decisions
 

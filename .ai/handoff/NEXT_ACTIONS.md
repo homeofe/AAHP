@@ -19,6 +19,13 @@ Current version: **v3.12.0**
 
 ## Recently Completed
 
+### 2026-09-28: Verify gate semantics
+
+- TRUST rows can be check-backed and are re-proven on every run; dated rows get a 14-day
+  grace period before blocking.
+- Dev-only, integrity-pinned lockfile updates without install scripts are exempt from
+  Layer 2 when a supply-chain scan is asserted; Layer 3 can report OK.
+
 ### 2026-09-28: Manifest generator, lint and CLI
 
 - The manifest generator can no longer write invalid JSON or drop data silently; lint
@@ -46,13 +53,6 @@ Current version: **v3.12.0**
   of #118's v6.2.0, with the pinned bats contract and policy schema anchor.
 - Re-verified the two TRUST rows whose expiry on 2026-09-22 had turned `aahp-verify` red
   on every pull request.
-
-### 2026-08-31: v3.12.0 release candidate
-
-- Merged fully green PR #110 and closed Dependabot PR #109 as superseded.
-- Prepared the 3.12.0 changelog, package metadata, lockfile metadata, and handoff state.
-- Excluded generated Python bytecode from git and npm package contents.
-- Recorded the first successful supply-chain-guard GitHub Actions run in TRUST.md.
 
 ---
 

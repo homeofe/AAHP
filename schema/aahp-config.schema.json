@@ -328,11 +328,61 @@
     },
     "handoffImpact": {
       "type": "object",
-      "description": "Reviewed exact-file exceptions for the Layer 2 content-drift gate. Only a modification (git status M) of a listed regular tracked file is non-impacting; additions, deletions, renames, copies, type changes, and mixed source changes remain impacting.",
-      "required": [
-        "nonImpactingModifiedFiles"
+      "description": "Reviewed exceptions for the Layer 2 content-drift gate. nonImpactingModifiedFiles: only a modification (git status M) of a listed regular tracked file is non-impacting; additions, deletions, renames, copies, type changes, and mixed source changes remain impacting. npmDevDependencyUpdates: an opt-in, content-based classification of registry-pinned devDependency lockfile updates. At least one of the two must be present.",
+      "anyOf": [
+        {
+          "required": [
+            "nonImpactingModifiedFiles"
+          ]
+        },
+        {
+          "required": [
+            "npmDevDependencyUpdates"
+          ]
+        }
       ],
       "properties": {
+        "npmDevDependencyUpdates": {
+          "type": "object",
+          "description": "Opt-in. A change set whose only files outside .ai/handoff/ are a content modification of package-lock.json (optionally with package.json) is non-impacting when every changed lock entry is a node_modules/ entry that is dev: true before and after, has no install script (hasInstallScript: true, new or kept, disqualifies it), carries a sha256/384/512 integrity and is resolved under https://registry.npmjs.org/, every other top-level lock key is unchanged, and package.json and the lock root entry differ only in devDependencies version specifiers. Decided by content, never by the change's author. Requires supplyChainScan, which the gate proves against the inspected snapshot on every run.",
+          "required": [
+            "reason",
+            "supplyChainScan"
+          ],
+          "properties": {
+            "reason": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "[\\p{L}\\p{N}]",
+              "not": {
+                "pattern": "[\\p{Cc}\\p{Cf}]"
+              },
+              "description": "Review rationale, logged whenever the classification is applied. It must contain a Unicode letter or number and cannot contain control or invisible format characters."
+            },
+            "supplyChainScan": {
+              "type": "object",
+              "description": "The supply-chain scanner the owner tied this exemption to. The gate verifies that the workflow is a regular tracked file, is triggered by pull_request, defines the job, that a job-level if: names pull_request, and that the job is not continue-on-error. It cannot verify that the job is a REQUIRED status check, which is a repository setting.",
+              "required": [
+                "workflow",
+                "job"
+              ],
+              "properties": {
+                "workflow": {
+                  "type": "string",
+                  "pattern": "^\\.github/workflows/[A-Za-z0-9_-][A-Za-z0-9._-]*\\.ya?ml$",
+                  "description": "Workflow file, relative to the repository top level (where GitHub reads workflows), directly under .github/workflows/."
+                },
+                "job": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z_][A-Za-z0-9_-]{0,99}$",
+                  "description": "The job id (the key under jobs:), not its display name."
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
         "nonImpactingModifiedFiles": {
           "type": "array",
           "description": "Exact repo-relative regular tracked files whose content-only modification does not change handoff state. Runtime validation rejects duplicates and prefix-like ambiguity and rejects directories, symlinks, and gitlinks.",
@@ -425,11 +475,66 @@
     },
     "trustTtl": {
       "type": "object",
-      "description": "Opt-in enforcement for aahp verify Layer 4 (TRUST-TTL expiry). Absent or enforce:false: expired 'verified' rows warn and the run still passes, which is the historical behaviour. enforce:true: expired rows fail the run, and a register that cannot be classified fails as well, since an unreadable register is not a clean one.",
+      "description": "Policy for aahp verify Layer 4 (TRUST-TTL). A 'verified' TRUST.md row that names a check in a Check column is judged by that check on every run, not by its date; any other 'verified' row is judged by its Expires date. Absent or enforce:false: every Layer 4 finding warns and the run still passes, which is the historical behaviour. enforce:true: a failing check fails the run, a date-judged row fails once it is more than graceDays past its expiry (it warns before that), and a register with no row that can be judged fails as well, since an unreadable register is not a clean one.",
       "properties": {
         "enforce": {
           "type": "boolean",
-          "description": "If true, expired 'verified' trust rows make aahp verify exit non-zero. Default false. Layer 4 does not run at precommit level, so this gates CI rather than local commits, and the pull request that refreshes TRUST.md carries the refreshed rows with it."
+          "description": "If true, Layer 4 findings past their grace make aahp verify exit non-zero. Default false. Layer 4 does not run at precommit level, so this gates CI rather than local commits, and the pull request that refreshes TRUST.md carries the refreshed rows with it."
+        },
+        "graceDays": {
+          "type": "integer",
+          "minimum": 0,
+          "not": {
+            "type": "integer",
+            "minimum": 366
+          },
+          "description": "From 0 to 365. Days a date-judged 'verified' row may be past its Expires date and still only warn under enforce. Default 14 (two weekly Dependabot cycles, so at least two routine runs print the expiry before it blocks). 0 blocks from the day after expiry."
+        },
+        "checks": {
+          "type": "array",
+          "description": "Reviewed, executable trust checks a TRUST.md row may name by id in its Check column. Each run is an argv executed without a shell, in the project root, with a 120-second limit; exit 0 re-proves the row. TRUST.md only ever supplies the id, never a command. Built-in ids (license-matches, manifest-integrity) are reserved.",
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "run",
+              "reason"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z0-9][a-z0-9-]{0,63}$",
+                "not": {
+                  "enum": [
+                    "license-matches",
+                    "manifest-integrity"
+                  ]
+                },
+                "description": "The name a TRUST.md Check cell uses. Unique; may not reuse a built-in id."
+              },
+              "run": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "not": {
+                    "pattern": "[\\p{Cc}]"
+                  }
+                },
+                "description": "argv: the program, then its arguments, each a non-empty string without control characters. Not passed to a shell, so no expansion, globbing, pipes or redirection. The runtime also refuses an empty array (this schema's validator has no minItems)."
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "[\\p{L}\\p{N}]",
+                "not": {
+                  "pattern": "[\\p{Cc}\\p{Cf}]"
+                },
+                "description": "Why a zero exit proves the claim the row makes."
+              }
+            },
+            "additionalProperties": false
+          }
         }
       },
       "additionalProperties": false

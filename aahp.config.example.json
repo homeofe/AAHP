@@ -53,6 +53,21 @@
         "file": ".github/dependabot.yml",
         "reason": "Dependency update scheduling does not describe product or implementation state."
       }
+    ],
+    "npmDevDependencyUpdates": {
+      "reason": "Registry-pinned devDependency lockfile updates change no shipped file and no runtime dependency.",
+      "supplyChainScan": { "workflow": ".github/workflows/ci.yml", "job": "supply-chain-guard" }
+    }
+  },
+  "trustTtl": {
+    "enforce": true,
+    "graceDays": 14,
+    "checks": [
+      {
+        "id": "build-passes",
+        "run": ["node", "scripts/build.mjs", "--check"],
+        "reason": "A zero exit from the build is the claim the Build passes row makes."
+      }
     ]
   },
   "check": {

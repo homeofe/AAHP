@@ -2,43 +2,43 @@
   "aahp_version": "3.0",
   "project": "AAHP",
   "last_session": {
-    "agent": "claude-opus-5.5",
-    "session_id": "cli-1790585636",
-    "timestamp": "2026-09-28T08:53:56Z",
-    "commit": "5d80088",
-    "phase": "implementation",
+    "agent": "cli-tool",
+    "session_id": "cli-1790589415",
+    "timestamp": "2026-09-28T09:56:55Z",
+    "commit": "8ba12ba",
+    "phase": "idle",
     "duration_minutes": 0
   },
   "files": {
     "STATUS.md": {
-      "checksum": "sha256:36fcdc59f79b2ef1d31cacb5a2e7fd30052d70457249eede2343edba4137ac76",
-      "updated": "2026-09-28T08:53:56Z",
-      "lines": 96,
-      "summary": "Working state: release 4.0.0 prepared; tagging and the publish approval are the owner's steps"
+      "checksum": "sha256:2d749e21b7d0f8236deed234f1fb0e382e4f83c91f88e991ede4021d62c27c24",
+      "updated": "2026-09-28T09:56:54Z",
+      "lines": 94,
+      "summary": "Working state: 4.0.0 released; supply-chain-guard's upgrade pull request is open for that repository's maintainer"
     },
     "NEXT_ACTIONS.md": {
-      "checksum": "sha256:a3c6f44bd3c5aa4150d564e65e8bc49f465669448ffc9206de00652be2d53037",
-      "updated": "2026-09-28T08:50:07Z",
-      "lines": 91,
-      "summary": "CHANGELOG `[4.0.0]`, `package.json` and lockfile at 4.0.0; STATUS.md lists the remaining release steps."
+      "checksum": "sha256:b060859df7fae73427357a0544642c1b8b46efe770f01639540803def9f12520",
+      "updated": "2026-09-28T09:56:54Z",
+      "lines": 89,
+      "summary": "Tag `v4.0.0` on main, the owner's approval in `npm-publish`; npm `latest` is 4.0.0 with provenance, and GitHub Release v4.0.0 is published."
     },
     "LOG.md": {
-      "checksum": "sha256:46bf6ddf4c19f787f036c5beb349a062dbef6bd32d81d805d6395c27f2b8a088",
-      "updated": "2026-09-28T08:50:08Z",
-      "lines": 276,
-      "summary": "Latest entry: [2026-09-28] claude-opus-5.5: release 4.0.0 prepared"
+      "checksum": "sha256:5357bb6c61b868e71ab0d0c5d4cc389ec2e48f463e849ecf8c94575ed7a33021",
+      "updated": "2026-09-28T09:56:54Z",
+      "lines": 277,
+      "summary": "Latest entry: [2026-09-28] claude-opus-5.5: 4.0.0 released, supply-chain-guard upgrade opened"
     },
     "LOG-ARCHIVE.md": {
-      "checksum": "sha256:c6f2a7aef094cbf1655462a36546da452e17115d89aef9d91a0695b08424f5f9",
-      "updated": "2026-09-28T08:50:08Z",
-      "lines": 568,
-      "summary": "Newest archived entry: [2026-09-28] claude-opus-5.5: consumer install path (audit fix programme, 1 of 8)"
+      "checksum": "sha256:9aedfbfe9fa5c7df50416b62376545d6a5dad0e43784a9d3c438f7d951c79849",
+      "updated": "2026-09-28T09:56:54Z",
+      "lines": 594,
+      "summary": "Newest archived entry: [2026-09-28] claude-opus-5.5: test-suite integrity (audit fix programme, 2 of 8)"
     },
     "LOG-ARCHIVE.index.json": {
-      "checksum": "sha256:4683d55fd23b20b8166556031650385ef19f01976e96e9cda98e1c8de8a4425c",
-      "updated": "2026-09-28T08:50:08Z",
-      "lines": 89,
-      "summary": "LOG archive index: 21 entries."
+      "checksum": "sha256:95b07a8886de6a7912dd3d767b400c310a4c34d7c081f73dded3d4dee8b66662",
+      "updated": "2026-09-28T09:56:54Z",
+      "lines": 93,
+      "summary": "LOG archive index: 22 entries."
     },
     "DASHBOARD.md": {
       "checksum": "sha256:a4994a683eaac92e36e9d25456e3d091d82801a348f680647041664d441c13e6",
@@ -77,11 +77,11 @@
       "summary": "PII allowlist: 0 entries."
     }
   },
-  "quick_context": "Release 4.0.0 prepared: CHANGELOG [4.0.0] cut from the audit fix programme (#119-#130), package.json and lockfile at 4.0.0. Remaining: owner sets the npm trusted-publisher environment, tag v4.0.0 on main, owner approves the npm-publish deployment.",
+  "quick_context": "Working state: 4.0.0 released; supply-chain-guard's upgrade pull request is open for that repository's maintainer. Tag `v4.0.0` on main, the owner's approval in `npm-publish`; npm `latest` is 4.0.0 with provenance, and GitHub Release v4.0.0 is published.",
   "token_budget": {
-    "manifest_only": 1399,
-    "manifest_plus_core": 3466,
-    "full_read": 23517
+    "manifest_only": 1417,
+    "manifest_plus_core": 3355,
+    "full_read": 23754
   },
   "next_task_id": 18,
   "tasks": {

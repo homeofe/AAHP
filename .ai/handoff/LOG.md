@@ -7,6 +7,33 @@
 
 ---
 
+## [2026-09-28] claude-opus-5.5: 4.0.0 released, supply-chain-guard upgrade opened
+
+**Agent:** claude-opus-5.5
+**Phase:** release
+**Branch:** chore/handoff-4.0.0-released
+**Tasks:** owner decision of 2026-09-28: release 4.0.0, then move the first adopter
+
+### What was done
+
+- Pushed tag `v4.0.0` on `8ba12ba` (merge commit of #131). The owner set the npm
+  trusted-publisher Environment name to `npm-publish` and approved the deployment.
+- Verified the result: npm `latest` is 4.0.0 with an SLSA provenance v1 attestation; a
+  fresh install reports a verified registry signature and attestation and prints 4.0.0;
+  GitHub Release v4.0.0 is published and marked latest.
+- Opened homeofe/supply-chain-guard#357, the one reviewed upgrade README 5.1 describes,
+  tested on a Linux runner against the published 4.0.0, including a simulated
+  devDependency update (passes Layer 2), a runtime one (fails it) and a mutation of the
+  scan the exemption names.
+
+### Decision
+
+- The upgrade in supply-chain-guard merges after its #354, because one of its tests
+  expects the 3.12.0 manifest summary. It is not bundled into #354: the two are
+  separate reviews in a repository another session maintains.
+
+---
+
 ## [2026-09-28] claude-opus-5.5: release 4.0.0 prepared
 
 **Agent:** claude-opus-5.5
@@ -248,29 +275,3 @@
 
 - The two workstreams land together: shipping the stricter doctor gate without the
   template fix would turn every freshly initialised repository red.
-
----
-
-## [2026-09-28] claude-opus-5.5: test-suite integrity (audit fix programme, 2 of 8)
-
-**Agent:** claude-opus-5.5
-**Phase:** implementation
-**Branch:** fix/test-suite-integrity
-**Tasks:** owner request of 2026-09-28 to fix every audit finding
-
-### What was done
-
-- Replaced three dead bare `!` negations with exit-status assertions and added a guard to
-  `npm run check` so they cannot return.
-- Made prerequisite skips fail on CI (`require_tool`) and made the runner fail a CI run on
-  any unlisted skip.
-- Added red controls for three wiring checks, positive assertions for two negative-only
-  tests, git isolation for the fixture, and a build-once fixture.
-- A fix agent implemented this in an isolated worktree (627 of 627 on a Linux runner,
-  with mutation proofs); the integrator rebased it onto #120, removed the guard's exemption
-  list once #120 had fixed its only entry, and wrote the handoff state.
-
-### Decision
-
-- The negation guard has no exemption list: its only entry went stale when #120 fixed
-  the line, so the mechanism was removed rather than kept for future exemptions.

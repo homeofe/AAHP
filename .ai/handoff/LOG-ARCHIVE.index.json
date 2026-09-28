@@ -2,6 +2,10 @@
   "version": 1,
   "entries": [
     {
+      "sha256": "bdd885d544ac59783536a4690a996ce6b86c9aae5bbf5d7155c79144b87cdcbb",
+      "title": "## [2026-09-28] claude-opus-5.5: test-suite integrity (audit fix programme, 2 of 8)"
+    },
+    {
       "sha256": "b5bc34f1b15fab2c84d2d2b1c19da8ae4db462dddb9eb1923aedd8c9c45782ea",
       "title": "## [2026-09-28] claude-opus-5.5: consumer install path (audit fix programme, 1 of 8)"
     },

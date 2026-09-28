@@ -19,12 +19,12 @@ Current version: **v4.0.0**
 
 ## Recently Completed
 
-### 2026-09-28: Release 4.0.0 prepared
+### 2026-09-28: 4.0.0 released
 
-- CHANGELOG `[4.0.0]`, `package.json` and lockfile at 4.0.0; STATUS.md lists the remaining
-  release steps.
-- Tag `v4.0.0` and the `npm-publish` approval are the owner's steps; supply-chain-guard's
-  upgrade follows the release.
+- Tag `v4.0.0` on main, the owner's approval in `npm-publish`; npm `latest` is 4.0.0 with
+  provenance, and GitHub Release v4.0.0 is published.
+- supply-chain-guard's upgrade pull request (homeofe/supply-chain-guard#357) is open; it
+  merges after that repository's #354.
 
 ### 2026-09-28: Adopter upgrade path to 4.0.0
 
@@ -57,17 +57,15 @@ Current version: **v4.0.0**
 
 ## Owner Decisions (not task registry entries)
 
-Decided 2026-09-28 and being implemented by the audit fix programme (see STATUS.md): full
+Decided 2026-09-28 and implemented by the audit fix programme, released in 4.0.0 (see STATUS.md): full
 ASCII with a gate; grouped Dependabot updates plus a content-based Layer 2 exemption for
 dev-only lockfile changes; executable TRUST claims with a grace period; STATUS.md as a
 snapshot; README split; redaction of internal details; the scanner as a required check.
 
 Open:
 
-- Track homeofe/supply-chain-guard#354 and its remaining follow-ups in that repository.
-- Owner: set the npm trusted-publisher Environment name to `npm-publish`.
-- Release 4.0.0: npm Environment field, tag `v4.0.0` on main, approve the `npm-publish`
-  deployment, verify npm and the GitHub Release.
+- Track homeofe/supply-chain-guard#354 and the upgrade #357 (merge order: #354 first) and
+  that repository's own follow-ups.
 
 ---
 

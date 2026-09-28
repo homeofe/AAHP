@@ -8,6 +8,32 @@
 
 ---
 
+## [2026-09-28] claude-opus-5.5: test-suite integrity (audit fix programme, 2 of 8)
+
+**Agent:** claude-opus-5.5
+**Phase:** implementation
+**Branch:** fix/test-suite-integrity
+**Tasks:** owner request of 2026-09-28 to fix every audit finding
+
+### What was done
+
+- Replaced three dead bare `!` negations with exit-status assertions and added a guard to
+  `npm run check` so they cannot return.
+- Made prerequisite skips fail on CI (`require_tool`) and made the runner fail a CI run on
+  any unlisted skip.
+- Added red controls for three wiring checks, positive assertions for two negative-only
+  tests, git isolation for the fixture, and a build-once fixture.
+- A fix agent implemented this in an isolated worktree (627 of 627 on a Linux runner,
+  with mutation proofs); the integrator rebased it onto #120, removed the guard's exemption
+  list once #120 had fixed its only entry, and wrote the handoff state.
+
+### Decision
+
+- The negation guard has no exemption list: its only entry went stale when #120 fixed
+  the line, so the mechanism was removed rather than kept for future exemptions.
+
+---
+
 ## [2026-09-28] claude-opus-5.5: consumer install path (audit fix programme, 1 of 8)
 
 **Agent:** claude-opus-5.5

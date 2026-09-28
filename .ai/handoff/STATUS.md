@@ -1,29 +1,27 @@
 # AAHP: Current Status
 
 Last updated: 2026-09-28
-Current package version: 4.0.0 (release candidate on branch release/4.0.0; not tagged, not published); previous release 3.12.0
+Current package version: 4.0.0 (released 2026-09-28: npm `latest` with provenance, GitHub Release v4.0.0); previous release 3.12.0
 Protocol version: 3.0
-Working state: release 4.0.0 prepared; tagging and the publish approval are the owner's steps
+Working state: 4.0.0 released; supply-chain-guard's upgrade pull request is open for that repository's maintainer
 
 ## Current objective
 
-Release 4.0.0. On 2026-09-28 the owner asked for every finding of a full audit to be
-fixed and every open item to be implemented before going to 4.0.0. That work is on
-main (#119 to #130). This change cuts the release: the `[4.0.0]` CHANGELOG section,
-`package.json` and lockfile at 4.0.0, and this handoff state.
+4.0.0 is released. On 2026-09-28 the owner asked for every finding of a full audit to
+be fixed and every open item to be implemented before going to 4.0.0. That work is on
+main (#119 to #130), and #131 cut the release.
 
-The remaining steps, in order:
+How it shipped:
 
-1. Merge this pull request once CI is green.
-2. Owner, on npmjs.com: set the trusted-publisher Environment name of
-   `@elvatis_com/aahp` to `npm-publish` (confirmed empty on 2026-09-28).
-3. Push the tag `v4.0.0` on the merge commit on main (the tag ruleset admits
-   administrators only).
-4. Owner: approve the `npm-publish` deployment in the Actions run (required reviewer,
-   no admin bypass). Then verify the npm version, its provenance and the GitHub Release.
-5. supply-chain-guard, the first adopter to move: open its upgrade pull request right
-   away (bump, `handoffImpact.npmDevDependencyUpdates` with `supplyChainScan`, STATUS
-   entry, regenerated MANIFEST.json), as README 5.1 describes.
+- Tag `v4.0.0` on `8ba12ba`, the merge commit of #131 on main.
+- The owner set the npm trusted-publisher Environment name to `npm-publish` and
+  approved the deployment of the tag run in that environment.
+- `@elvatis_com/aahp@4.0.0` is on npm with dist-tag `latest` and a provenance
+  attestation of type `https://slsa.dev/provenance/v1`. A fresh install reports a
+  verified registry signature and a verified attestation, and the installed CLI
+  prints 4.0.0.
+- GitHub Release `v4.0.0` was published at 09:14 UTC and is the repository's latest
+  release.
 
 ## What 4.0.0 contains
 
@@ -44,22 +42,23 @@ The remaining steps, in order:
 - Adopter upgrade path (#130): `aahp migrate` removes template placeholders, the doctor
   gate `cli-source` flags legacy CLI invocations, `aahp init --gates --workflows`.
 
-Why a major version: an upgrade can turn an adopter's CI red until it acts. Doctor
-validates the full manifest schema and adds `cli-source`, `propagate.sh` refuses targets
-without a pinned lockfile, lint prints ASCII marks, the dogfood verify workflow left the
-package, and `generate.log.target` is required. Each has a Migration note in the
-CHANGELOG, and README 5.1 walks through the upgrade.
+## First adopter: supply-chain-guard
 
-## Validation
+homeofe/supply-chain-guard#357 is the one reviewed upgrade README 5.1 describes: the
+exact pin 3.12.0 to 4.0.0, `handoffImpact.npmDevDependencyUpdates` tied to its `compat`
+job, a STATUS entry and the regenerated manifest. Measured on a Linux runner against
+the published 4.0.0:
 
-- Every pull request of the programme ran the full suite on Linux before merge and all
-  required checks on GitHub; main at `5d80088` passed CI.
-- This change, on a Linux runner on top of `5d80088`: `npm run check` (changelog format,
-  version sync and presence included), `doctor`, lint, archive verify, the schema
-  validation and the PII validator exit 0; `CI=true npm test` 929 of 929, 0 skipped;
-  `npm pack --dry-run` gives `@elvatis_com/aahp` 4.0.0 with 59 files.
-- A real adopter still on 3.12.0 was tested against the 4.0.0 content: with the upgrade
-  pull request described above, verify, doctor and check pass.
+- verify at level ci, lint, doctor (8 of 8 ran, `cli-source` advisory) and that
+  repository's build gates pass.
+- A simulated devDependency update on top passes Layer 2 through the exemption; the same
+  update of a runtime dependency fails it.
+- The scan the exemption names fails on a known-malicious dev-only lock entry.
+- Its full suite passes once homeofe/supply-chain-guard#354 is merged. Before that, one
+  test that expects the 3.12.0 manifest summary fails, so the upgrade merges after #354.
+
+Merging is that repository's maintainer's step. #355 (Dependabot cooldown and groups,
+the CLI by path) and #356 (scanner coverage) are independent of the upgrade.
 
 ## Owner decisions
 
@@ -80,9 +79,8 @@ Decided on 2026-09-28:
 
 Open:
 
-1. The release steps above (npm Environment field, tag, deployment approval).
-2. supply-chain-guard, for that repository's maintainer: homeofe/supply-chain-guard#354,
-   #355 and #356 are open and green; after the 4.0.0 release its upgrade pull request follows. Its own follow-ups:
+1. supply-chain-guard, for that repository's maintainer: merge #354, then the upgrade
+   #357 (after updating its branch); #355 and #356 in any order. Its own follow-ups:
    pin its npm dependencies with a shrinkwrap, read extensionless scripts in its PyPI and
    VSIX scanners, POD-aware internal-disclosure handling, and its STATUS.md, still a
    prepend log.

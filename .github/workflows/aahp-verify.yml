@@ -1,5 +1,14 @@
 # AAHP Verify - the intended REQUIRED status check for the handoff gate.
 #
+# THIS REPOSITORY'S OWN COPY. Do not copy it into another repository: it runs
+# the gate from the AAHP working tree (`bash scripts/verify-handoff.sh`, `node
+# bin/aahp.js`), which is right here because a pull request may change the gate
+# itself, and wrong anywhere else, where neither path exists. The adopter copy
+# is assets/governance/aahp-verify.yml: same triggers, permissions, pins and
+# base expression, with the CLI taken from the locked npm devDependency.
+# scripts/propagate.sh installs that one, and tests/verify-workflow.bats fails
+# if the two drift apart anywhere except in how they resolve the CLI.
+#
 # Runs `aahp verify --level ci`, which executes all 4 layers with NO escape
 # hatch (AAHP_SKIP_VERIFY is ignored at --level ci). This is the off-machine
 # backstop behind the local pre-commit / pre-push hooks:
@@ -49,9 +58,9 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          # Node 22 is the floor engines.node publishes. Consumers receive
-          # this file byte-identical via propagate.sh, so this pin is the
-          # runtime the whole fleet verifies on.
+          # Node 22 is the floor engines.node publishes. Keep it equal to the
+          # pin in assets/governance/aahp-verify.yml, which is the runtime
+          # every adopting repository verifies on.
           node-version: '22'
 
       - name: Set up Python 3

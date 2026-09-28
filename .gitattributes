@@ -3,6 +3,14 @@
 *.bash text eol=lf
 *.bats text eol=lf
 
+# The git hooks have no extension, so `*.sh` above never reached them, and a
+# Windows checkout with core.autocrlf wrote them CRLF. Git Bash runs a CRLF
+# script without complaint, so the machine that produced such a copy never
+# sees the defect; Linux bash rejects it (`set: pipefail: invalid option
+# name`). install-hooks.sh also strips CR when it copies, for checkouts made
+# before this line existed.
+scripts/hooks/* text eol=lf
+
 # `.ai/handoff/STATUS.md` is an append-log: every pull request prepends its own
 # session note, so two branches almost always differ by one prepended block and
 # nothing else. `union` keeps both sides, which is the correct resolution here

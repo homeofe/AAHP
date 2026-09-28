@@ -28,10 +28,13 @@
 # step below, marks handoff-set, manifest-schema and grounding as `skip`
 # WITHOUT evaluating them. Comparing a recorded checksum against the bytes on
 # disk is `aahp verify` Layer 1's job; ADR-011 assigns handoff drift to
-# `aahp verify`. If this repository also keeps `.ai/handoff/`, add
-# `.github/workflows/aahp-verify.yml` beside this file and make it a required
-# status check. Without it no gate here compares a handoff checksum, and a green
-# conformance record is a statement about conformance, not integrity.
+# `aahp verify`. If this repository also keeps `.ai/handoff/`, copy
+# node_modules/@elvatis_com/aahp/assets/governance/aahp-verify.yml beside this
+# file as .github/workflows/aahp-verify.yml and make it a required status check.
+# (Not the aahp-verify.yml in the AAHP repository's own .github/workflows/: that
+# one runs the gate from an AAHP checkout and fails anywhere else.) Without it
+# no gate here compares a handoff checksum, and a green conformance record is a
+# statement about conformance, not integrity.
 #
 # `aahp lint` is not a substitute either, least of all here: its checksum
 # comparison runs only under a Python interpreter, and this workflow sets up

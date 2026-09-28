@@ -9,6 +9,51 @@ independently of the npm version).
 > disabled, so `3.3.0` and `3.4.0` were developed in the repository but never published.
 > `3.5.0` is the first npm release since `3.2.1` and ships everything below it.
 
+## [Unreleased]
+
+### Added
+
+- `assets/governance/aahp-verify.yml`, the adopter verify workflow: `npm ci
+  --ignore-scripts`, then `aahp verify --level ci` and `aahp doctor` run by path from
+  `node_modules/`. Install it with `scripts/propagate.sh`, or copy it from the installed
+  package.
+- `tests/install-hooks.bats`, and propagate tests that run every `run:` step of the
+  installed workflow in a real npm consumer.
+
+### Changed
+
+- `propagate.sh` requires the target to declare `@elvatis_com/aahp` and to have a
+  `package-lock.json` in the git index that locks it; otherwise it exits 3 (new exit code)
+  before writing anything.
+- The npm package no longer ships AAHP's own `.github/workflows/aahp-verify.yml`, which
+  cannot run outside an AAHP checkout. Migration: a consumer that copied it should replace
+  it with `node_modules/@elvatis_com/aahp/assets/governance/aahp-verify.yml`.
+- Migration: hooks previously installed from a linked worktree were inert; re-run
+  `install-hooks.sh`.
+
+### Fixed
+
+- `propagate.sh` installed a workflow whose doctor step (`node bin/aahp.js`) failed in
+  every consumer with `MODULE_NOT_FOUND`.
+- `propagate.sh` vendored `lint-handoff.sh` without `check-conflict-markers.mjs` and
+  `validate-pii-allowlist.py`, so every commit reported conflict markers. It now vendors
+  the full closure and checks it after copying.
+- `propagate.sh` exited 0 when the staged baseline failed verification; it now exits 1,
+  and a caller's `AAHP_SKIP_VERIFY=1` no longer skips that check.
+- `propagate.sh` rejected linked worktrees; it now accepts them and refuses a
+  subdirectory instead.
+- `install-hooks.sh` installed hooks where git never runs them (in a linked worktree, and
+  with a relative `core.hooksPath` plus a subdirectory target); it now uses `git rev-parse
+  --git-path hooks`. It also strips CR, replaces a symlinked hook instead of writing
+  through it, and never overwrites an earlier backup.
+- `.gitattributes` checks out `scripts/hooks/*` with LF line endings; Linux bash rejects a
+  CRLF hook with `set: pipefail: invalid option name`.
+- README Quickstart told npm adopters to copy a workflow that only works inside an AAHP
+  checkout, and its step 4 output was wrong. Both are corrected, and the global-install
+  option is replaced by what it loses.
+- Tests: a bare `! grep` in the middle of a propagate test asserted nothing, and the
+  actor-bypass guard is now case-insensitive.
+
 ## [3.12.0] - 2026-08-31
 
 ### Added

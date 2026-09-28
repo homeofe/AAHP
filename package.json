@@ -32,7 +32,6 @@
     "!scripts/**/*.pyc",
     "!scripts/**/*.pyo",
     "!scripts/ROLLOUT.md",
-    ".github/workflows/aahp-verify.yml",
     "assets/",
     "templates/",
     "schema/",

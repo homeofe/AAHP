@@ -8,6 +8,36 @@
 
 ---
 
+## [2026-09-28] claude-opus-5.5: consumer install path (audit fix programme, 1 of 8)
+
+**Agent:** claude-opus-5.5
+**Phase:** implementation
+**Branch:** fix/consumer-install-path
+**Tasks:** owner request of 2026-09-28 to fix every audit finding
+
+### What was done
+
+- A read-only survey of consumer repositories [redacted: figures] showed that the shipped
+  `aahp-verify.yml` did not run unchanged outside AAHP: its doctor step called
+  `node bin/aahp.js`, which only exists inside an AAHP checkout, and propagate vendored a
+  lint whose helpers it did not copy. Consumers had rewritten the steps in different
+  ways, some fetching the CLI at runtime without a lockfile.
+- Shipped `assets/governance/aahp-verify.yml` for adopters (lockfile-pinned CLI by path),
+  made propagate install it with the full helper closure and a fatal baseline check, and
+  fixed install-hooks for linked worktrees, CRLF, symlinks and backups.
+- A fix agent implemented this in an isolated worktree and proved it on a Linux runner:
+  629 of 629 tests, 20 mutation proofs. The integrator reviewed the adopter workflow and
+  the package `files` change and wrote the handoff state.
+
+### Decision
+
+- Two verify workflows instead of one that detects its location: AAHP's own must run the
+  working-tree gate because a pull request can change the gate; an adopter must run the
+  version its lockfile pins. A shell branch between the two would be a skip that doctor's
+  verify-workflow gate cannot audit. A parity test keeps them aligned.
+
+---
+
 ## [2026-09-28] claude-opus-5.5: five Dependabot PRs integrated; scanner to v6.3.1
 
 **Agent:** claude-opus-5.5

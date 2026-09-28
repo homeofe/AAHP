@@ -40,7 +40,7 @@ aahp CLI runs the package the lockfile pins, not a legacy spelling (`cli-source`
 below). The record:
 
 ```json
-{ "schemaVersion": 2, "repo": "homeofe/AAHP", "aahpVersion": "3.12.0",
+{ "schemaVersion": 2, "repo": "homeofe/AAHP", "aahpVersion": "4.0.0",
   "gates": { "handoff-set": "pass", "manifest-schema": "pass", "grounding": "pass",
              "pinned-dep": "self", "changelog-format": "pass", "version-sync": "pass",
              "verify-workflow": "pass", "cli-source": "self" },

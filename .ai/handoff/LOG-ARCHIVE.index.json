@@ -2,6 +2,10 @@
   "version": 1,
   "entries": [
     {
+      "sha256": "b5bc34f1b15fab2c84d2d2b1c19da8ae4db462dddb9eb1923aedd8c9c45782ea",
+      "title": "## [2026-09-28] claude-opus-5.5: consumer install path (audit fix programme, 1 of 8)"
+    },
+    {
       "sha256": "89081ca59b94b9ff07f7089a5a508e4fa209188ac323858fcf4d83b20bcbf71b",
       "title": "## [2026-09-28] claude-opus-5.5: five Dependabot PRs integrated; scanner to v6.3.1"
     },

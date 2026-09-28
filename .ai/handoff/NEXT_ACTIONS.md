@@ -3,7 +3,7 @@
 > The MANIFEST task graph is authoritative. Owner decisions below are not autonomous
 > tasks and therefore do not appear as ready or blocked task entries.
 
-Current version: **v3.12.0**
+Current version: **v4.0.0**
 
 ---
 
@@ -18,6 +18,13 @@ Current version: **v3.12.0**
 ---
 
 ## Recently Completed
+
+### 2026-09-28: Release 4.0.0 prepared
+
+- CHANGELOG `[4.0.0]`, `package.json` and lockfile at 4.0.0; STATUS.md lists the remaining
+  release steps.
+- Tag `v4.0.0` and the `npm-publish` approval are the owner's steps; supply-chain-guard's
+  upgrade follows the release.
 
 ### 2026-09-28: Adopter upgrade path to 4.0.0
 
@@ -46,13 +53,6 @@ Current version: **v3.12.0**
 - No figures about other repositories remain in any tracked file; the rule now covers them
   all.
 
-### 2026-09-28: Documentation, spec split and redaction
-
-- README is quickstart plus specification; the decision log lives in `docs/adr/`, the gate
-  reference in `docs/governance.md`.
-- Internal names and figures about other repositories are removed and guarded by
-  forbidden-pattern rules; STATUS.md is a snapshot, LOG.md the journal.
-
 ---
 
 ## Owner Decisions (not task registry entries)
@@ -64,9 +64,10 @@ snapshot; README split; redaction of internal details; the scanner as a required
 
 Open:
 
-- Decide whether and when to release the unreleased changes, and the version number.
 - Track homeofe/supply-chain-guard#354 and its remaining follow-ups in that repository.
 - Owner: set the npm trusted-publisher Environment name to `npm-publish`.
+- Release 4.0.0: npm Environment field, tag `v4.0.0` on main, approve the `npm-publish`
+  deployment, verify npm and the GitHub Release.
 
 ---
 

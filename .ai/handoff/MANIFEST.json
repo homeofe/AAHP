@@ -3,42 +3,42 @@
   "project": "AAHP",
   "last_session": {
     "agent": "claude-opus-5.5",
-    "session_id": "cli-1790584693",
-    "timestamp": "2026-09-28T08:38:13Z",
-    "commit": "2764794",
+    "session_id": "cli-1790585636",
+    "timestamp": "2026-09-28T08:53:56Z",
+    "commit": "5d80088",
     "phase": "implementation",
     "duration_minutes": 0
   },
   "files": {
     "STATUS.md": {
-      "checksum": "sha256:f0d3119749f337975c72001c50528635a2176c9390aec6711c6ad15f26bf1a18",
-      "updated": "2026-09-28T08:38:13Z",
-      "lines": 108,
-      "summary": "Working state: audit fix programme in progress; pre-4.0.0 work; this change is the adopter upgrade path (branch fix/migration-and-legacy)"
+      "checksum": "sha256:36fcdc59f79b2ef1d31cacb5a2e7fd30052d70457249eede2343edba4137ac76",
+      "updated": "2026-09-28T08:53:56Z",
+      "lines": 96,
+      "summary": "Working state: release 4.0.0 prepared; tagging and the publish approval are the owner's steps"
     },
     "NEXT_ACTIONS.md": {
-      "checksum": "sha256:416959d3a2cbe1a21f703c2fff4c108a87343d33c85bd6703da2f95ba21d8f0e",
-      "updated": "2026-09-28T08:34:12Z",
-      "lines": 90,
-      "summary": "`aahp migrate` removes template placeholders from task fields; doctor gains the `cli-source` gate (ADR-025) with `aahp init --gates --workflows`..."
+      "checksum": "sha256:a3c6f44bd3c5aa4150d564e65e8bc49f465669448ffc9206de00652be2d53037",
+      "updated": "2026-09-28T08:50:07Z",
+      "lines": 91,
+      "summary": "CHANGELOG `[4.0.0]`, `package.json` and lockfile at 4.0.0; STATUS.md lists the remaining release steps."
     },
     "LOG.md": {
-      "checksum": "sha256:b73557933676661c491131b278cb9e42e688989fb091a69ff5aaeedff69e4a8c",
-      "updated": "2026-09-28T08:34:13Z",
-      "lines": 278,
-      "summary": "Latest entry: [2026-09-28] claude-opus-5.5: adopter upgrade path to 4.0.0"
+      "checksum": "sha256:46bf6ddf4c19f787f036c5beb349a062dbef6bd32d81d805d6395c27f2b8a088",
+      "updated": "2026-09-28T08:50:08Z",
+      "lines": 276,
+      "summary": "Latest entry: [2026-09-28] claude-opus-5.5: release 4.0.0 prepared"
     },
     "LOG-ARCHIVE.md": {
-      "checksum": "sha256:12befaf0e228d737e7d3e8393eb2e600a9bb2d3c6fa2093350bfc03d416cd5eb",
-      "updated": "2026-09-28T08:34:13Z",
-      "lines": 538,
-      "summary": "Newest archived entry: [2026-09-28] claude-opus-5.5: five Dependabot PRs integrated; scanner to v6.3.1"
+      "checksum": "sha256:c6f2a7aef094cbf1655462a36546da452e17115d89aef9d91a0695b08424f5f9",
+      "updated": "2026-09-28T08:50:08Z",
+      "lines": 568,
+      "summary": "Newest archived entry: [2026-09-28] claude-opus-5.5: consumer install path (audit fix programme, 1 of 8)"
     },
     "LOG-ARCHIVE.index.json": {
-      "checksum": "sha256:43727ddda1cbf648152dc2a3ce1f016585bdea5b1e5c3c653eb81302618f180a",
-      "updated": "2026-09-28T08:34:13Z",
-      "lines": 85,
-      "summary": "LOG archive index: 20 entries."
+      "checksum": "sha256:4683d55fd23b20b8166556031650385ef19f01976e96e9cda98e1c8de8a4425c",
+      "updated": "2026-09-28T08:50:08Z",
+      "lines": 89,
+      "summary": "LOG archive index: 21 entries."
     },
     "DASHBOARD.md": {
       "checksum": "sha256:a4994a683eaac92e36e9d25456e3d091d82801a348f680647041664d441c13e6",
@@ -77,11 +77,11 @@
       "summary": "PII allowlist: 0 entries."
     }
   },
-  "quick_context": "Pre-4.0.0: adopter upgrade path. aahp migrate removes template placeholders from task fields; doctor gate cli-source (ADR-025) with aahp init --gates --workflows as fix; README 5.1 documents the upgrade and its one-time handoff step. Release awaits the owner.",
+  "quick_context": "Release 4.0.0 prepared: CHANGELOG [4.0.0] cut from the audit fix programme (#119-#130), package.json and lockfile at 4.0.0. Remaining: owner sets the npm trusted-publisher environment, tag v4.0.0 on main, owner approves the npm-publish deployment.",
   "token_budget": {
-    "manifest_only": 1425,
-    "manifest_plus_core": 3804,
-    "full_read": 23495
+    "manifest_only": 1399,
+    "manifest_plus_core": 3466,
+    "full_read": 23517
   },
   "next_task_id": 18,
   "tasks": {

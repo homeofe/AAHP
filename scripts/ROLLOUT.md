@@ -13,25 +13,39 @@ reviewed-allowlist discipline, and the rules that must not be bypassed.
 
 ## What gets propagated
 
-Each target repo needs, copied from AAHP:
+`scripts/propagate.sh <consumer>` does the copying (README Section 10.1). It refuses
+before writing anything unless the target is the top level of a git work tree with an
+`.ai/handoff/` directory, and its `package.json` declares `@elvatis_com/aahp` with a
+`package-lock.json` in the git index that locks it. It then vendors, into the
+consumer's `scripts/`:
 
-- `scripts/verify-handoff.sh` - the gate (4 layers)
-- `scripts/_aahp-lib.sh` - shared helpers (already present in AAHP-enabled repos; refresh it)
-- `scripts/lint-handoff.sh` - checksum/lint layer (already present; refresh it)
-- `scripts/hooks/pre-commit`, `scripts/hooks/pre-push` - the hook scripts
-- `scripts/install-hooks.sh` - installs the hooks into the repo's `.git/hooks/`
-- `.github/workflows/aahp-verify.yml` - the intended REQUIRED CI check
+- `verify-handoff.sh` - the gate (4 layers)
+- `_aahp-lib.sh` - shared helpers
+- `lint-handoff.sh` - the lint the gate runs in Layer 1
+- `check-conflict-markers.mjs` and `validate-pii-allowlist.py` - the two files
+  `lint-handoff.sh` executes (a closure check fails the run if anything the scripts
+  name is missing)
+- `aahp-manifest.sh` - the generator the gate names as the remedy
+- `install-hooks.sh` and `scripts/hooks/pre-commit`, `scripts/hooks/pre-push` - the
+  hooks and their installer
 
-Then, in the target repo:
+and installs `assets/governance/aahp-verify.yml` from the package as
+`.github/workflows/aahp-verify.yml`, the intended REQUIRED CI check. That workflow
+runs `npm ci --ignore-scripts` and then the CLI from `node_modules/`, which is why the
+lockfile is required. AAHP's own `.github/workflows/aahp-verify.yml` is NOT
+propagated: it runs the gate from an AAHP checkout and fails anywhere else.
+
+propagate then installs the hooks, stamps `STATUS.md`, regenerates `MANIFEST.json`,
+stages the change set and runs `verify --level precommit` on it. The caller reviews,
+commits and pushes. To confirm a clean baseline by hand afterwards:
 
 ```bash
-bash scripts/install-hooks.sh .     # wire local pre-commit + pre-push
-bash scripts/verify-handoff.sh . --level full   # confirm a clean baseline
+bash scripts/verify-handoff.sh . --level full
 ```
 
 The gate is verify-only. It never regenerates `MANIFEST.json`; that stays a
-separate `/handoff` step. If the baseline run reports drift, run `/handoff`
-first so the repo starts from a clean, in-sync state.
+separate step. If the baseline run reports drift, update `STATUS.md` and run
+`aahp manifest` first, so the repo starts from a clean, in-sync state.
 
 ## The 4 layers (recap)
 
@@ -51,7 +65,8 @@ first so the repo starts from a clean, in-sync state.
    The comparison is base-to-HEAD, not merge-base-to-HEAD, so a rollback or
    force-push remains visible instead of collapsing to an empty three-dot diff.
 3. Commit-pointer freshness (`MANIFEST.last_session.commit` vs HEAD).
-4. TRUST-TTL expiry (advisory).
+4. TRUST-TTL: advisory by default; blocking in CI where the consumer sets
+   `trustTtl.enforce` (README Section 2.5).
 
 ## Defaults (do not change without an ADR)
 
@@ -60,8 +75,14 @@ first so the repo starts from a clean, in-sync state.
 - At `--level ci`, pass the pull request base SHA or push event `before` SHA.
   Missing, zero, invalid, unreadable, HEAD-equal, and undiffable bases fail.
 - Non-impacting classifications are exact regular tracked files with review reasons,
-  never directories, globs, actors, or change types other than `M`.
-- TRUST-TTL expiry is advisory (warn) and never blocks a commit on its own.
+  never directories, globs, actors, or change types other than `M`. The one
+  content-based classification, `handoffImpact.npmDevDependencyUpdates`, is decided
+  by what a lockfile change contains (dev-only, registry-resolved, integrity-pinned,
+  no install script), never by who made it, and requires a supply-chain scan the gate
+  re-proves on every run (README Section 2.8).
+- TRUST-TTL is advisory (warn) by default. A consumer that sets `trustTtl.enforce`
+  makes a failing check, or a row more than `trustTtl.graceDays` past expiry, fail
+  CI. Layer 4 never runs at `precommit`, so it never blocks a local commit.
 - Escape hatch `AAHP_SKIP_VERIFY=1` skips LOCAL verification only. The required
   CI invocation ignores the hatch. Protect the workflow, gate, parser, and invoked
   scripts with trusted review, because a pull-request workflow otherwise evaluates
@@ -107,7 +128,8 @@ to go looking. Keep the columns, keep the contents private.
 Consumer upgrade sequence: propagate the validator, schema, template, and
 refreshed scripts; add reviewed exact entries; run `aahp manifest`; then run
 `aahp verify --level full`. Do not use `AAHP_SKIP_VERIFY` or `--no-verify`. Run
-`aahp archive` before `/handoff` whenever `LOG.md` grows past 10 active entries.
+`aahp archive` before regenerating the manifest whenever `LOG.md` grows past 10
+active entries.
 
 ## CI strategy per wave
 
@@ -183,9 +205,10 @@ the rollout can answer "what is left" without the answer living in public.
 
 ## Per-consumer checklist
 
-- [ ] Copy the files listed under "What gets propagated".
-- [ ] `bash scripts/install-hooks.sh .`
-- [ ] Run `/handoff` if `aahp verify --level full` reports drift.
+- [ ] Run `scripts/propagate.sh <consumer>` (it copies the files listed under "What
+      gets propagated" and installs the hooks), and review the staged change set.
+- [ ] If `aahp verify --level full` reports drift, update `STATUS.md` and run
+      `aahp manifest`.
 - [ ] Confirm `aahp verify --level full` is green.
 - [ ] If the consumer needs a non-impacting classification, review each exact regular
       file and reason in `aahp.config.json`; verify A/D/R/C and a mixed change
@@ -194,6 +217,8 @@ the rollout can answer "what is left" without the answer living in public.
 - [ ] When CI is available: set `aahp-verify` as a required check.
 - [ ] Require trusted review (CODEOWNERS or an equivalent ruleset) for
       `.github/workflows/aahp-verify.yml`, `scripts/verify-handoff.sh`,
-      `scripts/_aahp-lib.sh`, and every script the workflow executes; the supplied
-      pull-request workflow is not an independent trust boundary without it.
+      `scripts/_aahp-lib.sh`, every script the workflow executes, `aahp.config.json`,
+      and `package.json` and `package-lock.json` (they decide which CLI version the
+      workflow installs and runs); the supplied pull-request workflow is not an
+      independent trust boundary without it.
 - [ ] Record the outcome in the private fleet list, including deliberate skips.

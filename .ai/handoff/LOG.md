@@ -3,6 +3,35 @@
 > **Append-only.** Never delete or edit past entries.
 > Every agent session adds a new entry at the top.
 > This file is the immutable history of decisions and work done.
+> Entries may be redacted for confidentiality (an internal name or figure replaced by a neutral description); they are never rewritten otherwise.
+
+---
+
+## [2026-09-28] claude-opus-5.5: documentation, spec split and redaction (audit fix programme, 7 of 8)
+
+**Agent:** claude-opus-5.5
+**Phase:** documentation
+**Branch:** docs/spec-split-and-redaction
+**Tasks:** owner decisions of 2026-09-28 on the README split, STATUS.md as a snapshot and redaction
+
+### What was done
+
+- Split the README into quickstart plus specification, `docs/adr/` and
+  `docs/governance.md`; corrected the docs to the code after #119 to #125; removed
+  unsupported claims; redacted an internal hostname and figures about other
+  repositories, including in this journal (header note added).
+- A fix agent did this in a separate worktree; the integrator rewrote two of its own
+  open items the new `no-estate-counts` rule caught, re-anchored the scanner TRUST row to
+  the catalog-consulting run on main and made the MANIFEST task notes ASCII.
+
+### Process notes, recorded because they happened
+
+- On `fix/ci-release-automation` the integrator pushed once with `--no-verify`, to give
+  the Linux test runner a base commit. The branch then held only the unchanged
+  Dependabot commit from #123; main was not affected. Hooks are not to be skipped.
+- The scanner has reported a medium `INTERNAL_PRIVATE_IP` finding since #122: a JSON
+  Schema section number in a comment, a false positive. The integrator did not read the
+  scanner reports of #122 and #124 before merging; they are read before every merge now.
 
 ---
 
@@ -128,11 +157,11 @@
 
 ### What was done
 
-- A read-only survey of 24 consumer repositories showed that none ran the shipped
-  `aahp-verify.yml` unchanged: its doctor step called `node bin/aahp.js`, which only
-  exists inside an AAHP checkout, and propagate vendored a lint whose helpers it did not
-  copy. Consumers had rewritten the steps three different ways; six fetched the CLI at
-  runtime without a lockfile.
+- A read-only survey of consumer repositories [redacted: figures] showed that the shipped
+  `aahp-verify.yml` did not run unchanged outside AAHP: its doctor step called
+  `node bin/aahp.js`, which only exists inside an AAHP checkout, and propagate vendored a
+  lint whose helpers it did not copy. Consumers had rewritten the steps in different
+  ways, some fetching the CLI at runtime without a lockfile.
 - Shipped `assets/governance/aahp-verify.yml` for adopters (lockfile-pinned CLI by path),
   made propagate install it with the full helper closure and a fatal baseline check, and
   fixed install-hooks for linked worktrees, CRLF, symlinks and backups.
@@ -236,12 +265,12 @@
 
 ---
 
-## [2026-08-31] codex: Third-party prompt audit and Windows/Linux hardening
+## [2026-08-31] codex: [redacted] review and Windows/Linux hardening
 
 **Agent:** codex
 **Phase:** implementation
 **Branch:** main working tree (uncommitted)
-**Tasks:** repository-wide prompt reconciliation and cross-platform validation
+**Tasks:** repository-wide [redacted] reconciliation and cross-platform validation
 
 ### What was done
 
@@ -268,7 +297,7 @@
 
 - Exercised dependencies, schemas, checks, doctor, packaging, scanner policy, npm audit,
   and test suites on Windows.
-- Applied the complete uncommitted patch to a fresh clone under `/tmp` on `openclaw` and
+- Applied the complete uncommitted patch to a fresh clone under `/tmp` on a Linux test host and
   ran ShellCheck, Python compilation, schemas, checks, doctor, npm audit, scanner, and
   Bats there.
 - Kept PR #109 unmerged because `aahp-verify` is failing. Performed no remote mutation,
@@ -276,34 +305,3 @@
 - Left five owner decisions explicit in STATUS.md instead of inventing ready tasks: ASCII
   scope, PR #109 handling, legacy workflow migration, post-CI scanner trust, and future
   ajv-cli replacement.
-
----
-
-## [2026-07-26] claude-opus-5: Layer 1 catches deleted indexed files; lint raises its own exit code
-
-**Agent:** claude-opus-5
-**Phase:** fix
-**Branch:** fix/layer1-deletion-and-lint-exit
-**Tasks:** #51, #52
-
-### What was done
-
-- Reproduced #51 before changing anything: a throwaway repository with a valid handoff set passed
-  `aahp verify --level ci` (exit 0), then one file indexed by `MANIFEST.json` was deleted and committed,
-  and the same command still passed (exit 0). `lint-handoff.sh` printed `! LOG.md: file not found` and
-  still ended with "All checks passed" and exit 0.
-- Confirmed the gates disagreed: `aahp doctor` on the identical state reported
-  `FAIL handoff-set: indexed file(s) missing on disk: LOG.md`. The blind spot was in verify Layer 1,
-  not in doctor.
-- Layer 1 now enumerates the indexed files and asserts existence itself, through a shared library
-  helper, instead of inferring the result from another script's stdout. A missing indexed file is
-  named and carries its own message, kept distinct from a checksum mismatch because the fixes differ.
-- #52 decided in favour of lint raising its own exit code. The script header already documented
-  `1 = violations found`, and two workflows already run it as a blocking step, so the exit 0 on a
-  mismatch was an accident of the comparison running in an embedded interpreter that cannot write to
-  the calling shell's counter. Both integrity failures now count as violations, and Layer 1 keeps its
-  own independent check so blocking never rests on that exit code or on matching lint's wording.
-- Regression tests: two in `tests/lint.bats` (mismatch exits 1; deletion exits 1 and names the file
-  without claiming a mismatch) and three in `tests/verify.bats` (deletion fails at `--level ci`; and
-  two that run verify against a stubbed `lint-handoff.sh` which always exits 0, so only Layer 1's own
-  checks can produce the failure).

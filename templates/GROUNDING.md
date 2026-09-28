@@ -37,8 +37,9 @@ Grounding shorthand names points on this SAME axis; it does not add levels:
 
 Two lifecycle markers are applied by the Trust Decay rule (README section 2.5); they
 are orthogonal to the three levels and are not provenance values: `expired` (TTL
-lapsed; auto-downgrades `verified` to `assumed`) and `rejected` (claim withdrawn;
-never reuse).
+lapsed; the row counts as `assumed` when read, but nothing rewrites it: `aahp verify`
+Layer 4 reports it and an agent re-verifies or downgrades it) and `rejected` (claim
+withdrawn; never reuse).
 
 ### Axis B - Provenance (how a claim was produced or checked). New, orthogonal field.
 
@@ -143,23 +144,31 @@ logical proof.
 ## 5. Required TRUST Fields
 
 A trust record that participates in the Grounded Reflection Layer should carry these
-fields. They extend the existing TRUST.md register rather than replacing its table;
-`status`, `ttl`, and `expires` map directly onto the Status, TTL, and Expires
-columns in TRUST.md.
+fields. They are a convention: they extend the existing TRUST.md register rather than
+replacing its table, and no AAHP gate reads them. What code reads is narrower: verify
+Layer 4 reads the Status, Expires and Check columns, and `aahp doctor` checks only that
+TRUST.md has a Provenance column (README sections 2.5 and 2.10).
 
-- `id` - stable identifier; never reused
-- `claim` - the assertion in one sentence
-- `status` - `verified` / `assumed` / `untested` (Axis A)
-- `provenance` - strongest achieved value on Axis B
-- `generated_by` - agent or model that produced the claim
+The ten recommended fields (the list README section 2.10 names), with the TRUST.md
+column each one maps onto:
+
+- `id` - stable identifier; never reused (the Property cell)
+- `claim` - the assertion in one sentence (the Property cell)
+- `status` - `verified` / `assumed` / `untested`, Axis A (Status)
+- `provenance` - strongest achieved value on Axis B (Provenance)
+- `generated_by` - agent or model that produced the claim (Agent)
+- `verified_by` - the anchor or agent that verified it, or null (Agent, or Notes)
+- `evidence` - pointer to the anchor: test run, source, scan, sign-off (Notes, or a
+  check named in the Check column)
+- `ttl` - time-to-live (TTL)
+- `expires` - expiry date (Expires)
+- `owner` - accountable agent or human (Notes)
+
+Five optional fields for high-impact work, recorded in Notes or in a separate record:
+
 - `reviewed_by` - reviewing agent or model (a different provider for high-impact work)
-- `verified_by` - the anchor or agent that verified it, or null
-- `confidence` - optional numeric estimate (see Section 4)
+- `confidence` - numeric estimate (see Section 4)
 - `confidence_source` - required whenever `confidence` is present
-- `evidence` - pointer to the anchor (test run, source, scan, sign-off)
-- `ttl` - time-to-live; maps to the TRUST.md TTL column
-- `expires` - expiry date; maps to the TRUST.md Expires column
-- `owner` - accountable agent or human
 - `remaining_uncertainty` - what is still open
 - `next_verification_step` - what the next agent should check first
 
@@ -203,7 +212,7 @@ Audit and review decisions use the reviewer vocabulary only: `SHIP`,
 ## Cross-References
 
 - TRUST.md - the confidence register (verified/assumed/untested) and per-row TTL + Expires columns
-- README section 2.4 - Agent Identity and Provenance (the audit-trail base this builds on)
+- README section 2.4 - Agent Identity and Provenance (a convention; ADR-022 withdrew its audit-trail claim)
 - README section 2.5 - Trust Decay (sole TTL authority)
 - README section 2.8 - The Verify Gate
 - README section 2.10 - Grounded Reflection Layer (the doctrine)

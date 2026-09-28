@@ -1,4 +1,4 @@
-# Fixture: the canonical shape propagate.sh installs. Nothing can skip the gate.
+# Fixture: an unconditional verify workflow in the shape of AAHP's own dogfood copy (vendored scripts, node bin/aahp.js), not the npm-based adopter copy propagate.sh installs. Nothing can skip the gate.
 # Expected verdict: enforced.
 name: AAHP Verify
 

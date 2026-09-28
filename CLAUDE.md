@@ -19,7 +19,8 @@
 - [`scripts/`](scripts/) - Shipped tooling. Shared shell helpers live in [`scripts/_aahp-lib.sh`](scripts/_aahp-lib.sh) and should be sourced, not duplicated.
 - [`templates/`](templates/) - Files copied into a user's `.ai/handoff/` directory. Templates use `[PLACEHOLDER]` syntax.
 - [`schema/`](schema/) - JSON Schema for `MANIFEST.json`.
-- [`tests/`](tests/) - Bats suites for manifest, lint, and migration flows.
+- [`tests/`](tests/) - Bats suites for the CLI, scripts and gates. Read [`tests/README.md`](tests/README.md) before adding a test: it states the rules the suite enforces on itself.
+- [`docs/`](docs/) - The [Architectural Decision Log](docs/adr/README.md) (one file per ADR) and the [governance-gate reference](docs/governance.md).
 
 ## Build & Test Commands
 
@@ -43,7 +44,7 @@ bash scripts/lint-handoff.sh .
 # is the fail-closed half, not a network guard: npx rewrites it to --yes=false,
 # so a missing package costs one registry metadata request and then stops
 # instead of being downloaded and run (measured 2026-09-28 on npm 10.9.9,
-# 11.20.0 and 12.0.2; README ADR-013). `npm exec --no-install` is NOT the same:
+# 11.20.0 and 12.0.2; docs/adr/ADR-013.md). `npm exec --no-install` is NOT the same:
 # npm 10 and 11 ignore the flag there and run the package. In workflows,
 # check-workflow-pinning.mjs requires `npm ci --ignore-scripts` before any npx in
 # the same job and `--no-install` on every npx, and rejects `npm exec`. Where

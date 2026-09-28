@@ -2,6 +2,10 @@
   "version": 1,
   "entries": [
     {
+      "sha256": "c1733cc2e660900dd5c6a7a0798832f322bd27bb420ac8f9c75122d7923e732d",
+      "title": "## [2026-07-26] claude-opus-5: Layer 1 catches deleted indexed files; lint raises its own exit code"
+    },
+    {
       "sha256": "528eb9e31a5f19f8e1d85673ba706565b33c355fe2af03fe913518356668c053",
       "title": "## [2026-07-25] claude-opus-5: Trust register re-verification (10 rows re-established, 0 downgraded)"
     },
@@ -42,7 +46,7 @@
       "title": "## [2026-02-27] Claude Opus 4.6: T-006 npm publish preparation"
     },
     {
-      "sha256": "fd444e090086e176dc71c68ae24457df68e1f0f75debe2412ecea58e1f69272c",
+      "sha256": "8369429c5c81fa3d47d636e674d8c7b98257f56e8a2224d354ea71005c0534ef",
       "title": "## [2026-02-26] Claude Opus 4.6: Complete T-003, T-004, T-005 -CI, CLI, Tests"
     },
     {

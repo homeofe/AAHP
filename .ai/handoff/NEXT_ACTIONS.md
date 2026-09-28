@@ -19,6 +19,13 @@ Current version: **v3.12.0**
 
 ## Recently Completed
 
+### 2026-09-28: Documentation, spec split and redaction
+
+- README is quickstart plus specification; the decision log lives in `docs/adr/`, the gate
+  reference in `docs/governance.md`.
+- Internal names and figures about other repositories are removed and guarded by
+  forbidden-pattern rules; STATUS.md is a snapshot, LOG.md the journal.
+
 ### 2026-09-28: CI, release and dependency automation
 
 - The scanner gates publishing and runs on tags; the publish job refuses tags off `main`
@@ -45,13 +52,6 @@ Current version: **v3.12.0**
   run check` and a CI skip audit keep them out.
 - Tests are isolated from global git config and build their fixture once per run.
 
-### 2026-09-28: Consumer install path
-
-- Shipped an adopter verify workflow that runs the lockfile-pinned CLI; the previous
-  one could not run in any consumer.
-- propagate vendors the full helper closure, fails on a failed baseline, and supports
-  linked worktrees; install-hooks installs where git actually runs hooks.
-
 ---
 
 ## Owner Decisions (not task registry entries)
@@ -70,11 +70,12 @@ Open:
 - Plan a future replacement for the deprecated transitive dependencies of ajv-cli 5.
 - Coordinate the supply-chain-guard test that expects the old STATUS.md summary before its
   next aahp bump.
-- Decide whether the three consumer manifests with template placeholder dates are fixed
-  before the release.
 - Decide on a protected publish environment bound in the npm trusted-publisher config.
 - Report the scanner coverage gaps (extensionless shell, .bats, install by version) to
   supply-chain-guard.
+- Decide whether consumer manifests with template placeholder dates are fixed before the
+  release.
+- Decide whether `docs/` ships to npm and whether `init --gates` writes `pinnedDep`.
 
 ---
 

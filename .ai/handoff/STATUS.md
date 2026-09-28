@@ -3,7 +3,7 @@
 Last updated: 2026-09-28
 Current package version: 3.12.0 (released 2026-08-31); unreleased changes: CHANGELOG.md `## [Unreleased]`
 Protocol version: 3.0
-Working state: audit fix programme in progress; this change is CI, release and dependency automation (`fix/ci-release-automation`)
+Working state: audit fix programme in progress; this change is the documentation workstream (branch docs/spec-split-and-redaction)
 
 ## Current objective
 
@@ -23,53 +23,54 @@ all fixes are in.
 | CLI | signal exit codes, doctor schema validation, migrate, help | merged, #122 (`d27db82`) |
 | Manifest, lint and shared lib | JSON generation, binary-safe scans, injection scan scope, template | merged, #122 (`d27db82`) |
 | Verify gate semantics | executable TRUST claims with grace, content-based Layer 2 exemption, Layer 3 | merged, #124 (`9416ed0`) |
-| CI and release | scanner on tags, publish guard, Dependabot grouping and cooldown | this change |
-| Documentation | README split, ADR fixes, redaction of internal details | next, after this change |
-| Full ASCII | replace non-ASCII in tracked text, widen the gate | last |
+| CI and release | scanner on tags, publish guard, Dependabot grouping and cooldown | merged, #125 (`f9b12ca`) |
+| Documentation | README split, ADR fixes, redaction of internal details | this change |
+| Full ASCII | replace non-ASCII in tracked text, widen the gate | ready, next (its gate needs this change first) |
 
-## This change: CI, release and dependency automation
+## This change: documentation, specification split and redaction
 
-- Supply-chain scan: the job now also runs on release tags and dispatches, and both
-  `publish` and `release` need it. It consults the historical threat catalog
-  (`refresh-catalog: true`; PR #119's run had used bundled indicators only). The
-  contract test asserts invariants instead of one literal SHA: a 40-hex pin with a
-  `# v6.x.y` comment, the policy `$schema` anchor on the same commit, least privilege, no
-  policy input. A v6 Dependabot bump no longer fails by construction; a v7 bump still
-  does, on purpose.
-- Publish guard: a new step refuses any ref that is not a `vMAJOR.MINOR.PATCH` tag equal
-  to the package.json version whose commit is reachable from `main`. The publish job
-  installs nothing, restores no cache and runs `npm publish --ignore-scripts`, so no
-  dependency or lifecycle code runs while it holds `id-token: write` (the tarball is
-  byte-identical without `node_modules`). `prepublishOnly` therefore no longer runs in
-  CI; the required jobs on the same commit run the same checks.
-- Required jobs install with `npm ci --ignore-scripts`, and ShellCheck is a pinned v0.9.0
-  release verified by sha256 instead of whatever apt ships with the runner image.
-- Dependabot (owner decision "group"): one grouped version-update PR per ecosystem with
-  a 7-day cooldown; security updates are neither grouped nor delayed.
-- `check-workflow-pinning.mjs` gains rules H (the shipped governance template pins the
-  same SHAs as the workflows), I (`npm ci --ignore-scripts`), J (an `npx` only after
-  `npm ci` in the same job) and K (grouped, cooled-down Dependabot lanes); rule B also
-  rejects `npm exec` and `npm x`.
-- `npx --no-install` documentation now matches the measurement on npm 10, 11 and 12:
-  `npx` sends one metadata request for a missing package and then refuses; `npm exec
-  --no-install` on npm 10 and 11 downloads and runs it. Corrected in ADR-013, README 2.1
-  and 11.1, CLAUDE.md, both hooks, both shipped workflow templates and a test comment.
-- The bats suite runs once per Node runtime per push instead of three times.
-- Includes Dependabot #123 unchanged (CodeQL v4.37.9 to v4.38.2; pin `2892aa5` is the
-  commit the v4.38.2 tag resolves to).
+Implements the owner's documentation decisions of 2026-09-28 and corrects the docs to
+what the code does after #119 to #125.
+
+- README split: README keeps the quickstart and the normative specification (sections 1
+  to 10, numbers unchanged because code and templates cite them). The decision log moved
+  to `docs/adr/` (one file per ADR plus an index), the governance-gate reference to
+  `docs/governance.md`, and the release ceremony to CONTRIBUTING.md. Moved text is
+  verbatim except for the corrections below. `docs/` is not shipped to npm (open item).
+- STATUS.md is a bounded snapshot and LOG.md the only journal: README, templates and
+  ADR-023 agree, merge rules are stated, and `.gitattributes` no longer sets
+  `merge=union` for STATUS.md.
+- Redaction: an internal hostname and figures about other repositories were removed
+  from README, ADRs, CHANGELOG history and LOG.md (redacted in place, with a header note;
+  LOG entries are otherwise never rewritten). New forbidden-pattern rules
+  `no-internal-hostnames` (all text files) and `no-estate-counts` (Markdown), and a
+  CONSTITUTION section on what public files may record.
+- Claims without a mechanism or measurement removed or corrected: the schema as a "hard
+  security boundary", a structural HTML-comment check, a nonexistent hook path, vendor
+  pricing and reduction percentages, HANDOFF.lock "enforcing" single-writer access,
+  "the counter increments automatically", `/handoff` as an AAHP command.
+- CONSTITUTION marks each rule Enforced (naming its gate or test) or Convention, with
+  the corrected ASCII rationale. CONTRIBUTING explains the per-PR handoff update,
+  Dependabot handling and how to run tests. CHANGELOG discloses the versions never
+  tagged or published, and its reference links now resolve.
+- ADR cross-references corrected (provenance ADR-022, doc paths ADR-023) and guarded by a
+  new `check:adr-refs` gate. Templates are ASCII and match the spec.
+- Integrator: the scanner TRUST row is re-anchored to the push run on main at `f9b12ca`
+  (catalog consulted); MANIFEST task notes are ASCII.
 
 ## Validation
 
-- Workstream tree on a Linux runner: `npm test` 659 of 659; 26 mutation proofs, each red
-  with its fix reverted and green restored. npx behaviour measured against a logging
-  local registry on npm 10.9.9, 11.20.0 and 12.0.2.
-- Integrated onto `9416ed0` with #123 and the corrected comments: `CI=true npm test` 812
-  of 812 after the rebase, 0 skipped; `npm run check`, `doctor`, lint,
-  archive verify, ajv and the PII validator exit 0.
-- Only a real GitHub run proves: the ShellCheck download and its sha256 (the step fails
-  closed on a mismatch, so this pull request's own run is the proof), `refresh-catalog`
-  inside the Action, Dependabot accepting `groups` and `cooldown`, and the publish guard
-  on a real tag. No tag, release or publish was made.
+- Workstream tree on a Linux runner: `npm test` 822 of 822; `npm run check` (13 gates,
+  doc shape over 39 documents), `doctor`, lint and archive verify exit 0 once the two
+  integrator lines the new `no-estate-counts` rule flagged were rewritten (they are, in
+  this change). Every CHANGELOG release link returned HTTP 200 (20 of 20); behaviour
+  claims (pinned-dep, acceptance-criteria binding, lint, generator field handling, init
+  next steps) were checked by running the commands.
+- Integrated onto `f9b12ca`: `CI=true npm test` 822 of 822, 0 skipped; `npm run check`,
+  `doctor`, lint, archive verify, ajv and the PII validator exit 0.
+- Not done here: shipped scripts, tests and hooks still cite "README ADR-NNN" and carry a
+  few figures about other repositories in comments; they are corrected in the full-ASCII
+  change, which owns those files.
 
 ## Owner decisions
 
@@ -105,21 +106,29 @@ Open:
    (`src/__tests__/handoff-gate.test.ts` line 256 expects the old table-header summary `|
    Field | Value |` for STATUS.md). That test needs a one-line update when
    supply-chain-guard next bumps @elvatis_com/aahp.
-8. Three consumer manifests will fail `aahp doctor` after upgrading, because they still
-   carry template placeholder dates. The CHANGELOG carries the migration note; should
-   those repos be fixed before the release?
-9. Should lint's PII scan also read JSON string values (task notes, `assigned_to`)? It
+8. Should lint's PII scan also read JSON string values (task notes, `assigned_to`)? It
    currently scans Markdown only, to avoid new failures in consumers.
-10. Publish environment: a GitHub environment (for example `npm-publish`) with a tag
+9. Publish environment: a GitHub environment (for example `npm-publish`) with a tag
    deployment rule, bound in the npm trusted-publisher config, would also stop a workflow
    that was edited at the tagged commit, which the new guard step cannot. Needs a
    repository setting and the npm-side binding.
-11. `refresh-catalog: true` merges the scanner's live feed for 24 hours, so the required
+10. `refresh-catalog: true` merges the scanner's live feed for 24 hours, so the required
    scanner check can turn red with no AAHP diff when a new indicator matches. Keep it, or
    pin the catalog?
-12. Upstream, for supply-chain-guard: its Action does not content-scan extensionless shell
+11. Upstream, for supply-chain-guard: its Action does not content-scan extensionless shell
    files (the shipped git hooks) or `.bats` files, and installs
    `supply-chain-guard@<version>` by version rather than by integrity.
+12. Consumer manifests that still carry template placeholder dates will fail `aahp doctor`
+   after upgrading. The CHANGELOG carries the migration note; should those repositories be
+   fixed before the release?
+13. `docs/` (the ADR log and the governance reference) is not shipped to npm, so messages
+   in shipped code that cite an ADR point at a file that exists in the repository but not
+   in `node_modules`. Ship `docs/`, or cite repository URLs?
+14. LOG.md may now be redacted for confidentiality as a protocol rule (README 1.3,
+   templates/LOG.md), and LOG-ARCHIVE.md was ASCII-normalised with a re-hashed index
+   entry. Confirm both as protocol rules.
+15. Should `aahp init --gates` write `"pinnedDep": {}` so the exact-pin advice is enforced
+   by default? Today the pinned-dep gate reports skip until it is configured.
 
 ## Constraints for the next agent
 

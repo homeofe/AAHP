@@ -545,9 +545,9 @@ set_job_if() {
 # ─── Section 5: the code record and the DOCUMENTED record have to agree ─────
 #
 # Section 3 above holds ci.yml to a literal list inside assert-repo-ci-shape.mjs.
-# ADR-019 in README.md is the record a person reads, and until section 5 nothing
+# docs/adr/ADR-019.md is the record a person reads, and until section 5 nothing
 # compared the two, so either could be edited alone and every check stayed green.
-# The tests below mutate the README copy only; ci.yml is untouched in all of them,
+# The tests below mutate the ADR copy only; ci.yml is untouched in all of them,
 # which is what makes a red result attributable to the documentation drifting
 # rather than to the workflow.
 
@@ -576,10 +576,12 @@ replace_line() {
     mv "$file.new" "$file"
 }
 
-# The section-3 fixture plus the README, so section 5 has both records to compare.
+# The section-3 fixture plus the ADR, so section 5 has both records to compare.
+ADR019="docs/adr/ADR-019.md"
 copy_repo_shape_with_readme() {
     copy_repo_shape
-    cp "$AAHP_ROOT/README.md" "$TEST_TMPDIR/README.md"
+    mkdir -p "$TEST_TMPDIR/docs/adr"
+    cp "$AAHP_ROOT/$ADR019" "$TEST_TMPDIR/$ADR019"
 }
 
 @test "publish record: this repository's ADR-019 and recorded list agree" {
@@ -588,10 +590,10 @@ copy_repo_shape_with_readme() {
     run node "$AAHP_ROOT/tests/assert-repo-ci-shape.mjs" "$AAHP_ROOT"
     [ "$status" -eq 0 ]
     [[ "$output" == *"repo CI shape OK"* ]]
-    [[ "$output" != *"README.md is not present"* ]]
+    [[ "$output" != *"$ADR019 is not present"* ]]
 }
 
-@test "publish record: the copy carrying a README is green, so every mutation starts there" {
+@test "publish record: the copy carrying the ADR is green, so every mutation starts there" {
     copy_repo_shape_with_readme
 
     run node "$AAHP_ROOT/tests/assert-repo-ci-shape.mjs" "$TEST_TMPDIR"
@@ -599,20 +601,20 @@ copy_repo_shape_with_readme() {
     [[ "$output" == *"repo CI shape OK"* ]]
 }
 
-@test "publish record: a root with no README is NOT asserted, and says so" {
-    # The third state. A fixture that never had a README is not a repository whose
+@test "publish record: a root with no ADR-019 file is NOT asserted, and says so" {
+    # The third state. A fixture that never had the ADR is not a repository whose
     # ADR was deleted, and reporting either as the other would be a guess. Every
     # section-3 test above lands here, which is why they stayed green.
     copy_repo_shape
 
     run node "$AAHP_ROOT/tests/assert-repo-ci-shape.mjs" "$TEST_TMPDIR"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"not asserted here: README.md is not present"* ]]
+    [[ "$output" == *"not asserted here: $ADR019 is not present"* ]]
 }
 
 @test "publish record: documenting an operand the code does not record is red" {
     copy_repo_shape_with_readme
-    replace_line "$TEST_TMPDIR/README.md" \
+    replace_line "$TEST_TMPDIR/$ADR019" \
         "(none)" \
         "github.actor == 'some-bot'"
 
@@ -629,7 +631,7 @@ copy_repo_shape_with_readme() {
     # Deleting the last line of the block is the edit that would otherwise read as
     # "there are no extra operands", which is the opposite of what ci.yml says.
     copy_repo_shape_with_readme
-    drop_line "$TEST_TMPDIR/README.md" "(none)"
+    drop_line "$TEST_TMPDIR/$ADR019" "(none)"
 
     run node "$AAHP_ROOT/tests/assert-repo-ci-shape.mjs" "$TEST_TMPDIR"
     [ "$status" -eq 1 ]
@@ -641,7 +643,7 @@ copy_repo_shape_with_readme() {
     # The single line a reviewer deletes to disarm section 5. Named here and
     # deleted here, so the claim is checked rather than asserted.
     copy_repo_shape_with_readme
-    drop_line "$TEST_TMPDIR/README.md" "**Recorded operands beyond the release definition.**"
+    drop_line "$TEST_TMPDIR/$ADR019" "**Recorded operands beyond the release definition.**"
 
     run node "$AAHP_ROOT/tests/assert-repo-ci-shape.mjs" "$TEST_TMPDIR"
     [ "$status" -eq 1 ]
@@ -650,16 +652,16 @@ copy_repo_shape_with_readme() {
 
 @test "publish record: deleting the ADR-019 heading is red" {
     copy_repo_shape_with_readme
-    drop_line "$TEST_TMPDIR/README.md" "### ADR-019: one release definition"
+    drop_line "$TEST_TMPDIR/$ADR019" "# ADR-019: one release definition"
 
     run node "$AAHP_ROOT/tests/assert-repo-ci-shape.mjs" "$TEST_TMPDIR"
     [ "$status" -eq 1 ]
-    [[ "$output" == *"has no '### ADR-019:' section"* ]]
+    [[ "$output" == *"has no '# ADR-019:' section"* ]]
 }
 
 @test "publish record: an ADR that stops stating the release definition is red" {
     copy_repo_shape_with_readme
-    replace_line "$TEST_TMPDIR/README.md" \
+    replace_line "$TEST_TMPDIR/$ADR019" \
         "**Decision:** the release definition \`startsWith(github.ref, 'refs/tags/v') &&" \
         "**Decision:** the release definition is written ONCE, as \`RELEASE_REF_CONDITION\` in"
 
@@ -669,7 +671,7 @@ copy_repo_shape_with_readme() {
 }
 
 @test "publish record: rewrapping the ADR prose does not change the verdict" {
-    # The release definition is line-wrapped in README.md, so the comparison
+    # The release definition is line-wrapped in the ADR, so the comparison
     # collapses whitespace. This proves that is a real property and not an
     # accident of where the current line break happens to fall: joining those two
     # lines must stay green.
@@ -684,8 +686,8 @@ copy_repo_shape_with_readme() {
             next
         }
         { print }
-    ' "$TEST_TMPDIR/README.md" > "$TEST_TMPDIR/README.new"
-    mv "$TEST_TMPDIR/README.new" "$TEST_TMPDIR/README.md"
+    ' "$TEST_TMPDIR/$ADR019" > "$TEST_TMPDIR/ADR-019.new"
+    mv "$TEST_TMPDIR/ADR-019.new" "$TEST_TMPDIR/$ADR019"
 
     run node "$AAHP_ROOT/tests/assert-repo-ci-shape.mjs" "$TEST_TMPDIR"
     [ "$status" -eq 0 ]

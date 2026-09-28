@@ -274,10 +274,13 @@ function cmdInit(targetPath, flags) {
   if (copied > 0) {
     console.log()
     console.log('Next steps:')
-    console.log('  1. Replace [PROJECT] placeholders in the template files')
+    console.log('  1. Replace [PROJECT] placeholders in the template files, and [VERSION] in NEXT_ACTIONS.md')
     console.log('  2. Edit CONVENTIONS.md with your project-specific rules')
     console.log('  3. Run: aahp manifest --phase idle')
     console.log('  4. Commit: git add .ai/handoff/ && git commit -m "chore: init AAHP handoff files"')
+    console.log('  5. Install the gate: bash node_modules/@elvatis_com/aahp/scripts/install-hooks.sh .')
+    console.log('     and copy node_modules/@elvatis_com/aahp/assets/governance/aahp-verify.yml')
+    console.log('     into .github/workflows/ as a required check (README Quickstart step 5)')
   }
 }
 
@@ -674,7 +677,8 @@ function runGate(scriptName, targetPath) {
 // `--json` carries gate statuses and no reasons, `--quiet` prints nothing for a
 // passing gate, and `--governance` marks this gate `skip` without evaluating
 // it. Those three are the invocations wired into CI and hooks
-// (.github/workflows/aahp-verify.yml, assets/governance/aahp-govern.yml,
+// (.github/workflows/aahp-verify.yml and the adopter copy
+// assets/governance/aahp-verify.yml, assets/governance/aahp-govern.yml,
 // scripts/hooks/pre-push), so a repository that reads the schemaVersion 1
 // record as a handoff-integrity signal is told exactly what it was told before.
 // Holding that record byte-identical is a compatibility choice for dashboards
@@ -686,8 +690,9 @@ function runGate(scriptName, targetPath) {
 // the AAHP verify gate) and the handoff gates are still evaluated, NO automated
 // gate in that repository compares a handoff checksum. The record is green and honest
 // about what it measured, and it is not a statement about handoff integrity.
-// Adopt .github/workflows/aahp-verify.yml, which runs `aahp verify --level ci`
-// before `aahp doctor` in the same job, or run `aahp verify` some other way.
+// Adopt the shipped assets/governance/aahp-verify.yml as
+// .github/workflows/aahp-verify.yml, which runs `aahp verify --level ci` before
+// `aahp doctor` in the same job, or run `aahp verify` some other way.
 function gateHandoffSet(handoffDir) {
   const manifestPath = join(handoffDir, 'MANIFEST.json')
   if (!existsSync(manifestPath)) return { status: 'fail', reason: 'MANIFEST.json not found' }

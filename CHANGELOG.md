@@ -5,9 +5,19 @@ All notable changes to `@elvatis_com/aahp` are recorded here. The format follows
 versioning (`aahp_version` in `MANIFEST.json` tracks the file-format contract and moves
 independently of the npm version).
 
-> Publishing note: npm releases lapsed after `3.2.1` because the CI publish workflow was
-> disabled, so `3.3.0` and `3.4.0` were developed in the repository but never published.
-> `3.5.0` is the first npm release since `3.2.1` and ships everything below it.
+> Publishing note, measured 2026-09-28 against `git ls-remote --tags` and
+> `npm view @elvatis_com/aahp versions`:
+>
+> - `3.1.0`, `3.3.0`, `3.4.0`, `3.8.2` and `3.8.3` have a section below but were never
+>   tagged and never published to npm. They were version numbers the repository passed
+>   through between releases; their changes first reached npm in `3.2.1` (for `3.1.0`),
+>   `3.5.0` (for `3.3.0` and `3.4.0`) and `3.9.0` (for `3.8.2` and `3.8.3`). Their
+>   reference links point at the commit that set the version, not at a tag.
+> - `3.2.0` was tagged but never published to npm; `3.2.1` was published instead.
+> - npm releases lapsed after `3.2.1` because the CI publish workflow was disabled, so
+>   `3.5.0` is the first npm release since `3.2.1` and ships everything below it.
+> - `3.0.0` to `3.0.4` were published to npm before this changelog existed and have no
+>   sections of their own; the `3.0.5` entry summarizes the 3.0 line.
 
 ## [Unreleased]
 
@@ -50,6 +60,17 @@ independently of the npm version).
   as the workflows), I (`npm ci --ignore-scripts`), J (`npx` only after `npm ci` in the
   same job) and K (grouped, cooled-down Dependabot lanes); rule B also rejects `npm exec`
   and `npm x`.
+- `docs/adr/`: the Architectural Decision Log, one file per decision (`ADR-NNN.md`) plus
+  an index, and `docs/governance.md`, the reference for `aahp doctor`, `aahp check` and
+  the config-driven gates. Both moved out of README.md, which keeps the quickstart and the
+  normative specification.
+- `npm run check:adr-refs` (`scripts/check-adr-refs.mjs`, repository-local): every ADR
+  number cited in a tracked file has a file, and each ADR's heading and index row match
+  its file name.
+- Forbidden-pattern rules `no-internal-hostnames` and `no-estate-counts`, and a
+  CONSTITUTION section on what public handoff state and documentation may record.
+- CONTRIBUTING.md documents the handoff update every pull request needs, Dependabot
+  handling, how to run tests, and the release ceremony (moved from README Section 11).
 
 ### Changed
 
@@ -93,11 +114,31 @@ independently of the npm version).
   bumps no longer fail by construction; a v7 bump still does.
 - The bats suite runs once per Node runtime per push instead of three times.
 - CodeQL actions v4.37.9 to v4.38.2 (Dependabot #123).
+- CONSTITUTION marks each rule Enforced (naming its gate or test) or Convention. The ASCII
+  rule's rationale is corrected: cp1252 cannot encode the emoji and arrows the templates
+  shipped, while the em dash is encodable.
+- STATUS.md is a bounded snapshot and LOG.md the only journal. On a conflict, rewrite the
+  STATUS snapshot from both sides and keep both LOG entries. `.gitattributes` no longer
+  sets `merge=union` for STATUS.md.
+- LOG.md entries may be redacted for confidentiality and are never otherwise rewritten.
+- Templates are ASCII only. WORKFLOW Phase 5 regenerates the manifest and runs `aahp
+  verify`; DASHBOARD is a derived display surface; GROUNDING's field list maps onto the
+  TRUST.md columns.
+- `aahp init` next steps mention the `[VERSION]` placeholder, the hooks and the adopter
+  verify workflow.
+- Consumers are told to pin an exact version; the advice to float a caret range is
+  withdrawn.
 
 ### Removed
 
 - `_aahp-lib.sh` helpers `aahp_file_mtime`, `aahp_auto_summary`, `aahp_estimate_tokens`
   and `aahp_file_entry_json`, used only by the old generator.
+- README claims with no mechanism or measurement behind them: vendor pricing, reduction
+  percentages, the schema as a "hard security boundary", a structural HTML-comment check,
+  a `.ai/hooks/lint-handoff.sh` hook, HANDOFF.lock "enforcing single-writer access", and
+  "the counter increments automatically".
+- An internal hostname and figures about other repositories, from README, ADRs, CHANGELOG
+  history and `.ai/handoff/LOG.md` (redacted in place).
 
 ### Fixed
 
@@ -183,6 +224,15 @@ independently of the npm version).
   hook comments, gate text) now matches the behaviour measured on npm 10, 11 and 12: `npx`
   refuses after one metadata request, while `npm exec --no-install` on npm 10 and 11
   downloads and runs the package.
+- ADR cross-references after the 3.11.0 renumbering: provenance cites ADR-022, doc paths
+  ADR-023.
+- CHANGELOG discloses the versions never tagged or published, and reference links that
+  pointed at missing tags now point at the version commits.
+- HANDOFF.lock recovery reads `HEAD`, not `HEAD~1`, and the acceptance-criteria examples
+  in README 8.1 and 8.7 now bind to their task.
+- README: the pinned-dep gate reports skip until `pinnedDep` is configured, and
+  MANIFEST.json fields are split into generated and hand-maintained.
+- `scripts/ROLLOUT.md` describes what `propagate.sh` actually vendors and installs.
 
 ### Security
 
@@ -254,8 +304,8 @@ independently of the npm version).
   behaviour is unchanged: expired rows warn and the run passes. True, and they fail it,
   as does a register this reader cannot classify, so the gate cannot be disabled by
   breaking the table rather than editing the config. Opt-in because blocking everywhere
-  was measured as the wrong trade: two of the nine consuming repositories hold registers
-  with 24 of 25 and 20 of 21 rows already expired. See ADR-024.
+  is the wrong trade: a repository whose register already holds expired rows would turn
+  red on its next commit for a file its pull requests never touch. See ADR-024.
 
 - An Installation and Quickstart section in `README.md`, above the architectural
   material. There was no heading at any level matching install, quickstart, getting
@@ -275,7 +325,7 @@ independently of the npm version).
   repository are resolved. Exceptions are declared with an exact occurrence COUNT rather
   than as an allowlist, because the defect and the correct uses are the same string in
   different sentences: a path-level allowlist would have exempted the defect this gate
-  exists for. It exits 2 on anything it could not assess. ADR-022.
+  exists for. It exits 2 on anything it could not assess. ADR-023.
 
 - The five-field provenance block from Section 2.4 now ships in `templates/LOG.md` and
   `templates/STATUS.md`. The templates carried one of the five, so a repository that
@@ -354,10 +404,9 @@ independently of the npm version).
   governance gate unconditionally and no verify gate gets its own verdict,
   `governance-only`, exit 0, whose pass reason says out loud that nothing there
   compares a handoff checksum. `npm run govern` is deliberately not recognised: what
-  that script expands to is not readable from the workflow. Measured 2026-08-23
-  against the nine consuming repositories in this estate, at their `origin/main`:
-  none holds an `aahp-govern.yml`, and every verdict and exit code is identical
-  before and after this change, so no consumer turns red without changing anything.
+  that script expands to is not readable from the workflow. Measured against consuming
+  repositories before release: every verdict and exit code was identical before and
+  after this change, so no consumer turns red without changing anything.
   The gate ships no YAML dependency, because AAHP has no runtime dependencies, so
   `tests/assert-workflow-parser-parity.mjs` holds its block-YAML reader against a real
   parser on every workflow and fixture in this repository, on the fields the audit
@@ -419,15 +468,11 @@ independently of the npm version).
   A reader that switches on `gates`
   needs NO change. A reader that asserts `schemaVersion === 1` must widen to `>= 1`;
   that is the only breaking edge, and it is why the version moved rather than fields
-  being added silently. Surveyed 2026-08-23 across the nine consuming repositories in
-  this estate: none of them parses the record. Every one runs `aahp doctor . --json`
-  as a CI step and consumes the exit code, so the field additions reach no parser, and
-  the exit code is NOT unchanged, and the corrected measurement is this: across the ten
-  consuming repositories (not nine), `aahp doctor . --json` went from exit 0 under 3.10.0
-  to exit 1 in EIGHT of them, caused by the new `verify-workflow` gate. That is why the
-  gate ships reporting-only by default in this release, behind `verifyWorkflow.enforce`;
-  with the default, all ten are back to exit 0. (each evaluates between 1 and 6
-  gates, so none reaches the zero-evaluated branch).
+  being added silently. A consumer that runs `aahp doctor . --json` as a CI step and
+  reads only the exit code is not affected by the field additions. The exit code itself
+  is NOT unchanged: blocking on the new `verify-workflow` gate would move existing
+  consumers from exit 0 to exit 1 on a workflow they had not touched, which is why the
+  gate ships reporting-only by default in this release, behind `verifyWorkflow.enforce`.
   New in 2: `gateOutcomes` gives each gate a refined `outcome` plus the human
   `reason`, `evaluated` counts the gates that produced a verdict, and `total` the
   gates defined. The refinement is the point. Version 1's `skip` stood for four
@@ -441,8 +486,8 @@ independently of the npm version).
   `--json` exited 0 with every gate `skip`, because the JSON branch returned above the
   zero-gate test. The machine-readable path is the one a CI tick and a dashboard
   consume, so it was the wrong half to leave green. The verdict is now computed once
-  and used by both paths. Measured against the nine consuming repositories: each runs
-  at least one applicable gate, so none changes exit code.
+  and used by both paths. A repository in which at least one gate runs keeps its exit
+  code.
 
 - **`aahp verify` Layer 4 no longer reports a trust register it could not read as
   clean.** `aahp_trust_expired` printed nothing both when no entry was expired and
@@ -450,11 +495,9 @@ independently of the npm version).
   `No expired 'verified' trust entries.` A register whose header no longer names a
   `Status` column, or which holds no table this reader recognises, is now reported as
   `TTL was NOT evaluated`, and a clean result carries the number of entries checked.
-  This is not hypothetical: measured 2026-08-23 across the nine consuming
-  repositories, SIX have a `TRUST.md` in which this reader sees zero decidable rows,
-  and in one of them the register is a real, populated `Verified Properties` table
-  with an `Expires` column and no `Status` column, holding a row eight days past its
-  expiry, reported as clean. Layer 4 remains ADVISORY: it still increments no failure
+  This is not hypothetical: a real, populated register headed `Verified Properties`,
+  with an `Expires` column and no `Status` column, held a row eight days past its
+  expiry and was reported as clean. Layer 4 remains ADVISORY: it still increments no failure
   count and still cannot fail a build. Whether an expired TTL should ever block is an
   owner decision and is deliberately not taken here.
 
@@ -463,17 +506,13 @@ independently of the npm version).
   `MANIFEST.last_session` records one agent for the most recent session across the whole
   handoff set rather than per entry, and a handoff set stripped of every provenance line
   passes lint, `verify --level ci` and `doctor` at exit 0, reproduced on a throwaway
-  repository. Enforcement was measured before being rejected: across the nine consumer
-  repositories in this estate, `LOG.md` holds 100 entries and 8 carry all five fields, so
-  a retroactive MUST would redden 9 of 9 over history none of them can change, and this
-  repository's own LOG would fail it too. The section now states the conditional version,
-  which is what is true. ADR-021.
+  repository. Enforcement was rejected because a retroactive MUST would fail adopters on
+  history none of them can change, and this repository's own LOG would fail it too. The
+  section now states the conditional version, which is what is true. ADR-022.
 
 - `README.md` names `assets/governance/aahp-govern.yml` as the source to copy for the
   governance workflow. It named a `.github/workflows/` path that does not exist in this
-  repository and is not in the published package. Measured across the nine consumer
-  checkouts: 9 of 9 carry `.github/workflows/aahp-verify.yml`, so the neighbouring copy
-  instruction was right, and 0 of 9 carry an `aahp-govern.yml` at all. The two mentions
+  repository and is not in the published package. The two mentions
   that correctly describe the DESTINATION are unchanged. Issue #74.
 
 - `aahp doctor`'s `handoff-set` gate now names the check it did not run. Its pass
@@ -516,8 +555,8 @@ independently of the npm version).
 
 - `engines.node` is now `>=22`, was `>=18`. Node 18 reached end of life on 2025-04-30
   and Node 20 on 2026-04-30, so the package publicly claimed support for a runtime it
-  could not have security-patched, and every repository in the estate inherited that
-  claim on install. Consumers still running Node 18 or 20 will now see an engine
+  could not have security-patched, and every consumer inherited that claim on
+  install. Consumers still running Node 18 or 20 will now see an engine
   warning, which is the intended signal.
 
 - CI validates on Node 22 instead of Node 20, in `ci.yml`, `aahp-manifest.yml` and the
@@ -627,9 +666,8 @@ independently of the npm version).
 - Committed handoff state and one gate comment no longer name private repositories. This
   repository is public and ships to npm, so naming consumer repositories here published
   a list of them to anyone reading the repository or the package. The `What is Missing`
-  row keeps every measurement it carried (six consumers report `bypassable`, three
-  report `enforced`, and one of the six is only partly corrected) and now states those
-  counts without identities. `.ai/handoff/` is outside the `files` list, so the row
+  row keeps its measurements and now states them without identities (the figures
+  themselves were removed on 2026-09-28, see CONSTITUTION.md). `.ai/handoff/` is outside the `files` list, so the row
   itself never reached the npm tarball, but `scripts/` is inside it, so the comment in
   `check-runtime-support.mjs` would have shipped on the next publish.
 
@@ -637,10 +675,10 @@ independently of the npm version).
   names had already been removed once, from the propagation playbook, and returned in a
   later change because nothing gated them. The rule matches on shape rather than on a
   list, so the gate does not itself have to enumerate the repositories it protects - but
-  the shape it matches is one naming prefix, and that covers seven of the eight consumer
-  identities the row was built from, not all eight. The eighth is a bare product word
-  carrying no shared prefix, and nothing in its shape separates it from ordinary prose.
-  Measured on this branch: a tracked file reintroducing that eighth name leaves the gate
+  the shape it matches is one naming prefix, and not every name the row was built from
+  carries it. One is a bare product word with no shared prefix, and nothing in its shape
+  separates it from ordinary prose.
+  Measured on this branch: a tracked file reintroducing that name leaves the gate
   reporting `Forbidden patterns OK: 2 rule(s), no matches.` and exiting 0, while the same
   file carrying a prefixed name exits 1. It was removed from the row by hand and stays
   out by review, not by the gate. Adding it to the rule is not the fix, because the rule
@@ -784,12 +822,12 @@ independently of the npm version).
   **Adopters: there is no single command that fixes this for you, and the instruction
   this entry first carried did not reach a single repository.** It said to run
   `aahp init --gates --force`. That command writes exactly one file,
-  `.github/workflows/aahp-govern.yml`. Measured across the ten repositories that consume
-  this package: ten have `.github/workflows/aahp-verify.yml` and **none** has
-  `aahp-govern.yml`. Running it there would have added a second, unreferenced workflow
-  beside the one that actually gates the branch, and left the vulnerable line untouched
-  in the file that runs. `scripts/install-hooks.sh` reaches as few: none of the ten has
-  vendored hooks under `scripts/hooks/`, so there is no installed copy for it to refresh.
+  `.github/workflows/aahp-govern.yml`. In a repository whose gate is
+  `.github/workflows/aahp-verify.yml`, running it would have added a second,
+  unreferenced workflow beside the one that actually gates the branch, and left the
+  vulnerable line untouched in the file that runs. `scripts/install-hooks.sh` does not
+  help where no hooks are vendored under `scripts/hooks/`: there is no installed copy
+  for it to refresh.
   What those repositories actually contain is a hand-held `aahp-verify.yml` that AAHP
   does not generate, so AAHP cannot rewrite it. Fix it by editing that file yourself:
 
@@ -822,8 +860,8 @@ independently of the npm version).
   the reason the comment above them has always given. Escaping the quantifier alone
   produced `_KEY=['\"]\?[a-zA-Z0-9]`, which matches a `*_KEY=` assignment of ANY value
   from one character upwards - a detector for the SHAPE of a configuration line, not for
-  a secret, in files that are full of prose describing configuration. Measured against
-  the consumer estate before the floor was added: one repository went from
+  a secret, in files that are full of prose describing configuration. Measured before
+  the floor was added: one consumer repository went from
   `All checks passed` exit 0 to `1 violation(s) found` exit 1 on a single committed line,
   and that line was a handoff note DESCRIBING a security finding - it quoted the
   placeholder `API_KEY=your-api-key-here` from an `.env.example` the note was arguing
@@ -832,9 +870,9 @@ independently of the npm version).
   with nothing in the repository changed. On a twelve-line prose corpus the unfloored
   spelling scored eight false positives; with the floor it scores zero and still matches
   all eight entries of a real-secret corpus, including the segmented modern formats
-  (`sk-proj-`, `github_pat_`, `rk_live_`) that a floor anchored at `=` would miss. Across
-  all eleven handoff directories available to measure, no pattern fires either before or
-  after, so no adopter changes state on upgrade. What the floor deliberately gives up is
+  (`sk-proj-`, `github_pat_`, `rk_live_`) that a floor anchored at `=` would miss. In
+  the handoff directories available to measure, no pattern fired either before or after,
+  so no adopter was expected to change state on upgrade. What the floor deliberately gives up is
   a short real password such as `DB_PASSWORD=hunter2`: nothing distinguishes that from
   prose by inspection, and a repository that needs it should run a purpose-built entropy
   scanner. A secret finding now prints `path:line` rather than a bare filename, and never
@@ -1365,8 +1403,8 @@ independently of the npm version).
 ### Added
 
 - Reviewed, exact-value, expiring PII email allowlist (`pii-allowlist.json`),
-  MANIFEST-indexed so it cannot suppress secrets. Shipped to npm as part of the 3.2.0
-  release.
+  MANIFEST-indexed so it cannot suppress secrets. First published to npm in 3.2.1
+  (3.2.0 was tagged but never published).
 
 ## [3.0.5] - 2026-06-20
 
@@ -1387,19 +1425,19 @@ independently of the npm version).
 [3.10.0]: https://github.com/homeofe/AAHP/compare/v3.9.2...v3.10.0
 [3.9.2]: https://github.com/homeofe/AAHP/compare/v3.9.1...v3.9.2
 [3.9.1]: https://github.com/homeofe/AAHP/compare/v3.9.0...v3.9.1
-[3.9.0]: https://github.com/homeofe/AAHP/compare/v3.8.3...v3.9.0
-[3.8.3]: https://github.com/homeofe/AAHP/compare/v3.8.2...v3.8.3
-[3.8.2]: https://github.com/homeofe/AAHP/compare/v3.8.1...v3.8.2
+[3.9.0]: https://github.com/homeofe/AAHP/compare/v3.8.1...v3.9.0
+[3.8.3]: https://github.com/homeofe/AAHP/commit/038939ba7e86dbe268b5305444b7352b233eb23c
+[3.8.2]: https://github.com/homeofe/AAHP/commit/7b6e543a3e8a98968b8905de666c740cc5ef1149
 [3.8.1]: https://github.com/homeofe/AAHP/compare/v3.8.0...v3.8.1
 [3.8.0]: https://github.com/homeofe/AAHP/compare/v3.7.0...v3.8.0
 [3.7.0]: https://github.com/homeofe/AAHP/compare/v3.6.1...v3.7.0
 [3.6.1]: https://github.com/homeofe/AAHP/compare/v3.6.0...v3.6.1
 [3.6.0]: https://github.com/homeofe/AAHP/compare/v3.5.0...v3.6.0
 [3.5.0]: https://github.com/homeofe/AAHP/releases/tag/v3.5.0
-[3.4.0]: https://github.com/homeofe/AAHP/compare/v3.2.1...v3.4.0
-[3.3.0]: https://github.com/homeofe/AAHP/compare/v3.2.1...v3.3.0
+[3.4.0]: https://github.com/homeofe/AAHP/commit/b98d269d7f8d4bb9424c09e9135455ba2e9dcb47
+[3.3.0]: https://github.com/homeofe/AAHP/commit/f040bfbc4d049cd4b0a8e1923196ef6f1e75b9c3
 [3.2.1]: https://github.com/homeofe/AAHP/releases/tag/v3.2.1
 [3.2.0]: https://github.com/homeofe/AAHP/releases/tag/v3.2.0
-[3.1.0]: https://github.com/homeofe/AAHP/compare/v3.0.5...v3.1.0
+[3.1.0]: https://github.com/homeofe/AAHP/commit/0aff4206a296798afbe37e60a3e156d243a3356d
 [3.0.5]: https://github.com/homeofe/AAHP/releases/tag/v3.0.5
 

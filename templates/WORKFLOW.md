@@ -10,12 +10,13 @@
 
 | Agent | Model | Role | Responsibility |
 |-------|-------|------|---------------|
-| 🔭 Researcher | e.g. perplexity/sonar-pro | Researcher | OSS research, compliance checks, doc review |
-| 🏛️ Architect | e.g. claude-opus | Architect | System design, ADRs, interface definitions |
-| ⚙️ Implementer | e.g. claude-sonnet | Implementer | Code, tests, refactoring, commits |
-| 💬 Reviewer | e.g. gpt-4 / second model | Reviewer | Second opinion, edge cases, security review |
+| Researcher | e.g. a research-capable model | Researcher | OSS research, compliance checks, doc review |
+| Architect | e.g. a strong reasoning model | Architect | System design, ADRs, interface definitions |
+| Implementer | e.g. a coding model | Implementer | Code, tests, refactoring, commits |
+| Reviewer | e.g. a second model from another provider | Reviewer | Second opinion, edge cases, security review |
 
-> Adapt roles and models to your team's tooling.
+> Adapt roles and models to your team's tooling. Keep vendor model IDs in the harness
+> configuration, not here.
 
 ---
 
@@ -31,7 +32,7 @@ Does:    Researches relevant OSS libraries / APIs / compliance requirements
          Checks whether similar solutions already exist in the project
          Clarifies ambiguities in the task
 
-Writes:  handoff/LOG.md -research findings + sources + recommendation
+Writes:  handoff/LOG.md: research findings + sources + recommendation
 ```
 
 ### Phase 2: Architecture Decision
@@ -45,7 +46,7 @@ Does:    Decides architecture and interface design
          Chooses branch name
          Defines exactly what the Implementer should build
 
-Writes:  handoff/LOG.md -ADR (Architecture Decision Record)
+Writes:  handoff/LOG.md: ADR (Architecture Decision Record)
 
 ADR format:
   ## [DATE] ADR: [Feature Name]
@@ -68,9 +69,9 @@ Does:    Creates feature branch: git checkout -b feat/<scope>-<name>
          Commits and pushes branch
 
 Branch convention:
-  feat/<scope>-<short-name>    → new feature
-  fix/<scope>-<short-name>     → bug fix
-  docs/<scope>-<name>          → documentation only
+  feat/<scope>-<short-name>    -> new feature
+  fix/<scope>-<short-name>     -> bug fix
+  docs/<scope>-<name>          -> documentation only
 
 Commit format:
   feat(scope): description [AAHP-auto]
@@ -82,13 +83,13 @@ Commit format:
 ```
 All agents review the completed code on the feature branch.
 
-Architect  → "Does the implementation match the ADR?"
-Reviewer   → "What could be more robust, simpler, or more secure?"
-Researcher → "Were all task items fulfilled? Any compliance concerns?"
+Architect  -> "Does the implementation match the ADR?"
+Reviewer   -> "What could be more robust, simpler, or more secure?"
+Researcher -> "Were all task items fulfilled? Any compliance concerns?"
 
 Outcome:
-  - Minor fixes → Implementer fixes in the same branch
-  - Larger issues → New tasks added to NEXT_ACTIONS.md / DASHBOARD.md
+  - Minor fixes -> Implementer fixes in the same branch
+  - Larger issues -> New tasks added to MANIFEST tasks / NEXT_ACTIONS.md
   - Everything documented in LOG.md
 ```
 
@@ -110,22 +111,27 @@ Emits:   An advisory verdict SHIP / NEEDS_CHANGES / BLOCK, before the terminal
 ### Phase 5: Completion & Handoff
 
 ```
-DASHBOARD.md:    Update build status, test counts, pipeline state
-STATUS.md:       Update changed system state (Verified / Assumed / Unknown)
-LOG.md:          Append session summary
+STATUS.md:       Rewrite the current-state snapshot (Verified / Assumed / Unknown);
+                 it is not a log, history goes to LOG.md
+LOG.md:          Add the session entry at the top (run `aahp archive` when it holds
+                 more than 10 entries)
 NEXT_ACTIONS.md: Check off completed task, add newly discovered tasks
+MANIFEST.json:   Regenerate: aahp manifest . --agent <id> --phase <phase>
+                 (it rewrites the index and keeps the task graph you edited)
+Verify:          aahp verify . --level prepush; do not commit on failure
+DASHBOARD.md:    Optional human display surface only (derived, not authoritative)
 
 Git:     Branch pushed, PR-ready
-Notify:  Project owner -only on fully completed tasks, not phase transitions
-         Format: "✅ [Feature] done -Branch: feat/... -Tests: X/X"
+Notify:  Project owner, only on fully completed tasks, not phase transitions
+         Format: "[Feature] done. Branch: feat/... Tests: X/X"
 ```
 
 ---
 
 ## Autonomy Boundaries
 
-| Allowed ✅ | Not allowed ❌ |
-|-----------|--------------|
+| Allowed | Not allowed |
+|---------|-------------|
 | Write & commit code | Push directly to `main` |
 | Write & run tests | Install new dependencies without documenting |
 | Push feature branches | Write secrets or PII into source |

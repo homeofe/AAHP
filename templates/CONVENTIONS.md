@@ -35,10 +35,10 @@ We are human beings and will remain human beings. Tasks are delegated to AI only
 ## Branching & Commits
 
 ```
-feat/<scope>-<short-name>    → new feature
-fix/<scope>-<short-name>     → bug fix
-docs/<scope>-<short-name>    → documentation only
-refactor/<scope>-<name>      → no behaviour change
+feat/<scope>-<short-name>    -> new feature
+fix/<scope>-<short-name>     -> bug fix
+docs/<scope>-<short-name>    -> documentation only
+refactor/<scope>-<name>      -> no behaviour change
 
 Commit format:
   feat(scope): add description [AAHP-auto]

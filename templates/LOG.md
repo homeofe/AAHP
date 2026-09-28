@@ -3,6 +3,7 @@
 > **Append-only.** Never delete or edit past entries.
 > Every agent session adds a new entry at the top.
 > This file is the immutable history of decisions and work done.
+> Entries may be redacted for confidentiality (an internal name or figure replaced by a neutral description); they are never rewritten otherwise.
 
 ---
 
@@ -11,7 +12,7 @@
 <!--
   The blockquote at the top of the first entry is the provenance block from
   README Section 2.4. It is a CONVENTION: no AAHP gate reads these five fields,
-  and no gate fails when an entry omits them (ADR-021). It ships here so that a
+  and no gate fails when an entry omits them (ADR-022). It ships here so that a
   repository following the template produces entries that can be traced back to
   an agent and a session. If your project needs that trail to be complete, you
   have to enforce it yourself; AAHP will not tell you when it is missing.

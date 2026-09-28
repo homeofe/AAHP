@@ -26,10 +26,10 @@ The project motto (Asimov's Three Laws) and the **do no damage** principle live 
 ## Branching & Commits
 
 ```
-feat/<scope>-<short-name>    → new feature
-fix/<scope>-<short-name>     → bug fix
-docs/<scope>-<short-name>    → documentation only
-refactor/<scope>-<name>      → no behaviour change
+feat/<scope>-<short-name>    -> new feature
+fix/<scope>-<short-name>     -> bug fix
+docs/<scope>-<short-name>    -> documentation only
+refactor/<scope>-<name>      -> no behaviour change
 
 Commit format:
   feat(scope): description [AAHP-auto]
@@ -39,21 +39,26 @@ Commit format:
 
 ## File Organization
 
-- `templates/` -Handoff file templates (users copy these to their projects)
-- `scripts/` -CLI tools (aahp-manifest.sh, aahp-migrate-v2.sh, lint-handoff.sh)
-- `scripts/_aahp-lib.sh` -Shared functions (sourced, not executed directly)
-- `schema/` -JSON Schema files for validation
-- `.ai/handoff/` -AAHP's own handoff files (dogfooding)
+- `templates/`: handoff file templates (users copy these to their projects)
+- `scripts/`: CLI tools (aahp-manifest.sh, aahp-migrate-v2.sh, lint-handoff.sh) and gates
+- `scripts/_aahp-lib.sh`: shared functions (sourced, not executed directly)
+- `schema/`: JSON Schema files for validation
+- `docs/`: the decision log (`docs/adr/`) and the governance-gate reference
+- `.ai/handoff/`: AAHP's own handoff files (dogfooding)
 
 ## Architecture Principles
 
-- **Bash-Only Core:** No Node.js or Python required for core tooling
+- **Node + bash core, no npm runtime dependencies:** the CLI and `aahp manifest` need
+  Node.js; `aahp archive` and lint's checksum comparison need Python 3; nothing needs a
+  package from the registry at run time (CONSTITUTION rule 1)
 - **Portable:** Scripts must work on Linux, macOS, and Git Bash (Windows)
 - **Git-Native:** Everything lives in the repo, recoverable via git history
 - **Layered Protocol:** Core files (STATUS, NEXT_ACTIONS, LOG) are mandatory; extended files (DASHBOARD, TRUST, CONVENTIONS, WORKFLOW) are optional
 
 ## Testing
 
+- Run the one bats file that covers a change: `node scripts/run-bats.mjs tests/<file>.bats`.
+  CI runs the full suite and is the verdict; `tests/README.md` has the suite's rules
 - Test scripts manually against a temp `.ai/handoff/` directory before committing
 - Validate generated JSON with `python3 -c "import json; json.load(open(...))"` or `jq .`
 - Run `lint-handoff.sh` against the project's own `.ai/handoff/` directory
@@ -76,7 +81,7 @@ section written as task boxes.
 
 ## Formatting
 
-- **No em dashes (U+2014)**: Never use Unicode em dashes in any file (code, docs, comments, templates). They break shell scripts, cause encoding errors on Windows (cp1252), and corrupt JSON. Use a regular hyphen (`-`) instead.
+- **ASCII only (CONSTITUTION rule 7)**: no character above U+007F in any tracked file (code, docs, comments, templates, handoff files). Emoji and arrows cannot be encoded in a Windows cp1252 console; the em dash (U+2014) is banned with them. Use `-`, `->`, a colon or brackets instead.
 
 ## What Agents Must NOT Do
 

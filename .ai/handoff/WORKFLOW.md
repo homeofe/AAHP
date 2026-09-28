@@ -107,6 +107,7 @@ STATUS.md:       Rewrite current state (not append)
 LOG.md:          Append session summary (rotate if entry count exceeds 10)
 NEXT_ACTIONS.md: Check off completed task, add newly discovered tasks
 MANIFEST.json:   Regenerate (aahp manifest) with accurate quick_context
+Verify:          aahp verify . --level prepush; do not commit on failure
 DASHBOARD.md:    Optional human display surface only (derived, not authoritative)
 
 Git:     Branch pushed, PR-ready

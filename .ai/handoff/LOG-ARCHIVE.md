@@ -8,6 +8,35 @@
 
 ---
 
+## [2026-08-31] codex: v3.12.0 release candidate after green PR #110
+
+**Agent:** codex
+**Phase:** implementation
+**Branch:** codex/release-3.12.0
+**Tasks:** owner-authorized v3.12.0 publication
+
+### What was done
+
+- Squash-merged PR #110 after every GitHub check passed, including `aahp-verify`, both
+  Node runtime legs, CodeQL, the handoff workflows, and supply-chain-guard v6.0.8.
+- Closed Dependabot PR #109 as superseded by #110 after its exact CodeQL pins landed.
+- Prepared the 3.12.0 changelog and package metadata. Also repaired the root version in
+  `package-lock.json`, which had remained at 3.10.0 through the 3.11.0 release.
+- A Linux dry-run compiled the PII validator before packing and exposed that the broad
+  `scripts/` package inclusion admitted `__pycache__` bytecode. Added explicit git and
+  npm package exclusions; the release package must be probed with a generated cache file
+  present before tagging.
+- Added a 30-day `verified` TRUST row for the scanner, anchored to GitHub Actions run
+  33385292682 and the independent clean Linux scan. Required-check status remains a
+  separate owner decision.
+
+### Release boundary
+
+- The tag must be created only after the release PR is green and merged. Tagging triggers
+  both OIDC npm publication and the GitHub Release; neither is performed from this branch.
+
+---
+
 ## [2026-08-31] codex: PR #109 integrated; scanner advanced to v6.0.8
 
 **Agent:** codex

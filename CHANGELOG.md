@@ -83,6 +83,11 @@ independently of the npm version).
 - `aahp init --gates` writes `.github/workflows/aahp-verify.yml` (the adopter copy) when
   `.ai/handoff/` exists, and otherwise prints how to add it later. It never writes it into
   the `@elvatis_com/aahp` package itself.
+- `scripts/validate-json-schema.mjs`: validates JSON files against a JSON Schema with ajv
+  (draft 2020-12, ajv-formats full mode, ajv's default strict mode). Exit 0 valid, 1
+  invalid (every error with its JSON Pointer), 2 could not evaluate. It ships in the
+  package; adopters who want it declare `ajv` and `ajv-formats` themselves (README Section
+  2.1).
 
 ### Changed
 
@@ -162,6 +167,11 @@ independently of the npm version).
 - `aahp init --gates` never writes or replaces `aahp-verify.yml` in the
   `@elvatis_com/aahp` package itself (the pinned-dep gate's `self`), even with `--force`:
   the package's own verify workflow runs the gate from the working tree.
+- CI validates `MANIFEST.json`, `aahp.config.json` and `aahp.config.example.json` with
+  `scripts/validate-json-schema.mjs` instead of `npx --no-install ajv-cli validate`; the
+  verdicts match ajv-cli 5.0.0 on a 27-case corpus, and no workflow runs npx any more.
+- The release ceremony in CONTRIBUTING.md has an approval step for the `npm-publish`
+  deployment.
 
 ### Removed
 
@@ -173,6 +183,10 @@ independently of the npm version).
   "the counter increments automatically".
 - An internal hostname and figures about other repositories, from README, ADRs, CHANGELOG
   history and `.ai/handoff/LOG.md` (redacted in place).
+- The `ajv-cli` devDependency (5.0.0, whose dependencies include the deprecated
+  `glob@7.2.3` and `inflight@1.0.6`) and the `fast-json-patch` override, which nothing
+  depends on any more. `ajv` 8.20.0 is a direct exact devDependency; the locked closure
+  goes from 28 to 8 packages and `npm ci` prints no deprecation warning.
 
 ### Fixed
 
@@ -289,6 +303,10 @@ independently of the npm version).
   and `release`, and consults the historical threat catalog (`refresh-catalog: true`).
 - The required `lint-and-validate` check installs with `npm ci --ignore-scripts` and uses
   a pinned, sha256-verified ShellCheck v0.9.0 instead of apt.
+- The npm publish job runs in the `npm-publish` GitHub environment (required reviewer,
+  deployment policy `v*` tags only, no admin bypass), so a release reaches npm only after
+  an explicit approval. `tests/workflow-hardening.bats` fails when the binding is removed
+  or renamed (ADR-019, amended 2026-09-28).
 
 ## [3.12.0] - 2026-08-31
 

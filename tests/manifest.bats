@@ -687,30 +687,18 @@ EOF
     # templates/MANIFEST.json shipped example tasks with "created": "[ISO-8601]".
     # The generator carries tasks over verbatim, so every fresh adopter got a
     # manifest that fails the schema (format date-time) while verify and doctor
-    # stayed green.
-    local entry
-    entry="$(cd "$AAHP_ROOT" && node -e '
-try {
-  const path = require("path");
-  const pkg = require("ajv-cli/package.json");
-  const dir = path.dirname(require.resolve("ajv-cli/package.json"));
-  const bin = typeof pkg.bin === "string" ? pkg.bin : pkg.bin.ajv;
-  process.stdout.write(path.resolve(dir, bin));
-} catch (e) {}
-' 2>/dev/null)"
-    # Not a skip: ajv-cli is a pinned devDependency, so a missing one is a broken
-    # install, and skipping here would hide exactly the regression this guards.
-    [ -n "$entry" ] || { echo "ajv-cli is not installed; run npm ci"; false; }
-
+    # stayed green. Validated with CI's ajv validator; not a skip when ajv is
+    # missing: it is a pinned devDependency, so the validator exits 2 on a
+    # broken install and that fails here, instead of hiding the regression.
     run node "$AAHP_ROOT/bin/aahp.js" init "$TEST_TMPDIR"
     [ "$status" -eq 0 ]
     run bash "$SCRIPTS_DIR/aahp-manifest.sh" "$TEST_TMPDIR" --quiet
     [ "$status" -eq 0 ]
-    run node "$entry" validate --spec=draft2020 -c ajv-formats \
-        -s "$AAHP_ROOT/schema/aahp-manifest.schema.json" \
-        -d "$TEST_TMPDIR/.ai/handoff/MANIFEST.json"
+    run node "$SCRIPTS_DIR/validate-json-schema.mjs" \
+        "$AAHP_ROOT/schema/aahp-manifest.schema.json" \
+        "$TEST_TMPDIR/.ai/handoff/MANIFEST.json"
     [ "$status" -eq 0 ] || { echo "$output"; false; }
-    [[ "$output" == *"valid"* ]]
+    [[ "$output" == *"MANIFEST.json valid"* ]]
 }
 
 # --- File indexing -------------------------------------------

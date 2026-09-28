@@ -108,10 +108,25 @@ and the grammar is machine-checked by `aahp doctor` / `check:changelog-format`.
    line, and `MANIFEST.json` (`aahp manifest`).
 5. `npm test` (bats green), commit, and push the `vX.Y.Z` tag at a commit that is on
    `main`, with `X.Y.Z` equal to the `package.json` version. CI runs the gates and the
-   supply-chain scan on the tagged commit, then publishes to npm (OIDC trusted
-   publishing) and creates the GitHub Release, which links to `CHANGELOG.md`. The publish
-   job refuses a tag that is not exactly `vX.Y.Z`, does not match `package.json`, or is
-   not reachable from `main` ([ADR-019](docs/adr/ADR-019.md)).
+   supply-chain scan on the tagged commit. The publish job refuses a tag that is not
+   exactly `vX.Y.Z`, does not match `package.json`, or is not reachable from `main`
+   ([ADR-019](docs/adr/ADR-019.md)).
+6. Approve the deployment. The publish job runs in the `npm-publish` environment, which
+   requires the owner's approval and admits `v*` tags only, so the run stops at that job
+   with "Waiting" until a reviewer opens the run in the Actions tab, chooses
+   **Review deployments**, selects `npm-publish` and approves. Only then do its steps
+   run: the release-ref check from step 5, then the publish to npm (OIDC trusted
+   publishing); after it succeeds, the release job creates the GitHub Release, which
+   links to `CHANGELOG.md`. A rejected or never-approved deployment publishes nothing.
 
 Step 4 is the same handoff update every change makes; a release additionally cuts a
 changelog entry and a version tag.
+
+**The npm side of the binding (package owner only).** The trusted-publisher entry for
+`@elvatis_com/aahp` on npmjs.com (package settings, **Trusted publisher**) can
+additionally name the environment: set its Environment name field to `npm-publish`.
+npm treats that field as optional, so publishing works whether or not it is set; once
+it is set, npm refuses a publish token minted by any job that did not run in that
+environment, so a workflow edited to drop the approval step cannot publish either.
+Only a package owner can change it, and this repository cannot read whether it is set
+([ADR-019](docs/adr/ADR-019.md)).

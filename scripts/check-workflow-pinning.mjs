@@ -21,6 +21,15 @@
 //
 // The packages are pinned now. This gate is why they stay pinned.
 //
+// Since 2026-09-28 those two steps run `node scripts/validate-json-schema.mjs`
+// on the exact-pinned `ajv` and `ajv-formats` libraries instead of
+// `npx --no-install ajv-cli`, whose dependency tree is deprecated. No workflow
+// here runs npx any more, so rules B, C and J below assert nothing about this
+// repository's own steps today (the summary line counts 0 npx invocations);
+// they stay for the next npx line and for the shipped templates, and
+// tests/workflow-pinning.bats proves each on fixtures. The exact pin of what the
+// validator loads is asserted by tests/assert-pinning-gate-wired.mjs.
+//
 // THE ROOT CAUSE IS NOT "SOMEONE FORGOT TO PIN"
 // ---------------------------------------------------------------------------
 // The repository already knew how to do this correctly and already documented
@@ -86,14 +95,15 @@
 //      network guard, because the metadata request still goes out; rule J is
 //      that guard. `npm exec` is rejected outright because the same flag there
 //      does nothing on the npm versions CI runs (Node 22 ships npm 10).
-//      MUTATION: drop `--no-install` from either validate step, or rewrite one
-//      as `npm exec --no-install -- ajv-cli ...`.
+//      MUTATION: add an `npx` step without `--no-install`, or one written as
+//      `npm exec --no-install -- <pkg> ...` (the fixtures in
+//      tests/workflow-pinning.bats do both).
 //
 //   C. Every package a workflow executes with `npx --no-install` is declared in
 //      package.json at an EXACT version. A range is reproducible through the
 //      lockfile but not reviewable in the diff, which is where a supply-chain
-//      change has to be visible. MUTATION: change "ajv-cli": "5.0.0" to
-//      "^5.0.0", or remove the declaration entirely.
+//      change has to be visible. MUTATION: declare the npx target at a range
+//      such as "^1.2.3", or remove the declaration entirely.
 //      Asked only of workflows that run HERE, not of the shipped templates:
 //      a template runs against a CONSUMER package.json, so this one is not
 //      the file that declares its npx target.
@@ -154,9 +164,10 @@
 //      MUTATION: change one SHA or one version comment in aahp-govern.yml, or
 //      give it an action no workflow in .github/workflows uses.
 //
-//   I. Every `npm ci` carries `--ignore-scripts`. The locked closure is 28
-//      packages with no install script (measured 2026-09-28, `hasInstallScript`
-//      in package-lock.json), so the flag costs nothing today, and it keeps the
+//   I. Every `npm ci` carries `--ignore-scripts`. The locked closure is 8
+//      packages with no install script (measured 2026-09-28 after ajv-cli was
+//      replaced, `hasInstallScript` in package-lock.json; 28 before, none with
+//      one either), so the flag costs nothing today, and it keeps the
 //      next dependency that ships one from running it inside a required check
 //      or a job that can mint a publish token without a reviewed change here.
 //      MUTATION: drop `--ignore-scripts` from any `npm ci`.

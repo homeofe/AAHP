@@ -44,21 +44,6 @@ make_pkg() {
 EOF
 }
 
-# Resolve ajv-cli's JS entrypoint via Node module resolution rooted at the repo.
-# Prints an absolute path, or nothing when ajv-cli is not installed (the schema
-# test then skips rather than triggering a network install).
-_ajv_entry() {
-    ( cd "$AAHP_ROOT" && node -e '
-try {
-  const path = require("path");
-  const pkg = require("ajv-cli/package.json");
-  const dir = path.dirname(require.resolve("ajv-cli/package.json"));
-  const bin = typeof pkg.bin === "string" ? pkg.bin : pkg.bin.ajv;
-  process.stdout.write(path.resolve(dir, bin));
-} catch (e) {}
-' ) 2>/dev/null
-}
-
 # --- scaffolding: writes config + govern script + both workflows -------------
 
 @test "init --gates scaffolds config, govern script, and both workflows" {
@@ -144,15 +129,13 @@ try {
     run node "$AAHP_BIN" init --gates "$TEST_TMPDIR"
     [ "$status" -eq 0 ]
 
-    local entry
-    entry="$(_ajv_entry)"
-    require_tool "ajv-cli not installed" [ -n "$entry" ]
-
-    run node "$entry" validate --spec=draft2020 -c ajv-formats \
-        -s "$AAHP_ROOT/schema/aahp-config.schema.json" \
-        -d "$TEST_TMPDIR/aahp.config.json"
-    [ "$status" -eq 0 ]
-    [[ "$output" == *"valid"* ]]
+    # CI's ajv validator. It exits 2 when ajv is not installed, so a broken
+    # install is red here rather than a skip; it never installs anything.
+    run node "$SCRIPTS_DIR/validate-json-schema.mjs" \
+        "$AAHP_ROOT/schema/aahp-config.schema.json" \
+        "$TEST_TMPDIR/aahp.config.json"
+    [ "$status" -eq 0 ] || { echo "$output"; false; }
+    [[ "$output" == *"aahp.config.json valid"* ]]
 }
 
 @test "init --gates config carries only forbiddenPatterns + docLinks + pinnedDep (plus schema ref)" {

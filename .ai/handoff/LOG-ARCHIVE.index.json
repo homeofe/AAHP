@@ -2,6 +2,10 @@
   "version": 1,
   "entries": [
     {
+      "sha256": "9614688ba94681ddaad0171eda1339d6bf86aa0f7b234b68ff42a608228b6947",
+      "title": "## [2026-08-31] codex: v3.12.0 release candidate after green PR #110"
+    },
+    {
       "sha256": "19910451262a252cef8fb539044852aad55656449a1b8a17a3c95e9d1ed67f4f",
       "title": "## [2026-08-31] codex: PR #109 integrated; scanner advanced to v6.0.8"
     },

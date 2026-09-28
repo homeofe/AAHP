@@ -7,6 +7,30 @@
 
 ---
 
+## [2026-09-28] claude-opus-5.5: protected publish environment, ajv-cli replaced
+
+**Agent:** claude-opus-5.5
+**Phase:** implementation
+**Branch:** fix/release-env-and-ajv
+**Tasks:** owner decision of 2026-09-28 to close every open item before 4.0.0
+
+### What was done
+
+- Created the `npm-publish` environment (owner as required reviewer, `v*` tags only,
+  no admin bypass) and bound the publish job to it; the release job stays unbound.
+- Replaced ajv-cli with `scripts/validate-json-schema.mjs` on the ajv library; the
+  locked closure shrinks from 28 to 8 packages and the two deprecation warnings are gone.
+- A fix agent implemented this in a separate worktree; the integrator set
+  `can_admins_bypass` to false after reading the environment back, and wrote the
+  handoff state.
+
+### Decision
+
+- No admin bypass: the only reviewer is the owner, so a bypass would only add a way
+  around the approval.
+
+---
+
 ## [2026-09-28] claude-opus-5.5: owner follow-up decisions
 
 **Agent:** claude-opus-5.5
@@ -257,32 +281,3 @@
   branches: one CI run, one handoff entry, no back-to-back merges, and the three
   lockfile bumps would otherwise have needed sequential rebases. Same pattern as
   #109 / #110. Layer 2 was not weakened.
-
----
-
-## [2026-08-31] codex: v3.12.0 release candidate after green PR #110
-
-**Agent:** codex
-**Phase:** implementation
-**Branch:** codex/release-3.12.0
-**Tasks:** owner-authorized v3.12.0 publication
-
-### What was done
-
-- Squash-merged PR #110 after every GitHub check passed, including `aahp-verify`, both
-  Node runtime legs, CodeQL, the handoff workflows, and supply-chain-guard v6.0.8.
-- Closed Dependabot PR #109 as superseded by #110 after its exact CodeQL pins landed.
-- Prepared the 3.12.0 changelog and package metadata. Also repaired the root version in
-  `package-lock.json`, which had remained at 3.10.0 through the 3.11.0 release.
-- A Linux dry-run compiled the PII validator before packing and exposed that the broad
-  `scripts/` package inclusion admitted `__pycache__` bytecode. Added explicit git and
-  npm package exclusions; the release package must be probed with a generated cache file
-  present before tagging.
-- Added a 30-day `verified` TRUST row for the scanner, anchored to GitHub Actions run
-  33385292682 and the independent clean Linux scan. Required-check status remains a
-  separate owner decision.
-
-### Release boundary
-
-- The tag must be created only after the release PR is green and merged. Tagging triggers
-  both OIDC npm publication and the GitHub Release; neither is performed from this branch.

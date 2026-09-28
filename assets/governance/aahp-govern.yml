@@ -12,7 +12,7 @@
 # drift, a workspace layout, an edited or reordered install step, a cache
 # failure - that line asked registry.npmjs.org about the UNSCOPED public name
 # `aahp`, and whether it then refused depended on npm's flag handling: the `npx`
-# binary stops (measured on npm 10 to 12, README ADR-013), while
+# binary stops (measured on npm 10 to 12, AAHP docs/adr/ADR-013.md), while
 # `npm exec --no-install` on npm 10 and 11 downloads and runs whatever comes
 # back, which would have run as this repository's governance gate. The published package
 # is `@elvatis_com/aahp`; the unscoped name belongs to nobody, so the fallback did

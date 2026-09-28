@@ -171,7 +171,7 @@ if (!ci?.jobs?.["runtime-matrix"]) {
   );
 }
 
-// ─── 3. One definition of a release, and no unrecorded path to npm publish ───
+// --- 3. One definition of a release, and no unrecorded path to npm publish ---
 //
 // ci.yml has two release-critical jobs. `publish` runs `npm publish --access
 // public --provenance` with `id-token: write`; `release` creates the GitHub
@@ -467,7 +467,7 @@ if (publishOperands !== null && releaseOperandCount !== 1) problems.push(publish
 for (const operand of publishOperands === null ? [] : unrecorded) problems.push(unrecordedOperandMessage(operand));
 for (const operand of publishOperands === null ? [] : recordedButGone) problems.push(recordedOperandGoneMessage(operand));
 
-// ─── 4. Job-level elevations that the top-level `contents: read` must not swallow ───
+// --- 4. Job-level elevations that the top-level `contents: read` must not swallow ---
 //
 // `scope` is the permission, `needed_by` names what stops working without it,
 // so a future reader who wants to delete the block can see what it costs before
@@ -542,7 +542,7 @@ for (const req of REQUIRED_JOB_PERMISSIONS) {
   }
 }
 
-// ─── 5. The code record and the DOCUMENTED record say the same thing ────────
+// --- 5. The code record and the DOCUMENTED record say the same thing --------
 //
 // Section 3 holds ci.yml to PUBLISH_CONDITIONS_BEYOND_RELEASE, a literal list in
 // this test file. That is one record. The other is docs/adr/ADR-019.md, which

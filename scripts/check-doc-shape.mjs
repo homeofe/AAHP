@@ -2,7 +2,7 @@
 // check-doc-shape.mjs - two assertions about the documents an adopter lands on:
 // a repo-relative path this repository tells you to use resolves against this
 // repository, and the setup heading a newcomer needs is present and comes before
-// the rationale material. Config-driven under "docPaths"; a clean no-op when the
+// the specification material. Config-driven under "docPaths"; a clean no-op when the
 // key is absent.
 //
 // WHY THIS GATE EXISTS
@@ -12,11 +12,11 @@
 // which that gate structurally cannot see. So README.md told adopters to copy
 // `.github/workflows/aahp-govern.yml`, a file that does not exist in this
 // repository and is not in the published package - the file is at
-// `assets/governance/aahp-govern.yml` - and every gate stayed green. Measured
-// across the nine consumer checkouts in this estate: 9 of 9 carry
-// .github/workflows/aahp-verify.yml, so the neighbouring copy instruction was
-// right, and 0 of 9 carry an aahp-govern.yml at all. Reported at
-// https://github.com/homeofe/AAHP/issues/74. See ADR-023.
+// `assets/governance/aahp-govern.yml` - and every gate stayed green. An adopter
+// following the neighbouring instruction for .github/workflows/aahp-verify.yml
+// got a working file; the aahp-govern.yml instruction could not be followed at
+// all, and nothing said so. Reported at
+// https://github.com/homeofe/AAHP/issues/74. See docs/adr/ADR-023.md.
 //
 // WHY THIS IS NOT A BLANKET RULE OVER EVERY BACKTICKED SPAN
 // ---------------------------------------------------------------------------
@@ -60,7 +60,7 @@
 //     "requiredHeadings": [
 //       { "id": "setup", "file": "README.md",
 //         "pattern": "^#{1,3} .*(Install|Quickstart)",
-//         "before": "^## 7\\. Architectural Decision Log" }
+//         "before": "^## 1\\. " }
 //     ]
 //   }
 //

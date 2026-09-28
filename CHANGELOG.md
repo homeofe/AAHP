@@ -71,6 +71,12 @@ independently of the npm version).
   CONSTITUTION section on what public handoff state and documentation may record.
 - CONTRIBUTING.md documents the handoff update every pull request needs, Dependabot
   handling, how to run tests, and the release ceremony (moved from README Section 11).
+- `scripts/check-ascii.mjs` (`npm run check:ascii`, part of `npm run check`): every
+  tracked text file must be pure ASCII, with no code point above U+007F and no byte order
+  mark. It reports `file:line:column` and the code point, exempts binary files (NUL byte),
+  and exits 1 on a finding and 2 when it cannot assess. This replaces the U+2014-only rule
+  as the enforcement of the ASCII-only invariant; a cp1252 Windows console cannot encode
+  characters such as U+2705 or U+2192.
 
 ### Changed
 
@@ -128,6 +134,14 @@ independently of the npm version).
   verify workflow.
 - Consumers are told to pin an exact version; the advice to float a caret range is
   withdrawn.
+- `scripts/lint-handoff.sh` prints ASCII status marks, `OK`, `x` and `!`, instead of check
+  marks, crosses and a warning sign; the final line is `All checks passed.`. Anything that
+  matched the old glyphs must match the message text instead.
+- `aahp migrate` reports only the optional `<!-- SECTION: summary -->` marker, the one
+  AAHP reads (README 1.2).
+- The release-journal generator's refusal messages cite docs/adr/ADR-004.md in the AAHP
+  repository instead of a README section that no longer exists.
+- The `no-estate-counts` forbidden pattern reads every tracked file, not only Markdown.
 
 ### Removed
 
@@ -233,6 +247,11 @@ independently of the npm version).
 - README: the pinned-dep gate reports skip until `pinnedDep` is configured, and
   MANIFEST.json fields are split into generated and hand-maintained.
 - `scripts/ROLLOUT.md` describes what `propagate.sh` actually vendors and installs.
+- The manifest truncation test places multi-byte characters across the real cut point and
+  compares exactly, so a byte-based or UTF-16-unit cut now fails it; before, both passed.
+- A JSON Schema section number in a comment of `scripts/aahp-schema.mjs` no longer reads
+  as a private IPv4 address to the supply-chain scanner.
+- Provenance tests cite ADR-022 and doc-shape tests ADR-023, matching the decision log.
 
 ### Security
 

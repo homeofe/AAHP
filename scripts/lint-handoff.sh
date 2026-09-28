@@ -124,7 +124,7 @@ if [ ! -d "$HANDOFF_DIR" ]; then
     exit 1
 fi
 
-# ─── Check 1: Prompt Injection Patterns ──────────────────────
+# --- Check 1: Prompt Injection Patterns ----------------------
 
 echo -e "${GREEN}[1/7]${NC} Checking for prompt injection patterns..."
 
@@ -149,10 +149,8 @@ INJECTION_PATTERNS=(
 # "ignore all previous" as "ignore all previous" while a byte grep does not.
 #
 # .aiignore is excluded, exactly as check 2 excludes it: the shipped template
-# LISTS these phrases as patterns (templates/.aiignore). Measured on 2026-09-28
-# across 13 local handoff directories that use AAHP: scanning every file flags
-# .aiignore in all 13 and nothing else, so including it would turn every
-# adopter red on its own ignore list.
+# LISTS these phrases as patterns (templates/.aiignore), so scanning it would
+# turn every adopter that keeps the shipped template red on its own ignore list.
 #
 # Decoding needs an interpreter (python, else node). With neither, the raw scan
 # still runs and the summary says the decoded scan did not; a JSON file that
@@ -258,7 +256,7 @@ for pattern in "${INJECTION_PATTERNS[@]}"; do
         scan_failed "Injection scan for '$pattern'" "$SCAN_RC" "$SCAN_TMP/grep.err"
     fi
     if [ -n "$MATCHES" ]; then
-        echo -e "  ${RED}✗ Injection pattern '$pattern' found in:${NC}"
+        echo -e "  ${RED}x Injection pattern '$pattern' found in:${NC}"
         while IFS= read -r hit; do
             echo "    $(display_path "$hit")"
         done <<< "$MATCHES"
@@ -267,10 +265,10 @@ for pattern in "${INJECTION_PATTERNS[@]}"; do
 done
 
 if [ "$VIOLATIONS" -eq "$INJECTION_START" ]; then
-    echo -e "  ${GREEN}✓ No injection patterns found.${NC}"
+    echo -e "  ${GREEN}OK No injection patterns found.${NC}"
 fi
 
-# ─── Check 2: Secrets & API Keys ─────────────────────────────
+# --- Check 2: Secrets & API Keys -----------------------------
 
 echo -e "${GREEN}[2/7]${NC} Checking for secrets and API keys..."
 
@@ -301,14 +299,13 @@ echo -e "${GREEN}[2/7]${NC} Checking for secrets and API keys..."
 # detector, it is a detector for the SHAPE of a configuration line, and handoff
 # files are full of prose that describes configuration.
 #
-# Measured, before the floor was added, against the ten handoff directories in
-# this project's own consumer estate: one consumer went from `All checks passed`
-# exit 0 to `1 violation(s) found` exit 1 on a single committed line, and that
-# line was a note DESCRIBING a security finding - it quoted the placeholder
-# `API_KEY=your-api-key-here` from an .env.example the note was arguing against.
-# Its `aahp verify --level ci` gate is REQUIRED and branch-protected, so the
-# upgrade alone would have turned a green protected branch red with nothing in
-# that repository changed. On a twelve-line prose corpus the unfloored spelling
+# The failure mode before the floor was added: a single committed handoff note
+# DESCRIBING a security finding, which quoted the placeholder
+# `API_KEY=your-api-key-here` from an .env.example it was arguing against,
+# turned `All checks passed` exit 0 into `1 violation(s) found` exit 1. Where
+# `aahp verify --level ci` is a required, branch-protected check, an AAHP
+# upgrade alone would turn a green protected branch red with nothing in that
+# repository changed. On a twelve-line prose corpus the unfloored spelling
 # scored EIGHT false positives; with the floor it scores zero and still matches
 # all eight entries of a real-secret corpus. A control that fails ordinary use
 # gets switched off, and it takes the nine prefix patterns down with it.
@@ -377,7 +374,7 @@ for pattern in "${SECRET_PATTERNS[@]}"; do
         SECRET_SCAN_FAILED=1
     fi
     if [ -n "$MATCHES" ]; then
-        echo -e "  ${RED}✗ Possible secret pattern '$pattern' found in:${NC}"
+        echo -e "  ${RED}x Possible secret pattern '$pattern' found in:${NC}"
         while IFS= read -r hit; do
             echo "    $(display_path "$hit")"
         done <<< "$MATCHES"
@@ -386,7 +383,7 @@ for pattern in "${SECRET_PATTERNS[@]}"; do
 done
 
 if [ "$SECRET_FOUND" -eq 0 ] && [ "$SECRET_SCAN_FAILED" -eq 0 ]; then
-    echo -e "  ${GREEN}✓ No secrets detected.${NC}"
+    echo -e "  ${GREEN}OK No secrets detected.${NC}"
 else
     VIOLATIONS=$((VIOLATIONS + SECRET_FOUND))
 fi
@@ -511,7 +508,7 @@ elif [ "$PII_SCAN_FAILED" -eq 0 ]; then
     echo -e "  ${GREEN}OK No unapproved PII detected.${NC}"
 fi
 
-# ─── Check 4: MANIFEST.json Basic Validation ─────────────────
+# --- Check 4: MANIFEST.json Basic Validation -----------------
 
 echo -e "${GREEN}[4/7]${NC} Validating MANIFEST.json..."
 
@@ -519,7 +516,7 @@ echo -e "${GREEN}[4/7]${NC} Validating MANIFEST.json..."
 
 if [ -f "$HANDOFF_DIR/MANIFEST.json" ]; then
     if [ -z "$PYTHON_CMD" ]; then
-        echo -e "  ${YELLOW}⚠ Python not found. MANIFEST.json integrity NOT verified here.${NC}"
+        echo -e "  ${YELLOW}! Python not found. MANIFEST.json integrity NOT verified here.${NC}"
         echo "    The blocking check is 'aahp verify' Layer 1, which uses node or"
         echo "    python and FAILS outright when neither is available."
         # Deliberately a warning, not a violation: making it one would turn
@@ -627,11 +624,11 @@ PY
         CHECK4_RC=0
         CHECK4_OUT=$("$PYTHON_CMD" -c "$CHECK4_PY" "$HANDOFF_DIR" "${REQUIRED_FIELDS[*]}" "${AAHP_HANDOFF_FILES[*]}") || CHECK4_RC=$?
         if [ "$CHECK4_RC" -eq 4 ]; then
-            echo -e "  ${RED}✗ Invalid JSON.${NC}"
+            echo -e "  ${RED}x Invalid JSON.${NC}"
             printf '%s\n' "$CHECK4_OUT" | tr -d '\r'
             VIOLATIONS=$((VIOLATIONS + 1))
         elif [ "$CHECK4_RC" -eq 0 ] || { [ "$CHECK4_RC" -ge 65 ] && [ "$CHECK4_RC" -le 127 ]; }; then
-            echo -e "  ${GREEN}✓ Valid JSON.${NC}"
+            echo -e "  ${GREEN}OK Valid JSON.${NC}"
             printf '%s\n' "$CHECK4_OUT" | tr -d '\r'
             if [ "$CHECK4_RC" -ne 0 ]; then
                 VIOLATIONS=$((VIOLATIONS + CHECK4_RC - 64))
@@ -640,7 +637,7 @@ PY
             if [ -n "$CHECK4_OUT" ]; then
                 printf '%s\n' "$CHECK4_OUT" | tr -d '\r'
             fi
-            echo -e "  ${RED}✗ Could not verify indexed files (verifier exited $CHECK4_RC).${NC}"
+            echo -e "  ${RED}x Could not verify indexed files (verifier exited $CHECK4_RC).${NC}"
             echo "    Integrity is UNPROVEN. That counts as a violation, not a note."
             VIOLATIONS=$((VIOLATIONS + 1))
         fi
@@ -651,25 +648,25 @@ else
     # a yellow note and let the run end with "All checks passed", which made
     # the blocking aahp-lint job green on a repository whose manifest was
     # gone. aahp verify Layer 1 has always failed here; both gates now agree.
-    echo -e "  ${RED}✗ MANIFEST.json not found. Nothing about the handoff set is verified.${NC}"
+    echo -e "  ${RED}x MANIFEST.json not found. Nothing about the handoff set is verified.${NC}"
     echo "    Fix: generate it with /handoff (aahp manifest)."
     VIOLATIONS=$((VIOLATIONS + 1))
 fi
 
-# ─── Check 5: Stale HANDOFF.lock ─────────────────────────────
+# --- Check 5: Stale HANDOFF.lock -----------------------------
 
 echo -e "${GREEN}[5/7]${NC} Checking for stale HANDOFF.lock..."
 
 if [ -f "$HANDOFF_DIR/HANDOFF.lock" ]; then
-    echo -e "  ${RED}✗ HANDOFF.lock exists! Previous session may not have completed cleanly.${NC}"
+    echo -e "  ${RED}x HANDOFF.lock exists! Previous session may not have completed cleanly.${NC}"
     echo "    Review the lock file and delete it if the session is no longer active."
     cat "$HANDOFF_DIR/HANDOFF.lock" 2>/dev/null
     VIOLATIONS=$((VIOLATIONS + 1))
 else
-    echo -e "  ${GREEN}✓ No stale lock.${NC}"
+    echo -e "  ${GREEN}OK No stale lock.${NC}"
 fi
 
-# ─── Check 6: Parallel Agent Detection ────────────────────────
+# --- Check 6: Parallel Agent Detection ------------------------
 
 echo -e "${GREEN}[6/7]${NC} Checking for parallel agent sessions..."
 
@@ -682,21 +679,21 @@ if command -v git &>/dev/null && git -C "$PROJECT_ROOT" rev-parse --git-dir &>/d
     done < <(git -C "$PROJECT_ROOT" for-each-ref --format='%(refname:short)' refs/heads/)
 
     if [ ${#LOCK_BRANCHES[@]} -gt 1 ]; then
-        echo -e "  ${YELLOW}⚠ HANDOFF.lock found on multiple branches:${NC}"
+        echo -e "  ${YELLOW}! HANDOFF.lock found on multiple branches:${NC}"
         for b in "${LOCK_BRANCHES[@]}"; do
             echo "    - $b"
         done
         echo "  AAHP is designed for sequential handoff. Ensure agents are working in isolated branches."
     elif [ ${#LOCK_BRANCHES[@]} -eq 1 ]; then
-        echo -e "  ${YELLOW}⚠ Active session on branch: ${LOCK_BRANCHES[0]}${NC}"
+        echo -e "  ${YELLOW}! Active session on branch: ${LOCK_BRANCHES[0]}${NC}"
     else
-        echo -e "  ${GREEN}✓ No active sessions detected across branches.${NC}"
+        echo -e "  ${GREEN}OK No active sessions detected across branches.${NC}"
     fi
 else
-    echo -e "  ${YELLOW}⚠ Not a git repo. Skipping parallel agent check.${NC}"
+    echo -e "  ${YELLOW}! Not a git repo. Skipping parallel agent check.${NC}"
 fi
 
-# ─── Check 7: Git conflict markers ───────────────────────────
+# --- Check 7: Git conflict markers ---------------------------
 # Refuse clean status when markers remain (nested-marker damage).
 
 echo -e "${GREEN}[7/7]${NC} Checking for git conflict markers..."
@@ -736,8 +733,8 @@ else
     # startsWith, so eight angle brackets matched there and not here. Measured, then
     # aligned to node's predicate, because an indented marker is still a marker. The
     # `=======` alternative is gone: seven equals signs is a Markdown setext
-    # underline and a Python docstring header, and it flipped 2 of 48 real adopter
-    # roots red on files with no conflict in them.
+    # underline and a Python docstring header, and it turned real adopter roots
+    # red on files with no conflict in them.
     #
     # The file set matches the node gate: inside a git work tree, the tracked
     # files plus the untracked files git does not ignore, plus everything in the
@@ -766,7 +763,7 @@ else
         while IFS= read -r -d '' f; do
             if [ ! -f "$f" ] || [ -L "$f" ]; then continue; fi
             if tr -d '\r' < "$f" | LC_ALL=C grep -a -E '^[[:space:]]*(<<<<<<<|>>>>>>>)' -q; then
-                echo -e "  ${RED}✗ Conflict markers present in: $f${NC}"
+                echo -e "  ${RED}x Conflict markers present in: $f${NC}"
                 MARKER_FOUND=1
             fi
         done < "$MARKER_LIST"
@@ -778,11 +775,11 @@ fi
 if [ "$MARKER_RC" -eq 1 ]; then
     VIOLATIONS=$((VIOLATIONS + 1))
 elif [ "$MARKER_RC" -ne 0 ]; then
-    echo -e "  ${RED}✗ conflict-marker check could not run (exit $MARKER_RC).${NC}"
+    echo -e "  ${RED}x conflict-marker check could not run (exit $MARKER_RC).${NC}"
     VIOLATIONS=$((VIOLATIONS + 1))
 fi
 
-# ─── Summary ──────────────────────────────────────────────────
+# --- Summary --------------------------------------------------
 
 echo ""
 echo "========================================="
@@ -797,7 +794,7 @@ if [ "$VIOLATIONS" -eq 0 ] && { [ "$INTEGRITY_UNVERIFIED" -eq 1 ] || [ "$JSON_DE
     echo "========================================="
     exit 0
 elif [ "$VIOLATIONS" -eq 0 ]; then
-    echo -e "  ${GREEN}All checks passed. ✓${NC}"
+    echo -e "  ${GREEN}All checks passed.${NC}"
     echo "========================================="
     exit 0
 else

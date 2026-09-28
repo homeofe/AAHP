@@ -33,8 +33,8 @@
       "id": "no-estate-counts",
       "pattern": "\\b(?:\\d+|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|twenty|thirty)(?:-[a-z]+)?\\s+(?:consum(?:er|ing)|adopting|downstream)\\s+(?:repositor(?:y|ies)|repos?|checkouts?|manifests?|projects?)\\b|\\b(?:in|across|of)\\s+(?:this|the|our)\\s+(?:consumer\\s+)?estate\\b",
       "flags": "gim",
-      "include": ["*.md"],
-      "message": "a count or posture figure about other repositories (for example 'nine consuming repositories', 'across this estate'); this repository is PUBLIC and ships to npm. State the rule, not the state of the repositories that consume it. See CONSTITUTION.md, 'What public handoff state and documentation may record'."
+      "include": ["*"],
+      "message": "a count or posture figure about other repositories (a number of consuming, adopting or downstream repositories, or 'across this' / 'in the' followed by 'estate'); this repository is PUBLIC and ships to npm. State the rule, not the state of the repositories that consume it. See CONSTITUTION.md, 'What public handoff state and documentation may record'."
     }
   ],
   "docSync": [

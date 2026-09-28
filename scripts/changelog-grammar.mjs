@@ -36,7 +36,7 @@ export function cmpVersion(a, b) {
 // emphasis/bullets/code, collapsed whitespace, non-ASCII dropped, pipes escaped,
 // capped at 120 chars - ready to drop into a Markdown table cell.
 export function parseReleases(changelogText) {
-  const lines = changelogText.replace(/^﻿/, "").split(/\r?\n/);
+  const lines = changelogText.replace(/^\uFEFF/, "").split(/\r?\n/);
   const heads = [];
   lines.forEach((l, i) => {
     const m = l.match(RELEASE_RE);

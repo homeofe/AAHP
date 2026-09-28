@@ -211,9 +211,10 @@
 // DELIBERATELY NOT IN bin/aahp.js CHECK_GATES
 // ---------------------------------------------------------------------------
 // The gates in CHECK_GATES run against an arbitrary CONSUMER project via
-// `aahp check`. Turning this one on there would go red on the first run in most
-// consumer repositories, which is a fleet-wide breaking change and an owner
-// decision, not a side effect of fixing this repository. It is wired into
+// `aahp check`. Turning this one on there would go red on the first run in any
+// consumer that does not pin its workflows this way, which is a breaking change
+// for consumers and an owner decision, not a side effect of fixing this
+// repository. It is wired into
 // `npm run check` instead, which is what the required lint-and-validate job
 // executes, and tests/workflow-pinning.bats asserts that wiring so the gate
 // cannot quietly stop being invoked.

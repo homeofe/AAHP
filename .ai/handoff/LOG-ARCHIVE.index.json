@@ -2,6 +2,10 @@
   "version": 1,
   "entries": [
     {
+      "sha256": "b02b0255d40e6aff18b2b9cb281849e5263a127d1ff31ec412345e99ef9d7657",
+      "title": "## [2026-08-31] codex: [redacted] review and Windows/Linux hardening"
+    },
+    {
       "sha256": "c1733cc2e660900dd5c6a7a0798832f322bd27bb420ac8f9c75122d7923e732d",
       "title": "## [2026-07-26] claude-opus-5: Layer 1 catches deleted indexed files; lint raises its own exit code"
     },

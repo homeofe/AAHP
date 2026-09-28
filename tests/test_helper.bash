@@ -8,7 +8,7 @@ export AAHP_ROOT
 SCRIPTS_DIR="$AAHP_ROOT/scripts"
 export SCRIPTS_DIR
 
-# ─── Cross-platform path helper ─────────────────────────────
+# --- Cross-platform path helper -----------------------------
 # On Windows Git Bash, mktemp returns /tmp/... which native tools (python, node)
 # cannot resolve. We create temp dirs under USERPROFILE on Windows and use
 # cygpath -m to get a mixed-mode path (C:/Users/...) that works everywhere.
@@ -122,7 +122,7 @@ require_tool() {
     skip "$reason"
 }
 
-# ─── Setup / Teardown ────────────────────────────────────────
+# --- Setup / Teardown ----------------------------------------
 
 setup() {
     _aahp_isolate_git
@@ -157,7 +157,7 @@ teardown() {
     fi
 }
 
-# ─── Fixture Helpers ─────────────────────────────────────────
+# --- Fixture Helpers -----------------------------------------
 
 # Create a minimal STATUS.md
 create_status_md() {

@@ -49,7 +49,7 @@ const fail = [];
 
 // R8: UTF-8 without BOM.
 if (raw.charCodeAt(0) === 0xfeff) fail.push("R8: file starts with a UTF-8 BOM - save as UTF-8 without a BOM.");
-const lines = raw.replace(/^﻿/, "").split(/\r?\n/);
+const lines = raw.replace(/^\uFEFF/, "").split(/\r?\n/);
 
 const today = new Date().toISOString().slice(0, 10);
 

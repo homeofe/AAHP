@@ -19,7 +19,7 @@ install_workflow() {
     cp "$FIXTURES/$1" "$TEST_TMPDIR/.github/workflows/aahp-verify.yml"
 }
 
-# ─── enforced: the gate cannot be skipped ────────────────────────────────────
+# --- enforced: the gate cannot be skipped ------------------------------------
 
 @test "enforced: the vendored-script canonical shape exits 0" {
     install_workflow enforced-canonical.yml
@@ -37,7 +37,7 @@ install_workflow() {
 # NOT shippable: its `node bin/aahp.js` exists only in an AAHP checkout.
 
 @test "adopter: the SHIPPED assets/governance/aahp-verify.yml passes its own gate" {
-    # The real bytes, not a fixture: this is the file with the whole fleet behind it.
+    # The real bytes, not a fixture: this is the file every adopter copies.
     mkdir -p "$TEST_TMPDIR/.github/workflows"
     cp "$AAHP_ROOT/assets/governance/aahp-verify.yml" "$TEST_TMPDIR/.github/workflows/aahp-verify.yml"
     run node "$GATE" "$TEST_TMPDIR" --json
@@ -160,7 +160,7 @@ EOF
     [[ "$output" != *"job-conditional"* ]]
 }
 
-# ─── bypassable: each way the check can go green having run nothing ──────────
+# --- bypassable: each way the check can go green having run nothing ----------
 
 @test "bypassable: a step-level if: on the gate step is reported, exit 1" {
     install_workflow bypass-step-conditional.yml
@@ -201,7 +201,7 @@ EOF
     [[ "$output" == *"AAHP_SKIP_VERIFY"* ]]
 }
 
-# ─── neither: absent, and undecidable ────────────────────────────────────────
+# --- neither: absent, and undecidable ----------------------------------------
 
 @test "absent: a repo with no workflows exits 0 and says there is no backstop" {
     run node "$GATE" "$TEST_TMPDIR"
@@ -243,7 +243,7 @@ EOF
     [ "$status" -eq 0 ]
 }
 
-# ─── the reader must agree with real YAML ────────────────────────────────────
+# --- the reader must agree with real YAML ------------------------------------
 
 @test "the zero-dependency YAML reader agrees with a real parser on every workflow" {
     # See tests/assert-workflow-parser-parity.mjs: the gate ships without a YAML
@@ -288,7 +288,7 @@ parity_copy() {
     [[ "$output" == *"nothing was compared"* ]]
 }
 
-# ─── wiring: doctor must actually run it ─────────────────────────────────────
+# --- wiring: doctor must actually run it -------------------------------------
 
 @test "doctor: reports verify-workflow pass on the canonical workflow" {
     install_workflow enforced-canonical.yml
@@ -301,15 +301,15 @@ parity_copy() {
 #
 # This gate's finding is correct wherever it fires, and it fires on a deliberate,
 # documented configuration that no pull-request author can clear from their own
-# pull request. Measured before the default was chosen: `aahp doctor . --json`, the
-# exact command every consuming repository runs as a CI step, went from exit 0 under
-# the published 3.10.0 to exit 1 in 8 of 10 of them with nothing changed on their
-# side, and neither `--governance` nor `check: { only: [] }` could switch it off.
+# pull request. Before the default was chosen, `aahp doctor . --json`, the exact
+# command a consuming repository runs as a CI step, went from exit 0 under the
+# published 3.10.0 to exit 1 with nothing changed on that repository's side, and
+# neither `--governance` nor `check: { only: [] }` could switch it off.
 #
 # So it reports by default and blocks on opt-in, the same shape trustTtl.enforce
 # uses. The two tests below are a pair on purpose: the first alone would also pass
 # for an implementation that ignores the config and fails everywhere, which is the
-# version that reds the fleet.
+# version that turns every consumer red.
 
 @test "doctor: FAILS the conformance record when the gate can be skipped AND enforce is on" {
     install_workflow bypass-step-conditional.yml
@@ -365,7 +365,7 @@ EOF
     [[ "$output" == *'"verify-workflow": "pass"'* ]]
 }
 
-# ─── the governance workflow, which this gate used to skip entirely ──────────
+# --- the governance workflow, which this gate used to skip entirely ----------
 #
 # assets/governance/aahp-govern.yml is what `aahp init --gates` writes into an
 # adopting repository, and a governance-only adopter has no aahp-verify.yml at

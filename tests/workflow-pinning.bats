@@ -73,7 +73,7 @@ write_good_fixture() {
     write_good_workflow
 }
 
-# ─── The load-bearing assertion: the real repository ────────────────────────
+# --- The load-bearing assertion: the real repository ------------------------
 
 @test "the real repository satisfies every pinning rule" {
     run node "$GATE" "$AAHP_ROOT"
@@ -127,7 +127,7 @@ write_good_fixture() {
     [[ "$output" == *"Workflow pinning OK"* ]]
 }
 
-# ─── Rule A: no project-level npm install in a workflow ─────────────────────
+# --- Rule A: no project-level npm install in a workflow ---------------------
 
 @test "reintroducing the original unpinned install is red" {
     write_good_fixture
@@ -182,7 +182,7 @@ EOF
     [[ "$output" == *"installs packages outside the committed lockfile"* ]]
 }
 
-# ─── Rule B: npx must carry --no-install ────────────────────────────────────
+# --- Rule B: npx must carry --no-install ------------------------------------
 
 @test "dropping --no-install from npx is red" {
     write_good_fixture
@@ -382,7 +382,7 @@ EOF
     [[ "$output" == *"Workflow pinning OK"* ]]
 }
 
-# ─── Rule C: what npx executes must be declared here, at an exact version ───
+# --- Rule C: what npx executes must be declared here, at an exact version ---
 
 @test "executing a package this repository does not declare is red" {
     write_pkg '"something-else": "1.2.3"'
@@ -428,7 +428,7 @@ EOF
     [ "$status" -eq 0 ]
 }
 
-# ─── Rule D: the lockfile pins every direct dependency by hash ──────────────
+# --- Rule D: the lockfile pins every direct dependency by hash --------------
 
 @test "a lockfile entry without an integrity hash is red" {
     write_pkg
@@ -452,7 +452,7 @@ EOF
     [[ "$output" == *"has no lockfile entry"* ]]
 }
 
-# ─── Exit 2: what the gate could not evaluate is never reported as clean ────
+# --- Exit 2: what the gate could not evaluate is never reported as clean ----
 
 @test "no workflow directory exits 2, not 0" {
     write_pkg
@@ -493,7 +493,7 @@ EOF
     [[ "$output" == *"no package-lock.json"* ]]
 }
 
-# ─── Rules E and F: what a workflow USES, and what moves those pins ─────────
+# --- Rules E and F: what a workflow USES, and what moves those pins ---------
 #
 # Rules A to D read `step.run`, the shell text of a step. Every `uses:` step has
 # no `run:` at all, so before rule E this gate skipped all of them - and exited 0
@@ -792,7 +792,7 @@ EOF
     [[ "$output" != *"Template pins: not asserted"* ]]
 }
 
-# ─── Rule F: the pins have to be able to move ───────────────────────────────
+# --- Rule F: the pins have to be able to move -------------------------------
 
 @test "pinned actions with no Dependabot configuration at all is red" {
     write_pkg
@@ -972,7 +972,7 @@ EOF
     [[ "$output" == *"updates[1] (npm)"* ]]
 }
 
-# ─── The finding itself, read off the repository rather than through the gate ─
+# --- The finding itself, read off the repository rather than through the gate -
 
 @test "every action reference in this repository is a commit SHA with a version" {
     # Deliberately NOT a restatement of "the real repository satisfies every
@@ -1366,7 +1366,7 @@ EOF
     [ "$output" = "version: 0.0.0" ]
 }
 
-# ─── The gate has to actually RUN ───────────────────────────────────────────
+# --- The gate has to actually RUN -------------------------------------------
 
 @test "the gate is wired into the aggregate check chain" {
     # A gate that exists but is never invoked protects nothing. The assertion

@@ -576,6 +576,10 @@ scaffold_drifted_handoff() {
         const r = JSON.parse(s);
         if (r.gates["handoff-set"] !== "pass") process.exit(2);
         if (r.gates["manifest-schema"] !== "pass") process.exit(3);
+        // The --json record carries the same caveat the text output prints
+        // (bin/aahp.js, the LIMIT OF THIS WORDING note above gateHandoffSet).
+        const why = r.gateOutcomes && r.gateOutcomes["handoff-set"] && r.gateOutcomes["handoff-set"].reason;
+        if (!/content not compared; aahp verify Layer 1 owns checksum integrity/.test(why || "")) process.exit(4);
       });
     '
 }

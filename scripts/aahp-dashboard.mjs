@@ -8,7 +8,7 @@
 //      release table from CHANGELOG.md into a target file, using the SINGLE
 //      grammar in changelog-grammar.mjs (so generator and validator cannot
 //      diverge). Opt-in on purpose: .ai/handoff/LOG.md is the append-only agent
-//      journal, NOT a release journal (README ADR-004), so AAHP does not
+//      journal, NOT a release journal (docs/adr/ADR-004.md), so AAHP does not
 //      configure log generation and its journal is left untouched.
 //
 //      The target is REQUIRED and may never be the agent journal. It used to
@@ -81,7 +81,7 @@ const norm = (s) => s.replace(/\r/g, ""); // CRLF-agnostic (Windows working tree
 // --- where the release journal may be written ---------------------------------
 
 // The agent journal and its archive. Overwriting any of them destroys session
-// history that exists nowhere else (README ADR-004 and section 2.9).
+// history that exists nowhere else (docs/adr/ADR-004.md and README section 2.9).
 const REFUSED_TARGETS = [".ai/handoff/LOG.md", ".ai/handoff/LOG-ARCHIVE.md", ".ai/handoff/LOG-ARCHIVE.index.json"];
 
 // Same file? Compared case-insensitively on the resolved path (Windows and
@@ -105,7 +105,8 @@ function resolveLogTarget(logCfg) {
     return {
       error:
         "generate.log.target is not set. It used to default to .ai/handoff/LOG.md, the append-only " +
-        "agent journal, which this generator must never overwrite (README ADR-004). Set " +
+        "agent journal, which this generator must never overwrite (ADR-004, docs/adr/ADR-004.md " +
+        "in the AAHP repository). Set " +
         'generate.log.target to a separate file, for example "docs/RELEASES.md".',
     };
   }
@@ -115,7 +116,8 @@ function resolveLogTarget(logCfg) {
     return {
       error:
         `generate.log.target "${rel}" is ${hit}, part of the append-only agent journal, and this ` +
-        "generator overwrites its target, so it refuses to write there (README ADR-004). Point " +
+        "generator overwrites its target, so it refuses to write there (ADR-004, " +
+        "docs/adr/ADR-004.md in the AAHP repository). Point " +
         'generate.log.target at a separate file, for example "docs/RELEASES.md".',
     };
   }

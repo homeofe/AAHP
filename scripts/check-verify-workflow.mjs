@@ -556,7 +556,7 @@ export function auditDoc(doc, file) {
 //
 // SCOPE, and why it is narrower than it looks. This runs only for jobs that host
 // NO verify step. Where `aahp verify` and `aahp doctor` sit in the same job -
-// the shape of every consumer measured on 2026-08-23, 8 of 9 of which run
+// the shape of the shipped assets/governance/aahp-verify.yml, which runs
 // `aahp doctor . --json` immediately after the verify step - that job's
 // skippability is already decided above, and a second verdict over the same
 // `if:` would double-report one condition. The uncovered case is therefore

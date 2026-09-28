@@ -10,7 +10,7 @@ teardown() {
     teardown
 }
 
-# ─── Basic migration ────────────────────────────────────────
+# --- Basic migration ----------------------------------------
 
 @test "creates MANIFEST.json from v1 handoff files" {
     # Set up a v1-style handoff directory (has .md files but no MANIFEST.json)
@@ -89,7 +89,7 @@ teardown() {
     [[ "$manifest_content" == *"Migrated from AAHP v1"* ]]
 }
 
-# ─── Missing handoff directory ───────────────────────────────
+# --- Missing handoff directory -------------------------------
 
 @test "handles missing handoff directory" {
     local empty_dir
@@ -107,7 +107,7 @@ teardown() {
     rm -rf "$empty_dir"
 }
 
-# ─── Re-migration prompt ────────────────────────────────────
+# --- Re-migration prompt ------------------------------------
 
 @test "prompts before overwriting existing MANIFEST.json" {
     create_full_handoff
@@ -179,7 +179,7 @@ teardown() {
     [[ "$manifest_content" == *'"agent": "migration-script"'* ]]
 }
 
-# ─── LOG.md entry check ─────────────────────────────────────
+# --- LOG.md entry check -------------------------------------
 
 @test "reports LOG.md entry count" {
     create_status_md
@@ -245,11 +245,36 @@ teardown() {
     [[ "$changed" != *"TTL"* ]]
     [[ "$todo" == *"NOT changed"* ]]
     [[ "$todo" == *"LOG.md has 12 entries"* ]]
-    [[ "$todo" == *"SECTION"* ]]
+    [[ "$todo" == *"Optional: add a <!-- SECTION: summary --> block to STATUS.md"* ]]
     [[ "$todo" == *"TTL"* ]]
 }
 
-# ─── .aiignore handling ─────────────────────────────────────
+# README section 1.2: the only marker AAHP reads is `summary`. Any other name is
+# a convention, so it must not satisfy the check, and a summary marker must.
+# Anchor: the summary-only grep in step 2 of scripts/aahp-migrate-v2.sh.
+
+@test "migrate: a STATUS.md with only other section markers still gets the optional summary note" {
+    printf '# Status\n\n<!-- SECTION: build -->\nBuild green.\n<!-- /SECTION: build -->\n' \
+        > "$TEST_TMPDIR/.ai/handoff/STATUS.md"
+    create_next_actions_md
+    run bash "$SCRIPTS_DIR/aahp-migrate-v2.sh" "$TEST_TMPDIR" </dev/null
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"No <!-- SECTION: summary --> marker"* ]]
+    [[ "$output" == *"Optional: add a <!-- SECTION: summary --> block to STATUS.md"* ]]
+}
+
+@test "migrate: a STATUS.md with a summary marker gets no marker note" {
+    printf '# Status\n\n<!-- SECTION: summary -->\nBuild green.\n<!-- /SECTION: summary -->\n' \
+        > "$TEST_TMPDIR/.ai/handoff/STATUS.md"
+    create_next_actions_md
+    run bash "$SCRIPTS_DIR/aahp-migrate-v2.sh" "$TEST_TMPDIR" </dev/null
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Summary marker present"* ]]
+    run grep -c "SECTION: summary --> block" <<<"$output"
+    [ "$output" = "0" ]
+}
+
+# --- .aiignore handling -------------------------------------
 
 @test "copies .aiignore template if missing" {
     create_status_md
@@ -282,7 +307,7 @@ teardown() {
     [[ "$output" == *".aiignore already present"* ]]
 }
 
-# ─── Migration summary ──────────────────────────────────────
+# --- Migration summary --------------------------------------
 
 @test "prints migration summary" {
     create_status_md

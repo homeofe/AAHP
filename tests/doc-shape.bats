@@ -1,6 +1,6 @@
 #!/usr/bin/env bats
 # doc-shape.bats - scripts/check-doc-shape.mjs, the gate behind issue #74 and
-# ADR-022: a repo-relative path a document tells you to use has to resolve
+# ADR-023: a repo-relative path a document tells you to use has to resolve
 # against this repository, and the setup heading a newcomer needs has to exist
 # and come before the rationale material.
 #
@@ -40,7 +40,7 @@ mkreadme() {
     git -C "$TEST_TMPDIR" add README.md
 }
 
-# ─── control: the gate is inert without configuration ───────────────────────
+# --- control: the gate is inert without configuration -----------------------
 
 @test "doc-shape: no docPaths config is a clean no-op" {
     seed_repo
@@ -56,7 +56,7 @@ EOF
     [[ "$output" == *"not configured"* ]]
 }
 
-# ─── assertion 1: a path presented as this repository's must resolve ─────────
+# --- assertion 1: a path presented as this repository's must resolve ---------
 
 @test "doc-shape CONTROL: a path that resolves passes" {
     seed_repo
@@ -139,7 +139,7 @@ EOF
     [ "$status" -eq 0 ]
 }
 
-# ─── the counted exception list ─────────────────────────────────────────────
+# --- the counted exception list ---------------------------------------------
 
 @test "doc-shape CONTROL: a declared exception with the recorded count passes and is reported" {
     seed_repo
@@ -255,7 +255,7 @@ EOF
     [[ "$output" == *"twice"* ]]
 }
 
-# ─── assertion 2: the required setup heading ────────────────────────────────
+# --- assertion 2: the required setup heading --------------------------------
 
 @test "doc-shape CONTROL: the required heading present before its anchor passes" {
     seed_repo
@@ -349,7 +349,7 @@ EOF
     [[ "$output" == *"no line matches that anchor"* ]]
 }
 
-# ─── could-not-assess is exit 2, and is never a pass ────────────────────────
+# --- could-not-assess is exit 2, and is never a pass ------------------------
 
 @test "doc-shape: outside a git work tree the gate exits 2" {
     # Same technique as gates-portability.bats: setup() git-inits TEST_TMPDIR and
@@ -397,7 +397,7 @@ EOF
     [[ "$output" == *"not tracked"* ]]
 }
 
-# ─── the gate has to actually RUN, and this repository has to pass it ───────
+# --- the gate has to actually RUN, and this repository has to pass it -------
 
 @test "doc-shape: the gate is wired into the aggregate check chain" {
     run node "$AAHP_ROOT/tests/assert-doc-shape-wired.mjs" "$AAHP_ROOT"

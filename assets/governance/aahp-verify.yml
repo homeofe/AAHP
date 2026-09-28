@@ -26,7 +26,7 @@
 # local resolution makes even `npx --no-install aahp` ask the public registry
 # about the UNSCOPED name `aahp`, which this project does not own, and
 # `npm exec --no-install` on npm 10 and 11 would download and run whatever it
-# returns (README ADR-013). The path below can only resolve to
+# returns (AAHP docs/adr/ADR-013.md). The path below can only resolve to
 # what `npm ci` placed from your committed lockfile; if it did not place it,
 # `node` exits non-zero and the job fails closed.
 #

@@ -100,6 +100,12 @@ EOF
     [ -f "$written" ]
     [ "$(grep -c '^permissions:' "$written")" -eq 1 ]
     [ "$(grep -c '^ *persist-credentials: false' "$written")" -eq 1 ]
+    # setup() creates .ai/handoff/, so init --gates also writes the verify
+    # workflow, and that copy is hardened too.
+    written="$TEST_TMPDIR/.github/workflows/aahp-verify.yml"
+    [ -f "$written" ]
+    [ "$(grep -c '^permissions:' "$written")" -eq 1 ]
+    [ "$(grep -c '^ *persist-credentials: false' "$written")" -eq 1 ]
 }
 
 @test "the baseline fixture passes, so every mutation below starts from green" {

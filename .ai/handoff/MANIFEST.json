@@ -3,42 +3,42 @@
   "project": "AAHP",
   "last_session": {
     "agent": "claude-opus-5.5",
-    "session_id": "cli-1790574972",
-    "timestamp": "2026-09-28T05:56:12Z",
-    "commit": "aa17c1f",
+    "session_id": "cli-1790579690",
+    "timestamp": "2026-09-28T07:14:50Z",
+    "commit": "21a2ac7",
     "phase": "implementation",
     "duration_minutes": 0
   },
   "files": {
     "STATUS.md": {
-      "checksum": "sha256:0c56ae5b2b3b14df90d0f38bcae3393c82c2f4e3aa3518bb357b3a5856fff4d1",
-      "updated": "2026-09-28T05:56:12Z",
-      "lines": 137,
-      "summary": "Working state: audit fix programme in progress; this change is full ASCII (branch fix/full-ascii), the last workstream; with it the audit fix..."
+      "checksum": "sha256:f8a7fb9ea373abfde105e042f9fb387530b0ed51e833bc43dfad8862f85b500b",
+      "updated": "2026-09-28T07:14:48Z",
+      "lines": 128,
+      "summary": "Working state: audit fix programme in progress; this change implements the owner's follow-up decisions (branch fix/owner-decisions-followup)"
     },
     "NEXT_ACTIONS.md": {
-      "checksum": "sha256:b366571ee5e5cb0b56dbc74ad22414461c70323d36e55ccb8160c66837c0b0d8",
-      "updated": "2026-09-28T05:48:19Z",
-      "lines": 100,
-      "summary": "Every tracked text file is ASCII, enforced by `check:ascii` in `npm run check`."
+      "checksum": "sha256:5994dc01132fde542c4590109fc0119825fcc92a577b94f0b11608e4ce4dc85b",
+      "updated": "2026-09-28T07:11:04Z",
+      "lines": 94,
+      "summary": "`init --gates` scaffolds `pinnedDep` and the adopter verify workflow; lint's PII check reads JSON values."
     },
     "LOG.md": {
-      "checksum": "sha256:fa5a4a712631ab243ec93cf729e280abca73abee791a9ce4a398cb7be3413d15",
-      "updated": "2026-09-28T05:48:20Z",
-      "lines": 289,
-      "summary": "Latest entry: [2026-09-28] claude-opus-5.5: full ASCII and remaining redaction (audit fix programme, 8 of 8)"
+      "checksum": "sha256:dd534d05105e7aa7fe4f57fa4f4a6d34c05b39ef6fcc24cbe9be50d578de1828",
+      "updated": "2026-09-28T07:11:04Z",
+      "lines": 288,
+      "summary": "Latest entry: [2026-09-28] claude-opus-5.5: owner follow-up decisions"
     },
     "LOG-ARCHIVE.md": {
-      "checksum": "sha256:83bb3faa7d4e6167eeae8db55c8a46fa9dff90caa0713e228be6e8c25d7af156",
-      "updated": "2026-09-28T05:48:20Z",
-      "lines": 449,
-      "summary": "Newest archived entry: [2026-08-31] codex: [redacted] review and Windows/Linux hardening"
+      "checksum": "sha256:dab1c6e167a9d00bf20dd682e226b99f3d9bb312885fa3b4a937573c4c8675f0",
+      "updated": "2026-09-28T07:11:04Z",
+      "lines": 478,
+      "summary": "Newest archived entry: [2026-08-31] codex: PR #109 integrated; scanner advanced to v6.0.8"
     },
     "LOG-ARCHIVE.index.json": {
-      "checksum": "sha256:855c3c7b0c31ef9c27368582b3981ee09160c9bc9d8396b63f7f9de51a621f7f",
-      "updated": "2026-09-28T05:48:20Z",
-      "lines": 73,
-      "summary": "LOG archive index: 17 entries."
+      "checksum": "sha256:1abbc732e583df32cd74732abe4815f6765d1a511740c2f43d3e3df2ffa89c97",
+      "updated": "2026-09-28T07:11:04Z",
+      "lines": 77,
+      "summary": "LOG archive index: 18 entries."
     },
     "DASHBOARD.md": {
       "checksum": "sha256:a4994a683eaac92e36e9d25456e3d091d82801a348f680647041664d441c13e6",
@@ -77,11 +77,11 @@
       "summary": "PII allowlist: 0 entries."
     }
   },
-  "quick_context": "Audit fix programme 2026-09-28 complete with workstream 8 of 8: full ASCII enforced by check:ascii, remaining redaction in code, scanner false positive reworded. v3.12.0 released; the unreleased changes await the owner's release decision.",
+  "quick_context": "Owner follow-up decisions 2026-09-28: init --gates scaffolds pinnedDep and the adopter verify workflow; lint PII check reads JSON values; LOG redaction marker with aahp archive --reindex; propagate and old-bash refusals name their fix. supply-chain-guard#354 opened. Release awaits the owner.",
   "token_budget": {
-    "manifest_only": 1410,
-    "manifest_plus_core": 4480,
-    "full_read": 23190
+    "manifest_only": 1419,
+    "manifest_plus_core": 4116,
+    "full_read": 23228
   },
   "next_task_id": 18,
   "tasks": {

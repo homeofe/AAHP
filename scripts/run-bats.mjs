@@ -8,9 +8,10 @@
 //    failing `[[ ]]` or `(( ))` unless it is the last command of the test, so
 //    most assertions in this suite could never fail there (bats-core documents
 //    this as a gotcha). Bats runs each test through `#!/usr/bin/env bash`, i.e.
-//    the FIRST bash on PATH, so that is the one probed. An old one is refused;
-//    AAHP_ALLOW_OLD_BASH=1 runs anyway, for someone who knows the verdict is
-//    partial.
+//    the FIRST bash on PATH, so that is the one probed. An old one is refused,
+//    and the refusal names the fix (on macOS: `brew install bash`, then put that
+//    bash first on PATH); AAHP_ALLOW_OLD_BASH=1 runs anyway, for someone who
+//    knows the verdict is partial.
 // 2. With CI set, a skipped test is a failure unless it is listed in
 //    ALLOWED_SKIPS below. `[ -n "$tool" ] || skip` fails open: a broken lookup
 //    turns the test into a green skip. tests/test_helper.bash `require_tool`
@@ -88,21 +89,36 @@ function main() {
 
   const bash = resolveBash();
 
-  // Guard 1: the bash that will run the test bodies.
-  const probe = spawnSync(bash, ["-c", "env bash -c 'echo \"${BASH_VERSINFO[0]} ${BASH_VERSINFO[1]}\"'"], {
+  // Guard 1: the bash that will run the test bodies. $BASH names which one, so
+  // the refusal can say which file on PATH is the problem.
+  const probe = spawnSync(bash, ["-c", "env bash -c 'echo \"${BASH_VERSINFO[0]} ${BASH_VERSINFO[1]} $BASH\"'"], {
     cwd: root,
     encoding: "utf8",
   });
-  const [major, minor] = String(probe.stdout || "").trim().split(/\s+/).map(Number);
+  const probed = String(probe.stdout || "").trim().split(/\s+/);
+  const [major, minor] = probed.slice(0, 2).map(Number);
+  const probedPath = probed.slice(2).join(" ");
   if (Number.isInteger(major) && Number.isInteger(minor) && (major < 4 || (major === 4 && minor < 1))) {
-    const msg =
-      `run-bats: the first bash on PATH is ${major}.${minor}. Before 4.1, a failing [[ ]] or (( )) ` +
-      `that is not a test's last command does not fail the test, so most assertions in this ` +
-      `suite cannot go red. Put bash >= 4.1 first on PATH (macOS: brew install bash).`;
+    const where = probedPath ? ` (${probedPath})` : "";
+    const msg = [
+      `run-bats: the first bash on PATH${where} is ${major}.${minor}. Before 4.1, a failing [[ ]] or (( )) ` +
+        `that is not a test's last command does not fail the test, so most assertions in this ` +
+        `suite cannot go red.`,
+      "run-bats: to fix it on macOS, whose /bin/bash is 3.2:",
+      "  1. brew install bash",
+      "  2. make sure that bash is first on PATH: Homebrew puts it in $(brew --prefix)/bin",
+      "     (/opt/homebrew/bin on Apple silicon, /usr/local/bin on Intel), so add",
+      '     export PATH="$(brew --prefix)/bin:$PATH" to your shell profile and open a new shell',
+      "  3. check: env bash --version must report 4.1 or newer",
+      "run-bats: on any other system, install bash 4.1 or newer and put it first on PATH.",
+    ].join("\n");
     if (process.env.AAHP_ALLOW_OLD_BASH === "1") {
       console.error(`${msg}\nrun-bats: AAHP_ALLOW_OLD_BASH=1 - running anyway; a green result here is partial.`);
     } else {
-      console.error(`${msg}\nrun-bats: refusing to run. AAHP_ALLOW_OLD_BASH=1 overrides.`);
+      console.error(
+        `${msg}\nrun-bats: refusing to run. AAHP_ALLOW_OLD_BASH=1 overrides and runs the suite on this bash ` +
+          "anyway; treat a green result from such a run as partial, because most assertions could not fail.",
+      );
       process.exit(2);
     }
   }

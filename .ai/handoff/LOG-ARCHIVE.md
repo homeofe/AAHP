@@ -1,17 +1,46 @@
 # AAHP: Archived Agent Journal
 
 > Older entries rotated from LOG.md. Append-only.
-> Entries may be redacted for confidentiality or normalized to ASCII (CONSTITUTION rule 7), and
-> LOG-ARCHIVE.index.json is re-hashed in the same change; they are never rewritten otherwise.
+> Entries may be normalized to ASCII (CONSTITUTION rule 7).
+> A redaction here uses the LOG.md marker `[redacted: <reason>]` and is recorded in the
+> same change with `aahp archive --reindex`: LOG-ARCHIVE.index.json holds a hash per
+> entry, so `aahp archive --verify` fails on any edit the index has not recorded.
 
 ---
 
-## [2026-08-31] codex: [redacted] review and Windows/Linux hardening
+## [2026-08-31] codex: PR #109 integrated; scanner advanced to v6.0.8
+
+**Agent:** codex
+**Phase:** implementation
+**Branch:** codex/prompt-audit-supply-chain-guard
+**Tasks:** replacement pull request requested by owner
+
+### What was done
+
+- Integrated the exact three CodeQL v4.37.8 action pins from Dependabot PR #109 instead
+  of weakening Layer 2 or merging its red branch directly.
+- Resolved the signed supply-chain-guard v6.0.8 annotated tag to commit
+  `2ba749d08e19b4d5c75c71467233987748f8e8c7` and updated the workflow, policy schema
+  anchor, and regression contract to that immutable commit.
+- Confirmed that README already contains the live `aahp-verify.yml` workflow badge. It was
+  retained as-is rather than adding a duplicate badge. Added `AAHP Govern - available`
+  linked to the shipped consumer template because no standalone govern workflow runs in
+  this repository, and added a dynamic npm-derived Node compatibility badge.
+
+### Decision
+
+- The replacement pull request contains both the repository audit and PR #109's update.
+  The old Dependabot pull request should be closed as superseded only after the new pull
+  request has been created successfully.
+
+---
+
+## [2026-08-31] codex: [redacted: private process detail] review and Windows/Linux hardening
 
 **Agent:** codex
 **Phase:** implementation
 **Branch:** main working tree (uncommitted)
-**Tasks:** repository-wide [redacted] reconciliation and cross-platform validation
+**Tasks:** repository-wide [redacted: private process detail] reconciliation and cross-platform validation
 
 ### What was done
 

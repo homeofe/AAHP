@@ -29,7 +29,8 @@ It checks seven gates: the handoff file set matches `AAHP_HANDOFF_FILES` (indexe
 files present, no strays, file content not compared); `MANIFEST.json` conforms to
 the schema; `GROUNDING.md` is present and `TRUST.md` carries a Provenance column;
 `@elvatis_com/aahp` is pinned to an exact version in `devDependencies` (`self` for
-this repo; the gate reports `skip` unless `pinnedDep` is configured, see below); the
+this repo; the gate reports `skip` unless `pinnedDep` is configured, which
+`aahp init --gates` does, see below); the
 `CHANGELOG.md` matches the Keep a Changelog grammar; the version
 is in sync across configured sites; and the workflow that runs the AAHP gate
 cannot skip it (`verify-workflow`, below). The record:
@@ -187,7 +188,8 @@ compares a handoff checksum. `aahp doctor` exits 0, `aahp check` exits 0, and a
 handoff file edited outside the protocol is invisible to both. The record is
 accurate about what it measured and it is not an integrity signal. Fix it by
 adopting the shipped `assets/governance/aahp-verify.yml` as your
-`.github/workflows/aahp-verify.yml` (README Quickstart step 5), which runs
+`.github/workflows/aahp-verify.yml` (README Quickstart step 5, or `aahp init --gates`
+in a repository that has `.ai/handoff/`), which runs
 `aahp verify --level ci` before `aahp doctor` in the same job, or by running
 `aahp verify` some other way.
 
@@ -251,7 +253,8 @@ The config shape is described by `schema/aahp-config.schema.json`; see
 commands rather than an individual gate: `check` (`only` / `skip`) selects which gates
 `aahp check` runs, and `pinnedDep` (`name` / `location` / `allowRange`) opts a repo into
 the doctor pinned-dep gate (absent, it reports `skip`; `"pinnedDep": {}` asserts an
-exact pin of `@elvatis_com/aahp` in `devDependencies`). The gates that enumerate tracked
+exact pin of `@elvatis_com/aahp` in `devDependencies`, and is what `aahp init --gates`
+writes). The gates that enumerate tracked
 files (`forbidden-patterns`, `doc-links`) fail loud outside a git work tree rather than
 silently scanning zero files, so a misconfigured CI job cannot pass vacuously. `npm run
 check` runs the gates and `npm run doctor` runs the conformance check; both run in CI.
@@ -315,6 +318,16 @@ tracked-file gates (`forbidden-patterns`, `doc-links`) scan git-tracked files an
 outside a git work tree, so run them in a checkout (in CI, `actions/checkout`).
 
 The fastest way to adopt all of this is `aahp init --gates`, which scaffolds a trimmed
-`aahp.config.json`, a `govern` npm script (`aahp check .`), and a portable
+`aahp.config.json` (the em-dash ban, internal doc links, and `"pinnedDep": {}`, so
+`doctor` holds the exact pin from the first run), a `govern` npm script (`aahp check .`), and a portable
 `.github/workflows/aahp-govern.yml` (verify-only, invoked by path, no vendored copy of the CLI) without
-touching `.ai/handoff/`.
+touching `.ai/handoff/`. Where `.ai/handoff/` already exists it also copies the adopter
+`assets/governance/aahp-verify.yml` into the repository's workflows, so the handoff gate
+and the governance gate arrive together. Without a handoff set it writes no verify
+workflow, because `aahp verify` fails where there is no handoff set to gate, and prints
+how to add it later: run `aahp init` and `aahp manifest`, then `aahp init --gates` again,
+or copy the file. Every file that already exists is skipped unless `--force` is given,
+and `--force` replaces a workflow wholesale. The one exception is this package itself (a
+root `package.json` named `@elvatis_com/aahp`, the pinned-dep gate's `self`): there the
+verify workflow is never written or replaced, because the package's own runs the gate
+from the working tree (README Section 9.2).

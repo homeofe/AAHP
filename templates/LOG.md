@@ -3,7 +3,7 @@
 > **Append-only.** Never delete or edit past entries.
 > Every agent session adds a new entry at the top.
 > This file is the immutable history of decisions and work done.
-> Entries may be redacted for confidentiality (an internal name or figure replaced by a neutral description); they are never rewritten otherwise.
+> Entries may be redacted for confidentiality: the passage is replaced by the marker `[redacted: <reason>]` (for example `[redacted: internal hostname]`), naming the kind of thing removed and never the thing itself, and nothing else in the entry changes. They are never rewritten otherwise.
 
 ---
 

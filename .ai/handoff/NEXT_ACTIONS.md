@@ -19,6 +19,13 @@ Current version: **v3.12.0**
 
 ## Recently Completed
 
+### 2026-09-28: Owner follow-up decisions
+
+- `init --gates` scaffolds `pinnedDep` and the adopter verify workflow; lint's PII check
+  reads JSON values.
+- LOG redaction has a marker and `aahp archive --reindex`; the propagate and old-bash
+  refusals name their fix.
+
 ### 2026-09-28: Full ASCII and remaining redaction
 
 - Every tracked text file is ASCII, enforced by `check:ascii` in `npm run check`.
@@ -46,12 +53,6 @@ Current version: **v3.12.0**
 - Dev-only, integrity-pinned lockfile updates without install scripts are exempt from
   Layer 2 when a supply-chain scan is asserted; Layer 3 can report OK.
 
-### 2026-09-28: Manifest generator, lint and CLI
-
-- The manifest generator can no longer write invalid JSON or drop data silently; lint
-  scans bytes as text and covers every handoff file.
-- Doctor validates the full manifest schema; the CLI no longer exits 0 on a signal.
-
 ---
 
 ## Owner Decisions (not task registry entries)
@@ -63,20 +64,13 @@ snapshot; README split; redaction of internal details; the scanner as a required
 
 Open:
 
-- Is a consumer without an npm lockfile a supported propagate target (it now exits 3)?
-- Should `aahp init` scaffold the adopter verify workflow?
-- Keep the dogfood verify workflow out of the npm package?
 - Choose whether legacy governance workflows need doctor detection or forced migration.
 - Plan a future replacement for the deprecated transitive dependencies of ajv-cli 5.
-- Coordinate the supply-chain-guard test that expects the old STATUS.md summary before its
-  next aahp bump.
 - Decide on a protected publish environment bound in the npm trusted-publisher config.
-- Report the scanner coverage gaps (extensionless shell, .bats, install by version) to
-  supply-chain-guard.
 - Decide whether consumer manifests with template placeholder dates are fixed before the
   release.
-- Decide whether `docs/` ships to npm and whether `init --gates` writes `pinnedDep`.
 - Decide whether and when to release the unreleased changes, and the version number.
+- Track homeofe/supply-chain-guard#354 and its remaining follow-ups in that repository.
 
 ---
 

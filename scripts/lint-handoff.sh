@@ -8,7 +8,9 @@
 #   1. Prompt injection patterns (every handoff file except .aiignore, plus the
 #      decoded string values of every JSON file)
 #   2. Secrets & API keys (same scope as check 1)
-#   3. PII patterns (emails, *.md)
+#   3. PII patterns (emails: every *.md file, plus the decoded string values of
+#      every *.json file except pii-allowlist.json, which holds the approved
+#      addresses by design)
 #   4. MANIFEST.json schema (basic) and checksum integrity
 #   5. HANDOFF.lock stale check
 #   6. Parallel agent detection (advisory)
@@ -81,7 +83,12 @@ JSON_DECODE_UNVERIFIED=0
 SCAN_TMP="$(mktemp -d)"
 trap 'rm -rf "$SCAN_TMP"' EXIT
 JSON_DECODED_DIR="$SCAN_TMP/json"
-mkdir -p "$JSON_DECODED_DIR"
+# One line per line of the matching decoded dump, naming where in the JSON document
+# that line came from ("value at /tasks/T-001/notes"). Kept OUTSIDE JSON_DECODED_DIR,
+# because checks 1 and 2 grep that directory recursively and a key name echoed here
+# would be scanned twice.
+JSON_WHERE_DIR="$SCAN_TMP/json-where"
+mkdir -p "$JSON_DECODED_DIR" "$JSON_WHERE_DIR"
 
 # Print grep's diagnostics for a scan that exited 2 and count it. Reading "could
 # not scan" as "nothing found" is exactly the false green the text-mode switch
@@ -155,10 +162,20 @@ INJECTION_PATTERNS=(
 # Decoding needs an interpreter (python, else node). With neither, the raw scan
 # still runs and the summary says the decoded scan did not; a JSON file that
 # cannot be decoded at all is a violation, since its escaped text was not read.
+#
+# Each decoder also writes, per JSON file, a "where" file into JSON_WHERE_DIR with
+# one line per line of the decoded dump: "value at <JSON Pointer>" or "key at
+# <JSON Pointer>". Check 3 uses it to name the place in MANIFEST.json a finding
+# came from. The dump itself is unchanged, so checks 1 and 2 read what they read
+# before. A string with N newlines fills N+1 dump lines, so its label is written
+# N+1 times; a newline inside a label is escaped so it cannot shift the lines.
 IFS= read -r -d '' JSON_STRINGS_PY <<'PY' || true
 import json, os, sys
-src, dst = sys.argv[1], sys.argv[2]
+src, dst, where = sys.argv[1], sys.argv[2], sys.argv[3]
 failed = []
+def pointer(parts):
+    text = ''.join('/' + str(p).replace('~', '~0').replace('/', '~1') for p in parts)
+    return (text or '(root)').replace('\r', '\\r').replace('\n', '\\n')
 for base, dirs, names in os.walk(src):
     dirs.sort()
     for name in sorted(names):
@@ -172,20 +189,24 @@ for base, dirs, names in os.walk(src):
         except Exception as exc:
             failed.append('%s (%s)' % (rel, exc.__class__.__name__))
             continue
-        out, stack = [], [doc]
+        out, labels, stack = [], [], [(doc, [])]
         while stack:
-            value = stack.pop()
+            value, parts = stack.pop()
             if isinstance(value, str):
                 out.append(value)
+                labels.extend(['value at ' + pointer(parts)] * (value.count('\n') + 1))
             elif isinstance(value, dict):
                 for key, item in value.items():
                     out.append(key)
-                    stack.append(item)
+                    labels.extend(['key at ' + pointer(parts + [key])] * (key.count('\n') + 1))
+                    stack.append((item, parts + [key]))
             elif isinstance(value, list):
-                stack.extend(value)
-        target = os.path.join(dst, rel.replace('/', '__'))
-        with open(target, 'w', encoding='utf-8', newline='\n') as handle:
+                stack.extend((item, parts + [i]) for i, item in enumerate(value))
+        target = rel.replace('/', '__')
+        with open(os.path.join(dst, target), 'w', encoding='utf-8', newline='\n') as handle:
             handle.write('\n'.join(out) + '\n')
+        with open(os.path.join(where, target), 'w', encoding='utf-8', newline='\n') as handle:
+            handle.write('\n'.join(labels) + '\n')
 for item in failed:
     print(item)
 sys.exit(3 if failed else 0)
@@ -194,8 +215,12 @@ IFS= read -r -d '' JSON_STRINGS_JS <<'JS' || true
 'use strict';
 const fs = require('fs');
 const path = require('path');
-const [src, dst] = process.argv.slice(1);
+const [src, dst, where] = process.argv.slice(1);
 const failed = [];
+const pointer = (parts) =>
+  (parts.map((p) => '/' + String(p).replace(/~/g, '~0').replace(/\//g, '~1')).join('') || '(root)')
+    .replace(/\r/g, '\\r').replace(/\n/g, '\\n');
+const lineCount = (s) => s.split('\n').length;
 function walk(dir) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true }).sort((a, b) => (a.name < b.name ? -1 : 1))) {
     const full = path.join(dir, entry.name);
@@ -205,16 +230,25 @@ function walk(dir) {
     let doc;
     try { doc = JSON.parse(fs.readFileSync(full, 'utf8')); } catch (err) { failed.push(rel + ' (' + err.name + ')'); continue; }
     const out = [];
-    const stack = [doc];
+    const labels = [];
+    const stack = [[doc, []]];
     while (stack.length) {
-      const value = stack.pop();
-      if (typeof value === 'string') out.push(value);
-      else if (Array.isArray(value)) stack.push(...value);
+      const [value, parts] = stack.pop();
+      if (typeof value === 'string') {
+        out.push(value);
+        for (let i = 0; i < lineCount(value); i++) labels.push('value at ' + pointer(parts));
+      } else if (Array.isArray(value)) stack.push(...value.map((item, i) => [item, parts.concat(i)]));
       else if (value && typeof value === 'object') {
-        for (const [key, item] of Object.entries(value)) { out.push(key); stack.push(item); }
+        for (const [key, item] of Object.entries(value)) {
+          out.push(key);
+          for (let i = 0; i < lineCount(key); i++) labels.push('key at ' + pointer(parts.concat(key)));
+          stack.push([item, parts.concat(key)]);
+        }
       }
     }
-    fs.writeFileSync(path.join(dst, rel.split('/').join('__')), out.join('\n') + '\n');
+    const target = rel.split('/').join('__');
+    fs.writeFileSync(path.join(dst, target), out.join('\n') + '\n');
+    fs.writeFileSync(path.join(where, target), labels.join('\n') + '\n');
   }
 }
 walk(src);
@@ -230,9 +264,9 @@ if [ "$HAS_JSON" -eq 1 ]; then
     DECODE_RC=0
     DECODE_OUT=""
     if [ -n "$PYTHON_CMD" ]; then
-        DECODE_OUT=$("$PYTHON_CMD" -c "$JSON_STRINGS_PY" "$HANDOFF_DIR" "$JSON_DECODED_DIR") || DECODE_RC=$?
+        DECODE_OUT=$("$PYTHON_CMD" -c "$JSON_STRINGS_PY" "$HANDOFF_DIR" "$JSON_DECODED_DIR" "$JSON_WHERE_DIR") || DECODE_RC=$?
     elif command -v node >/dev/null 2>&1; then
-        DECODE_OUT=$(node -e "$JSON_STRINGS_JS" "$HANDOFF_DIR" "$JSON_DECODED_DIR") || DECODE_RC=$?
+        DECODE_OUT=$(node -e "$JSON_STRINGS_JS" "$HANDOFF_DIR" "$JSON_DECODED_DIR" "$JSON_WHERE_DIR") || DECODE_RC=$?
     else
         JSON_DECODE_UNVERIFIED=1
         echo -e "  ${YELLOW}! No python or node: JSON string values were scanned as raw bytes only.${NC}"
@@ -469,16 +503,55 @@ fi
 # for a file holding a NUL and an address. (An invalid UTF-8 byte did not hide
 # an address here, because -o prints only the ASCII match; it did hide the
 # secret-scan line in check 2.) The pattern is ASCII, so C matches exactly the
-# same addresses. An absent *.md set is not a scan failure; grep exit 2 is.
-MD_FILES=()
+# same addresses. An absent file set is not a scan failure; grep exit 2 is.
+#
+# SCOPE: every *.md file, plus every *.json file except pii-allowlist.json. The
+# scan used to read *.md only, so an address in MANIFEST.json (a task's notes,
+# `assigned_to`, `quick_context`, the per-file summaries) or in
+# LOG-ARCHIVE.index.json passed, although MANIFEST.json is the file an incoming
+# agent reads FIRST. JSON is read through the decoded dump check 1 already wrote,
+# so an address behind a \u0040 escape is seen the way an agent reads it, and a
+# finding names the JSON Pointer of its value. Where no dump exists (no python
+# or node, or a file that is not valid JSON, already a violation above) the raw
+# file is scanned instead, so the address is still found, by line.
+# pii-allowlist.json is excluded because it holds the approved addresses by
+# design: scanning it would report every approved address as unapproved PII.
+PII_FILES=()
 for md_file in "$HANDOFF_DIR"/*.md; do
-    [ -f "$md_file" ] && MD_FILES+=("$md_file")
+    [ -f "$md_file" ] && PII_FILES+=("$md_file")
 done
+for json_file in "$HANDOFF_DIR"/*.json; do
+    [ -f "$json_file" ] || continue
+    json_name="${json_file##*/}"
+    [ "$json_name" = "pii-allowlist.json" ] && continue
+    if [ -f "$JSON_DECODED_DIR/$json_name" ]; then
+        PII_FILES+=("$JSON_DECODED_DIR/$json_name")
+    else
+        PII_FILES+=("$json_file")
+    fi
+done
+
+# Where a PII match was found, for a human: "file:line" for a file read as
+# bytes, "file (value at /json/pointer)" for a decoded JSON value, whose dump line
+# number points nowhere real.
+pii_location() {
+    local file="${1%%:*}" rest="${1#*:}" line name label
+    line="${rest%%:*}"
+    case "$file" in
+        "$JSON_DECODED_DIR"/*)
+            name="${file#"$JSON_DECODED_DIR"/}"
+            label="$(sed -n "${line}p" "$JSON_WHERE_DIR/$name" 2>/dev/null || true)"
+            printf '%s/%s (%s)' "$HANDOFF_DIR" "$name" "${label:-decoded JSON string value}"
+            ;;
+        *) printf '%s:%s' "$file" "$line" ;;
+    esac
+}
+
 EMAIL_MATCHES=""
 PII_SCAN_FAILED=0
-if [ "${#MD_FILES[@]}" -gt 0 ]; then
+if [ "${#PII_FILES[@]}" -gt 0 ]; then
     SCAN_RC=0
-    EMAIL_MATCHES=$(LC_ALL=C grep -HnoEa '[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}' "${MD_FILES[@]}" 2>"$SCAN_TMP/grep.err" | awk -F: '{ addr=$NF; if (addr ~ /\.noreply\./ || addr ~ /^no-?reply@/ || index(addr,"example.com") || index(addr,"placeholder")) next; print }'; exit "${PIPESTATUS[0]}") || SCAN_RC=$?
+    EMAIL_MATCHES=$(LC_ALL=C grep -HnoEa '[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}' "${PII_FILES[@]}" 2>"$SCAN_TMP/grep.err" | awk -F: '{ addr=$NF; if (addr ~ /\.noreply\./ || addr ~ /^no-?reply@/ || index(addr,"example.com") || index(addr,"placeholder")) next; print }'; exit "${PIPESTATUS[0]}") || SCAN_RC=$?
     if [ "$SCAN_RC" -gt 1 ]; then
         scan_failed "PII scan" "$SCAN_RC" "$SCAN_TMP/grep.err"
         PII_SCAN_FAILED=1
@@ -497,12 +570,12 @@ if [ -n "$EMAIL_MATCHES" ]; then
                 break
             fi
         done <<< "$ALLOWLIST_ENTRIES"
-        [ "$allowed" -eq 1 ] || UNAPPROVED="${UNAPPROVED}${UNAPPROVED:+$'\n'}$match"
+        [ "$allowed" -eq 1 ] || UNAPPROVED="${UNAPPROVED}${UNAPPROVED:+$'\n'}$(pii_location "$match"): $address"
     done <<< "$EMAIL_MATCHES"
 fi
 if [ -n "$UNAPPROVED" ]; then
     echo -e "  ${YELLOW}Possible email addresses found:${NC}"
-    echo "    $UNAPPROVED"
+    printf '%s\n' "$UNAPPROVED" | sed 's/^/    /'
     VIOLATIONS=$((VIOLATIONS + 1))
 elif [ "$PII_SCAN_FAILED" -eq 0 ]; then
     echo -e "  ${GREEN}OK No unapproved PII detected.${NC}"

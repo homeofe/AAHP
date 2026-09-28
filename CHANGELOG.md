@@ -77,6 +77,12 @@ independently of the npm version).
   and exits 1 on a finding and 2 when it cannot assess. This replaces the U+2014-only rule
   as the enforcement of the ASCII-only invariant; a cp1252 Windows console cannot encode
   characters such as U+2705 or U+2192.
+- `aahp archive --reindex` records a deliberate edit (a redaction) of `LOG-ARCHIVE.md` in
+  `LOG-ARCHIVE.index.json`: it prints every hash it drops and records, writes nothing when
+  nothing changed, touches only the index, and refuses to combine with `--verify`.
+- `aahp init --gates` writes `.github/workflows/aahp-verify.yml` (the adopter copy) when
+  `.ai/handoff/` exists, and otherwise prints how to add it later. It never writes it into
+  the `@elvatis_com/aahp` package itself.
 
 ### Changed
 
@@ -142,6 +148,20 @@ independently of the npm version).
 - The release-journal generator's refusal messages cite docs/adr/ADR-004.md in the AAHP
   repository instead of a README section that no longer exists.
 - The `no-estate-counts` forbidden pattern reads every tracked file, not only Markdown.
+- `aahp init --gates` scaffolds `"pinnedDep": {}`, so `aahp doctor` fails a range or a
+  missing `@elvatis_com/aahp` pin from the first run; a repository with no root
+  `package.json` still reports skip. Migration: `init --gates --force` now also overwrites
+  `aahp-verify.yml` where `.ai/handoff/` exists.
+- A LOG redaction must leave the marker `[redacted: <reason>]` (README 1.3,
+  `templates/LOG.md`).
+- The `propagate.sh` exit-3 message lists the exact fix commands, and README and ROLLOUT
+  state that non-JavaScript repositories adopt AAHP with a `package.json` that only pins
+  the tool.
+- The `run-bats.mjs` refusal of a bash older than 4.1 names the macOS fix and the probed
+  bash path.
+- `aahp init --gates` never writes or replaces `aahp-verify.yml` in the
+  `@elvatis_com/aahp` package itself (the pinned-dep gate's `self`), even with `--force`:
+  the package's own verify workflow runs the gate from the working tree.
 
 ### Removed
 
@@ -252,6 +272,10 @@ independently of the npm version).
 - A JSON Schema section number in a comment of `scripts/aahp-schema.mjs` no longer reads
   as a private IPv4 address to the supply-chain scanner.
 - Provenance tests cite ADR-022 and doc-shape tests ADR-023, matching the decision log.
+- `aahp lint`'s PII check read `*.md` only. It now also reads the decoded string values of
+  every JSON handoff file (`MANIFEST.json`, `LOG-ARCHIVE.index.json`) except
+  `pii-allowlist.json`, names the JSON path of each finding, and keeps the allowlist and
+  noreply/example exemptions.
 
 ### Security
 

@@ -292,6 +292,11 @@ parity_copy() {
 
 @test "doctor: reports verify-workflow pass on the canonical workflow" {
     install_workflow enforced-canonical.yml
+    # The fixture is AAHP's own dogfood shape: its doctor step runs `node
+    # bin/aahp.js`, which only this package can. In any other repository the
+    # cli-source gate fails that step (tests/cli-source.bats), so the repository
+    # here is the package itself, as the fixture describes.
+    printf '{"name":"@elvatis_com/aahp","version":"0.0.0"}\n' > "$TEST_TMPDIR/package.json"
     run node "$AAHP" doctor "$TEST_TMPDIR" --governance --json
     [ "$status" -eq 0 ]
     [[ "$output" == *'"verify-workflow": "pass"'* ]]

@@ -1,0 +1,27 @@
+# Fixture: an adopter verify workflow whose verify step is current but whose
+# doctor step was copied from AAHP's own dogfood workflow: `node bin/aahp.js`
+# exists only in an AAHP checkout, so in an adopter it exits MODULE_NOT_FOUND.
+# Expected: cli-source [checkout-path] (fail) in an adopter; `self` in the
+# package itself; no finding where bin/aahp.js exists; verify-workflow enforced.
+name: AAHP Verify
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  aahp-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install the pinned aahp devDependency
+        run: npm ci --ignore-scripts
+      - name: Run aahp verify (CI level, no escape hatch)
+        run: node ./node_modules/@elvatis_com/aahp/bin/aahp.js verify . --level ci
+      - name: Run aahp doctor (conformance record)
+        run: node bin/aahp.js doctor . --json

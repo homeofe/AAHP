@@ -2,6 +2,10 @@
   "version": 1,
   "entries": [
     {
+      "sha256": "89081ca59b94b9ff07f7089a5a508e4fa209188ac323858fcf4d83b20bcbf71b",
+      "title": "## [2026-09-28] claude-opus-5.5: five Dependabot PRs integrated; scanner to v6.3.1"
+    },
+    {
       "sha256": "9614688ba94681ddaad0171eda1339d6bf86aa0f7b234b68ff42a608228b6947",
       "title": "## [2026-08-31] codex: v3.12.0 release candidate after green PR #110"
     },

@@ -502,3 +502,27 @@ console.log(npm.supplyChainScan.workflow + " " + npm.supplyChainScan.job);
     [ "$status" -eq 0 ]
     [ "$output" = ".github/workflows/ci.yml supply-chain-guard" ]
 }
+
+# README 2.8 states exactly what the scan-job reader proves: the workflow's
+# top-level `on:` includes pull_request, and a job-level `if:`, only when the job
+# has one, names pull_request. A job with no `if:` passes. These pin that
+# sentence, both halves, against the reader itself.
+@test "workflow reader: no if: passes, if: always() is refused, a push-only workflow is refused" {
+    local lib="$SCRIPTS_DIR/_aahp-lib.sh"
+    printf 'on: [push, pull_request]\njobs:\n  scan:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo scan\n' \
+        > "$TEST_TMPDIR/noif.yml"
+    run bash -c 'source "$1"; aahp_workflow_job_on_pull_request scan < "$2"' _ "$lib" "$TEST_TMPDIR/noif.yml"
+    [ "$status" -eq 0 ]
+
+    printf 'on: [push, pull_request]\njobs:\n  scan:\n    if: always()\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo scan\n' \
+        > "$TEST_TMPDIR/always.yml"
+    run bash -c 'source "$1"; aahp_workflow_job_on_pull_request scan < "$2"' _ "$lib" "$TEST_TMPDIR/always.yml"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"has an if: condition that does not name pull_request"* ]]
+
+    printf 'on: [push]\njobs:\n  scan:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo scan\n' \
+        > "$TEST_TMPDIR/push-only.yml"
+    run bash -c 'source "$1"; aahp_workflow_job_on_pull_request scan < "$2"' _ "$lib" "$TEST_TMPDIR/push-only.yml"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"the workflow is not triggered by pull_request"* ]]
+}

@@ -12,7 +12,10 @@
 // this repository plus every fixture under tests/fixtures/workflows/, on exactly
 // the fields the audit consumes (job `if`, job `continue-on-error`, and each
 // step's name/run/uses/if/continue-on-error) AND on the resulting finding ids.
-// `yaml` is a devDependency, so this runs in CI and never in a consumer.
+// The cli-source audit (scripts/check-cli-source.mjs) reads the same reader's
+// output, plus each step's `working-directory` and the workflow and job
+// `defaults`, so those are projected too and its finding ids are compared the
+// same way. `yaml` is a devDependency, so this runs in CI and never in a consumer.
 //
 // Both DIRECTIONS matter and both are covered by the fixture set: workflows that
 // must come out enforced, and workflows that must come out bypassable.
@@ -28,29 +31,48 @@ import { readdirSync, readFileSync, existsSync } from "node:fs";
 import { join, resolve, relative } from "node:path";
 import { parse } from "yaml";
 import { parseYamlSubset, auditDoc } from "../scripts/check-verify-workflow.mjs";
+import { auditCliDoc } from "../scripts/check-cli-source.mjs";
 
 const root = resolve(process.argv[2] || ".");
 
-// Project a parsed document down to the fields the audit reads. Everything else
-// is free to differ: this gate never looks at it.
+// Project a parsed document down to the fields the audits read. Everything else
+// is free to differ: neither gate looks at it.
 function projection(doc) {
   const jobs = doc && typeof doc === "object" && doc.jobs && typeof doc.jobs === "object" ? doc.jobs : {};
   const str = (v) => (v === undefined ? null : String(v));
-  const out = {};
+  const json = (v) => (v === undefined ? null : JSON.stringify(v));
+  const out = { defaults: json(doc && typeof doc === "object" ? doc.defaults : undefined), jobs: {} };
   for (const [id, job] of Object.entries(jobs)) {
     if (!job || typeof job !== "object") continue;
     const steps = Array.isArray(job.steps) ? job.steps : [];
-    out[id] = {
+    out.jobs[id] = {
       if: str(job.if),
       coe: str(job["continue-on-error"]),
+      defaults: json(job.defaults),
       steps: steps.map((s) =>
         s && typeof s === "object"
-          ? { name: str(s.name), run: str(s.run), uses: str(s.uses), if: str(s.if), coe: str(s["continue-on-error"]) }
+          ? {
+              name: str(s.name),
+              run: str(s.run),
+              uses: str(s.uses),
+              if: str(s.if),
+              coe: str(s["continue-on-error"]),
+              wd: str(s["working-directory"]),
+            }
           : null,
       ),
     };
   }
   return out;
+}
+
+// cli-source findings as `id:severity`, with bin/aahp.js assumed absent so the
+// checkout-path finding is exercised on every fixture that has that shape.
+function cliFindings(doc, label) {
+  return auditCliDoc(doc, label, { checkoutCli: false })
+    .findings.map((f) => `${f.id}:${f.severity}`)
+    .sort()
+    .join(",");
 }
 
 const dirs = [join(root, ".github", "workflows"), join(root, "tests", "fixtures", "workflows")];
@@ -93,6 +115,11 @@ for (const dir of dirs) {
     const fb = auditDoc(mine, label).findings.map((f) => f.id).sort().join(",");
     if (fa !== fb) {
       problems.push(`${label}: same file, different verdict: yaml=[${fa}] aahp=[${fb}]`);
+    }
+    const ca = cliFindings(reference, label);
+    const cb = cliFindings(mine, label);
+    if (ca !== cb) {
+      problems.push(`${label}: same file, different cli-source findings: yaml=[${ca}] aahp=[${cb}]`);
     }
   }
 }

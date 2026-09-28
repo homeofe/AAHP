@@ -368,3 +368,95 @@ _pin_status() {
     [[ "$output" == *"no package.json"* ]]
     [[ "$output" == *"Done. 3 written/updated, 0 skipped."* ]]
 }
+
+# --- --workflows: rewrite the workflow copies and nothing else ---------------
+#
+# The remediation the doctor cli-source gate names. `--force` re-scaffolds the
+# config and the govern script too, which would replace an adopter's tuned
+# aahp.config.json with the trimmed default; `--workflows` must not touch either.
+
+# A customised adopter: its own config (no pinnedDep, a versionSites entry) and a
+# package.json with no govern script, so a --workflows that wrote either file
+# would change its bytes.
+make_customised_adopter() {
+    cat > "$TEST_TMPDIR/aahp.config.json" <<'EOF'
+{
+  "versionSites": [
+    { "file": "README.md", "minOccurrences": 1 }
+  ],
+  "docLinks": { "include": ["README.md"] }
+}
+EOF
+    make_pkg
+    mkdir -p "$TEST_TMPDIR/.github/workflows"
+    cp "$AAHP_ROOT/tests/fixtures/workflows/legacy-no-install.yml" "$TEST_TMPDIR/.github/workflows/aahp-govern.yml"
+    cp "$AAHP_ROOT/tests/fixtures/workflows/legacy-npx-version.yml" "$TEST_TMPDIR/.github/workflows/aahp-verify.yml"
+    cp "$TEST_TMPDIR/aahp.config.json" "$TEST_TMPDIR/config.before"
+    cp "$TEST_TMPDIR/package.json" "$TEST_TMPDIR/package.before"
+}
+
+@test "init --gates --workflows rewrites both legacy workflows and leaves config and package.json byte-identical" {
+    make_customised_adopter
+    [ -d "$TEST_TMPDIR/.ai/handoff" ]
+
+    run node "$AAHP_BIN" init --gates --workflows "$TEST_TMPDIR"
+    [ "$status" -eq 0 ]
+    cmp "$AAHP_ROOT/assets/governance/aahp-govern.yml" "$TEST_TMPDIR/.github/workflows/aahp-govern.yml"
+    cmp "$AAHP_ROOT/assets/governance/aahp-verify.yml" "$TEST_TMPDIR/.github/workflows/aahp-verify.yml"
+    cmp "$TEST_TMPDIR/config.before" "$TEST_TMPDIR/aahp.config.json"
+    cmp "$TEST_TMPDIR/package.before" "$TEST_TMPDIR/package.json"
+    [[ "$output" == *"keep: aahp.config.json (--workflows: not written)"* ]]
+    [[ "$output" == *"keep: package.json (--workflows: no govern script change)"* ]]
+    [[ "$output" == *"write: .github/workflows/aahp-govern.yml"* ]]
+    [[ "$output" == *"write: .github/workflows/aahp-verify.yml"* ]]
+    [[ "$output" == *"Done. 2 written/updated, 0 skipped."* ]]
+}
+
+@test "init --gates (no --workflows) on the same adopter keeps the legacy workflows, so the difference is --workflows" {
+    # The control for the test above: without the flag, existing workflows are
+    # skipped, so the rewrite there is the flag's doing.
+    make_customised_adopter
+    cp "$TEST_TMPDIR/.github/workflows/aahp-govern.yml" "$TEST_TMPDIR/govern.before"
+    run node "$AAHP_BIN" init --gates "$TEST_TMPDIR"
+    [ "$status" -eq 0 ]
+    cmp "$TEST_TMPDIR/govern.before" "$TEST_TMPDIR/.github/workflows/aahp-govern.yml"
+    [[ "$output" == *"skip: .github/workflows/aahp-govern.yml (already exists"* ]]
+}
+
+@test "init --gates --workflows without .ai/handoff writes only the governance workflow and counts one" {
+    rm -rf "$TEST_TMPDIR/.ai"
+    make_customised_adopter
+    rm -f "$TEST_TMPDIR/.github/workflows/aahp-verify.yml"
+    run node "$AAHP_BIN" init --gates --workflows "$TEST_TMPDIR"
+    [ "$status" -eq 0 ]
+    cmp "$AAHP_ROOT/assets/governance/aahp-govern.yml" "$TEST_TMPDIR/.github/workflows/aahp-govern.yml"
+    [ ! -e "$TEST_TMPDIR/.github/workflows/aahp-verify.yml" ]
+    [[ "$output" == *"note: no .ai/handoff/"* ]]
+    [[ "$output" == *"Done. 1 written/updated, 0 skipped."* ]]
+    cmp "$TEST_TMPDIR/config.before" "$TEST_TMPDIR/aahp.config.json"
+}
+
+@test "init --gates --workflows in the aahp package itself never replaces its verify workflow" {
+    printf '{\n  "name": "@elvatis_com/aahp",\n  "version": "3.12.0"\n}\n' > "$TEST_TMPDIR/package.json"
+    mkdir -p "$TEST_TMPDIR/.github/workflows"
+    printf 'name: AAHP Verify\n# runs node bin/aahp.js from the working tree\n' \
+        > "$TEST_TMPDIR/.github/workflows/aahp-verify.yml"
+    cp "$TEST_TMPDIR/.github/workflows/aahp-verify.yml" "$TEST_TMPDIR/own-verify.yml"
+    cp "$TEST_TMPDIR/package.json" "$TEST_TMPDIR/package.before"
+
+    run node "$AAHP_BIN" init --gates --workflows "$TEST_TMPDIR"
+    [ "$status" -eq 0 ]
+    cmp "$TEST_TMPDIR/own-verify.yml" "$TEST_TMPDIR/.github/workflows/aahp-verify.yml"
+    cmp "$TEST_TMPDIR/package.before" "$TEST_TMPDIR/package.json"
+    [ ! -e "$TEST_TMPDIR/aahp.config.json" ]
+    [[ "$output" == *"is not written or"* ]]
+    [[ "$output" == *"Done. 1 written/updated, 0 skipped."* ]]
+}
+
+@test "--workflows without --gates is refused and writes nothing" {
+    run node "$AAHP_BIN" init --workflows "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"--workflows is an option of init --gates"* ]]
+    [ ! -e "$TEST_TMPDIR/.github" ]
+    [ ! -e "$TEST_TMPDIR/.ai/handoff/STATUS.md" ]
+}

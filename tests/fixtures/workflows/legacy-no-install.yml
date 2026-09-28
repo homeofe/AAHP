@@ -1,0 +1,23 @@
+# Fixture: the current invocation by path, with the install step edited out.
+# On a fresh runner node_modules is empty, so both steps fail; restored from a
+# cache they would run whatever the cache holds.
+# Expected: cli-source [no-install] (fail, twice); verify-workflow
+# governance-only.
+name: AAHP Govern
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  govern:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run governance gates
+        run: node ./node_modules/@elvatis_com/aahp/bin/aahp.js check .
+      - name: Governance conformance record
+        run: node ./node_modules/@elvatis_com/aahp/bin/aahp.js doctor --governance --json .

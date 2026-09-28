@@ -25,32 +25,37 @@ aahp doctor --json       # only the JSON record, on stdout
 aahp doctor --governance # governance-only record; skip the 3 handoff gates (alias --no-handoff)
 ```
 
-It checks seven gates: the handoff file set matches `AAHP_HANDOFF_FILES` (indexed
+It checks eight gates: the handoff file set matches `AAHP_HANDOFF_FILES` (indexed
 files present, no strays, file content not compared); `MANIFEST.json` conforms to
-the schema; `GROUNDING.md` is present and `TRUST.md` carries a Provenance column;
+the schema (a task field left as a template placeholder names `aahp migrate` as the
+fix, README Section 5.1); `GROUNDING.md` is present and `TRUST.md` carries a
+Provenance column;
 `@elvatis_com/aahp` is pinned to an exact version in `devDependencies` (`self` for
 this repo; the gate reports `skip` unless `pinnedDep` is configured, which
 `aahp init --gates` does, see below); the
 `CHANGELOG.md` matches the Keep a Changelog grammar; the version
-is in sync across configured sites; and the workflow that runs the AAHP gate
-cannot skip it (`verify-workflow`, below). The record:
+is in sync across configured sites; the workflow that runs the AAHP gate
+cannot skip it (`verify-workflow`, below); and every workflow step that runs the
+aahp CLI runs the package the lockfile pins, not a legacy spelling (`cli-source`,
+below). The record:
 
 ```json
 { "schemaVersion": 2, "repo": "homeofe/AAHP", "aahpVersion": "3.12.0",
   "gates": { "handoff-set": "pass", "manifest-schema": "pass", "grounding": "pass",
              "pinned-dep": "self", "changelog-format": "pass", "version-sync": "pass",
-             "verify-workflow": "pass" },
+             "verify-workflow": "pass", "cli-source": "self" },
   "gateOutcomes": { "pinned-dep": { "outcome": "self", "reason": "this repo is @elvatis_com/aahp itself" } },
-  "evaluated": 7, "total": 7,
+  "evaluated": 8, "total": 8,
   "checkedAt": "2026-07-18T00:00:00Z" }
 ```
 
 `gateOutcomes` is abbreviated above; the real record carries one entry per gate.
+The `cli-source` key is new in 4.0.0; a reader that asserts `total === 7` must widen.
 
 **Reading the summary line, and `schemaVersion` 2.** The human footer counts
-gates that RAN, not gates that exist: `Conformance OK: 5 of 7 gate(s) ran, no
+gates that RAN, not gates that exist: `Conformance OK: 5 of 8 gate(s) ran, no
 failures.` A run in which nothing was evaluated is a third outcome, not a pass:
-it prints `Conformance NOT EVALUATED: 0 of 7 gate(s) ran. This is not a pass.`
+it prints `Conformance NOT EVALUATED: 0 of 8 gate(s) ran. This is not a pass.`
 and exits 1, on the text path, under `--quiet`, and under `--json` alike. Before
 version 2 the footer read `Conformance OK: 7 gate(s), no failures.` over seven
 skips and zero evaluations, and `--quiet` printed nothing at all.
@@ -62,9 +67,10 @@ reader that switches on `gates` needs no change. What is new is `gateOutcomes`
 The refinement matters because version 1's `skip` stood for four different
 states at once, so a repository that has adopted governance and one that has
 switched every gate off through `config.check` emitted identical records. The
-`outcome` values are `pass`, `fail`, `missing`, `self`, `not-applicable`,
-`deselected` and `unevaluated`. A reader asserting `schemaVersion === 1` must
-widen to `>= 1`; a reader that ignores unknown fields needs nothing.
+`outcome` values are `pass`, `fail`, `missing`, `self`, `advisory` (a finding
+that is reported and does not fail the run), `not-applicable`, `deselected` and
+`unevaluated`. A reader asserting `schemaVersion === 1` must widen to `>= 1`; a
+reader that ignores unknown fields needs nothing.
 
 ## The `verify-workflow` gate: can the workflow that runs the gate skip it?
 
@@ -151,6 +157,58 @@ real YAML would be the worst possible engine for a security gate, so
 `tests/assert-workflow-parser-parity.mjs` compares it against a real YAML parser on
 every workflow in this repository and every fixture, on exactly the fields the
 audit reads and on the resulting findings.
+
+## The `cli-source` gate: which aahp does a workflow run?
+
+`verify-workflow` asks whether a workflow can SKIP the gate. `cli-source` asks a
+different question about the same files: is the aahp CLI a workflow step runs the
+package this repository pinned, installed from its lockfile? Adopters copied earlier
+versions of the shipped workflows, and a copy does not change when the package does.
+`scripts/check-cli-source.mjs` reads `.github/workflows/` with the same block-YAML
+reader and reports:
+
+| Finding | Shape | Verdict |
+|---------|-------|---------|
+| `registry-fetch` | `npx -y @elvatis_com/aahp@<version>`, `npx` without `--no-install`, `npm exec`, `pnpm dlx`, `yarn dlx`, `bunx`, or `npm install` naming the package | `fail` |
+| `unowned-name` | any of those with the unscoped name `aahp` | `fail` |
+| `unowned-name` | `npx --no-install aahp` | `advisory` |
+| `checkout-path` | `node bin/aahp.js` where the repository has no `bin/aahp.js` | `fail` |
+| `no-install` | the CLI run from `node_modules/` (by path, or `npx --no-install`) with no install step earlier in the same job | `fail` |
+
+The severity rule is technical: a shape FAILS when it can execute code the lockfile
+did not pin, or when it can never succeed. `registry-fetch` runs whatever the spec
+resolves to at run time, unchecked against the lockfile; `unowned-name` downloads and
+executes whatever the registry holds under a name this project does not own
+([ADR-013](adr/ADR-013.md)); `checkout-path` exits `MODULE_NOT_FOUND` on every run;
+`no-install` has an empty `node_modules/` on a fresh runner, or runs an unverified
+cache. `npx --no-install aahp` is the one advisory shape: the `npx` binary stops on a
+local miss instead of executing, so it fails closed and costs only a registry lookup
+of the unowned name. It is still reported, because the same line spelled `npm exec`
+executes the answer. There is no opt-in switch, unlike `verifyWorkflow.enforce`: a
+failing shape is a stale copy nobody keeps on purpose, and the fix is one command the
+pull-request author can run in the same pull request. [ADR-025](adr/ADR-025.md)
+records why this is a gate of its own, the severity rule, and what it does not cover.
+
+Every finding carries the remediation: `aahp init --gates --workflows` rewrites ONLY
+the workflow files `aahp init --gates` manages, overwriting the copies: the
+governance workflow `aahp-govern.yml`, and `aahp-verify.yml` where `.ai/handoff/`
+exists (never in this package itself), from the installed templates. It leaves
+`aahp.config.json` and `package.json` untouched; review `git diff` and re-apply any
+edit your old copies carried (README Section 5.1). `aahp init --gates --force` stays
+the full re-scaffold, config and `govern` script included. A legacy step in any other
+workflow file must be edited by hand.
+
+Deliberately NOT findings, because a false positive gets a gate switched off: this
+package itself (`self`, by the same `isSelfPackage` predicate as the pin gate, since
+its own workflows run `node bin/aahp.js` from the working tree); `node bin/aahp.js`
+in a repository that has that file (a fork or a vendored copy) or under a
+`working-directory:` or `cd`; a missing install when an earlier step uses an action
+other than `actions/checkout`, `actions/setup-node` or `actions/setup-python` (it may
+install or restore `node_modules/`, and the reader cannot see inside it); and
+`npm run` indirections. A workflow that mentions `aahp` and cannot be parsed is `fail`,
+because undecided is not clean. A repository whose workflows never run the CLI
+reports `skip`. `tests/assert-workflow-parser-parity.mjs` holds this audit's findings
+on every fixture to the same answer under a real YAML parser.
 
 ## What `doctor` does not check: handoff file content
 
@@ -274,7 +332,12 @@ Markdown links, and `generate` drives an optional release journal (a file such a
 `NEXT_ACTIONS.md` current-version freshness gate. `handoffImpact` carries the reviewed,
 exact-file, M-only Layer 2 classifications (`nonImpactingModifiedFiles`) and the opt-in,
 content-verified npm devDependency classification (`npmDevDependencyUpdates`, with its
-mandatory `supplyChainScan`) described in README Section 2.8. Two selection keys
+mandatory `supplyChainScan`) described in README Section 2.8. That key is new in 4.0.0
+and 3.12.0 rejects it (its schema requires `nonImpactingModifiedFiles` and allows no
+other key), so it cannot be added before the upgrade: the pull request that moves the
+pin to 4.0.0 carries the opt-in, a `STATUS.md` update and a regenerated
+`MANIFEST.json` together, and later devDependency bumps pass without one (README
+Section 5.1 has the exact shape and the `supplyChainScan` job requirements). Two selection keys
 tune the surface:
 `check` (`only`/`skip`) chooses which gates `aahp check` runs, and `pinnedDep`
 (`name`/`location`/`allowRange`) opts the `doctor` pinned-dep gate in (absent, it is a clean
@@ -327,7 +390,9 @@ and the governance gate arrive together. Without a handoff set it writes no veri
 workflow, because `aahp verify` fails where there is no handoff set to gate, and prints
 how to add it later: run `aahp init` and `aahp manifest`, then `aahp init --gates` again,
 or copy the file. Every file that already exists is skipped unless `--force` is given,
-and `--force` replaces a workflow wholesale. The one exception is this package itself (a
+and `--force` replaces a workflow wholesale. `--workflows` (with `--gates`) rewrites
+only the workflows, overwriting existing copies, and never touches `aahp.config.json`
+or `package.json`; it is the fix the `cli-source` gate names. The one exception is this package itself (a
 root `package.json` named `@elvatis_com/aahp`, the pinned-dep gate's `self`): there the
 verify workflow is never written or replaced, because the package's own runs the gate
 from the working tree (README Section 9.2).

@@ -19,6 +19,13 @@ Current version: **v3.12.0**
 
 ## Recently Completed
 
+### 2026-09-28: Adopter upgrade path to 4.0.0
+
+- `aahp migrate` removes template placeholders from task fields; doctor gains the
+  `cli-source` gate (ADR-025) with `aahp init --gates --workflows` as its fix.
+- README 5.1 documents the upgrade, including the one-time handoff step for the npm
+  devDependency exemption.
+
 ### 2026-09-28: Protected publish environment, ajv-cli replaced
 
 - npm publishing waits for the owner's approval in the `npm-publish` environment (tags
@@ -46,13 +53,6 @@ Current version: **v3.12.0**
 - Internal names and figures about other repositories are removed and guarded by
   forbidden-pattern rules; STATUS.md is a snapshot, LOG.md the journal.
 
-### 2026-09-28: CI, release and dependency automation
-
-- The scanner gates publishing and runs on tags; the publish job refuses tags off `main`
-  or off the package version and runs no third-party code with the OIDC token.
-- Dependabot is grouped with a cooldown; ShellCheck and installs in required jobs are
-  pinned and script-free.
-
 ---
 
 ## Owner Decisions (not task registry entries)
@@ -64,9 +64,6 @@ snapshot; README split; redaction of internal details; the scanner as a required
 
 Open:
 
-- Choose whether legacy governance workflows need doctor detection or forced migration.
-- Decide whether consumer manifests with template placeholder dates are fixed before the
-  release.
 - Decide whether and when to release the unreleased changes, and the version number.
 - Track homeofe/supply-chain-guard#354 and its remaining follow-ups in that repository.
 - Owner: set the npm trusted-publisher Environment name to `npm-publish`.

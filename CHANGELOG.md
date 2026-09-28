@@ -21,6 +21,8 @@ independently of the npm version).
 
 ## [Unreleased]
 
+## [4.0.0] - 2026-09-28
+
 ### Added
 
 - `assets/governance/aahp-verify.yml`, the adopter verify workflow: `npm ci
@@ -1514,7 +1516,8 @@ independently of the npm version).
 
 - Relicensed to Apache-2.0 (earlier commits carried MIT, then CC BY 4.0, headers).
 
-[Unreleased]: https://github.com/homeofe/AAHP/compare/v3.12.0...HEAD
+[Unreleased]: https://github.com/homeofe/AAHP/compare/v4.0.0...HEAD
+[4.0.0]: https://github.com/homeofe/AAHP/compare/v3.12.0...v4.0.0
 [3.12.0]: https://github.com/homeofe/AAHP/compare/v3.11.0...v3.12.0
 [3.11.0]: https://github.com/homeofe/AAHP/compare/v3.10.0...v3.11.0
 [3.10.0]: https://github.com/homeofe/AAHP/compare/v3.9.2...v3.10.0

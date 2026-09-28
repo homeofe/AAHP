@@ -445,8 +445,9 @@ for index, entry in enumerate(entries):
 # less than it might look like, and says so in README 2.8:
 #   - it cannot see repository settings, so it cannot prove the job is a
 #     REQUIRED status check (that is a branch-protection setting);
-#   - a job-level `if:` must name pull_request, but the expression itself is not
-#     evaluated;
+#   - a job-level `if:`, when the job has one, must name pull_request (a job
+#     with none passes: it runs on every event of its workflow); the expression
+#     itself is not evaluated;
 #   - a job with `continue-on-error` other than false is refused, because its
 #     failure could not block a merge;
 #   - `paths:` filters are not evaluated; a required check that never reports

@@ -21,7 +21,9 @@
 # `npm ci` did not place it, `node` exits non-zero and the job fails closed.
 #
 # If you copied an earlier version of this file into your repository, re-scaffold
-# it with `aahp init --gates --force`; fixing it here does not fix your copy.
+# it with `aahp init --gates --workflows`, which rewrites only the workflow files
+# (`aahp doctor` reports a stale copy in its cli-source gate); fixing it here
+# does not fix your copy.
 #
 # This workflow runs NO handoff-integrity gate, and neither of its two steps
 # stands in for one. `aahp check` runs the config-driven governance gates only:

@@ -361,7 +361,7 @@
             },
             "supplyChainScan": {
               "type": "object",
-              "description": "The supply-chain scanner the owner tied this exemption to. The gate verifies that the workflow is a regular tracked file, is triggered by pull_request, defines the job, that a job-level if: names pull_request, and that the job is not continue-on-error. It cannot verify that the job is a REQUIRED status check, which is a repository setting.",
+              "description": "The supply-chain scanner the owner tied this exemption to. The gate verifies that the workflow is a regular tracked file, has pull_request among its top-level on: triggers (pull_request_target does not count), defines the job, that a job-level if:, when the job has one, names pull_request in its text (a job with no if: passes; if: always() is refused), and that the job is not continue-on-error. It cannot verify that the job is a REQUIRED status check, which is a repository setting.",
               "required": [
                 "workflow",
                 "job"

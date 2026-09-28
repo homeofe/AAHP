@@ -88,6 +88,22 @@ independently of the npm version).
   invalid (every error with its JSON Pointer), 2 could not evaluate. It ships in the
   package; adopters who want it declare `ajv` and `ajv-formats` themselves (README Section
   2.1).
+- `aahp doctor` gains a `cli-source` gate (`scripts/check-cli-source.mjs`, ADR-025). It
+  reports workflow steps that fetch the aahp CLI from the registry at run time
+  (`registry-fetch`), run the unscoped name `aahp` through a package runner
+  (`unowned-name`), run `node bin/aahp.js` in a repository without that file
+  (`checkout-path`), or call it from `node_modules/` with no install step earlier in the
+  job (`no-install`). Each fails doctor, except `npx --no-install aahp` after an install,
+  which fails closed and is `advisory`. The package itself reports `self`; `gates` gains
+  the `cli-source` key (`total` 8, `schemaVersion` stays 2).
+- `aahp init --gates --workflows` rewrites only the workflow files `init --gates` manages
+  (aahp-govern.yml, and aahp-verify.yml where `.ai/handoff/` exists, never in the package
+  itself) and leaves `aahp.config.json` and `package.json` untouched; `--workflows`
+  without `--gates` is refused.
+- `aahp migrate` removes optional MANIFEST.json task fields that hold a template
+  placeholder the schema rejects (`"[ISO-8601]"`, `"YYYY-MM-DDT00:00:00Z"`) and prints
+  task, field and old value; a required field holding one stops the run with nothing
+  changed, and a regeneration `aahp manifest` refuses restores the original bytes.
 
 ### Changed
 
@@ -110,9 +126,8 @@ independently of the npm version).
   it cannot run.
 - `aahp doctor`'s manifest-schema gate validates the whole
   `schema/aahp-manifest.schema.json` (enums, lengths, additional keys, RFC 3339 dates).
-  Migration: a manifest with template placeholder dates such as `"[ISO-8601]"` now fails
-  doctor, as it already failed ajv; replace or remove leftover template tasks before
-  upgrading if doctor runs in CI or the pre-push hook.
+  A manifest with template placeholder dates such as `"[ISO-8601]"` now fails doctor, as
+  it already failed ajv; `aahp migrate` removes them (see the Migration note below).
 - Migration: a `generate.log` config with no `target`, or with a target on the agent
   journal, now fails; point `generate.log.target` at a separate file such as
   `docs/RELEASES.md`.
@@ -172,6 +187,21 @@ independently of the npm version).
   verdicts match ajv-cli 5.0.0 on a 27-case corpus, and no workflow runs npx any more.
 - The release ceremony in CONTRIBUTING.md has an approval step for the `npm-publish`
   deployment.
+- Doctor's manifest-schema failure names `aahp migrate` when task fields hold template
+  placeholders, and only then.
+- Migration: from 4.0.0 a task field left as a template placeholder fails doctor; run
+  `aahp migrate --yes` (a required field such as title or status must be set by hand).
+- Migration: workflow copies from earlier versions that fetch the CLI at run time, use the
+  unscoped name, run `node bin/aahp.js`, or skip `npm ci` fail doctor's `cli-source` gate;
+  run `aahp init --gates --workflows`, review the diff and re-apply local edits (steps in
+  other workflow files are edited by hand). `aahp init --gates --force` stays the full
+  re-scaffold.
+- Migration: `handoffImpact.npmDevDependencyUpdates` cannot be added before upgrading,
+  because 3.12.0 rejects the key; land the upgrade as one reviewed pull request with the
+  version bump, the opt-in (with `supplyChainScan`), a STATUS.md update and a regenerated
+  MANIFEST.json (README 5.1).
+- The `aahp migrate` prompt and `--yes` cover the placeholder removal; its steps are
+  numbered 1 to 6.
 
 ### Removed
 
@@ -290,6 +320,10 @@ independently of the npm version).
   every JSON handoff file (`MANIFEST.json`, `LOG-ARCHIVE.index.json`) except
   `pii-allowlist.json`, names the JSON path of each finding, and keeps the allowlist and
   noreply/example exemptions.
+- README 2.8 and the config schema description said the npm exemption's scan job needs a
+  job-level `if:` naming `pull_request`. The gate checks that the workflow's `on:`
+  includes `pull_request`, and checks a job-level `if:` only when the job has one: no
+  `if:` passes, `if: always()` is refused.
 
 ### Security
 

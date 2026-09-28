@@ -1,0 +1,26 @@
+# Fixture: the governance workflow as earlier versions of aahp-govern.yml
+# shipped it: `npm ci`, then `npx --no-install aahp`. The unscoped name `aahp`
+# belongs to nobody; with --no-install the npx binary stops on a local miss
+# instead of executing (ADR-013), so this fails closed.
+# Expected: cli-source [unowned-name] (advisory, twice); verify-workflow
+# governance-only.
+name: AAHP Govern
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  govern:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install pinned aahp devDependency
+        run: npm ci --ignore-scripts
+      - name: Run governance gates
+        run: npx --no-install aahp check .
+      - name: Governance conformance record
+        run: npx --no-install aahp doctor --governance --json .

@@ -3,42 +3,42 @@
   "project": "AAHP",
   "last_session": {
     "agent": "claude-opus-5.5",
-    "session_id": "cli-1790583089",
-    "timestamp": "2026-09-28T08:11:29Z",
-    "commit": "f37a89a",
+    "session_id": "cli-1790584693",
+    "timestamp": "2026-09-28T08:38:13Z",
+    "commit": "2764794",
     "phase": "implementation",
     "duration_minutes": 0
   },
   "files": {
     "STATUS.md": {
-      "checksum": "sha256:85b4124d01f8f8da7795309633aaa5144a45a221ea6d92fe1c5945edfd88b382",
-      "updated": "2026-09-28T08:11:28Z",
-      "lines": 105,
-      "summary": "Working state: audit fix programme in progress; pre-4.0.0 work; this change binds publishing to a protected environment and replaces ajv-cli..."
+      "checksum": "sha256:f0d3119749f337975c72001c50528635a2176c9390aec6711c6ad15f26bf1a18",
+      "updated": "2026-09-28T08:38:13Z",
+      "lines": 108,
+      "summary": "Working state: audit fix programme in progress; pre-4.0.0 work; this change is the adopter upgrade path (branch fix/migration-and-legacy)"
     },
     "NEXT_ACTIONS.md": {
-      "checksum": "sha256:581046737e8afbc1239a7e6b583343c4ffa68b90e298d138a9fa7f7c262c7483",
-      "updated": "2026-09-28T08:06:19Z",
-      "lines": 93,
-      "summary": "npm publishing waits for the owner's approval in the `npm-publish` environment (tags `v*` only, no admin bypass)."
+      "checksum": "sha256:416959d3a2cbe1a21f703c2fff4c108a87343d33c85bd6703da2f95ba21d8f0e",
+      "updated": "2026-09-28T08:34:12Z",
+      "lines": 90,
+      "summary": "`aahp migrate` removes template placeholders from task fields; doctor gains the `cli-source` gate (ADR-025) with `aahp init --gates --workflows`..."
     },
     "LOG.md": {
-      "checksum": "sha256:492477ba5f54767539664aa8c6d8652eaa6db3c3e9724e5052adf60e7f47a095",
-      "updated": "2026-09-28T08:06:20Z",
-      "lines": 283,
-      "summary": "Latest entry: [2026-09-28] claude-opus-5.5: protected publish environment, ajv-cli replaced"
+      "checksum": "sha256:b73557933676661c491131b278cb9e42e688989fb091a69ff5aaeedff69e4a8c",
+      "updated": "2026-09-28T08:34:13Z",
+      "lines": 278,
+      "summary": "Latest entry: [2026-09-28] claude-opus-5.5: adopter upgrade path to 4.0.0"
     },
     "LOG-ARCHIVE.md": {
-      "checksum": "sha256:4ae131bd11fa94a03b3a1f1a5c03ad872351ff7e433669ec735807f4752935fa",
-      "updated": "2026-09-28T08:06:20Z",
-      "lines": 507,
-      "summary": "Newest archived entry: [2026-08-31] codex: v3.12.0 release candidate after green PR #110"
+      "checksum": "sha256:12befaf0e228d737e7d3e8393eb2e600a9bb2d3c6fa2093350bfc03d416cd5eb",
+      "updated": "2026-09-28T08:34:13Z",
+      "lines": 538,
+      "summary": "Newest archived entry: [2026-09-28] claude-opus-5.5: five Dependabot PRs integrated; scanner to v6.3.1"
     },
     "LOG-ARCHIVE.index.json": {
-      "checksum": "sha256:3c4481a49faab47fff3f717a10e2ac7f0b6255f424917118e2e7e687c52bb140",
-      "updated": "2026-09-28T08:06:20Z",
-      "lines": 81,
-      "summary": "LOG archive index: 19 entries."
+      "checksum": "sha256:43727ddda1cbf648152dc2a3ce1f016585bdea5b1e5c3c653eb81302618f180a",
+      "updated": "2026-09-28T08:34:13Z",
+      "lines": 85,
+      "summary": "LOG archive index: 20 entries."
     },
     "DASHBOARD.md": {
       "checksum": "sha256:a4994a683eaac92e36e9d25456e3d091d82801a348f680647041664d441c13e6",
@@ -77,11 +77,11 @@
       "summary": "PII allowlist: 0 entries."
     }
   },
-  "quick_context": "Pre-4.0.0: npm publishing bound to the protected npm-publish environment (owner approval, v* tags, no admin bypass); ajv-cli replaced by scripts/validate-json-schema.mjs on the ajv library (28 to 8 locked packages, no deprecation warnings). Release awaits the owner.",
+  "quick_context": "Pre-4.0.0: adopter upgrade path. aahp migrate removes template placeholders from task fields; doctor gate cli-source (ADR-025) with aahp init --gates --workflows as fix; README 5.1 documents the upgrade and its one-time handoff step. Release awaits the owner.",
   "token_budget": {
-    "manifest_only": 1421,
-    "manifest_plus_core": 3805,
-    "full_read": 23190
+    "manifest_only": 1425,
+    "manifest_plus_core": 3804,
+    "full_read": 23495
   },
   "next_task_id": 18,
   "tasks": {

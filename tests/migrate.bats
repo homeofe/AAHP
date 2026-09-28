@@ -318,3 +318,152 @@ teardown() {
     [ "$status" -eq 0 ]
     [[ "$output" == *"Migration Summary"* ]]
 }
+
+# --- Template placeholders in task fields (the 4.0.0 upgrade path) ----------
+#
+# Since `aahp doctor` validates MANIFEST.json against the whole schema, a task
+# field left as a template placeholder ("created": "[ISO-8601]", the shape the
+# template itself used to ship, or "YYYY-MM-DDT00:00:00Z") fails doctor after an
+# upgrade, and `aahp manifest` carries tasks over unchanged. The rule lives in
+# scripts/aahp-manifest-placeholders.mjs: a placeholder SHAPE that the schema
+# REJECTS. These tests hold both halves, the refusal for a required field, and
+# the all-or-nothing edit.
+
+# Replace the fixture manifest's `tasks` with the JSON object in $1.
+set_tasks() {
+    node -e '
+      const fs = require("fs");
+      const m = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+      m.tasks = JSON.parse(process.argv[2]);
+      m.next_task_id = Object.keys(m.tasks).length + 1;
+      fs.writeFileSync(process.argv[1], JSON.stringify(m, null, 2) + "\n");
+    ' "$TEST_TMPDIR/.ai/handoff/MANIFEST.json" "$1"
+}
+
+# Print task $1's field $2 as JSON, or <absent>.
+task_field() {
+    node -e '
+      const m = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
+      const t = (m.tasks || {})[process.argv[2]] || {};
+      const has = Object.prototype.hasOwnProperty.call(t, process.argv[3]);
+      console.log(has ? JSON.stringify(t[process.argv[3]]) : "<absent>");
+    ' "$TEST_TMPDIR/.ai/handoff/MANIFEST.json" "$1" "$2"
+}
+
+tasks_json() {
+    node -e 'console.log(JSON.stringify(JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")).tasks))' \
+        "$TEST_TMPDIR/.ai/handoff/MANIFEST.json"
+}
+
+@test "placeholders: --yes removes optional task fields in both shapes, prints each, and doctor's schema gate passes" {
+    create_full_handoff
+    set_tasks '{"T-001":{"title":"Example: Implement feature X","status":"in_progress","priority":"high","depends_on":[],"created":"[ISO-8601]"},"T-002":{"title":"Ship it","status":"ready","created":"YYYY-MM-DDT00:00:00Z","completed":"[ISO-8601]"}}'
+    run node "$AAHP_ROOT/bin/aahp.js" doctor "$TEST_TMPDIR"
+    [[ "$output" == *"FAIL     manifest-schema"* ]]
+
+    run bash "$SCRIPTS_DIR/aahp-migrate-v2.sh" "$TEST_TMPDIR" --yes </dev/null
+    [ "$status" -eq 0 ]
+    # Every change is printed with task, field and old value.
+    [[ "$output" == *'removed T-001.created (was "[ISO-8601]"'* ]]
+    [[ "$output" == *'removed T-002.created (was "YYYY-MM-DDT00:00:00Z"'* ]]
+    [[ "$output" == *'removed T-002.completed (was "[ISO-8601]"'* ]]
+    local changed
+    changed="$(printf '%s\n' "$output" | sed -n '/^Changed:/,/^Next steps:/p')"
+    [[ "$changed" == *"MANIFEST.json: removed T-001.created"* ]]
+    [[ "$changed" == *"MANIFEST.json: removed T-002.completed"* ]]
+    # Removed, and nothing else in the task moved.
+    [ "$(task_field T-001 created)" = "<absent>" ]
+    [ "$(task_field T-002 created)" = "<absent>" ]
+    [ "$(task_field T-002 completed)" = "<absent>" ]
+    [ "$(task_field T-001 title)" = '"Example: Implement feature X"' ]
+    [ "$(task_field T-001 priority)" = '"high"' ]
+    [ "$(task_field T-001 depends_on)" = '[]' ]
+    [ "$(task_field T-002 status)" = '"ready"' ]
+
+    run node "$AAHP_ROOT/bin/aahp.js" doctor "$TEST_TMPDIR"
+    [[ "$output" == *"manifest-schema: MANIFEST.json validates against"* ]]
+}
+
+@test "placeholders: a real date and bracketed free text are data, and are left alone" {
+    # "[unassigned]" and "[waiting on review]" have the placeholder shape, but the
+    # schema accepts any string there, so they are not what doctor rejects and
+    # not what migrate may touch. "[WIP] parser" is not even the shape.
+    create_full_handoff
+    set_tasks '{"T-001":{"title":"[WIP] parser","status":"done","assigned_to":"[unassigned]","blocked_by":"[waiting on review]","created":"2026-02-26T10:00:00Z","completed":"2026-02-26T14:30:00Z"}}'
+    local before
+    before="$(tasks_json)"
+    run bash "$SCRIPTS_DIR/aahp-migrate-v2.sh" "$TEST_TMPDIR" --yes </dev/null
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"No task field holds an unreplaced template placeholder."* ]]
+    [[ "$output" != *"-> removed "* ]]
+    [ "$(tasks_json)" = "$before" ]
+    [ "$(task_field T-001 created)" = '"2026-02-26T10:00:00Z"' ]
+    [ "$(task_field T-001 assigned_to)" = '"[unassigned]"' ]
+}
+
+@test "placeholders: a REQUIRED field holding one is refused, naming task and field, and nothing changes" {
+    create_full_handoff
+    set_tasks '{"T-001":{"title":"Example","status":"[ready|in_progress|blocked|done|cancelled]","created":"[ISO-8601]"}}'
+    cp "$TEST_TMPDIR/.ai/handoff/MANIFEST.json" "$TEST_TMPDIR/manifest.before"
+    [ ! -f "$TEST_TMPDIR/.ai/handoff/.aiignore" ]
+
+    run bash "$SCRIPTS_DIR/aahp-migrate-v2.sh" "$TEST_TMPDIR" --yes </dev/null
+    [ "$status" -eq 1 ]
+    [[ "$output" == *'T-001.status = "[ready|in_progress|blocked|done|cancelled]"'* ]]
+    [[ "$output" == *'"status" is required'* ]]
+    [[ "$output" == *"Nothing was changed."* ]]
+    # Not even the optional placeholder beside it, and no later step ran.
+    cmp -s "$TEST_TMPDIR/manifest.before" "$TEST_TMPDIR/.ai/handoff/MANIFEST.json"
+    [ ! -f "$TEST_TMPDIR/.ai/handoff/.aiignore" ]
+    [[ "$output" != *"Migration Summary"* ]]
+}
+
+@test "placeholders: a second run finds nothing and changes no task (idempotent)" {
+    create_full_handoff
+    set_tasks '{"T-001":{"title":"Example","status":"ready","created":"[ISO-8601]"},"T-002":{"title":"Real","status":"done","created":"2026-02-26T10:00:00Z"}}'
+    run bash "$SCRIPTS_DIR/aahp-migrate-v2.sh" "$TEST_TMPDIR" --yes </dev/null
+    [ "$status" -eq 0 ]
+    [[ "$output" == *'removed T-001.created'* ]]
+    local first
+    first="$(tasks_json)"
+
+    run bash "$SCRIPTS_DIR/aahp-migrate-v2.sh" "$TEST_TMPDIR" --yes </dev/null
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"No task field holds an unreplaced template placeholder."* ]]
+    [[ "$output" != *"-> removed "* ]]
+    [ "$(tasks_json)" = "$first" ]
+    [ "$(task_field T-002 created)" = '"2026-02-26T10:00:00Z"' ]
+}
+
+@test "placeholders: declining the prompt lists them and leaves MANIFEST.json byte-identical" {
+    create_full_handoff
+    set_tasks '{"T-001":{"title":"Example","status":"ready","created":"[ISO-8601]"}}'
+    cp "$TEST_TMPDIR/.ai/handoff/MANIFEST.json" "$TEST_TMPDIR/manifest.before"
+    run bash -c "echo n | bash '$SCRIPTS_DIR/aahp-migrate-v2.sh' '$TEST_TMPDIR'"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *'T-001.created = "[ISO-8601]" is an unreplaced template placeholder'* ]]
+    [[ "$output" == *"Aborted."* ]]
+    cmp -s "$TEST_TMPDIR/manifest.before" "$TEST_TMPDIR/.ai/handoff/MANIFEST.json"
+}
+
+@test "placeholders: when the generator refuses, the removal is rolled back to the original bytes" {
+    # An unknown top-level field makes aahp manifest refuse to overwrite (it
+    # cannot carry the field over). The placeholder edit must not survive alone.
+    create_full_handoff
+    set_tasks '{"T-001":{"title":"Example","status":"ready","created":"[ISO-8601]"}}'
+    node -e '
+      const fs = require("fs");
+      const m = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+      m.legacy_field = true;
+      fs.writeFileSync(process.argv[1], JSON.stringify(m, null, 2) + "\n");
+    ' "$TEST_TMPDIR/.ai/handoff/MANIFEST.json"
+    cp "$TEST_TMPDIR/.ai/handoff/MANIFEST.json" "$TEST_TMPDIR/manifest.before"
+
+    run bash "$SCRIPTS_DIR/aahp-migrate-v2.sh" "$TEST_TMPDIR" --yes </dev/null
+    [ "$status" -eq 1 ]
+    [[ "$output" == *'removed T-001.created'* ]]
+    [[ "$output" == *"refusing to overwrite"* ]]
+    [[ "$output" == *"restored to the bytes it had before this run"* ]]
+    cmp -s "$TEST_TMPDIR/manifest.before" "$TEST_TMPDIR/.ai/handoff/MANIFEST.json"
+    [ "$(task_field T-001 created)" = '"[ISO-8601]"' ]
+}

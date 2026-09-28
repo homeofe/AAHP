@@ -1,0 +1,24 @@
+# Fixture: a legacy adopter verify workflow that fetches the published CLI at
+# run time, by exact version, with `npx -y`. Nothing checks what it downloads
+# against the lockfile, and the version that runs is not the devDependency pin.
+# Expected: cli-source [registry-fetch] (fail); verify-workflow enforced.
+name: AAHP Verify
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  aahp-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Run aahp verify (CI level, no escape hatch)
+        run: npx -y @elvatis_com/aahp@3.10.0 verify . --level ci
+      - name: Run aahp doctor (conformance record)
+        run: npx -y @elvatis_com/aahp@3.10.0 doctor . --json

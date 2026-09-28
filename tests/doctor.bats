@@ -59,7 +59,7 @@ EOF
       process.stdin.on("data", (d) => (s += d)).on("end", () => {
         const r = JSON.parse(s);
         if (r.schemaVersion !== 2) process.exit(2);
-        const keys = ["handoff-set","manifest-schema","grounding","pinned-dep","changelog-format","version-sync","verify-workflow"];
+        const keys = ["handoff-set","manifest-schema","grounding","pinned-dep","changelog-format","version-sync","verify-workflow","cli-source"];
         for (const k of keys) if (!(k in r.gates)) process.exit(3);
         if (typeof r.checkedAt !== "string") process.exit(4);
         if (typeof r.aahpVersion !== "string") process.exit(5);
@@ -88,7 +88,7 @@ EOF
     printf '{"name":"empty","version":"1.0.0","private":true}\n' > "$TEST_TMPDIR/package.json"
     run node "$AAHP" doctor "$TEST_TMPDIR" --governance
     [ "$status" -eq 1 ]
-    [[ "$output" == *"Conformance NOT EVALUATED: 0 of 7 gate(s) ran. This is not a pass."* ]]
+    [[ "$output" == *"Conformance NOT EVALUATED: 0 of 8 gate(s) ran. This is not a pass."* ]]
     [[ "$output" != *"Conformance OK"* ]]
 }
 
@@ -97,9 +97,9 @@ EOF
     run node "$AAHP" doctor "$TEST_TMPDIR"
     [ "$status" -eq 0 ]
     # MEASURED on Linux, not guessed: the three handoff gates plus pinned-dep
-    # evaluate; changelog-format, version-sync and verify-workflow have nothing
+    # evaluate; changelog-format, version-sync, verify-workflow and cli-source have nothing
     # to check in this fixture.
-    [[ "$output" == *"Conformance OK: 4 of 7 gate(s) ran, no failures."* ]]
+    [[ "$output" == *"Conformance OK: 4 of 8 gate(s) ran, no failures."* ]]
     [[ "$output" != *"Conformance OK: 7 gate(s)"* ]]
 }
 
@@ -128,7 +128,7 @@ EOF
     scaffold_conformant
     run node "$AAHP" doctor "$TEST_TMPDIR" --quiet
     [ "$status" -eq 0 ]
-    [[ "$output" == *"Conformance OK: 4 of 7 gate(s) ran, no failures."* ]]
+    [[ "$output" == *"Conformance OK: 4 of 8 gate(s) ran, no failures."* ]]
 }
 
 @test "doctor --json: the record separates governance-mode skips from not-applicable" {
@@ -502,7 +502,7 @@ EOF
     ' "$gov" "$nh"
 }
 
-@test "doctor --governance --json emits mode:governance with all seven gate keys and the 3 handoff gates skip" {
+@test "doctor --governance --json emits mode:governance with all eight gate keys and the 3 handoff gates skip" {
     scaffold_conformant
     rm -rf "$TEST_TMPDIR/.ai"
     run node "$AAHP" doctor "$TEST_TMPDIR" --governance --json
@@ -512,7 +512,7 @@ EOF
       process.stdin.on("data", (d) => (s += d)).on("end", () => {
         const r = JSON.parse(s);
         if (r.mode !== "governance") process.exit(2);
-        const keys = ["handoff-set","manifest-schema","grounding","pinned-dep","changelog-format","version-sync","verify-workflow"];
+        const keys = ["handoff-set","manifest-schema","grounding","pinned-dep","changelog-format","version-sync","verify-workflow","cli-source"];
         for (const k of keys) if (!(k in r.gates)) process.exit(3);
         for (const k of ["handoff-set", "manifest-schema", "grounding"]) {
           if (r.gates[k] !== "skip") process.exit(4);
@@ -592,4 +592,42 @@ scaffold_drifted_handoff() {
     run bash "$SCRIPTS_DIR/verify-handoff.sh" "$TEST_TMPDIR" --level precommit
     [ "$status" -eq 1 ]
     [[ "$output" == *"Checksum mismatch: STATUS.md"* ]]
+}
+
+# --- A template placeholder in a task names its fix (4.0.0 upgrade path) -----
+#
+# The manifest-schema gate became a full-schema check, so a task field still
+# holding a template placeholder fails doctor after an upgrade. The failure must
+# name the fix, and ONLY for that failure: the hint comes from the same predicate
+# `aahp migrate` applies, so a schema error migrate would not touch gets none.
+
+# Put tasks (the JSON object in $1) into the conformant fixture's manifest.
+doctor_set_tasks() {
+    node -e '
+      const fs = require("fs");
+      const m = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+      m.tasks = JSON.parse(process.argv[2]);
+      fs.writeFileSync(process.argv[1], JSON.stringify(m, null, 2) + "\n");
+    ' "$TEST_TMPDIR/.ai/handoff/MANIFEST.json" "$1"
+}
+
+@test "doctor: a task field left as a template placeholder names aahp migrate as the fix" {
+    scaffold_conformant
+    doctor_set_tasks '{"T-001":{"title":"Example","status":"ready","created":"[ISO-8601]"},"T-002":{"title":"Other","status":"done","completed":"YYYY-MM-DDT00:00:00Z"}}'
+    run node "$AAHP" doctor "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"FAIL     manifest-schema"* ]]
+    [[ "$output" == *"2 task field(s) hold an unreplaced template placeholder (T-001.created, T-002.completed)"* ]]
+    [[ "$output" == *"run aahp migrate"* ]]
+}
+
+@test "doctor: a schema failure that is not a placeholder does not point at aahp migrate" {
+    # The pair to the test above: an invalid date that is not a template shape.
+    scaffold_conformant
+    doctor_set_tasks '{"T-001":{"title":"Example","status":"ready","created":"2026-13-45T00:00:00Z"}}'
+    run node "$AAHP" doctor "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"FAIL     manifest-schema"* ]]
+    [[ "$output" == *"/tasks/T-001/created"* ]]
+    [[ "$output" != *"aahp migrate"* ]]
 }

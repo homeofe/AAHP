@@ -7,6 +7,32 @@
 
 ---
 
+## [2026-09-28] claude-opus-5.5: adopter upgrade path to 4.0.0
+
+**Agent:** claude-opus-5.5
+**Phase:** implementation
+**Branch:** fix/migration-and-legacy
+**Tasks:** owner decision of 2026-09-28 to close every open item before 4.0.0
+
+### What was done
+
+- `aahp migrate` removes schema-rejected template placeholders from optional task
+  fields; doctor names that fix.
+- New doctor gate `cli-source` (ADR-025) and `aahp init --gates --workflows` as its
+  targeted remediation.
+- README 5.1 documents the upgrade and the one-time handoff step for adopters that want
+  the npm devDependency exemption; README 2.8 wording corrected.
+- A compatibility test ran this tree against supply-chain-guard, still pinned to 3.12.0:
+  doctor passes with three advisory findings; the fix there is a hand edit of three
+  steps, prepared as a pull request in that repository.
+
+### Decision
+
+- `npx --no-install aahp` after an install is advisory, not a failure: measured
+  fail-closed, zero registry requests when the package is installed.
+
+---
+
 ## [2026-09-28] claude-opus-5.5: protected publish environment, ajv-cli replaced
 
 **Agent:** claude-opus-5.5
@@ -250,34 +276,3 @@
   working-tree gate because a pull request can change the gate; an adopter must run the
   version its lockfile pins. A shell branch between the two would be a skip that doctor's
   verify-workflow gate cannot audit. A parity test keeps them aligned.
-
----
-
-## [2026-09-28] claude-opus-5.5: five Dependabot PRs integrated; scanner to v6.3.1
-
-**Agent:** claude-opus-5.5
-**Phase:** implementation
-**Branch:** chore/deps-2026-09
-**Tasks:** owner request to integrate the open pull requests
-
-### What was done
-
-- Found all five open pull requests (#112, #113, #115, #117, #118) red on the required
-  `aahp-verify` check, some for four weeks. Two causes, both measured: Layer 2 because
-  Dependabot writes no handoff state, and Layer 4 because two `verified` TRUST rows had
-  expired on 2026-09-22, which fails every pull request, not only Dependabot's.
-- #118 additionally failed `tests/workflow-pinning.bats` (line 704), the contract that pins the
-  scanner to a reviewed commit. That is the gate doing its job, not a defect.
-- Cherry-picked #112, #113, #115 and #117 unchanged. Checked each lockfile integrity hash
-  against the registry and the CodeQL pin against its tag.
-- Moved supply-chain-guard to v6.3.1 (owner pointed out it is current) rather than #118's
-  v6.2.0, after resolving the signed tag and diffing `action.yml` and
-  `policy-schema.json` against v6.0.8. Mutation-proved the moved bats contract.
-- Re-verified the two expired TRUST rows against the tree before resetting their dates.
-
-### Decision
-
-- One replacement pull request instead of five handoff commits on five Dependabot
-  branches: one CI run, one handoff entry, no back-to-back merges, and the three
-  lockfile bumps would otherwise have needed sequential rebases. Same pattern as
-  #109 / #110. Layer 2 was not weakened.

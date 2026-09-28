@@ -31,6 +31,8 @@ import { constants as osConstants } from 'node:os'
 import { resolveBash, toBashPath } from '../scripts/aahp-config.mjs'
 import { validateConfigObject, formatConfigErrors, validateManifestObject } from '../scripts/aahp-schema.mjs'
 import { audit as auditVerifyWorkflow } from '../scripts/check-verify-workflow.mjs'
+import { findTaskPlaceholders } from '../scripts/aahp-manifest-placeholders.mjs'
+import { auditCliSource } from '../scripts/check-cli-source.mjs'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -58,8 +60,11 @@ Commands:
   init [path]       Initialize .ai/handoff/ directory with AAHP templates
   manifest [path]   (Re)generate MANIFEST.json from existing handoff files
   lint [path]       Validate handoff files for safety violations
-  migrate [path]    Migrate an AAHP v1 project to v2/v3 (generates MANIFEST.json;
-                    reports the remaining manual steps, changes nothing else)
+  migrate [path]    Migrate an AAHP v1 project to v2/v3, or bring an existing
+                    MANIFEST.json up to the current schema: removes optional
+                    task fields left as template placeholders ("[ISO-8601]"),
+                    regenerates MANIFEST.json, and reports the remaining manual
+                    steps; it changes nothing else
   migrate-grounding [path]  Add the Grounded Reflection Layer to an existing project
   verify [path]     Run the canonical handoff gate (checksum + drift + pointer + TTL)
   check [path]      Run the config-driven governance gates as one aggregate
@@ -79,6 +84,9 @@ Init options:
                     pinnedDep), a govern npm script, .github/workflows/
                     aahp-govern.yml, and .github/workflows/aahp-verify.yml
                     when .ai/handoff/ exists; does NOT create .ai/handoff/
+  --workflows       With --gates: (re)write ONLY the workflow files --gates
+                    manages, overwriting existing copies; aahp.config.json and
+                    package.json are not touched (the aahp doctor cli-source fix)
   --force           Overwrite existing files (default: skip existing)
   --with-pii-allowlist  Copy pii-allowlist.json template when needed
 
@@ -120,7 +128,7 @@ Archive options (requires Python 3, as python3 or python on PATH):
                     every hash it drops and records; writes only the index
 
 Migrate options:
-  --yes, -y         Regenerate an existing MANIFEST.json without asking.
+  --yes, -y         Update an existing MANIFEST.json without asking.
                     Without it, the answer is read from stdin, and a stdin
                     with no answer (not a terminal, nothing piped) is an error.
 
@@ -322,6 +330,14 @@ function cmdInit(targetPath, flags) {
 // isSelfPackage, the same predicate the doctor pinned-dep gate uses, so the two
 // cannot disagree about which repository is the package. `pinnedDep: {}` is still
 // written there: the gate reports `self` before it reads the key, so it is inert.
+//
+// --workflows is the targeted remediation the doctor cli-source gate names. It
+// (re)writes ONLY the workflow files this command manages, overwriting existing
+// copies (aahp-govern.yml, and aahp-verify.yml under the same .ai/handoff/ and
+// self rules as above), and does not write aahp.config.json or package.json at
+// all. `--force` alone re-scaffolds everything, the config included, which is the
+// wrong tool for an adopter whose only problem is a stale workflow copy: it would
+// replace a tuned aahp.config.json with the trimmed default.
 // ---------------------------------------------------------------------------
 
 const GATES_CONFIG = {
@@ -367,6 +383,10 @@ function scaffoldWorkflow(targetPath, name, force) {
 
 function cmdInitGates(targetPath, flags) {
   const force = flags.includes('--force')
+  // Workflows only: the config and the govern script are left alone, and the
+  // workflows are overwritten (see the header comment).
+  const workflowsOnly = flags.includes('--workflows')
+  const forceWorkflows = force || workflowsOnly
 
   if (!existsSync(targetPath)) {
     console.error(`Error: target directory does not exist: ${targetPath}`)
@@ -383,7 +403,10 @@ function cmdInitGates(targetPath, flags) {
   try {
     // 1. aahp.config.json (inlined; ASCII; em-dash stored as an escape)
     const configPath = join(targetPath, 'aahp.config.json')
-    if (existsSync(configPath) && !force) {
+    if (workflowsOnly) {
+      // A note, not a skip: nothing was declined, the step was not asked for.
+      console.log('  keep: aahp.config.json (--workflows: not written)')
+    } else if (existsSync(configPath) && !force) {
       console.log('  skip: aahp.config.json (already exists, use --force to overwrite)')
       skipped++
     } else {
@@ -394,7 +417,9 @@ function cmdInitGates(targetPath, flags) {
 
     // 2. govern npm script - only when a package.json already exists (never create one)
     const pkgPath = join(targetPath, 'package.json')
-    if (existsSync(pkgPath)) {
+    if (workflowsOnly) {
+      console.log('  keep: package.json (--workflows: no govern script change)')
+    } else if (existsSync(pkgPath)) {
       const pkg = readJsonSafe(pkgPath)
       if (!pkg) {
         console.log('  skip: package.json present but not valid JSON; not adding a govern script')
@@ -414,7 +439,7 @@ function cmdInitGates(targetPath, flags) {
     }
 
     // 3. .github/workflows/aahp-govern.yml (copied from the packaged asset)
-    if (scaffoldWorkflow(targetPath, 'aahp-govern.yml', force) === 'write') wrote++
+    if (scaffoldWorkflow(targetPath, 'aahp-govern.yml', forceWorkflows) === 'write') wrote++
     else skipped++
 
     // 4. .github/workflows/aahp-verify.yml, only where there is a handoff set to
@@ -428,7 +453,7 @@ function cmdInitGates(targetPath, flags) {
       console.log('        tree, which the adopter copy cannot (README Section 9.2).')
     } else if (isDirectory(join(targetPath, '.ai', 'handoff'))) {
       verifyScaffolded = true
-      if (scaffoldWorkflow(targetPath, 'aahp-verify.yml', force) === 'write') wrote++
+      if (scaffoldWorkflow(targetPath, 'aahp-verify.yml', forceWorkflows) === 'write') wrote++
       else skipped++
     } else {
       console.log('  note: no .ai/handoff/; skipped .github/workflows/aahp-verify.yml (it runs aahp verify,')
@@ -448,6 +473,14 @@ function cmdInitGates(targetPath, flags) {
   console.log()
   console.log(`Done. ${wrote} written/updated, ${skipped} skipped.`)
   console.log()
+  if (workflowsOnly) {
+    console.log('Next steps:')
+    console.log('  1. Review git diff -- .github/workflows/ and re-apply any edit your old copies carried')
+    console.log('     (a branches: list for a default branch other than main, say).')
+    console.log('  2. Keep an npm ci --ignore-scripts step working: the workflows run the pinned CLI by path.')
+    console.log('  3. Run: aahp doctor (its cli-source gate reports any legacy step left in another workflow file).')
+    return
+  }
   console.log('Next steps:')
   console.log('  1. Pin aahp exactly: npm install --save-dev --save-exact @elvatis_com/aahp')
   console.log('     (the scaffolded pinnedDep makes aahp doctor fail a range or a missing pin),')
@@ -819,6 +852,30 @@ function gateHandoffSet(handoffDir) {
 // not check. It now runs the in-repo validator (scripts/aahp-schema.mjs, Node
 // built-ins only, ADR-002) over the full schema, and a schema keyword that
 // validator does not implement is an error, never a silent pass.
+// The upgrade path for the most common manifest-schema failure after that change:
+// a task field still holding a template placeholder ("created": "[ISO-8601]"). The
+// failure names its fix, computed by the SAME predicate `aahp migrate` applies
+// (scripts/aahp-manifest-placeholders.mjs), so the hint appears exactly when
+// migrate would act and never for a failure migrate does not touch. A detector
+// that cannot run adds no hint; the schema errors above are still the verdict.
+function placeholderRemedy(manifest) {
+  let found
+  try {
+    found = findTaskPlaceholders(manifest)
+  } catch {
+    return ''
+  }
+  if (found.length === 0) return ''
+  const names = found.map((f) => `${f.task}.${f.field}`)
+  const optional = found.filter((f) => !f.required).length
+  const required = found.length - optional
+  const what =
+    required === 0
+      ? 'aahp migrate removes them (optional fields; it prints each change)'
+      : `aahp migrate names the ${required} required one(s) to set by hand and removes the optional ones`
+  return ` FIX: ${found.length} task field(s) hold an unreplaced template placeholder (${names.join(', ')}); run aahp migrate (aahp migrate --yes in CI): ${what}.`
+}
+
 function gateManifestSchema(handoffDir) {
   const manifest = readJsonSafe(join(handoffDir, 'MANIFEST.json'))
   if (!manifest) return { status: 'fail', reason: 'MANIFEST.json missing or invalid JSON' }
@@ -830,7 +887,10 @@ function gateManifestSchema(handoffDir) {
   }
   if (errs.length) {
     const shown = errs.slice(0, 5).map((e) => `${e.path === '' ? '(root)' : e.path}: ${e.message}`)
-    return { status: 'fail', reason: shown.join('; ') + (errs.length > 5 ? ` (+${errs.length - 5} more)` : '') }
+    return {
+      status: 'fail',
+      reason: shown.join('; ') + (errs.length > 5 ? ` (+${errs.length - 5} more)` : '') + placeholderRemedy(manifest),
+    }
   }
   return {
     status: 'pass',
@@ -994,6 +1054,76 @@ function gateVerifyWorkflow(targetPath) {
   return { status: 'fail', reason: detail + remediation }
 }
 
+// ---------------------------------------------------------------------------
+// cli-source gate - "is the aahp CLI a workflow runs the one the lockfile pins?"
+//
+// Adopters copied earlier versions of the shipped workflows, and a copy does not
+// update with the package. The audit (scripts/check-cli-source.mjs, whose header
+// lists the shapes) finds the legacy ones: the gate fetched from the registry at
+// run time (`npx -y @elvatis_com/aahp@<version>`), the unowned UNSCOPED name run
+// through a package runner, `node bin/aahp.js` where only an AAHP checkout has
+// that file, and a node_modules invocation with no install before it. (The
+// unscoped spellings are deliberately not written out in this directory:
+// tests/inert-controls.bats forbids them anywhere under bin/.)
+//
+// SEVERITY, decided per finding by the audit: FAIL when a shape can execute code
+// the lockfile did not pin or can never succeed; ADVISORY when it fails closed
+// (the unscoped name behind --no-install). Unlike verify-workflow's opt-in
+// enforcement, there is no switch here: the failing shapes are not a deliberate
+// configuration anyone
+// keeps, they are stale copies, and the fix is one command the pull-request
+// author can run in the same pull request.
+//
+// This package itself is `self`, by the same isSelfPackage predicate as the pin
+// gate and `init --gates`: its own workflows run `node bin/aahp.js` from the
+// working tree on purpose (README Section 9.2).
+// ---------------------------------------------------------------------------
+function cliSourceRemediation(name) {
+  return (
+    ' REMEDIATION: run aahp init --gates --workflows. It rewrites .github/workflows/aahp-govern.yml, and' +
+    ' .github/workflows/aahp-verify.yml where .ai/handoff/ exists, from the installed templates, which run' +
+    ' the pinned CLI by path after npm ci, and touches nothing else (aahp.config.json and package.json stay' +
+    ' as they are); review git diff and re-apply any edit your old copies carried. A step in any other' +
+    ` workflow file is not rewritten: run node ./node_modules/${name}/bin/aahp.js <command> there after` +
+    ' npm ci --ignore-scripts, or delete the step.'
+  )
+}
+
+function gateCliSource(targetPath, pkg, config) {
+  const name = pinnedPackageName(config)
+  if (isSelfPackage(pkg, config)) {
+    return {
+      status: 'self',
+      reason: `this repo is ${name} itself; its workflows run the CLI from the working tree, which is right here and nowhere else (README Section 9.2)`,
+    }
+  }
+  let r
+  try {
+    r = auditCliSource(targetPath, { pkgName: name })
+  } catch (err) {
+    return { status: 'fail', reason: `could not audit how workflows invoke the aahp CLI: ${err.message}` }
+  }
+  if (r.unassessed.length > 0) {
+    return { status: 'fail', reason: `a workflow that mentions aahp could not be assessed: ${r.unassessed[0]}` }
+  }
+  if (r.invocations === 0) return { status: 'skip', reason: 'no workflow here invokes the aahp CLI' }
+  const failing = r.findings.filter((f) => f.severity === 'fail')
+  if (r.findings.length === 0) {
+    return {
+      status: 'pass',
+      reason:
+        `${r.invocations} aahp CLI invocation(s) in workflows, none of a legacy shape` +
+        ' (registry fetch, unowned name, checkout path, missing install)',
+    }
+  }
+  const first = (failing.length > 0 ? failing : r.findings)[0]
+  const others = r.findings.filter((f) => f !== first)
+  const more = others.length > 0 ? ` (+${others.length} more: ${[...new Set(others.map((f) => f.id))].join(', ')})` : ''
+  const reason = `legacy workflow [${first.id}] ${first.detail}${more}${cliSourceRemediation(name)}`
+  if (failing.length > 0) return { status: 'fail', reason }
+  return { status: 'advisory', reason: `${reason} ADVISORY: this shape fails closed, so it is reported and does not fail doctor.` }
+}
+
 // Absent config, absent section, or enforce:false all mean NOT enforced, so a
 // repository that has never heard of this setting keeps the exit code it had.
 //
@@ -1085,7 +1215,7 @@ function cmdDoctor(targetPath, flags) {
   // Same rule as `check`: a config that does not match its own schema is an
   // error, and the record says which gates were never evaluated because of it.
   if (configProblem) {
-    const gateIds = ['handoff-set', 'manifest-schema', 'grounding', 'pinned-dep', 'changelog-format', 'version-sync', 'verify-workflow']
+    const gateIds = ['handoff-set', 'manifest-schema', 'grounding', 'pinned-dep', 'changelog-format', 'version-sync', 'verify-workflow', 'cli-source']
     const gates = {}
     const gateOutcomes = {}
     for (const id of gateIds) {
@@ -1131,6 +1261,9 @@ function cmdDoctor(targetPath, flags) {
     // Evaluated in governance mode too: a repo can adopt the CI backstop
     // without adopting the handoff files, and weakening it matters either way.
     'verify-workflow': gateVerifyWorkflow(targetPath),
+    // Evaluated in governance mode too, for the same reason: aahp-govern.yml is a
+    // workflow that runs the CLI, with or without a handoff set.
+    'cli-source': gateCliSource(targetPath, pkg, config),
   }
   // The three handoff gates in governance mode are the one skip here that is a
   // DECISION not to look, rather than an absent precondition. Everything else
@@ -1541,6 +1674,12 @@ const rest = rawArgs.slice(1)
 switch (command) {
   case 'init': {
     const { targetPath, flags } = extractPathAndFlags(rest)
+    // --workflows only means something to --gates. Without it, plain init would
+    // copy the handoff templates, which is not what the flag asks for.
+    if (flags.includes('--workflows') && !flags.includes('--gates')) {
+      console.error('Error: --workflows is an option of init --gates: aahp init --gates --workflows [path]')
+      process.exit(1)
+    }
     if (flags.includes('--gates')) cmdInitGates(targetPath, flags)
     else cmdInit(targetPath, flags)
     break

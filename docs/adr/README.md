@@ -52,3 +52,4 @@ re-litigated once they fall out of the default read set.
 | [ADR-022](ADR-022.md) | section 2.4 provenance is a convention, and the audit-trail claim is withdrawn |
 | [ADR-023](ADR-023.md) | a path a document tells you to copy is a path a gate resolves |
 | [ADR-024](ADR-024.md) | trust decay can block, and each repository decides whether it does |
+| [ADR-025](ADR-025.md) | which aahp a workflow runs is its own doctor gate, and a shape that can run unpinned code fails |

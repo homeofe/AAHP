@@ -179,7 +179,9 @@ exists it also copies the adopter verify workflow of step 5; where it does not, 
 writes no verify workflow, because `aahp verify` would fail there on its first run,
 and prints how to add it later (run `aahp init` and `aahp manifest`, then
 `aahp init --gates` again, or copy the file as in step 5). Every file that already
-exists is skipped unless you pass `--force`.
+exists is skipped unless you pass `--force`. `aahp init --gates --workflows` rewrites
+only those workflow files, overwriting your copies, and leaves `aahp.config.json` and
+`package.json` alone (Section 5.1).
 [docs/governance.md](docs/governance.md) documents each gate and what makes it
 applicable.
 
@@ -842,8 +844,13 @@ between the diff base and the inspected snapshot (the index):
 The owner tied the exemption to a supply-chain scanner being a required check, so
 `supplyChainScan` is mandatory, and on EVERY run the gate proves against the
 inspected snapshot that the workflow (relative to the repository top level) is a
-regular tracked file triggered by `pull_request`, that it defines the job, that a
-job-level `if:` names `pull_request`, and that the job is not `continue-on-error`.
+regular tracked file whose top-level `on:` triggers include `pull_request`
+(`pull_request_target` does not count), that it defines the job, that the job's
+job-level `if:`, IF it has one, names `pull_request` in its text, and that the job
+is not `continue-on-error`. A job with no `if:` passes, because it runs on every
+event its workflow is triggered by; a job whose condition does not name
+`pull_request`, `if: always()` included, is refused (`scripts/_aahp-lib.sh`,
+`aahp_workflow_job_on_pull_request`).
 Deleting or disabling the scanner while the opt-in stays fails in that very change.
 What it cannot prove, stated so the green is not over-read: that the job is a
 REQUIRED status check (a branch-protection setting the gate cannot read); what a
@@ -971,10 +978,12 @@ AAHP has no agent/command layer of its own.
 The layers above gate *handoff* state. Release hygiene is a separate concern with its
 own commands, documented in full in [docs/governance.md](docs/governance.md):
 
-- **`aahp doctor`** emits a versioned conformance record (`schemaVersion` 2) over seven
+- **`aahp doctor`** emits a versioned conformance record (`schemaVersion` 2) over eight
   gates: the handoff file set, the manifest schema, the grounding files, the pinned
   dependency (skipped unless `pinnedDep` is configured), the changelog grammar, version
-  sync, and whether the workflow that runs `aahp verify` can skip it. A run that
+  sync, whether the workflow that runs `aahp verify` can skip it, and whether each
+  workflow runs the aahp CLI the lockfile pins rather than a legacy spelling
+  (`cli-source`, Section 5.1). A run that
   evaluated no gate is `NOT EVALUATED` and exits 1; it is never a pass. `doctor` never
   hashes a handoff file: checksum integrity belongs to `aahp verify` Layer 1.
 - **`aahp check`** runs the eight config-driven governance gates (changelog presence
@@ -1114,17 +1123,118 @@ v2/v3 is fully backward compatible. An agent encountering a v1 directory (no `MA
 `aahp migrate [path]` (`scripts/aahp-migrate-v2.sh`) performs steps 1 and 5 and
 only REPORTS on steps 2 to 4. It never edits `STATUS.md`, `LOG.md` or `TRUST.md`;
 it checks each one and its summary lists what is left under "Left for you",
-apart from what it changed.
+apart from what it changed. On a project that already has a `MANIFEST.json` it also
+removes task fields left as template placeholders before regenerating it (Section
+5.1).
 
 ```bash
-aahp migrate            # asks before regenerating an existing MANIFEST.json
-aahp migrate --yes      # regenerate without asking (CI, scripts)
+aahp migrate            # asks before changing an existing MANIFEST.json
+aahp migrate --yes      # change it without asking (CI, scripts)
 aahp archive            # then rotate LOG.md, if migrate reported more than 10 entries
 ```
 
 Without `--yes` the answer to that prompt is read from stdin. A piped answer
 (`echo y | aahp migrate`) still works; a stdin that yields no answer at all (not a
 terminal, nothing piped in) is an error: exit 1, nothing changed.
+
+### 5.1 Upgrading an existing adoption to 4.0.0
+
+Three things meet an adopter on the upgrade from 3.x. Each has a fix, and all three
+belong in the one pull request that moves the pin.
+
+**1. Template placeholders in `MANIFEST.json` tasks.** From 4.0.0 `aahp doctor`
+validates `MANIFEST.json` against the whole schema, so a task field that still holds a
+template placeholder fails its `manifest-schema` gate, and the failure names the fix.
+Two shapes occur: `"created": "[ISO-8601]"`, which `templates/MANIFEST.json` shipped
+for its example tasks before 4.0.0, and the literal `"created": "YYYY-MM-DDT00:00:00Z"`.
+`aahp manifest` carries tasks over unchanged, so regenerating alone never clears them.
+`aahp migrate` does, and touches nothing else:
+
+- A task field is a candidate only when its WHOLE value has a placeholder shape (one
+  bracketed token such as `[ISO-8601]`, or `YYYY-MM-DD` optionally followed by a time)
+  AND `schema/aahp-manifest.schema.json` rejects that value for that field, decided by
+  the same validator `aahp doctor` runs. A real date, or a free-text field whose value
+  happens to be bracketed (`"assigned_to": "[unassigned]"`), is valid and left alone.
+- An optional field (`created`, `completed`, `priority`, ...) is removed, and every
+  removal is printed with task id, field and old value.
+- A required field (`title`, `status`) can be neither removed nor guessed. `aahp migrate`
+  names the task and the field, changes nothing, and exits 1; set the value by hand
+  and run it again.
+- The removal and the regeneration land together: if `aahp manifest` refuses the file
+  (for example over an unknown top-level field), `MANIFEST.json` is restored byte for
+  byte. A second run finds nothing to remove.
+
+```bash
+aahp migrate --yes   # then: aahp doctor
+```
+
+**2. Workflow copies from earlier versions.** A workflow copied out of an earlier
+package does not change when the package does. The `cli-source` gate of `aahp doctor`
+([docs/governance.md](docs/governance.md)) reports the legacy ways of running the CLI
+in `.github/workflows/`, with the remediation `aahp init --gates --workflows`
+([ADR-025](docs/adr/ADR-025.md)):
+
+| Finding | Shape | Verdict |
+|---------|-------|---------|
+| `registry-fetch` | `npx -y @elvatis_com/aahp@<version> ...`, `npx` without `--no-install`, `npm exec`, `pnpm dlx`, `yarn dlx`, `bunx`, `npm install @elvatis_com/aahp` in a step | fail: fetched at run time, no lockfile integrity, not the reviewed pin |
+| `unowned-name` | the same with the unscoped name `aahp` | fail: on a local miss it downloads and runs whatever the registry holds under a name this project does not own ([ADR-013](docs/adr/ADR-013.md)) |
+| `unowned-name` | `npx --no-install aahp ...` after an install | advisory: the `npx` binary stops on a miss instead of executing, so it fails closed |
+| `checkout-path` | `node bin/aahp.js ...` in a repository without `bin/aahp.js` | fail: exits `MODULE_NOT_FOUND` on every run |
+| `no-install` | the CLI run from `node_modules/` with no `npm ci` (or other install) earlier in the same job | fail: an empty `node_modules/` on a fresh runner, or an unverified cache |
+
+`aahp init --gates --workflows` rewrites ONLY the workflow files `aahp init --gates`
+manages, overwriting your copies: the governance workflow `aahp-govern.yml`, and the
+verify workflow `aahp-verify.yml` where `.ai/handoff/` exists, from the templates in
+the installed package, which run the pinned CLI by path after `npm ci`.
+`aahp.config.json` and `package.json` are not touched. Review `git diff` and re-apply
+any edit your old copies carried (a `branches:` list for a default branch other than
+`main`, say) before committing. `aahp init --gates --force` is the full re-scaffold:
+it also rewrites `aahp.config.json` with the trimmed default and resets the `govern`
+npm script, so use it only when that is what you want. A legacy step in any other
+workflow file is not rewritten by either: change it to
+`node ./node_modules/@elvatis_com/aahp/bin/aahp.js <command>` after
+`npm ci --ignore-scripts`, or delete it. This package itself reports `self`: its own
+workflows run `node bin/aahp.js` from the working tree on purpose (Section 9.2), and
+`--workflows` never writes its verify workflow either.
+
+**3. The npm devDependency exemption cannot be staged ahead of the upgrade.**
+`handoffImpact.npmDevDependencyUpdates` (Section 2.8) is new in 4.0.0, and 3.12.0
+rejects it: its config schema requires `handoffImpact.nonImpactingModifiedFiles` and
+allows no other key there. With the key in place before the upgrade, `aahp check` and
+`aahp doctor` on 3.12.0 refuse the whole config (doctor marks every gate
+`unevaluated`), and verify Layer 2 refuses `handoffImpact`. The pull request that moves
+the pin to 4.0.0 is therefore itself handoff-impacting, and the exemption it introduces
+cannot classify it (a change to `aahp.config.json` keeps a change impacting anyway).
+Land the upgrade as ONE reviewed pull request that carries:
+
+- the version bump: the exact `@elvatis_com/aahp` pin in `package.json` and the
+  matching `package-lock.json`;
+- the opt-in, in this exact shape (keep any `nonImpactingModifiedFiles` you already
+  have beside it):
+
+  ```json
+  {
+    "handoffImpact": {
+      "npmDevDependencyUpdates": {
+        "reason": "Registry-pinned devDependency lockfile updates change no shipped file and no runtime dependency.",
+        "supplyChainScan": { "workflow": ".github/workflows/<file>.yml", "job": "<job id>" }
+      }
+    }
+  }
+  ```
+
+  `workflow` is a file directly under `.github/workflows/`; `job` is the job id (the
+  key under `jobs:`), not its display name. The gate re-proves on every run that this
+  workflow is tracked, that its `on:` triggers include `pull_request`, that it defines
+  the job, that the job's `if:`, when it has one, names `pull_request` (a job with no
+  `if:` passes; `if: always()` is refused), and that the job is not
+  `continue-on-error`. Name your supply-chain scanner job, and make it a required
+  status check: that part is a repository setting the gate cannot read;
+- a `STATUS.md` update and a regenerated `MANIFEST.json` (`aahp manifest`), as for
+  any handoff-impacting change.
+
+From then on every devDependency update that meets the conditions of Section 2.8, a
+4.0.x bump of `@elvatis_com/aahp` included, passes Layer 2 without a handoff update.
 
 ---
 
@@ -1694,14 +1804,14 @@ your-project/
 ```
 
 - **Hooks.** `scripts/install-hooks.sh` (shipped by AAHP) installs the pre-commit and pre-push hooks; the harness runs it once at setup. The hooks resolve the vendored `scripts/verify-handoff.sh` first, fall back to `node_modules/@elvatis_com/aahp/bin/aahp.js` when that file exists, and skip when neither resolves (the required CI check is the off-machine backstop once its evaluator paths are protected). The fallback is a filesystem test, never `npx`, so a repository with the hooks installed and no local package makes no registry request. If your installed hooks still contain `npx --no-install aahp`, re-run `scripts/install-hooks.sh`: fixing the source here does not fix the copy in your `.git/hooks/`. See Section 2.8.
-- **CI.** Copy `assets/governance/aahp-verify.yml` out of the installed package (`cp node_modules/@elvatis_com/aahp/assets/governance/aahp-verify.yml .github/workflows/`), or let `scripts/propagate.sh` install it (Section 10.1). It runs `npm ci --ignore-scripts`, then `aahp verify --level ci` (no escape hatch) and `aahp doctor` by path from `node_modules/`, and should be a required status check. Do not copy this repository's own `.github/workflows/aahp-verify.yml`: it runs the gate from an AAHP checkout (`node bin/aahp.js`) and fails in any other repository. Also require trusted review for the workflow, `package.json`, `package-lock.json` and any vendored gate/parser paths, because a `pull_request` workflow otherwise evaluates code, and a lockfile, from the proposed branch. For governance (changelog, version sync, forbidden patterns, doc links) copy the portable `assets/governance/aahp-govern.yml` into your own `.github/workflows/` beside it, or let `aahp init --gates` scaffold it; it runs `aahp check` by invoking `node ./node_modules/@elvatis_com/aahp/bin/aahp.js` directly and is verify-only. If your scaffolded copy still calls `npx --no-install aahp`, re-run `aahp init --gates --force`: that spelling can reach the public registry, and fixing the template here does not fix your copy. **`aahp init --gates --force` rewrites `aahp-verify.yml` only where `.ai/handoff/` exists, and then wholesale**, discarding any edit you made to your copy (a `branches:` list for a default branch other than `main`, say). If the vulnerable spelling is in your `aahp-verify.yml`, which is the common case, replace that file with the shipped adopter copy (the `cp` above, or `--force`) and re-apply your edits, or edit the step yourself: replace `npx --no-install aahp` with `node ./node_modules/@elvatis_com/aahp/bin/aahp.js`, keeping the `npm ci` step that installs the exact-pinned devDependency ahead of it. A step that reads `npx -y @elvatis_com/aahp@<version>` names the scoped package at an exact version, so it is not the unscoped-name hazard, but it downloads that version at run time instead of taking it from your lockfile, and it stays on that version until someone edits the line; the adopter copy runs whatever your lockfile pins.
+- **CI.** Copy `assets/governance/aahp-verify.yml` out of the installed package (`cp node_modules/@elvatis_com/aahp/assets/governance/aahp-verify.yml .github/workflows/`), or let `scripts/propagate.sh` install it (Section 10.1). It runs `npm ci --ignore-scripts`, then `aahp verify --level ci` (no escape hatch) and `aahp doctor` by path from `node_modules/`, and should be a required status check. Do not copy this repository's own `.github/workflows/aahp-verify.yml`: it runs the gate from an AAHP checkout (`node bin/aahp.js`) and fails in any other repository. Also require trusted review for the workflow, `package.json`, `package-lock.json` and any vendored gate/parser paths, because a `pull_request` workflow otherwise evaluates code, and a lockfile, from the proposed branch. For governance (changelog, version sync, forbidden patterns, doc links) copy the portable `assets/governance/aahp-govern.yml` into your own `.github/workflows/` beside it, or let `aahp init --gates` scaffold it; it runs `aahp check` by invoking `node ./node_modules/@elvatis_com/aahp/bin/aahp.js` directly and is verify-only. If your scaffolded copy still calls `npx --no-install aahp`, re-run `aahp init --gates --workflows` (it rewrites only the workflow copies; `--force` would also reset `aahp.config.json`): that spelling can reach the public registry, fixing the template here does not fix your copy, and `aahp doctor` reports it as its `cli-source` gate (Section 5.1). **`aahp init --gates --workflows` rewrites `aahp-verify.yml` only where `.ai/handoff/` exists, and then wholesale**, discarding any edit you made to your copy (a `branches:` list for a default branch other than `main`, say). If the vulnerable spelling is in your `aahp-verify.yml`, which is the common case, replace that file with the shipped adopter copy (the `cp` above, or `--workflows`) and re-apply your edits, or edit the step yourself: replace `npx --no-install aahp` with `node ./node_modules/@elvatis_com/aahp/bin/aahp.js`, keeping the `npm ci` step that installs the exact-pinned devDependency ahead of it. A step that reads `npx -y @elvatis_com/aahp@<version>` names the scoped package at an exact version, so it is not the unscoped-name hazard, but it downloads that version at run time instead of taking it from your lockfile, and it stays on that version until someone edits the line; the adopter copy runs whatever your lockfile pins.
   Both shipped workflows declare their own `permissions:` (`contents: read`) and set
   `persist-credentials: false` on the checkout, so neither inherits your repository's
   `default_workflow_permissions` and neither leaves the job's `GITHUB_TOKEN` in
   `.git/config` where later steps can read it (ADR-020). If you scaffolded
   `aahp-govern.yml` before AAHP declared those two things, `aahp init --gates` will
   NOT replace your copy: it skips a workflow that already exists. Re-run it with
-  `--force`, or add the two lines by hand.
+  `--workflows`, which rewrites only the workflow copies, or add the two lines by hand.
 - **Referencing scripts.** Harness commands invoke AAHP by the vendored script path (`bash scripts/verify-handoff.sh . --level prepush`) or the CLI by its scoped name (`npx @elvatis_com/aahp verify`; the unscoped `aahp` is owned by nobody). They never reimplement the checks.
 
 ### 9.3 Minimal harness bootstrap

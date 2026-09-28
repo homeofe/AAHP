@@ -7,6 +7,24 @@
 # tags while the npm lane was visibly working. `scripts/check-workflow-pinning.mjs`
 # now asserts that the `github-actions` lane below exists, so deleting it is red
 # rather than silent.
+#
+# Every lane carries the same two settings, and rule K of that gate asserts both
+# on every lane:
+#
+# - `groups:` with a single `"*"` group for version updates. One pull request
+#   per ecosystem per week instead of one per dependency. Each dependency pull
+#   request re-runs the whole required CI, and the ones that touch a pin other
+#   files must follow (the governance template, the scanner policy anchor) all
+#   need the same follow-up commit; one grouped pull request takes it once.
+#   `applies-to: version-updates` keeps security updates out of the group, so a
+#   fix is never held back behind an unrelated version bump.
+#
+# - `cooldown:` a release must be `default-days` old before Dependabot proposes
+#   it. Most malicious package versions are found and pulled within days of
+#   publication, and a lane that proposes a release the hour it appears is the
+#   fastest route from a compromised upstream into this repository. The cooldown
+#   applies to version updates only; GitHub does not delay security updates by
+#   it.
 version: 2
 updates:
   - package-ecosystem: "npm"
@@ -17,6 +35,13 @@ updates:
     open-pull-requests-limit: 5
     labels:
       - "dependencies"
+    cooldown:
+      default-days: 7
+    groups:
+      npm:
+        applies-to: version-updates
+        patterns:
+          - "*"
 
   # Every `uses:` in .github/workflows/ is pinned to a commit SHA, which is the
   # only reference GitHub cannot repoint. A pin with no update lane is not the
@@ -28,8 +53,10 @@ updates:
   # `directory: "/"` is the whole repository's workflow directory: for the
   # github-actions ecosystem Dependabot reads `.github/workflows/` under the
   # named directory. assets/governance/aahp-govern.yml is a TEMPLATE, not a
-  # workflow directory, so this lane does not reach it - see ADR-021 for what
-  # covers that file instead.
+  # workflow directory, so this lane does not reach it. Rule H of the pinning
+  # gate therefore requires every action the template uses to sit at the SHA
+  # the workflows use: a pull request from this lane that moves one of them is
+  # red until the template moves in the same pull request (ADR-021).
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
@@ -38,21 +65,23 @@ updates:
     open-pull-requests-limit: 5
     labels:
       - "dependencies"
-    # Dependabot treats every SUB-PATH of an action repository as a separate
-    # dependency, so github/codeql-action/init, /autobuild and /analyze each get
-    # their own pull request. For this action that produces three changes that can
-    # never be merged one at a time: codeql-action refuses to run when its steps
-    # are not on the same version, so each single-path pull request fails with
-    # "Not all workflow steps that use github/codeql-action actions use the same
-    # version". Measured on #96, #98 and #99, all three correct and all three
-    # individually unmergeable. Grouping makes the next bump arrive as one commit.
+    cooldown:
+      default-days: 7
+    # One group for every action, which also covers the case that made this
+    # lane need a group first. Dependabot treats every SUB-PATH of an action
+    # repository as a separate dependency, so github/codeql-action/init,
+    # /autobuild and /analyze each got their own pull request, and codeql-action
+    # refuses to run when its steps are not on the same version: each
+    # single-path pull request failed with "Not all workflow steps that use
+    # github/codeql-action actions use the same version". Measured on #96, #98
+    # and #99, all three correct and all three individually unmergeable.
     #
     # `scripts/check-workflow-pinning.mjs` rule G fails if any action used through
-    # more than one sub-path is left ungrouped, so deleting this block is red
-    # rather than silent - and it covers the next multi-path action too, not just
-    # this one.
+    # more than one sub-path is left ungrouped, so narrowing the pattern below is
+    # red rather than silent - and it covers the next multi-path action too, not
+    # just this one.
     groups:
-      codeql-action:
+      github-actions:
+        applies-to: version-updates
         patterns:
-          - "github/codeql-action*"
-
+          - "*"

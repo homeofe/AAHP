@@ -45,9 +45,13 @@ jobs:
       - name: Install pinned dependencies
         run: npm ci --ignore-scripts
       - name: Validate MANIFEST schema
-        # `--no-install` is the load-bearing half: without it npx falls back to
-        # the registry whenever the local resolution misses, and the pin above
-        # buys nothing. scripts/check-workflow-pinning.mjs keeps this shape.
+        # The `npm ci` above is what keeps this line off the registry: with the
+        # locked package placed, npx makes no request at all. `--no-install` is
+        # the fail-closed half: npx rewrites it to `--yes=false`, so a miss stops
+        # with "npx canceled due to missing packages" after one metadata request
+        # instead of downloading and running what the registry returns, which is
+        # what npx does without it in CI (measured on npm 10, 11 and 12, see
+        # ADR-013). scripts/check-workflow-pinning.mjs rules B and J keep both.
         run: npx --no-install ajv-cli validate --spec=draft2020 -c ajv-formats -s schema/aahp-manifest.schema.json -d .ai/handoff/MANIFEST.json
       - name: Check MANIFEST generator
         run: |

@@ -19,6 +19,13 @@ Current version: **v3.12.0**
 
 ## Recently Completed
 
+### 2026-09-28: CI, release and dependency automation
+
+- The scanner gates publishing and runs on tags; the publish job refuses tags off `main`
+  or off the package version and runs no third-party code with the OIDC token.
+- Dependabot is grouped with a cooldown; ShellCheck and installs in required jobs are
+  pinned and script-free.
+
 ### 2026-09-28: Verify gate semantics
 
 - TRUST rows can be check-backed and are re-proven on every run; dated rows get a 14-day
@@ -45,15 +52,6 @@ Current version: **v3.12.0**
 - propagate vendors the full helper closure, fails on a failed baseline, and supports
   linked worktrees; install-hooks installs where git actually runs hooks.
 
-### 2026-09-28: Dependabot integration and scanner v6.3.1
-
-- Integrated #112, #113, #115 and #117 unchanged in #119 and closed them, together with
-  #118, as superseded.
-- Moved supply-chain-guard to the signed v6.3.1 release commit (current release) instead
-  of #118's v6.2.0, with the pinned bats contract and policy schema anchor.
-- Re-verified the two TRUST rows whose expiry on 2026-09-22 had turned `aahp-verify` red
-  on every pull request.
-
 ---
 
 ## Owner Decisions (not task registry entries)
@@ -74,6 +72,9 @@ Open:
   next aahp bump.
 - Decide whether the three consumer manifests with template placeholder dates are fixed
   before the release.
+- Decide on a protected publish environment bound in the npm trusted-publisher config.
+- Report the scanner coverage gaps (extensionless shell, .bats, install by version) to
+  supply-chain-guard.
 
 ---
 

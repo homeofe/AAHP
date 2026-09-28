@@ -25,8 +25,9 @@
 // ---------------------------------------------------------------------------
 // The repository already knew how to do this correctly and already documented
 // it. assets/governance/aahp-govern.yml - the workflow template this package
-// ships to consumers - has always used `npm ci --ignore-scripts` followed by
-// `npx --no-install`, and .github/workflows/aahp-verify.yml pins its actions to
+// ships to consumers - used `npm ci --ignore-scripts` followed by
+// `npx --no-install` (it now runs the installed binary by path), and
+// .github/workflows/aahp-verify.yml pins its actions to
 // full commit SHAs. Both are files strangers read. The workflows that only ever
 // ran here did not follow the same rule, because nothing made them.
 //
@@ -67,11 +68,26 @@
 //      nothing else. MUTATION: put `npm install --no-save ajv-cli ajv-formats`
 //      back into any scanned workflow.
 //
-//   B. Every `npx` in a workflow carries `--no-install`. This is the load
-//      bearing half, and leaving it out is the failure that looks fixed:
-//      without `--no-install`, npx silently falls back to fetching from the
-//      registry whenever the local resolution misses, and the pin buys nothing.
-//      MUTATION: drop `--no-install` from either validate step.
+//   B. Every `npx` in a workflow carries `--no-install`, and no workflow runs
+//      `npm exec` / `npm x`. What the flag does was MEASURED, because this file
+//      and the README had described it two opposite ways. 2026-09-28, CI=true,
+//      stdin not a TTY, a package that is not installed, a logging registry on
+//      127.0.0.1, npm 10.9.9 / 11.20.0 / 12.0.2 on Node 24:
+//        npx <pkg>                 metadata GET, tarball GET, EXECUTED, exit 0
+//        npx --no-install <pkg>    metadata GET only, "npx canceled due to
+//                                  missing packages and no YES option", exit 1
+//        npm exec --no-install     npm 10: flag ignored silently, EXECUTED;
+//                                  npm 11: "Unknown cli config" warning,
+//                                  EXECUTED; npm 12: EUNKNOWNCONFIG, exit 1
+//      The `npx` binary rewrites `--no-install` to `--yes=false` (bin/npx-cli.js,
+//      identical in npm 10.9.0, 11.9.0 and 12.1.0); `npm exec` has no such
+//      rewrite. So on npx the flag is the FAIL-CLOSED half: a miss stops instead
+//      of downloading and running whatever the registry returns. It is not a
+//      network guard, because the metadata request still goes out; rule J is
+//      that guard. `npm exec` is rejected outright because the same flag there
+//      does nothing on the npm versions CI runs (Node 22 ships npm 10).
+//      MUTATION: drop `--no-install` from either validate step, or rewrite one
+//      as `npm exec --no-install -- ajv-cli ...`.
 //
 //   C. Every package a workflow executes with `npx --no-install` is declared in
 //      package.json at an EXACT version. A range is reproducible through the
@@ -127,6 +143,40 @@
 //      tree. Measure them with
 //      `gh pr list -R <repo> --author app/dependabot --state all`.
 //
+//   H. Every action a shipped TEMPLATE uses is pinned to the same commit, with
+//      the same version comment, as the same action in .github/workflows.
+//      Dependabot reads only .github/workflows, so rule F's lane never reaches
+//      assets/governance/aahp-govern.yml, and before this rule a bump of
+//      actions/checkout moved every workflow here and left the file adopters
+//      copy on the old commit, green. Now that pull request is red until the
+//      template moves with it. An action the template uses and no workflow here
+//      uses is a finding too: nothing would ever move that pin.
+//      MUTATION: change one SHA or one version comment in aahp-govern.yml, or
+//      give it an action no workflow in .github/workflows uses.
+//
+//   I. Every `npm ci` carries `--ignore-scripts`. The locked closure is 28
+//      packages with no install script (measured 2026-09-28, `hasInstallScript`
+//      in package-lock.json), so the flag costs nothing today, and it keeps the
+//      next dependency that ships one from running it inside a required check
+//      or a job that can mint a publish token without a reviewed change here.
+//      MUTATION: drop `--ignore-scripts` from any `npm ci`.
+//
+//   J. Every `npx` is preceded, in the SAME job, by `npm ci`. That install is
+//      what keeps npx off the network: with the locked package placed, npx
+//      made zero registry requests in the measurement above, with or without
+//      `--no-install`. Jobs do not share a filesystem, so an `npm ci` in another
+//      job places nothing for this one. MUTATION: delete the `npm ci` step of a
+//      job that runs npx, or move it below the npx step.
+//
+//   K. Every Dependabot lane groups its version updates into one pull request
+//      (a group with pattern "*" that applies to version updates) and declares a
+//      `cooldown` of at least one day. The group turns a week of per-package
+//      pull requests, each re-running the required checks and each needing the
+//      same rule-H follow-up, into one. The cooldown keeps a release from being
+//      proposed within hours of publication, the window in which most malicious
+//      versions are caught and pulled; GitHub does not apply it to security
+//      updates. MUTATION: delete `cooldown:` or the "*" group from either lane.
+//
 // Global installs are covered too. The repository used to run
 // `npm install -g npm@latest` immediately before publishing while holding
 // `id-token: write`. Node 24 already ships an npm version new enough for trusted
@@ -180,6 +230,14 @@ const TEMPLATE_DIRS = [join("assets", "governance")];
 // `npm install` and every alias npm accepts for it. `ci` is deliberately absent:
 // it is the form this gate exists to require.
 const INSTALL_VERBS = new Set(["install", "i", "in", "ins", "inst", "insta", "instal", "isntall", "add"]);
+
+// `npm ci` and the aliases npm accepts for it, including the two that run
+// `npm test` afterwards. Rules I and J read these.
+const CI_VERBS = new Set(["ci", "clean-install", "ic", "install-clean", "isntall-clean", "cit", "install-ci-test"]);
+
+// `npm exec` and its alias. Rule B rejects both: `--no-install` is a no-op or
+// an error there depending on the npm major, never a guard.
+const EXEC_VERBS = new Set(["exec", "x"]);
 
 // An exact version: no caret, tilde, range, tag, URL or git ref.
 // At most ONE prerelease run and at most ONE build run, deliberately: a
@@ -381,7 +439,12 @@ function collectUses(file, { doc, lineCounter }) {
         });
         return;
       }
-      usesRefs.push({ where, ref: node.value, comment: typeof node.comment === "string" ? node.comment : null });
+      usesRefs.push({
+        where,
+        ref: node.value,
+        comment: typeof node.comment === "string" ? node.comment : null,
+        local: file.local,
+      });
     },
   });
 }
@@ -395,6 +458,10 @@ for (const file of scanned) {
 
   for (const [jobName, job] of Object.entries(jobs)) {
     const steps = Array.isArray(job?.steps) ? job.steps : [];
+    // Rule J: has this job placed the locked closure yet? Per job, because jobs
+    // do not share a filesystem, and in step order, because an install that
+    // runs after the npx places nothing for it.
+    let lockfileInstalled = false;
     for (let i = 0; i < steps.length; i++) {
       const step = steps[i];
       if (typeof step?.run !== "string") continue;
@@ -403,6 +470,38 @@ for (const file of scanned) {
       for (const command of commandsIn(step.run)) {
         const tokens = tokenize(command);
         if (tokens.length === 0) continue;
+
+        if (tokens[0] === "npm" && CI_VERBS.has(tokens[1] ?? "")) {
+          lockfileInstalled = true;
+          // Rule I.
+          if (!tokens.includes("--ignore-scripts") && !tokens.includes("--ignore-scripts=true")) {
+            findings.push({
+              where,
+              command,
+              message:
+                "installs the locked closure with lifecycle scripts enabled. Every install, " +
+                "preinstall and postinstall script in it then runs inside this job, with " +
+                "whatever this job can reach. Add `--ignore-scripts`; a dependency that " +
+                "genuinely needs its install script is a reviewed exception to this rule, " +
+                "not a default.",
+            });
+          }
+          continue;
+        }
+
+        if (tokens[0] === "npm" && EXEC_VERBS.has(tokens[1] ?? "")) {
+          // Rule B, second half.
+          findings.push({
+            where,
+            command,
+            message:
+              "runs `npm exec`, which has no `--no-install`: npm 10 ignores the flag silently " +
+              "and npm 11 with a warning, and both then download and run a package that is " +
+              "not installed (measured; see rule B). Use `npx --no-install` after `npm ci` " +
+              "in the same job, or run the installed binary by path.",
+          });
+          continue;
+        }
 
         if (tokens[0] === "npm" && INSTALL_VERBS.has(tokens[1] ?? "")) {
           findings.push({
@@ -422,11 +521,25 @@ for (const file of scanned) {
               where,
               command,
               message:
-                "runs npx without `--no-install`, so npx falls back to fetching from the " +
-                "registry whenever the local resolution misses. Any pin upstream of this " +
-                "line buys nothing while this line can reach the network.",
+                "runs npx without `--no-install`, so when the package is not installed npx " +
+                "downloads it from the registry and runs it (measured in CI mode on npm 10, " +
+                "11 and 12). With the flag the same miss stops with an error. Any pin " +
+                "upstream of this line buys nothing while this line can do that.",
             });
             continue;
+          }
+          // Rule J.
+          if (!lockfileInstalled) {
+            findings.push({
+              where,
+              command,
+              message:
+                "runs npx in a job that has not run `npm ci` before it. Nothing in this job " +
+                "placed the locked package, so npx has to ask the registry for it: " +
+                "`--no-install` then stops the run, but only after a registry request, and the " +
+                "pin in package-lock.json never applied. Run `npm ci --ignore-scripts` earlier " +
+                "in the same job; jobs do not share node_modules.",
+            });
           }
           // Rule C is asked only of workflows that run HERE. A shipped
           // template runs in a consumer repository against a consumer
@@ -574,6 +687,70 @@ for (const { where, ref, comment } of usesRefs) {
 }
 
 // ---------------------------------------------------------------------------
+// Rule H: a shipped template sits on the commits the workflows here sit on.
+//
+// Compared by the full action path before the `@` (so codeql-action/init and
+// codeql-action/analyze are different actions), and on both halves Dependabot
+// rewrites together: the SHA and the version named in the trailing comment. A
+// reference rule E already rejected (a tag, a missing comment) is not compared
+// again here; one finding per defect.
+// ---------------------------------------------------------------------------
+const releaseOf = (comment) => {
+  const m = typeof comment === "string" ? comment.match(/v?\d+(?:\.\d+)*(?:[-+][0-9A-Za-z.-]+)?/) : null;
+  return m ? m[0] : null;
+};
+const splitAction = (ref) => {
+  if (ref.startsWith("./") || ref.startsWith(".\\") || ref.startsWith("docker://")) return null;
+  const at = ref.lastIndexOf("@");
+  if (at === -1) return null;
+  const sha = ref.slice(at + 1);
+  return COMMIT_SHA.test(sha) ? { path: ref.slice(0, at), sha } : null;
+};
+
+const localPins = new Map();
+for (const { ref, comment, local } of usesRefs) {
+  if (!local) continue;
+  const a = splitAction(ref);
+  if (a === null) continue;
+  if (!localPins.has(a.path)) localPins.set(a.path, new Set());
+  localPins.get(a.path).add(`${a.sha} # ${releaseOf(comment) ?? "?"}`);
+}
+
+let templatePinsCompared = 0;
+for (const { where, ref, comment, local } of usesRefs) {
+  if (local) continue;
+  const a = splitAction(ref);
+  if (a === null) continue;
+  templatePinsCompared += 1;
+  const here = `${a.sha} # ${releaseOf(comment) ?? "?"}`;
+  const there = localPins.get(a.path);
+  if (!there) {
+    findings.push({
+      where,
+      command: `uses: ${ref}`,
+      message:
+        `is used by a shipped template and by no workflow in ${WORKFLOW_DIR.replace(/\\/g, "/")}. ` +
+        "Dependabot reads only that directory, so nothing will ever offer to move this pin and " +
+        "it goes stale in every repository that copies the template. Use an action the " +
+        "workflows here also use, so the two move together.",
+    });
+    continue;
+  }
+  if (there.size !== 1 || !there.has(here)) {
+    findings.push({
+      where,
+      command: `uses: ${ref}`,
+      message:
+        `has drifted from ${WORKFLOW_DIR.replace(/\\/g, "/")}, which pins ${a.path} at ` +
+        `${[...there].sort().join(" and ")}; the template has ${here}. Dependabot moves ` +
+        "only the workflows, so after a bump the file adopters copy stays on the old " +
+        "commit. Set the template to the workflows' SHA and version comment in the same " +
+        "pull request.",
+    });
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Rule F: something has to offer to move those pins.
 //
 // Asked only when the LOCAL workflow directory holds at least one remote `uses:`.
@@ -623,6 +800,39 @@ if (localUsesCount > 0) {
         "It refuses to report a clean result over a shape it cannot read.",
       ]);
     }
+
+    // Rule K, over EVERY lane, not only the github-actions one.
+    for (const [index, lane] of updates.entries()) {
+      const label = `${rel}: updates[${index}] (${lane?.["package-ecosystem"] ?? "no ecosystem"})`;
+      const days = lane?.cooldown?.["default-days"];
+      if (!Number.isInteger(days) || days < 1) {
+        findings.push({
+          where: label,
+          command: "cooldown: default-days",
+          message:
+            `is ${days === undefined ? "missing" : JSON.stringify(days)}, so this lane proposes a ` +
+            "release the moment it is published, inside the window in which most malicious " +
+            "versions are still undetected. Add `cooldown: { default-days: 7 }` (a whole number " +
+            "of days, at least 1). GitHub does not apply it to security updates.",
+        });
+      }
+      const groupsAll = Object.values(lane?.groups ?? {}).some(
+        (g) =>
+          (g?.["applies-to"] === undefined || g?.["applies-to"] === "version-updates") &&
+          (g?.patterns ?? []).some((p) => String(p) === "*"),
+      );
+      if (!groupsAll) {
+        findings.push({
+          where: label,
+          command: 'groups: { <name>: { applies-to: version-updates, patterns: ["*"] } }',
+          message:
+            "is missing, so this lane opens one pull request per dependency, each re-running " +
+            "the required checks and each needing the same follow-up. Group every version " +
+            "update of the lane into one pull request with a `\"*\"` pattern.",
+        });
+      }
+    }
+
     const actionsLanes = updates.filter((u) => u?.["package-ecosystem"] === ACTIONS_ECOSYSTEM);
     if (actionsLanes.length === 0) {
       findings.push({
@@ -741,6 +951,13 @@ console.log(
 // no Dependabot pull request in it - so the verdict is stated rather than left
 // to be inferred from the absence of a finding.
 console.log(`    Dependabot lane: ${dependabotVerdict}`);
+console.log(
+  `    Template pins: ${
+    templatePinsCompared > 0
+      ? `${templatePinsCompared} action reference(s) in shipped templates match ${WORKFLOW_DIR.replace(/\\/g, "/")}`
+      : "not asserted: no pinned action reference in a shipped template"
+  }`,
+);
 console.log(
   "    Not asserted here: whether Dependabot is enabled for this repository, and whether it has",
 );

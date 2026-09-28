@@ -46,6 +46,10 @@ independently of the npm version).
   from registry.npmjs.org and carries no install script. It is decided by content, never
   by author, and requires a `supplyChainScan` assertion that the gate re-proves on every
   run.
+- `check-workflow-pinning.mjs` rules H (a shipped template pins the same SHA and version
+  as the workflows), I (`npm ci --ignore-scripts`), J (`npx` only after `npm ci` in the
+  same job) and K (grouped, cooled-down Dependabot lanes); rule B also rejects `npm exec`
+  and `npm x`.
 
 ### Changed
 
@@ -83,6 +87,12 @@ independently of the npm version).
   `handoffImpact` needs `nonImpactingModifiedFiles` or `npmDevDependencyUpdates`;
   `templates/TRUST.md` tables gain a `Check` column.
 - `tests/verify.bats` builds its fixture once (about 36% faster on Linux).
+- Dependabot opens one grouped version-update PR per ecosystem with a 7-day cooldown;
+  security updates are neither grouped nor delayed.
+- The scanner contract test asserts invariants instead of a literal SHA, so v6 Dependabot
+  bumps no longer fail by construction; a v7 bump still does.
+- The bats suite runs once per Node runtime per push instead of three times.
+- CodeQL actions v4.37.9 to v4.38.2 (Dependabot #123).
 
 ### Removed
 
@@ -169,6 +179,23 @@ independently of the npm version).
   more. The GNU grep 3.0 of Git for Windows aborts on that combination (exit 134), which
   made the new `license-matches` check reject a correct LICENSE on Windows; a test in
   `tests/bash-portability.bats` now forbids it.
+- `npx --no-install` documentation (ADR-013, README 2.1 and 11.1, CLAUDE.md, workflow and
+  hook comments, gate text) now matches the behaviour measured on npm 10, 11 and 12: `npx`
+  refuses after one metadata request, while `npm exec --no-install` on npm 10 and 11
+  downloads and runs the package.
+
+### Security
+
+- Publish: a `Verify the release ref` step refuses any ref that is not a
+  `vMAJOR.MINOR.PATCH` tag equal to the package.json version whose commit is reachable
+  from `main`.
+- Publish: the job installs nothing, restores no cache and runs `npm publish
+  --ignore-scripts`, so no dependency or lifecycle code runs while it holds `id-token:
+  write`.
+- The supply-chain scan runs on release tag pushes and dispatches, gates both `publish`
+  and `release`, and consults the historical threat catalog (`refresh-catalog: true`).
+- The required `lint-and-validate` check installs with `npm ci --ignore-scripts` and uses
+  a pinned, sha256-verified ShellCheck v0.9.0 instead of apt.
 
 ## [3.12.0] - 2026-08-31
 

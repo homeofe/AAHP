@@ -9,8 +9,9 @@
 #        `forbiddenPatterns` misspelled by one letter read as an absent section,
 #        an absent section is "not applicable", and "not applicable" is a clean
 #        SKIP. A failing gate reported `Governance OK`, exit 0.
-#   #82  `npx --no-install <name>` does not prevent a registry fetch. npx is
-#        npm exec, which has no such option and ignores it silently. The shipped
+#   #82  `npx --no-install <name>` does not keep a missing name off the
+#        registry: npx asks registry.npmjs.org about it before refusing (README
+#        ADR-013), and `npm exec` ignores the flag. The shipped
 #        workflow and the shipped git hooks resolved the UNSCOPED public name
 #        `aahp`, which this project does not own.
 #   #80  `.ai/handoff/.aiignore` is read by nothing, while the README and the

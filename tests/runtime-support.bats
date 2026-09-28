@@ -691,3 +691,111 @@ copy_repo_shape_with_readme() {
     [ "$status" -eq 0 ]
     [[ "$output" == *"repo CI shape OK"* ]]
 }
+
+# --- The bats suite runs once per runtime, and the required check keeps it ----
+#
+# lint-and-validate (the required check, Node 22) and the Node 22 leg of
+# runtime-matrix both ran the full suite, so every push ran it three times for
+# two runtimes. The runtime-matrix step now skips exactly the major
+# lint-and-validate pins. This is the relation that makes that safe: every
+# runtime in the matrix runs the suite EXACTLY once across the two jobs (a skip
+# that drops coverage and a duplicate are both red), and the required job runs
+# it unconditionally, so the suite cannot move out of the required check.
+
+suite_coverage() {
+    node --input-type=module -e '
+      import { readFileSync } from "node:fs";
+      import { join } from "node:path";
+      import YAML from "yaml";
+      const ci = YAML.parse(readFileSync(join(process.argv[1], ".github/workflows/ci.yml"), "utf8"));
+      const lav = ci.jobs?.["lint-and-validate"];
+      const rm = ci.jobs?.["runtime-matrix"];
+      const problems = [];
+      const runsSuite = (s) => /(^|[\s;&|])npm (test|t|run test)(\s|$)/m.test(String(s.run ?? ""));
+      const setup = (lav?.steps ?? []).find((s) => String(s.uses ?? "").startsWith("actions/setup-node@"));
+      const floor = Number(String(setup?.with?.["node-version"] ?? "NaN"));
+      const lavSuite = (lav?.steps ?? []).filter(runsSuite);
+      if (lavSuite.length === 0) problems.push("the required lint-and-validate job no longer runs the bats suite");
+      if (lavSuite.some((s) => Object.hasOwn(s, "if"))) problems.push("lint-and-validate runs the bats suite only conditionally");
+      const matrix = [].concat(rm?.strategy?.matrix?.["node-version"] ?? []).map(Number);
+      const rmSuite = (rm?.steps ?? []).filter(runsSuite);
+      if (rmSuite.length !== 1) problems.push("runtime-matrix runs the bats suite in " + rmSuite.length + " step(s), expected exactly 1");
+      let skipped = null;
+      const cond = rmSuite[0]?.if;
+      if (cond !== undefined) {
+        const bare = String(cond).trim().replace(/^\$\{\{\s*/, "").replace(/\s*\}\}$/, "");
+        const m = bare.match(/^matrix\.node-version\s*!=\s*(?:(\d+)|\x27(\d+)\x27)$/);
+        if (m) skipped = Number(m[1] ?? m[2]);
+        else problems.push("the runtime-matrix suite condition is not `matrix.node-version != <major>`: " + JSON.stringify(cond));
+      }
+      for (const v of matrix) {
+        const runs = (lavSuite.length > 0 && v === floor ? 1 : 0) + (rmSuite.length === 1 && v !== skipped ? 1 : 0);
+        if (runs !== 1) problems.push("Node " + v + " runs the bats suite " + runs + " time(s) per push, expected exactly 1");
+      }
+      for (const p of problems) console.error("  - " + p);
+      if (problems.length > 0) process.exit(1);
+      console.log("suite coverage OK: Node " + matrix.join(", ") + " each run once (" + floor + " in lint-and-validate)");
+    ' "$1"
+}
+
+# Replace the first line matching awk regex $2 inside job $1 of the fixture
+# ci.yml with $3 (empty deletes). Exits 3 when nothing matched. Lines compared
+# with any trailing CR removed, for a CRLF checkout.
+mutate_ci_job() {
+    local file job="$1" re="$2" repl="$3"
+    file="$(wf_dir)/ci.yml"
+    awk -v job="$job" -v re="$re" -v repl="$repl" '
+        {
+            line = $0
+            sub(/\r$/, "", line)
+            if (line ~ /^  [A-Za-z_][A-Za-z0-9_-]*:[[:space:]]*$/) injob = (line == "  " job ":")
+            if (injob && !done && line ~ re) {
+                done = 1
+                if (repl != "") print repl
+                next
+            }
+            print
+        }
+        END { if (!done) exit 3 }
+    ' "$file" > "$file.new" || { rm -f "$file.new"; return 3; }
+    mv "$file.new" "$file"
+}
+
+@test "suite coverage: this repository runs the suite once per runtime" {
+    run suite_coverage "$AAHP_ROOT"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"suite coverage OK: Node 22, 24 each run once (22 in lint-and-validate)"* ]]
+}
+
+@test "suite coverage: removing the skip duplicates the floor and is red" {
+    copy_repo_shape
+    mutate_ci_job runtime-matrix '^        if: matrix\.node-version' ''
+    run suite_coverage "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Node 22 runs the bats suite 2 time(s)"* ]]
+}
+
+@test "suite coverage: skipping a runtime lint-and-validate does not run is red" {
+    copy_repo_shape
+    mutate_ci_job runtime-matrix '^        if: matrix\.node-version' '        if: matrix.node-version != 24'
+    run suite_coverage "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Node 24 runs the bats suite 0 time(s)"* ]]
+}
+
+@test "suite coverage: moving the suite out of the required job is red" {
+    copy_repo_shape
+    mutate_ci_job lint-and-validate '^        run: npm test' '        run: echo skipped'
+    run suite_coverage "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"no longer runs the bats suite"* ]]
+    [[ "$output" == *"Node 22 runs the bats suite 0 time(s)"* ]]
+}
+
+@test "suite coverage: a skip condition it cannot read is red, not assumed" {
+    copy_repo_shape
+    mutate_ci_job runtime-matrix '^        if: matrix\.node-version' "        if: matrix.node-version != 22 || github.event_name == 'push'"
+    run suite_coverage "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"is not \`matrix.node-version != <major>\`"* ]]
+}

@@ -343,3 +343,266 @@ EOF
     [[ "$output" == *"package.json is not present"* ]]
     [[ "$output" != *"ENOENT"* ]]
 }
+
+# --- The publish job: a narrow release guard, and nothing third-party ---------
+#
+# jobs.publish holds `id-token: write`, so every step in it can mint the OIDC
+# token npm trusts for this package. Its `if:` is the shared release DEFINITION
+# and is deliberately loose (any `v*` tag containing a dot). The narrow check is
+# the "Verify the release ref" step. The tests below run THAT step, extracted
+# from the parsed workflow, against fixture repositories, so what is tested is
+# the text the job runs.
+
+# Print the run text of the named publish-job step from ci.yml under root $1.
+publish_step_run() {
+    node --input-type=module -e '
+      import { readFileSync } from "node:fs";
+      import { join } from "node:path";
+      import YAML from "yaml";
+      const [root, name] = process.argv.slice(1);
+      const job = YAML.parse(readFileSync(join(root, ".github/workflows/ci.yml"), "utf8")).jobs.publish;
+      const step = (job.steps ?? []).find((s) => s.name === name);
+      if (!step) { console.error("no publish step named " + name); process.exit(3); }
+      process.stdout.write(step.run);
+    ' "$1" "$2"
+}
+
+# A remote whose main carries package.json at version $1, cloned into
+# $TEST_TMPDIR/work. Nothing is tagged yet; each test places its own tag.
+release_fixture() {
+    local version="$1" seed="$TEST_TMPDIR/seed"
+    # symbolic-ref rather than `init -b`: it works on every git that has
+    # worktrees, and it does not depend on init.defaultBranch.
+    git init -q --bare "$TEST_TMPDIR/origin.git"
+    git -C "$TEST_TMPDIR/origin.git" symbolic-ref HEAD refs/heads/main
+    git init -q "$seed"
+    git -C "$seed" symbolic-ref HEAD refs/heads/main
+    printf '{ "name": "fx", "version": "%s" }\n' "$version" > "$seed/package.json"
+    git -C "$seed" add package.json
+    git -C "$seed" -c user.name=t -c user.email=t@example.invalid commit -q -m "release $version"
+    git -C "$seed" push -q "$TEST_TMPDIR/origin.git" main
+    git clone -q -b main "$TEST_TMPDIR/origin.git" "$TEST_TMPDIR/work"
+    publish_step_run "$AAHP_ROOT" "Verify the release ref" > "$TEST_TMPDIR/guard.sh"
+    [ -s "$TEST_TMPDIR/guard.sh" ]
+}
+
+# A commit on a pushed side branch, NOT on main, carrying the same version.
+# Prints its SHA.
+side_commit() {
+    local seed="$TEST_TMPDIR/seed"
+    git -C "$seed" checkout -q -b side
+    printf 'side\n' > "$seed/side.txt"
+    git -C "$seed" add side.txt
+    git -C "$seed" -c user.name=t -c user.email=t@example.invalid commit -q -m "side"
+    git -C "$seed" push -q "$TEST_TMPDIR/origin.git" side
+    git -C "$TEST_TMPDIR/work" fetch -q origin side
+    git -C "$TEST_TMPDIR/work" rev-parse FETCH_HEAD
+}
+
+# Run the guard in the fixture checkout the way the publish job runs a step,
+# with GITHUB_REF=$1 and GITHUB_REF_NAME=$2.
+run_guard() {
+    run bash -c 'cd "$1" && GITHUB_REF="$2" GITHUB_REF_NAME="$3" bash --noprofile --norc -eo pipefail "$4"' \
+        _ "$TEST_TMPDIR/work" "$1" "$2" "$TEST_TMPDIR/guard.sh"
+}
+
+@test "release guard: a vX.Y.Z tag on main matching package.json passes" {
+    release_fixture 1.2.3
+    git -C "$TEST_TMPDIR/work" tag v1.2.3
+    git -C "$TEST_TMPDIR/work" checkout -q --detach v1.2.3
+
+    run_guard refs/tags/v1.2.3 v1.2.3
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"release guard OK: v1.2.3 = package.json 1.2.3"* ]]
+}
+
+@test "release guard: a branch ref is refused" {
+    release_fixture 1.2.3
+    run_guard refs/heads/main main
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"is not a tag"* ]]
+}
+
+@test "release guard: a tag the job condition admits but that is not vX.Y.Z is refused" {
+    # `startsWith(github.ref, 'refs/tags/v') && contains(github.ref, '.')`
+    # admits all three of these.
+    release_fixture 1.2.3
+    local t
+    for t in v1.2 v1.2.3-rc.1 v1.2.3.4; do
+        git -C "$TEST_TMPDIR/work" tag "$t"
+        git -C "$TEST_TMPDIR/work" checkout -q --detach "$t"
+        run_guard "refs/tags/$t" "$t"
+        [ "$status" -eq 1 ] || { echo "$t was not refused: $output"; false; }
+        [[ "$output" == *"is not vMAJOR.MINOR.PATCH"* ]]
+    done
+}
+
+@test "release guard: a tag that names another version than package.json is refused" {
+    release_fixture 1.2.3
+    git -C "$TEST_TMPDIR/work" tag v1.2.4
+    git -C "$TEST_TMPDIR/work" checkout -q --detach v1.2.4
+
+    run_guard refs/tags/v1.2.4 v1.2.4
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"does not match package.json version '1.2.3'"* ]]
+}
+
+@test "release guard: GITHUB_REF_NAME that does not name GITHUB_REF is refused" {
+    release_fixture 1.2.3
+    git -C "$TEST_TMPDIR/work" tag v1.2.3
+    git -C "$TEST_TMPDIR/work" checkout -q --detach v1.2.3
+
+    run_guard refs/tags/v1.2.3 v9.9.9
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"does not name 'refs/tags/v1.2.3'"* ]]
+}
+
+@test "release guard: a tag on a commit that is not on main is refused" {
+    # The case the job condition cannot see at all: a correctly named tag with
+    # the right version, pushed at a commit from a branch that never merged.
+    release_fixture 1.2.3
+    local side
+    side="$(side_commit)"
+    git -C "$TEST_TMPDIR/work" tag v1.2.3 "$side"
+    git -C "$TEST_TMPDIR/work" checkout -q --detach v1.2.3
+
+    run_guard refs/tags/v1.2.3 v1.2.3
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"is not reachable from origin/main"* ]]
+}
+
+@test "release guard: main is fetched from origin, not trusted from the checkout" {
+    # Point the checkout's own origin/main at the side commit. A guard that
+    # trusted the local ref would pass; this one fetches main and refuses.
+    release_fixture 1.2.3
+    local side
+    side="$(side_commit)"
+    git -C "$TEST_TMPDIR/work" update-ref refs/remotes/origin/main "$side"
+    git -C "$TEST_TMPDIR/work" tag v1.2.3 "$side"
+    git -C "$TEST_TMPDIR/work" checkout -q --detach v1.2.3
+
+    run_guard refs/tags/v1.2.3 v1.2.3
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"is not reachable from origin/main"* ]]
+}
+
+@test "release guard: a checkout that is not the tagged commit is refused" {
+    # The tag moved after the event: the job checked out one commit and the tag
+    # now names another.
+    release_fixture 1.2.3
+    local side
+    side="$(side_commit)"
+    git -C "$TEST_TMPDIR/work" tag v1.2.3 "$side"
+    git -C "$TEST_TMPDIR/work" checkout -q --detach origin/main
+
+    run_guard refs/tags/v1.2.3 v1.2.3
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"is not the commit tag 'v1.2.3' points at"* ]]
+}
+
+# The shape of the publish job, read from a ROOT so each clause is mutated
+# below against a copy.
+publish_job_shape() {
+    node --input-type=module -e '
+      import { readFileSync } from "node:fs";
+      import { join } from "node:path";
+      import YAML from "yaml";
+      const job = YAML.parse(readFileSync(join(process.argv[1], ".github/workflows/ci.yml"), "utf8")).jobs.publish;
+      const problems = [];
+      const steps = job.steps ?? [];
+      const at = (pred) => steps.findIndex(pred);
+      const checkout = at((s) => String(s.uses ?? "").startsWith("actions/checkout@"));
+      const setup = at((s) => String(s.uses ?? "").startsWith("actions/setup-node@"));
+      const guard = at((s) => s.name === "Verify the release ref");
+      const publish = at((s) => /\bnpm publish\b/.test(String(s.run ?? "")));
+      if (guard === -1) problems.push("the release guard step is gone");
+      if (publish === -1) problems.push("no npm publish step");
+      if (guard !== -1 && publish !== -1 && guard > publish) problems.push("the release guard runs after npm publish");
+      if (steps[checkout]?.with?.["fetch-depth"] !== 0) problems.push("the checkout is shallow, so reachability from main cannot be decided");
+      if (setup !== -1 && Object.hasOwn(steps[setup].with ?? {}, "cache")) problems.push("setup-node restores a cache in the job that publishes");
+      const cmd = String(steps[publish]?.run ?? "");
+      if (!/--ignore-scripts\b/.test(cmd)) problems.push("npm publish runs lifecycle scripts (prepublishOnly) with id-token: write");
+      if (!/--provenance\b/.test(cmd)) problems.push("npm publish lost --provenance");
+      for (const [i, s] of steps.entries()) {
+        if (i === guard || i === publish || typeof s.run !== "string") continue;
+        problems.push("an extra run step executes in the publish job: " + JSON.stringify(s.name ?? s.run));
+      }
+      for (const p of problems) console.error("  - " + p);
+      if (problems.length > 0) process.exit(1);
+      console.log("publish job shape OK");
+    ' "$1"
+}
+
+copy_ci() {
+    mkdir -p "$TEST_TMPDIR/.github/workflows"
+    cp "$AAHP_ROOT/.github/workflows/ci.yml" "$TEST_TMPDIR/.github/workflows/ci.yml"
+}
+
+# Replace the first line matching awk regex $1 inside the publish job of the
+# copied ci.yml with $2 (awk -v expands \n; empty deletes). Exits 3 when nothing
+# matched, so a mutation that applied to nothing is never a green test. Lines
+# are compared with any trailing CR removed, for a CRLF checkout.
+mutate_publish() {
+    local file="$TEST_TMPDIR/.github/workflows/ci.yml"
+    awk -v re="$1" -v repl="$2" '
+        {
+            line = $0
+            sub(/\r$/, "", line)
+            if (line ~ /^  [A-Za-z_][A-Za-z0-9_-]*:[[:space:]]*$/) injob = (line == "  publish:")
+            if (injob && !done && line ~ re) {
+                done = 1
+                if (repl != "") print repl
+                next
+            }
+            print
+        }
+        END { if (!done) exit 3 }
+    ' "$file" > "$file.new" || { rm -f "$file.new"; return 3; }
+    mv "$file.new" "$file"
+}
+
+@test "publish job: this repository's shape holds" {
+    run publish_job_shape "$AAHP_ROOT"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"publish job shape OK"* ]]
+}
+
+@test "publish job: an npm ci step in the publish job is red" {
+    copy_ci
+    mutate_publish '^      - name: Publish to npm' '      - run: npm ci --ignore-scripts\n      - name: Publish to npm (OIDC trusted publishing, no token)'
+    run publish_job_shape "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"an extra run step executes in the publish job"* ]]
+}
+
+@test "publish job: npm publish without --ignore-scripts is red" {
+    copy_ci
+    mutate_publish 'run: npm publish' '        run: npm publish --access public --provenance'
+    run publish_job_shape "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"runs lifecycle scripts (prepublishOnly)"* ]]
+}
+
+@test "publish job: a restored npm cache is red" {
+    copy_ci
+    mutate_publish "registry-url: 'https://registry.npmjs.org'" "          registry-url: 'https://registry.npmjs.org'\n          cache: 'npm'"
+    run publish_job_shape "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"restores a cache in the job that publishes"* ]]
+}
+
+@test "publish job: a shallow checkout is red" {
+    copy_ci
+    mutate_publish 'fetch-depth: 0' ''
+    run publish_job_shape "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"the checkout is shallow"* ]]
+}
+
+@test "publish job: deleting the release guard is red" {
+    copy_ci
+    mutate_publish '^      - name: Verify the release ref' '      - name: Renamed step'
+    run publish_job_shape "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"the release guard step is gone"* ]]
+}

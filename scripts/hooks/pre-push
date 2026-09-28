@@ -26,13 +26,12 @@ VERIFY="$REPO_ROOT/scripts/verify-handoff.sh"
 #
 # The fallback is a filesystem test on an exact path, never `npx`. Earlier
 # versions of this hook guarded with `npx --no-install aahp --version`, with
-# stdout and stderr discarded. `npx` is `npm exec`, which has no `--no-install`
-# option and ignores it silently. So on a consumer with the hooks installed but
-# no local package, that guard made an outbound request to registry.npmjs.org
-# for the UNSCOPED name `aahp` on every push. This project does not own that
-# name. It returned 404 and the hook fell through to the skip branch, so the
-# behaviour was correct BY ACCIDENT: whoever published that name would have had
-# their code executed in the pre-push hook of every such repository. A `[ -f ]`
+# stdout and stderr discarded. On a consumer with the hooks installed but no
+# local package, that guard asked registry.npmjs.org about the UNSCOPED name
+# `aahp`, which this project does not own, on every push before npx refused
+# (measured on npm 10 to 12, README ADR-013). It stayed closed only because of
+# how the `npx` binary maps `--no-install`; `npm exec --no-install` on npm 10
+# and 11 downloads and runs whatever the registry returns. A `[ -f ]`
 # test cannot reach the network and cannot resolve any name but the scoped one.
 AAHP_CLI="$REPO_ROOT/node_modules/@elvatis_com/aahp/bin/aahp.js"
 

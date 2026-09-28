@@ -2,6 +2,10 @@
   "version": 1,
   "entries": [
     {
+      "sha256": "528eb9e31a5f19f8e1d85673ba706565b33c355fe2af03fe913518356668c053",
+      "title": "## [2026-07-25] claude-opus-5: Trust register re-verification (10 rows re-established, 0 downgraded)"
+    },
+    {
       "sha256": "b85a1e4630c4c476ecb9cce4084d642092ff8e6209fb8df3606f6fe10d0ea42c",
       "title": "## [2026-07-18] claude-opus-4-8: Anti-entropy initiative (gates + constitution + ADR log, v3.7.0)"
     },

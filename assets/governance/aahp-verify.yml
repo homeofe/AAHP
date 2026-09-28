@@ -22,10 +22,11 @@
 # then `aahp doctor`, whose verify-workflow gate reports whether THIS file can
 # skip the gate. Do not wrap either step, or the job, in an `if:`.
 #
-# The CLI is invoked by PATH inside node_modules, never through `npx`. `npx` is
-# `npm exec`, which has no `--no-install` option and ignores it silently, so a
-# missed local resolution reaches the public registry for the UNSCOPED name
-# `aahp`, which this project does not own. The path below can only resolve to
+# The CLI is invoked by PATH inside node_modules, never through `npx`: a missed
+# local resolution makes even `npx --no-install aahp` ask the public registry
+# about the UNSCOPED name `aahp`, which this project does not own, and
+# `npm exec --no-install` on npm 10 and 11 would download and run whatever it
+# returns (README ADR-013). The path below can only resolve to
 # what `npm ci` placed from your committed lockfile; if it did not place it,
 # `node` exits non-zero and the job fails closed.
 #

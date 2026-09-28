@@ -38,6 +38,13 @@ jobs:
   lint-and-validate:
     runs-on: ubuntu-latest
 
+    # The shellcheck release this required check runs, and the sha256 of the
+    # upstream asset. Moving shellcheck is a reviewed diff to these two lines,
+    # never a side effect of the runner image. See the install step below.
+    env:
+      SHELLCHECK_VERSION: v0.9.0
+      SHELLCHECK_SHA256: 700324c6dd0ebea0117591c6cc9d7350d9c7c5c287acbad7630fa17b1d4d9e2f
+
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -60,13 +67,43 @@ jobs:
           python-version: '3.x'
 
       - name: Install dependencies
-        run: npm ci
+        # --ignore-scripts: no lifecycle script of any locked package runs in
+        # the required check. Measured 2026-09-28: 28 locked packages, none
+        # with `hasInstallScript`, and the full suite passes on a tree installed
+        # this way, so nothing here needs them. npm still links the bins
+        # (bats, ajv); only lifecycle scripts are skipped.
+        # scripts/check-workflow-pinning.mjs rule I keeps every `npm ci` so.
+        run: npm ci --ignore-scripts
 
-      - name: Install shellcheck
-        run: sudo apt-get update && sudo apt-get install -y shellcheck
+      - name: Install shellcheck (pinned release, sha256-verified)
+        # This used to be `apt-get update && apt-get install -y shellcheck`,
+        # which installs whatever the runner image and the Ubuntu mirror offer
+        # that day. ubuntu-24.04 carries 0.9.0-1 today; a newer image, or
+        # ubuntu-latest moving to the next LTS, brings a newer shellcheck with
+        # new checks, and a REQUIRED check turns red on an unchanged tree.
+        # `apt-get update` was a network step of its own as well. The upstream
+        # release pinned above is independent of the image. Its sha256 is the
+        # one shellcheck-py publishes for this exact asset and verifies on every
+        # install (setup.py at its tag v0.9.0.6), and 0.9.0 is the version the
+        # image carried, so pinning it changes no verdict. A mismatch fails
+        # closed here, before anything is extracted.
+        run: |
+          asset="shellcheck-${SHELLCHECK_VERSION}.linux.x86_64.tar.xz"
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/$asset" \
+            "https://github.com/koalaman/shellcheck/releases/download/${SHELLCHECK_VERSION}/${asset}"
+          echo "${SHELLCHECK_SHA256}  $RUNNER_TEMP/$asset" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/shellcheck-bin"
+          tar -xJf "$RUNNER_TEMP/$asset" -C "$RUNNER_TEMP/shellcheck-bin" \
+            --strip-components=1 --wildcards '*/shellcheck'
+          echo "$RUNNER_TEMP/shellcheck-bin" >> "$GITHUB_PATH"
 
       - name: ShellCheck scripts
         run: |
+          # The pinned binary, not an older one the image still has on PATH.
+          # grep without -q reads to EOF, so shellcheck never meets a closed
+          # pipe under the runner's `bash -eo pipefail`.
+          test "$(command -v shellcheck)" = "$RUNNER_TEMP/shellcheck-bin/shellcheck"
+          shellcheck --version | grep -x "version: ${SHELLCHECK_VERSION#v}"
           # Shellcheck every tracked shell script + git hook. A glob (not a
           # hand-maintained list) means new scripts are covered automatically -
           # the old list had already missed scripts/propagate.sh.
@@ -82,11 +119,16 @@ jobs:
 
       - name: Validate MANIFEST.json against schema
         # ajv-cli and ajv-formats are exact devDependencies, so the `npm ci`
-        # step above already installed the locked closure and there is nothing
-        # left to fetch here. `--no-install` is the load-bearing half: without
-        # it npx falls back to the registry whenever the local resolution
-        # misses, and the pin upstream buys nothing.
-        # scripts/check-workflow-pinning.mjs keeps this shape.
+        # step above already placed the locked closure and this line makes no
+        # registry request at all. That `npm ci` is the guard against the
+        # network, and rule J of scripts/check-workflow-pinning.mjs requires it
+        # earlier in the same job. `--no-install` is the fail-closed half:
+        # `npx` rewrites it to `--yes=false`, so if the install were ever
+        # missing the line would stop with "npx canceled due to missing
+        # packages" after one registry metadata request, instead of
+        # downloading and running whatever the registry returned, which is what
+        # npx does without it in CI. Measured 2026-09-28 against a logging
+        # local registry on npm 10.9.9, 11.20.0 and 12.0.2 (ADR-013).
         run: npx --no-install ajv-cli validate --spec=draft2020 -c ajv-formats -s schema/aahp-manifest.schema.json -d .ai/handoff/MANIFEST.json
 
       - name: Validate aahp.config.json against schema
@@ -115,7 +157,14 @@ jobs:
 
   supply-chain-guard:
     name: Supply chain guard
-    if: github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    # No `if:`, on purpose. This job runs on every event the workflow accepts,
+    # including a release tag push and a manual dispatch against a tag, and
+    # both publish and release need it. It used to skip tag pushes while
+    # publish did not wait for it, so the one run whose output reaches the
+    # public registry was the one run that was never scanned. A needed job that
+    # is skipped skips its dependents too, so re-adding a condition that
+    # excludes a release event would silently stop releases rather than fail
+    # them. tests/workflow-pinning.bats asserts both halves.
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -128,6 +177,22 @@ jobs:
         uses: homeofe/supply-chain-guard@013febcb8447107bcf9d82e400d5b492d44bb10f # v6.3.1
         with:
           comment-on-pr: false
+          # Without the catalog the scan matched the bundled indicator set only:
+          # the report on #119 said 86,885 historical catalog indicators were
+          # not consulted. This downloads the catalog into the Action's own
+          # RUNNER_TEMP cache before scanning. Safe to turn on here because the
+          # scanner verifies the catalog index against a digest compiled into
+          # the pinned release, and every shard against the index, before
+          # writing anything, so its content is exactly what v6.3.1 pins; a
+          # failed download is reported as THREAT_FEED_CATALOG_MISSING at
+          # severity info (policy `catalog` defaults to optional), below
+          # `fail-on: critical`, so a network failure degrades to the old
+          # bundle-only scan instead of a red required check; and this job holds
+          # contents: read and no secret. The same refresh also merges the
+          # scanner's published feed.json for 24 hours. That feed can only ADD
+          # indicators, so it can turn this check red with no diff here when a
+          # dependency becomes known-malicious, which is the point of scanning.
+          refresh-catalog: true
 
   runtime-matrix:
     # Exercise the WHOLE range engines.node publishes, not just its floor.
@@ -159,7 +224,7 @@ jobs:
         with:
           python-version: '3.x'
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts  # see lint-and-validate
       - name: Syntax-check Node gates
         run: |
           for f in scripts/*.mjs; do node --check "$f"; done
@@ -168,12 +233,23 @@ jobs:
       - name: Run aahp doctor (conformance)
         run: npm run doctor
       - name: Run bats tests
+        # The floor's suite already runs in lint-and-validate, the required
+        # check, on the same Node major. Running it here as well made every
+        # push run the full suite three times for two runtimes. The skip names
+        # exactly the major lint-and-validate pins, and the rest of this leg
+        # (syntax check, runtime relation, doctor) still runs on it.
+        # tests/runtime-support.bats asserts that every runtime in this matrix
+        # runs the suite exactly once across the two jobs, so skipping a
+        # second runtime here, or dropping the suite from lint-and-validate,
+        # is red.
+        if: matrix.node-version != 22
         run: npm test
 
   publish:
     name: Publish to npm
-    # Both gates, so a release cannot ship past a red runtime matrix.
-    needs: [lint-and-validate, runtime-matrix]
+    # Every gate, so a release cannot ship past a red runtime matrix or an
+    # unscanned tree.
+    needs: [lint-and-validate, runtime-matrix, supply-chain-guard]
     runs-on: ubuntu-latest
     # Release authorization. Identical to the `release` job's condition below,
     # on purpose. tests/assert-repo-ci-shape.mjs holds the two together, so they
@@ -188,13 +264,28 @@ jobs:
     # still be re-run by hand. What is gone is publishing from a ref that is not a
     # release tag. Measured before the change: 206 runs of this workflow, zero of
     # them a manual dispatch. See ADR-019.
+    #
+    # This condition is the shared DEFINITION and it is deliberately loose: any
+    # tag starting with `v` and containing a dot. The narrow check is the
+    # "Verify the release ref" step below, which runs before anything publishes.
     if: startsWith(github.ref, 'refs/tags/v') && contains(github.ref, '.')
     permissions:
       contents: read
       id-token: write
+    # Nothing third-party executes in this job beyond the two pinned actions and
+    # npm itself. It installs no dependencies and runs no package lifecycle
+    # script: the published tarball does not depend on node_modules (measured
+    # 2026-09-28, `npm pack --dry-run` in a tree with and without node_modules:
+    # identical shasum, 54 entries, no node_modules path), and the gates that
+    # prepublishOnly would re-run here already passed on this same commit in
+    # the unprivileged jobs listed in `needs`. Every step in a job holding
+    # `id-token: write` can mint the OIDC token npm trusts for this package, so
+    # the job is kept to what publishing needs.
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          # Full history, so the guard below can decide reachability from main.
+          fetch-depth: 0
           persist-credentials: false  # see the header
       - name: Setup Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -202,17 +293,54 @@ jobs:
           # Trusted publishing needs npm >=11.5.1 and Node >=22.14.0. The
           # current Node 24 line includes a qualifying npm, so no unpinned
           # package-manager install is needed in this privileged job.
+          # No `cache:` on purpose: a restored cache is state written by an
+          # earlier run, and this is the one job whose output is published.
           node-version: '24'
           registry-url: 'https://registry.npmjs.org'
-          cache: 'npm'
-      - run: npm ci
-      - run: npm run build --if-present
+      - name: Verify the release ref
+        # The narrow half of release authorization. Publishing is refused unless
+        #   1. the ref is a tag named exactly vMAJOR.MINOR.PATCH (the `if:`
+        #      above also admits v1.2, v1.2.3-rc.1 or v1.2.3.4);
+        #   2. that name is `v` + package.json's version, so a tag cannot
+        #      publish a version other than the one it names;
+        #   3. the checked-out commit is the one the tag points at, and it is
+        #      reachable from main, fetched explicitly here rather than taken
+        #      from whatever the checkout left behind.
+        # Inline rather than a file under scripts/, because scripts/ ships in
+        # the npm package. tests/workflow-pinning.bats extracts THIS block from
+        # the parsed workflow and runs it against fixture repositories, so the
+        # text below is the text that is tested.
+        run: |
+          set -euo pipefail
+          fail() { echo "::error::release guard: $*" >&2; exit 1; }
+          ref="${GITHUB_REF:-}"
+          name="${GITHUB_REF_NAME:-}"
+          case "$ref" in
+            refs/tags/*) ;;
+            *) fail "ref '$ref' is not a tag; only a release tag publishes" ;;
+          esac
+          [ "$ref" = "refs/tags/$name" ] || fail "GITHUB_REF_NAME '$name' does not name '$ref'"
+          [[ "$name" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || fail "tag '$name' is not vMAJOR.MINOR.PATCH"
+          version="$(node -p "require('./package.json').version")"
+          [ "$name" = "v$version" ] || fail "tag '$name' does not match package.json version '$version'"
+          head="$(git rev-parse --verify 'HEAD^{commit}')"
+          tagged="$(git rev-parse --verify --quiet "refs/tags/$name^{commit}")" || fail "tag '$name' is not in the checkout"
+          [ "$head" = "$tagged" ] || fail "checked-out commit $head is not the commit tag '$name' points at ($tagged)"
+          git fetch --no-tags --quiet origin +refs/heads/main:refs/remotes/origin/main || fail "could not fetch main from origin"
+          git merge-base --is-ancestor "$head" refs/remotes/origin/main || fail "commit $head (tag '$name') is not reachable from origin/main"
+          echo "release guard OK: $name = package.json $version, $head is on origin/main"
       - name: Publish to npm (OIDC trusted publishing, no token)
-        run: npm publish --access public --provenance
+        # --ignore-scripts skips prepublishOnly, which would otherwise run the
+        # whole gate chain and the bats suite, with every devDependency they
+        # load, while this job can mint a publish token. See the job comment.
+        run: npm publish --access public --provenance --ignore-scripts
 
   release:
     name: Create GitHub Release
-    needs: publish
+    # supply-chain-guard is already upstream through publish; it is named here
+    # as well so that editing publish's `needs` cannot quietly un-gate the
+    # GitHub Release. Asserted by tests/workflow-pinning.bats.
+    needs: [publish, supply-chain-guard]
     runs-on: ubuntu-latest
     # The shared release definition, byte-identical to the first operand of the
     # publish condition above. Asserted by tests/assert-repo-ci-shape.mjs.

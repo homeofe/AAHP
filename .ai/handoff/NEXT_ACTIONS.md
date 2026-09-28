@@ -19,10 +19,17 @@ Current version: **v3.12.0**
 
 ## Recently Completed
 
+### 2026-09-28: Consumer install path
+
+- Shipped an adopter verify workflow that runs the lockfile-pinned CLI; the previous
+  one could not run in any consumer.
+- propagate vendors the full helper closure, fails on a failed baseline, and supports
+  linked worktrees; install-hooks installs where git actually runs hooks.
+
 ### 2026-09-28: Dependabot integration and scanner v6.3.1
 
-- Integrated #112, #113, #115 and #117 unchanged in one replacement pull request; to be
-  closed as superseded after merge together with #118.
+- Integrated #112, #113, #115 and #117 unchanged in #119 and closed them, together with
+  #118, as superseded.
 - Moved supply-chain-guard to the signed v6.3.1 release commit (current release) instead
   of #118's v6.2.0, with the pinned bats contract and policy schema anchor.
 - Re-verified the two TRUST rows whose expiry on 2026-09-22 had turned `aahp-verify` red
@@ -93,13 +100,18 @@ Current version: **v3.12.0**
 
 ## Owner Decisions (not task registry entries)
 
-- Reconcile the full-ASCII wording with the implemented U+2014-only gate.
-- Choose manual repair or bot-authored handoff updates for future Dependabot action bumps.
+Decided 2026-09-28 and being implemented by the audit fix programme (see STATUS.md): full
+ASCII with a gate; grouped Dependabot updates plus a content-based Layer 2 exemption for
+dev-only lockfile changes; executable TRUST claims with a grace period; STATUS.md as a
+snapshot; README split; redaction of internal details; the scanner as a required check.
+
+Open:
+
+- Is a consumer without an npm lockfile a supported propagate target (it now exits 3)?
+- Should `aahp init` scaffold the adopter verify workflow?
+- Keep the dogfood verify workflow out of the npm package?
 - Choose whether legacy governance workflows need doctor detection or forced migration.
-- Consider making the now-proven scanner job a required status check.
 - Plan a future replacement for the deprecated transitive dependencies of ajv-cli 5.
-- Decide how an enforced TRUST-TTL should behave in an idle repository, where it turns a
-  required check red on a calendar date with no code change.
 
 ---
 

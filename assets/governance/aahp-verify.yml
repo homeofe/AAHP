@@ -1,0 +1,99 @@
+# aahp-verify.yml - the AAHP handoff gate as a REQUIRED status check, for a
+# repository that installs @elvatis_com/aahp from npm.
+#
+# This is the file an adopter copies to .github/workflows/aahp-verify.yml, and
+# the file scripts/propagate.sh installs there. It is NOT the workflow of the
+# same name in this repository's own .github/workflows/: that one runs the gate
+# from the AAHP working tree (`bash scripts/verify-handoff.sh`, `node
+# bin/aahp.js`), because a pull request here may change the gate itself. Neither
+# path exists in an adopting repository, so a copy of that file fails there on
+# its first run (MODULE_NOT_FOUND). tests/verify-workflow.bats holds the two
+# files to the same triggers, permissions, action pins and base expression, so
+# they differ only in where the CLI comes from.
+#
+# Runs `aahp verify --level ci`, which executes all 4 layers with NO escape
+# hatch (AAHP_SKIP_VERIFY is ignored at --level ci). This is the off-machine
+# backstop behind the local pre-commit / pre-push hooks:
+#   Layer 1: MANIFEST checksum integrity
+#   Layer 2: content-drift gate (code changed => STATUS.md + MANIFEST.json must change)
+#   Layer 3: commit-pointer freshness
+#   Layer 4: TRUST-TTL expiry (advisory unless trustTtl.enforce is set)
+# then `aahp doctor`, whose verify-workflow gate reports whether THIS file can
+# skip the gate. Do not wrap either step, or the job, in an `if:`.
+#
+# The CLI is invoked by PATH inside node_modules, never through `npx`. `npx` is
+# `npm exec`, which has no `--no-install` option and ignores it silently, so a
+# missed local resolution reaches the public registry for the UNSCOPED name
+# `aahp`, which this project does not own. The path below can only resolve to
+# what `npm ci` placed from your committed lockfile; if it did not place it,
+# `node` exits non-zero and the job fails closed.
+#
+# Prerequisites in the adopting repository:
+#   - @elvatis_com/aahp as an exact devDependency (npm i -D -E @elvatis_com/aahp)
+#   - a committed package-lock.json (npm ci needs it)
+#   - an .ai/handoff/ set with a generated MANIFEST.json (aahp init, aahp manifest)
+#   - a default branch named `main`, or edit the two `branches:` lists below
+#
+# Mark this job as a REQUIRED status check, and require trusted review for
+# changes to this workflow, package.json and package-lock.json. A pull_request
+# workflow runs the proposed branch, including the lockfile that decides which
+# aahp executes, so the status alone is self-authorizing unless repository
+# rules protect those paths.
+#
+# `permissions: contents: read` and `persist-credentials: false` are declared
+# here, not inherited, for the reasons ADR-020 records: this job reads the
+# checkout and pushes nothing, and neither `npm ci` nor anything aahp executes
+# should find a write-capable token in the job or in .git/config.
+
+name: AAHP Verify
+
+permissions:
+  contents: read
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      base:
+        description: Exact base commit SHA for the Layer 2 diff
+        required: true
+        type: string
+
+jobs:
+  aahp-verify:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Full history so the content-drift gate can diff against the base.
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          # Node 22 is the floor engines.node publishes for @elvatis_com/aahp.
+          # Adopters receive this file byte-identical, so this pin is the
+          # runtime every adopting repository verifies on.
+          node-version: '22'
+
+      - name: Set up Python 3
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.x'
+
+      - name: Install the pinned aahp devDependency
+        run: npm ci --ignore-scripts
+
+      - name: Run aahp verify (CI level, no escape hatch)
+        run: node ./node_modules/@elvatis_com/aahp/bin/aahp.js verify . --level ci
+        env:
+          AAHP_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before || inputs.base }}
+
+      - name: Run aahp doctor (conformance record)
+        run: node ./node_modules/@elvatis_com/aahp/bin/aahp.js doctor . --json

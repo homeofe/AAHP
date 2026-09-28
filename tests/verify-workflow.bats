@@ -21,12 +21,103 @@ install_workflow() {
 
 # ─── enforced: the gate cannot be skipped ────────────────────────────────────
 
-@test "enforced: the canonical workflow propagate.sh installs exits 0" {
+@test "enforced: the vendored-script canonical shape exits 0" {
     install_workflow enforced-canonical.yml
     run node "$GATE" "$TEST_TMPDIR"
     [ "$status" -eq 0 ]
     [[ "$output" == *"OK"* ]]
     [[ "$output" == *"unconditionally at --level ci"* ]]
+}
+
+# --- the adopter workflow AAHP ships, and its drift against the dogfood copy ---
+#
+# assets/governance/aahp-verify.yml is what propagate.sh installs and what the
+# README tells an npm adopter to copy. This repository's own
+# .github/workflows/aahp-verify.yml runs the gate from the working tree and is
+# NOT shippable: its `node bin/aahp.js` exists only in an AAHP checkout.
+
+@test "adopter: the SHIPPED assets/governance/aahp-verify.yml passes its own gate" {
+    # The real bytes, not a fixture: this is the file with the whole fleet behind it.
+    mkdir -p "$TEST_TMPDIR/.github/workflows"
+    cp "$AAHP_ROOT/assets/governance/aahp-verify.yml" "$TEST_TMPDIR/.github/workflows/aahp-verify.yml"
+    run node "$GATE" "$TEST_TMPDIR" --json
+    [ "$status" -eq 0 ]
+    [[ "$output" == *'"verdict": "enforced"'* ]]
+    [[ "$output" == *'"job": "aahp-verify"'* ]]
+}
+
+@test "adopter: the two verify workflows differ only in how they resolve the CLI" {
+    # Same triggers, permissions, job shape, action pins (with their inputs), step
+    # names and base expression. The adopter file's run: steps are pinned exactly:
+    # the lockfile install, then the CLI by its path in node_modules, derived from
+    # package.json so a rename cannot leave a stale path green.
+    cat > "$TEST_TMPDIR/parity.cjs" <<'EOF'
+const fs = require("fs");
+const path = require("path");
+const root = process.argv[2];
+const YAML = require(require.resolve("yaml", { paths: [root] }));
+const read = (rel) => fs.readFileSync(path.join(root, rel), "utf8");
+const pkg = JSON.parse(read("package.json"));
+const cli = "node ./node_modules/" + pkg.name + "/" + pkg.bin.aahp;
+const own = YAML.parse(read(".github/workflows/aahp-verify.yml"));
+const adopter = YAML.parse(read("assets/governance/aahp-verify.yml"));
+const problems = [];
+const same = (label, a, b) => {
+  if (JSON.stringify(a) !== JSON.stringify(b)) {
+    problems.push(label + ": " + JSON.stringify(a) + " vs " + JSON.stringify(b));
+  }
+};
+for (const k of ["name", "permissions", "on", "env", "defaults", "concurrency"]) same(k, own[k], adopter[k]);
+same("job ids", Object.keys(own.jobs), Object.keys(adopter.jobs));
+const oj = own.jobs["aahp-verify"] || {};
+const aj = adopter.jobs["aahp-verify"] || {};
+for (const k of new Set([...Object.keys(oj), ...Object.keys(aj)])) {
+  if (k !== "steps") same("job." + k, oj[k], aj[k]);
+}
+const uses = (j) => (j.steps || []).filter((s) => s.uses !== undefined);
+same("uses steps", uses(oj), uses(aj));
+const runs = (j, re) => (j.steps || []).filter((s) => typeof s.run === "string" && re.test(s.run));
+const ov = runs(oj, /--level ci/);
+const av = runs(aj, /--level ci/);
+same("verify step count", [ov.length, av.length], [1, 1]);
+if (ov.length === 1 && av.length === 1) {
+  same("verify step env", ov[0].env, av[0].env);
+  same("verify step name", ov[0].name, av[0].name);
+}
+same("doctor step names", runs(oj, /doctor/).map((s) => s.name), runs(aj, /doctor/).map((s) => s.name));
+same(
+  "adopter run steps",
+  (aj.steps || []).filter((s) => s.run !== undefined).map((s) => String(s.run).trim()),
+  ["npm ci --ignore-scripts", cli + " verify . --level ci", cli + " doctor . --json"],
+);
+if (problems.length) {
+  console.error(problems.join("\n"));
+  process.exit(1);
+}
+console.log("parity OK");
+EOF
+    run node "$TEST_TMPDIR/parity.cjs" "$AAHP_ROOT"
+    echo "$output"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"parity OK"* ]]
+}
+
+@test "adopter: no executable line invokes npx, and the CLI path matches package.json" {
+    # Same rule as the hooks and the govern workflow (inert-controls.bats, 82):
+    # npx is npm exec, which ignores --no-install, so a missed local resolution
+    # would fetch the UNSCOPED public name. Comments may explain that; code may
+    # not do it.
+    local asset="$AAHP_ROOT/assets/governance/aahp-verify.yml" expected
+    grep -v '^[[:space:]]*#' "$asset" > "$TEST_TMPDIR/adopter-code.yml"
+    [ -s "$TEST_TMPDIR/adopter-code.yml" ]
+    run grep -n "npx" "$TEST_TMPDIR/adopter-code.yml"
+    [ "$status" -eq 1 ]
+
+    expected="$(node -e 'const p = require(process.argv[1]); process.stdout.write("node_modules/" + p.name + "/" + p.bin.aahp)' "$AAHP_ROOT/package.json")"
+    [ -n "$expected" ]
+    run grep -c -F "$expected" "$TEST_TMPDIR/adopter-code.yml"
+    [ "$status" -eq 0 ]
+    [ "$output" -eq 2 ]
 }
 
 @test "enforced: the published CLI invoked by exact version is recognised" {

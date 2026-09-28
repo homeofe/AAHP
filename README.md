@@ -83,17 +83,26 @@ section is the shortest path to a repository that has the protocol running. It i
 five steps, and every command in them was executed in a throwaway git repository
 against this tree before it was written down.
 
-**1. Install the CLI.** The package is scoped; the unscoped name `aahp` on npm is
-owned by nobody, so always install the scoped name.
+**1. Install the CLI into the repository.** The package is scoped; the unscoped
+name `aahp` on npm is owned by nobody, so always install the scoped name.
 
 ```bash
-npm i -g @elvatis_com/aahp          # global, for the one-off adoption run
-npm i -D @elvatis_com/aahp          # or as an exact-pinned devDependency (what CI uses)
+npm i -D -E @elvatis_com/aahp       # exact-pinned devDependency; commit package-lock.json
 ```
 
-Pin the devDependency exactly, with no range. `aahp doctor` has a `pinned-dep`
-gate that reports on it (Section 2.11), and the workflow below runs the CLI from
-`node_modules/`, never from the registry.
+Pin it exactly, with no range. `aahp doctor` has a `pinned-dep` gate that reports
+on it (Section 2.11), and the workflow in step 5 runs the CLI from `node_modules/`
+after `npm ci`, never from the registry, so it needs the committed lockfile.
+
+Do not rely on a global install (`npm i -g`). The hooks and the CI workflow look
+for the CLI only in the repository (a vendored `scripts/verify-handoff.sh`, or
+`node_modules/@elvatis_com/aahp/`), never on `PATH`. With only a global install,
+both hooks print a one-line skip and pass every commit and push, and the workflow
+fails, because `npm ci` installs only what your lockfile lists and the CLI it then
+runs is not there. In the steps below, `aahp` means `./node_modules/.bin/aahp`, the
+binary npm just placed from your lockfile. Do not shorten it to `npx aahp`: when
+the local install is missing, `npx` resolves the unscoped public name instead
+(ADR-013).
 
 **2. Create the handoff set.** From the root of the repository you are adopting:
 
@@ -119,23 +128,35 @@ git add .ai/handoff/ && git commit -m "chore: init AAHP handoff files"
 aahp verify . --level prepush
 ```
 
-A first run straight after the commit above reports Layers 1, 2 and 4 OK and a
-Layer 3 WARN, because the manifest was generated before the commit that contains
-it, so `last_session.commit` is one commit behind `HEAD`. That warning is
-expected on the very first run and clears at the next `/handoff`. Layer 3 warns;
-it does not fail (ADR-007).
+A first run straight after the commit above passes (exit 0) with Layers 1 and 2
+OK and two warnings. Layer 3 warns because the manifest was generated before the
+commit that contains it, so `last_session.commit` is one commit behind `HEAD`;
+that clears at the next `/handoff`. Layer 4 warns that `TRUST.md` holds rows but
+none it could classify as a dated `verified` entry, so TTL was NOT evaluated: the
+template's example rows carry no `Status` and `Expires` columns. That warning
+stays until your `TRUST.md` has such rows. Both layers warn; neither fails
+(ADR-007).
 
 **5. Install the hooks and the CI check.**
 
 ```bash
 bash node_modules/@elvatis_com/aahp/scripts/install-hooks.sh .   # pre-commit + pre-push
+mkdir -p .github/workflows
+cp node_modules/@elvatis_com/aahp/assets/governance/aahp-verify.yml .github/workflows/
 ```
 
-Then copy `.github/workflows/aahp-verify.yml` from this repository into your own
-`.github/workflows/` and make it a required status check. That workflow is the
-off-machine backstop: the local hooks honour `AAHP_SKIP_VERIFY=1`, and
-`--level ci` ignores it. Section 9.2 covers the rest of the harness wiring,
-including the separate, opt-in governance workflow.
+Commit the workflow like any other change under the gate: it is a file outside
+`.ai/handoff/`, so the pre-commit hook you just installed expects an updated
+`STATUS.md` and a regenerated `MANIFEST.json` in the same commit (Layer 2). Then
+make its `aahp-verify` job a required status check. It runs
+`npm ci --ignore-scripts`, then `aahp verify --level ci` and `aahp doctor` from
+`node_modules/`, which is why step 1 installs a pinned devDependency and commits
+the lockfile. That workflow is the off-machine backstop: the local hooks honour
+`AAHP_SKIP_VERIFY=1`, and `--level ci` ignores it. Do not copy this repository's
+own `.github/workflows/aahp-verify.yml` instead. It runs the gate from an AAHP
+checkout (`node bin/aahp.js`), and in any other repository it fails on its first
+run. Section 9.2 covers the rest of the harness wiring, including the separate,
+opt-in governance workflow.
 
 **Governance gates are a separate, optional adoption.** They are about releases
 (changelog, version sync, forbidden patterns, doc links), not about handoff
@@ -863,9 +884,10 @@ handoff gates are still evaluated, then no automated gate in that repository
 compares a handoff checksum. `aahp doctor` exits 0, `aahp check` exits 0, and a
 handoff file edited outside the protocol is invisible to both. The record is
 accurate about what it measured and it is not an integrity signal. Fix it by
-adopting `.github/workflows/aahp-verify.yml`, which runs `aahp verify --level ci`
-before `aahp doctor` in the same job, or by running `aahp verify` some other
-way.
+adopting the shipped `assets/governance/aahp-verify.yml` as your
+`.github/workflows/aahp-verify.yml` (Quickstart step 5), which runs
+`aahp verify --level ci` before `aahp doctor` in the same job, or by running
+`aahp verify` some other way.
 
 In this repository, and in any repository whose `aahp-verify.yml` matches the
 shipped one, that ordering is already in place: a checksum drift fails the job at the verify step
@@ -1939,16 +1961,19 @@ your-project/
     MANIFEST.json
     STATUS.md
     ...
-  scripts/                # the AAHP gate scripts (vendored or from node_modules)
+  scripts/                # ONLY when vendored by propagate.sh; otherwise from node_modules
     verify-handoff.sh
     aahp-manifest.sh
     lint-handoff.sh
     _aahp-lib.sh
+    check-conflict-markers.mjs  # run by lint-handoff.sh
+    validate-pii-allowlist.py   # run by lint-handoff.sh
   .git/hooks/
     pre-commit            # -> scripts/verify-handoff.sh . --level precommit
     pre-push              # -> scripts/verify-handoff.sh . --level prepush
   .github/workflows/
-    aahp-verify.yml       # runs `aahp verify --level ci` as a required check (handoff)
+    aahp-verify.yml       # the package's assets/governance/aahp-verify.yml: npm ci, then
+                          #   `aahp verify --level ci` as a required check (handoff)
     aahp-govern.yml       # portable governance gate: `aahp check` by path (governance)
   .claude/
     CLAUDE.md             # harness system prompt (see 9.3)
@@ -1961,7 +1986,7 @@ your-project/
 ```
 
 - **Hooks.** `scripts/install-hooks.sh` (shipped by AAHP) installs the pre-commit and pre-push hooks; the harness runs it once at setup. The hooks resolve the vendored `scripts/verify-handoff.sh` first, fall back to `node_modules/@elvatis_com/aahp/bin/aahp.js` when that file exists, and skip when neither resolves (the required CI check is the off-machine backstop once its evaluator paths are protected). The fallback is a filesystem test, never `npx`, so a repository with the hooks installed and no local package makes no registry request. If your installed hooks still contain `npx --no-install aahp`, re-run `scripts/install-hooks.sh`: fixing the source here does not fix the copy in your `.git/hooks/`. See Section 2.8.
-- **CI.** Copy `.github/workflows/aahp-verify.yml`; it runs `aahp verify --level ci` (no escape hatch) and should be a required status check. Also require trusted review for the workflow and its vendored gate/parser paths, because a `pull_request` workflow otherwise evaluates code from the proposed branch. For governance (changelog, version sync, forbidden patterns, doc links) copy the portable `assets/governance/aahp-govern.yml` into your own `.github/workflows/` beside it, or let `aahp init --gates` scaffold it; it runs `aahp check` by invoking `node ./node_modules/@elvatis_com/aahp/bin/aahp.js` directly and is verify-only. If your scaffolded copy still calls `npx --no-install aahp`, re-run `aahp init --gates --force`: that spelling can reach the public registry, and fixing the template here does not fix your copy. **`aahp init --gates --force` only rewrites `aahp-govern.yml`.** If the vulnerable spelling is in your `aahp-verify.yml` instead, which is the common case because AAHP does not generate that file, no command fixes it: edit the step yourself and replace `npx --no-install aahp` with `node node_modules/@elvatis_com/aahp/bin/aahp.js`, keeping the `npm ci` step that installs the exact-pinned devDependency ahead of it. A step that already reads `npx -y @elvatis_com/aahp@<version>` names the scoped package at an exact version and needs no change.
+- **CI.** Copy `assets/governance/aahp-verify.yml` out of the installed package (`cp node_modules/@elvatis_com/aahp/assets/governance/aahp-verify.yml .github/workflows/`), or let `scripts/propagate.sh` install it (Section 10.1). It runs `npm ci --ignore-scripts`, then `aahp verify --level ci` (no escape hatch) and `aahp doctor` by path from `node_modules/`, and should be a required status check. Do not copy this repository's own `.github/workflows/aahp-verify.yml`: it runs the gate from an AAHP checkout (`node bin/aahp.js`) and fails in any other repository. Also require trusted review for the workflow, `package.json`, `package-lock.json` and any vendored gate/parser paths, because a `pull_request` workflow otherwise evaluates code, and a lockfile, from the proposed branch. For governance (changelog, version sync, forbidden patterns, doc links) copy the portable `assets/governance/aahp-govern.yml` into your own `.github/workflows/` beside it, or let `aahp init --gates` scaffold it; it runs `aahp check` by invoking `node ./node_modules/@elvatis_com/aahp/bin/aahp.js` directly and is verify-only. If your scaffolded copy still calls `npx --no-install aahp`, re-run `aahp init --gates --force`: that spelling can reach the public registry, and fixing the template here does not fix your copy. **`aahp init --gates --force` only rewrites `aahp-govern.yml`.** If the vulnerable spelling is in your `aahp-verify.yml` instead, which is the common case, replace that file with the shipped adopter copy (the `cp` above), or edit the step yourself: replace `npx --no-install aahp` with `node ./node_modules/@elvatis_com/aahp/bin/aahp.js`, keeping the `npm ci` step that installs the exact-pinned devDependency ahead of it. A step that reads `npx -y @elvatis_com/aahp@<version>` names the scoped package at an exact version, so it is not the unscoped-name hazard, but it downloads that version at run time instead of taking it from your lockfile, and it stays on that version until someone edits the line; the adopter copy runs whatever your lockfile pins.
   Both shipped workflows declare their own `permissions:` (`contents: read`) and set
   `persist-credentials: false` on the checkout, so neither inherits your repository's
   `default_workflow_permissions` and neither leaves the job's `GITHUB_TOKEN` in
@@ -2035,6 +2060,15 @@ AAHP distinguishes three terms:
 - **Propagation commit**: the commit in a consumer that adopts or updates the upstream artifact (new scripts, new schema version). It is a normal AAHP handoff commit in the consumer, subject to that consumer's own verify gate.
 
 `propagate.sh` (conceptually) copies the upstream artifacts into a consumer while preserving that consumer's own per-repo configuration (its `AAHP_HANDOFF_FILES` set, its `CONVENTIONS.md`). The direction is one-way: upstream never reads consumer state, and a consumer never edits the upstream copy in place; it re-propagates to update.
+
+Concretely, `bash node_modules/@elvatis_com/aahp/scripts/propagate.sh <consumer>` (or the same script from an AAHP checkout) does this, in order:
+
+- **Refuses before writing anything** when the target is not the top level of a git work tree (exit 1; a linked worktree qualifies), has no `.ai/handoff/` (exit 2), or cannot run the CI workflow it would install (exit 3): `package.json` must declare `@elvatis_com/aahp` and a `package-lock.json` in the git index must lock it, because that workflow runs the CLI from `node_modules/` after `npm ci`.
+- **Vendors the gate with everything it executes** into `scripts/`: `verify-handoff.sh`, `_aahp-lib.sh`, `lint-handoff.sh`, `aahp-manifest.sh`, `install-hooks.sh`, and the two files `lint-handoff.sh` runs, `check-conflict-markers.mjs` and `validate-pii-allowlist.py`. A closure check then re-derives that set from the scripts themselves and fails the run if anything they name is missing. Before this, the two helpers were not copied, and the missing module's exit 1 read as "conflict markers found" on every commit.
+- **Installs the hooks** into the directory git runs hooks from (`git rev-parse --git-path hooks`), and the adopter workflow `assets/governance/aahp-verify.yml` as `.github/workflows/aahp-verify.yml`.
+- **Stamps `STATUS.md`, regenerates `MANIFEST.json`, stages the change set, and runs `verify --level precommit` on it** with the local escape hatch cleared. Exit 0 means that baseline passed; a baseline that fails is exit 1, with the change set left staged and nothing committed. The caller commits and pushes.
+
+After a propagation the hooks run the vendored scripts and CI runs the locked package, so the two can differ by version; propagate prints a NOTE when they do. `tests/propagate.bats` runs every `run:` step of the installed workflow in a consumer built from the packed tarball, once green and once against a drifted commit, so a workflow that cannot run outside this repository fails the suite.
 
 ### 10.2 Cross-repo handoff pattern
 

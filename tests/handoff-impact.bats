@@ -429,20 +429,27 @@ EOF
 }
 
 @test "required workflow always runs and passes event base SHA" {
-    run grep -n -E 'dependabot|author\.username|github\.actor' "$AAHP_ROOT/.github/workflows/aahp-verify.yml"
-    [ "$status" -eq 1 ]
+    # Both verify workflows: this repository's own, and the adopter copy that
+    # propagate.sh installs and adopters copy out of the package.
+    local wf
+    for wf in "$AAHP_ROOT/.github/workflows/aahp-verify.yml" "$AAHP_ROOT/assets/governance/aahp-verify.yml"; do
+        # `-i`: GitHub expression contexts are case-insensitive, so
+        # `GitHub.Actor` is the same bypass as `github.actor`.
+        run grep -n -i -E 'dependabot|author\.username|github\.actor' "$wf"
+        [ "$status" -eq 1 ]
 
-    run grep -n 'AAHP_BASE_SHA.*pull_request.base.sha.*event.before.*inputs.base' "$AAHP_ROOT/.github/workflows/aahp-verify.yml"
-    [ "$status" -eq 0 ]
+        run grep -n 'AAHP_BASE_SHA.*pull_request.base.sha.*event.before.*inputs.base' "$wf"
+        [ "$status" -eq 0 ]
 
-    run grep -Ec 'uses: actions/(checkout|setup-node|setup-python)@[0-9a-f]{40} # v' "$AAHP_ROOT/.github/workflows/aahp-verify.yml"
-    [ "$status" -eq 0 ]
-    [ "$output" -eq 3 ]
-    run grep -nE 'uses: .*@v[0-9]' "$AAHP_ROOT/.github/workflows/aahp-verify.yml"
-    [ "$status" -eq 1 ]
-    grep -q 'permissions:' "$AAHP_ROOT/.github/workflows/aahp-verify.yml"
-    grep -q 'contents: read' "$AAHP_ROOT/.github/workflows/aahp-verify.yml"
-    grep -q 'persist-credentials: false' "$AAHP_ROOT/.github/workflows/aahp-verify.yml"
+        run grep -Ec 'uses: actions/(checkout|setup-node|setup-python)@[0-9a-f]{40} # v' "$wf"
+        [ "$status" -eq 0 ]
+        [ "$output" -eq 3 ]
+        run grep -nE 'uses: .*@v[0-9]' "$wf"
+        [ "$status" -eq 1 ]
+        grep -q 'permissions:' "$wf"
+        grep -q 'contents: read' "$wf"
+        grep -q 'persist-credentials: false' "$wf"
+    done
 }
 
 @test "CLI help documents the explicit verify base" {

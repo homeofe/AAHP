@@ -6,6 +6,36 @@
 
 ---
 
+## [2026-09-28] claude-opus-5.5: consumer install path (audit fix programme, 1 of 8)
+
+**Agent:** claude-opus-5.5
+**Phase:** implementation
+**Branch:** fix/consumer-install-path
+**Tasks:** owner request of 2026-09-28 to fix every audit finding
+
+### What was done
+
+- A read-only survey of 24 consumer repositories showed that none ran the shipped
+  `aahp-verify.yml` unchanged: its doctor step called `node bin/aahp.js`, which only
+  exists inside an AAHP checkout, and propagate vendored a lint whose helpers it did not
+  copy. Consumers had rewritten the steps three different ways; six fetched the CLI at
+  runtime without a lockfile.
+- Shipped `assets/governance/aahp-verify.yml` for adopters (lockfile-pinned CLI by path),
+  made propagate install it with the full helper closure and a fatal baseline check, and
+  fixed install-hooks for linked worktrees, CRLF, symlinks and backups.
+- A fix agent implemented this in an isolated worktree and proved it on a Linux runner:
+  629 of 629 tests, 20 mutation proofs. The integrator reviewed the adopter workflow and
+  the package `files` change and wrote the handoff state.
+
+### Decision
+
+- Two verify workflows instead of one that detects its location: AAHP's own must run the
+  working-tree gate because a pull request can change the gate; an adopter must run the
+  version its lockfile pins. A shell branch between the two would be a skip that doctor's
+  verify-workflow gate cannot audit. A parity test keeps them aligned.
+
+---
+
 ## [2026-09-28] claude-opus-5.5: five Dependabot PRs integrated; scanner to v6.3.1
 
 **Agent:** claude-opus-5.5
@@ -250,18 +280,3 @@
 - Verified npm latest was 3.5.0 (local checkout was 13 commits stale); reconciled onto origin/main and bumped 3.5.0 -> 3.6.0. An early 3.4.0 target would have collided with a published version.
 - REJECTED the SCG lint-handoff relative PII-path change: it is a Windows regression here (breaks lint.bats 20-24) and main correctly uses the absolute path. The Layer 3 warn fix was already merged on main (#27).
 - Kept AAHP's LOG.md as an append-only agent journal (did NOT point the LOG generator at it); the generator ships as an opt-in consumer capability.
-
----
-
-## [2026-06-26] Codex: Fix manifest badge schema for AAHP JSON files
-
-**Agent:** Codex
-**Phase:** fix
-**Branch:** codex/issue-21-pii-allowlist
-**Tasks:** AAHP PR #13 merge blocker
-
-### What was done
-
-- Fixed `schema/aahp-manifest.schema.json` so MANIFEST file entries can include AAHP-owned JSON handoff files.
-- Allowed `pii-allowlist.json` and `LOG-ARCHIVE.index.json` while keeping unknown JSON files rejected.
-- Reproduced the GitHub Actions `AAHP Manifest` validation locally with `ajv-cli` and confirmed `.ai/handoff/MANIFEST.json valid`.

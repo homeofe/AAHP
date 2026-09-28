@@ -19,6 +19,14 @@ independently of the npm version).
   package.
 - `tests/install-hooks.bats`, and propagate tests that run every `run:` step of the
   installed workflow in a real npm consumer.
+- `npm run check:bats-negations` (`tests/assert-bats-negations.mjs`): fails on a `!`
+  negation that is not the last command of a test or function.
+- `scripts/run-bats.mjs`: with `CI` set, fails the run on any skip not listed in
+  `ALLOWED_SKIPS`, and refuses a first-on-PATH bash older than 4.1 unless
+  `AAHP_ALLOW_OLD_BASH=1`.
+- Red-control tests for `assert-pinning-gate-wired.mjs`, `assert-doc-shape-wired.mjs` and
+  `assert-workflow-parser-parity.mjs`; `tests/README.md` with the suite's rules, covered
+  by `tests/bats-hygiene.bats`.
 
 ### Changed
 
@@ -30,6 +38,8 @@ independently of the npm version).
   it with `node_modules/@elvatis_com/aahp/assets/governance/aahp-verify.yml`.
 - Migration: hooks previously installed from a linked worktree were inert; re-run
   `install-hooks.sh`.
+- The test fixture repository is built once per bats run and copied per test: setup cost
+  per test drops from about 22 to 7 ms on Linux and from about 595 to 201 ms on Windows.
 
 ### Fixed
 
@@ -53,6 +63,16 @@ independently of the npm version).
   option is replaced by what it loses.
 - Tests: a bare `! grep` in the middle of a propagate test asserted nothing, and the
   actor-bypass guard is now case-insensitive.
+- Tests: three `! grep` assertions (archive rotation and two migrate-grounding
+  preconditions) could never fail, because bash exempts negated commands from `set -e`;
+  they now assert the exit status.
+- Tests: prerequisite skips (ajv-cli, python, symlink support) no longer fail open on CI;
+  `require_tool` skips locally and fails when `CI` is set.
+- Tests: two lint assertions that only checked for missing output also require exit 0 and
+  a positive result line, so a crash can no longer pass them.
+- Tests: the fixture repository is isolated from the machine's global and system git
+  config, from repository variables leaked by git hooks, and from repositories above the
+  temp directory (`GIT_CEILING_DIRECTORIES`).
 
 ## [3.12.0] - 2026-08-31
 

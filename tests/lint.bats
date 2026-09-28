@@ -378,7 +378,7 @@ unmanaged edit
 
     local py real_py
     py="$(bash -c "source '$SCRIPTS_DIR/_aahp-lib.sh'; aahp_python_cmd")"
-    [ -n "$py" ] || skip "no working python interpreter"
+    require_tool "no working python interpreter" [ -n "$py" ]
     real_py="$(command -v "$py")"
 
     # BASH_ENV functions avoid an extension-precedence difference on Windows,
@@ -406,7 +406,7 @@ WRAP
 
     local py
     py="$(bash -c "source '$SCRIPTS_DIR/_aahp-lib.sh'; aahp_python_cmd")"
-    [ -n "$py" ] || skip "no working python interpreter"
+    require_tool "no working python interpreter" [ -n "$py" ]
     "$py" - "$TEST_TMPDIR/.ai/handoff/MANIFEST.json" <<'PY'
 import json, sys
 path = sys.argv[1]
@@ -431,7 +431,7 @@ PY
 
     local py
     py="$(bash -c "source '$SCRIPTS_DIR/_aahp-lib.sh'; aahp_python_cmd")"
-    [ -n "$py" ] || skip "no working python interpreter"
+    require_tool "no working python interpreter" [ -n "$py" ]
     printf 'MALICIOUS CONTENT\n' > "$TEST_TMPDIR/.ai/handoff/LOG.md"
     "$py" - "$TEST_TMPDIR/.ai/handoff/MANIFEST.json" <<'PY'
 import json, sys

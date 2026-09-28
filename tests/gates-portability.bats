@@ -10,8 +10,10 @@
 # not change in-tree behavior, nor the section-absent no-op.
 #
 # setup() (in test_helper) git-inits TEST_TMPDIR. To exercise the non-git path
-# we `ungit` (rm the .git dir); the mktemp base has no git-repo ancestor, so the
-# target is then genuinely outside any work tree. In-tree fixtures are staged
+# we `ungit` (rm the .git dir). That the target is then genuinely outside any
+# work tree is ENFORCED, not assumed: test_helper exports GIT_CEILING_DIRECTORIES
+# as the mktemp base, so a repository above it (a dotfiles repo in $HOME, a
+# checkout holding $TMPDIR) is never discovered. In-tree fixtures are staged
 # with `git add` before the gate runs, matching anti-entropy.bats.
 
 load test_helper

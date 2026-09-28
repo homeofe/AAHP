@@ -254,6 +254,40 @@ EOF
     [[ "$output" == *"workflow parser parity OK"* ]]
 }
 
+# Red controls for the parity assertion, which was only ever run green: a copy
+# of the real workflows and fixtures is green, one divergent file turns it red,
+# and an empty tree is "nothing compared" (exit 2), never a pass.
+parity_copy() {
+    mkdir -p "$TEST_TMPDIR/.github/workflows" "$TEST_TMPDIR/tests/fixtures/workflows"
+    cp "$AAHP_ROOT"/.github/workflows/*.yml "$TEST_TMPDIR/.github/workflows/"
+    cp "$FIXTURES"/*.yml "$TEST_TMPDIR/tests/fixtures/workflows/"
+}
+
+@test "parity red control: a copy of the real workflows is green" {
+    parity_copy
+    run node "$AAHP_ROOT/tests/assert-workflow-parser-parity.mjs" "$TEST_TMPDIR"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"workflow parser parity OK"* ]]
+}
+
+@test "parity red control: a step the reader misreads is red" {
+    parity_copy
+    # YAML 1.2 resolves the "\x41" escape to "A"; the zero-dependency reader
+    # only knows \n and \t, so it reads "x41". A real divergence on `run:`.
+    printf '%s\n' 'name: Divergent' 'on: push' 'jobs:' '  build:' '    runs-on: ubuntu-latest' \
+        '    steps:' '      - run: "echo \x41"' > "$TEST_TMPDIR/.github/workflows/divergent.yml"
+    grep -q 'echo \\x41' "$TEST_TMPDIR/.github/workflows/divergent.yml"
+    run node "$AAHP_ROOT/tests/assert-workflow-parser-parity.mjs" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *".github/workflows/divergent.yml: the AAHP reader disagrees with real YAML"* ]]
+}
+
+@test "parity red control: nothing to compare is exit 2, never a pass" {
+    run node "$AAHP_ROOT/tests/assert-workflow-parser-parity.mjs" "$TEST_TMPDIR"
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"nothing was compared"* ]]
+}
+
 # ─── wiring: doctor must actually run it ─────────────────────────────────────
 
 @test "doctor: reports verify-workflow pass on the canonical workflow" {

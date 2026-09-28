@@ -19,6 +19,12 @@ Current version: **v3.12.0**
 
 ## Recently Completed
 
+### 2026-09-28: Test-suite integrity
+
+- Dead negations, fail-open skips and negative-only assertions now fail; a guard in `npm
+  run check` and a CI skip audit keep them out.
+- Tests are isolated from global git config and build their fixture once per run.
+
 ### 2026-09-28: Consumer install path
 
 - Shipped an adopter verify workflow that runs the lockfile-pinned CLI; the previous
@@ -49,52 +55,6 @@ Current version: **v3.12.0**
   schema pinned to the same immutable source.
 - Confirmed the README already carries the `aahp-verify` workflow badge; added an
   availability badge for the shipped governance template and a dynamic Node badge.
-
-### 2026-08-31: Third-party prompt audit and cross-platform hardening
-
-- Reconciled every recommendation with the current repository and rejected stale or
-  technically incorrect instructions.
-- Added an immutable, least-privilege supply-chain scan and its runtime-compatible empty
-  policy.
-- Removed the unpinned npm self-update from trusted publishing.
-- Added a locked, portable Bats runner and repaired Windows/Linux test assumptions.
-- Fixed private-key header detection and added regression coverage.
-- Added adopter remediation for verify-workflow bypasses and pre-3.9.2 project-name
-  corruption.
-- Verified the patched tree on Windows and in a fresh Linux clone under `/tmp`.
-
-### 2026-08-20: v3.10.0 prepared - fail-closed CI base + reviewed M-only impact
-
-- Added explicit `--base SHA` / `AAHP_BASE_SHA` anchoring and strict invalid-base checks.
-- Added exact, reasoned non-impacting modified-file entries; only `M` can be exempted.
-- Removed the actor-wide dependency-bot workflow bypass.
-
-### 2026-08-05: v3.9.2 - Windows bash portability + project-name preservation
-
-- Unified Bash resolution and Windows path conversion.
-- Preserved existing MANIFEST project names during regeneration.
-
-### 2026-08-03: Handoff hygiene + doctor partial-index alignment
-
-- Aligned the workflow, status snapshot, manifest summaries, and partial-index behavior.
-
-### T-033: Reusable AAHP badge workflows
-
-- Added stable AAHP Verify, Lint, Manifest, Archive, and PII Allowlist badge workflows.
-
-### T-032: LOG archive integrity
-
-- Added `aahp archive`, integrity verification, and regression tests.
-
-### T-031: Reviewed, expiring PII allowlist
-
-- Added a strict allowlist with owner, reason, expiry, schema, and tests.
-
-### T-014 through T-017 and T-006
-
-- CLI integration coverage, `aahp status`, `aahp archive`, project guidance, and npm
-  publication were completed in earlier releases. Closure evidence remains in git
-  history and the archived handoff journal.
 
 ---
 

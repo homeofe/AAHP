@@ -3,85 +3,85 @@
   "project": "AAHP",
   "last_session": {
     "agent": "claude-opus-5.5",
-    "session_id": "cli-1790552737",
-    "timestamp": "2026-09-27T23:45:37Z",
-    "commit": "1917ca8",
+    "session_id": "cli-1790554332",
+    "timestamp": "2026-09-28T00:12:12Z",
+    "commit": "3e8e8d7",
     "phase": "implementation",
     "duration_minutes": 0
   },
   "files": {
     "STATUS.md": {
-      "checksum": "sha256:5357d13f3c24e2eab030826a6fba66b88981a549743c52b3d20518c2f41df737",
-      "updated": "2026-09-27T23:44:46Z",
-      "lines": 100,
+      "checksum": "sha256:e7e812f76e351bd920b6460961450c638e6c249a0c7c61c2043906d2787805a7",
+      "updated": "2026-09-28T00:12:12Z",
+      "lines": 107,
       "summary": "Last updated: 2026-09-28"
     },
     "NEXT_ACTIONS.md": {
-      "checksum": "sha256:0a54b1c3e26d7d9e84ee06df6d3ee68a46b646cf315b5327331edd0ca2f61af2",
-      "updated": "2026-09-27T23:45:23Z",
-      "lines": 135,
+      "checksum": "sha256:aaa2da047f7355e722e106548311856feebf5cc08bf14962e54c264c0a38a491",
+      "updated": "2026-09-28T00:08:12Z",
+      "lines": 95,
       "summary": "Current version: **v3.12.0**"
     },
     "LOG.md": {
-      "checksum": "sha256:0c93fc3341f4a641a6794841d991394ed8dd53223ab310fecbedb27c0d4ecb29",
-      "updated": "2026-09-27T23:45:37Z",
-      "lines": 282,
+      "checksum": "sha256:41d63dedb5de872e23008723b9da0a93d0b2696741741dfad99ac6624221edb4",
+      "updated": "2026-09-28T00:12:12Z",
+      "lines": 286,
       "summary": "**Agent:** claude-opus-5.5"
     },
     "LOG-ARCHIVE.md": {
-      "checksum": "sha256:79ccdb89885d7ee4678a0c1b3c46549d01be86b2c7ef784c0e0b8d19c31eff04",
-      "updated": "2026-09-27T23:45:37Z",
-      "lines": 287,
-      "summary": "**Agent:** Codex"
+      "checksum": "sha256:1d233b5cbe7d607ae196172e95eb4cfd51ed062086df796b1b9f725da070156b",
+      "updated": "2026-09-28T00:08:12Z",
+      "lines": 309,
+      "summary": "**Agent:** claude-opus-4-8"
     },
     "LOG-ARCHIVE.index.json": {
-      "checksum": "sha256:e19f8c97ab9d57aa9c3af38a47b021b57e9bfe460371cfb90abc398f3b78ae03",
-      "updated": "2026-09-27T23:45:37Z",
-      "lines": 49,
+      "checksum": "sha256:6408e9643fec7b8a8116d411dbe1e2e9d285d5e74d2917b600236a8bbc035ed0",
+      "updated": "2026-09-28T00:08:12Z",
+      "lines": 53,
       "summary": "{"
     },
     "DASHBOARD.md": {
       "checksum": "sha256:e96e392db8dab2e9719e542dfa2a10c240d0be16ac6721298c460a22985cbdea",
-      "updated": "2026-09-27T23:03:50Z",
+      "updated": "2026-09-28T00:06:33Z",
       "lines": 96,
       "summary": "| Name | Path | Build | Tests | Status | Notes |"
     },
     "TRUST.md": {
       "checksum": "sha256:d3b79c9fee9268c855731d1462d4b05b771b2642defbee7f21dbfbdc59f22ccf",
-      "updated": "2026-09-27T23:03:50Z",
+      "updated": "2026-09-28T00:06:33Z",
       "lines": 110,
       "summary": "| Level | Meaning |"
     },
     "CONVENTIONS.md": {
       "checksum": "sha256:1c0150404d22c6e15e39139e8b2c991b0167ba1e095f579efafb85555dfe0d88",
-      "updated": "2026-09-27T23:03:50Z",
+      "updated": "2026-09-28T00:06:33Z",
       "lines": 93,
       "summary": "The project motto (Asimov's Three Laws) and the **do no damage** principle live once, in README (## Our Motto: The Three Laws). Agents must never take"
     },
     "WORKFLOW.md": {
       "checksum": "sha256:ef005f24e399791abb986b3a76403295c33ad3b28bb9b7dc777d1d0528b31151",
-      "updated": "2026-09-27T23:03:50Z",
+      "updated": "2026-09-28T00:06:33Z",
       "lines": 156,
       "summary": "| Agent | Model | Role | Responsibility |"
     },
     "GROUNDING.md": {
       "checksum": "sha256:7ef8cece585dc5defb4285175b9ba560d5469675df553d4ce28ec9e7aec24343",
-      "updated": "2026-09-27T23:03:50Z",
+      "updated": "2026-09-28T00:06:33Z",
       "lines": 209,
       "summary": "This register EXTENDS existing AAHP machinery; it does not fork or replace it. It"
     },
     "pii-allowlist.json": {
       "checksum": "sha256:7c1051f6e2bc3943b7c1dbe4da229694455681b8875a346c99279e555edb733f",
-      "updated": "2026-09-27T23:03:50Z",
+      "updated": "2026-09-28T00:06:33Z",
       "lines": 4,
       "summary": "{"
     }
   },
-  "quick_context": "Audit fix programme 2026-09-28, workstream 1 of 8: consumer install path. Adopter verify workflow assets/governance/aahp-verify.yml runs the lockfile-pinned CLI; propagate vendors the full helper closure and fails on a failed baseline; install-hooks fixed for linked worktrees. v3.12.0 released; no release until the owner decides.",
+  "quick_context": "Audit fix programme 2026-09-28, workstream 2 of 8: test-suite integrity. Dead negations, fail-open skips and negative-only assertions now fail; guards in npm run check and a CI skip audit keep them out; git-isolated build-once fixture. v3.12.0 released; no release until the owner decides.",
   "token_budget": {
     "manifest_only": 85,
-    "manifest_plus_core": 2201,
-    "full_read": 14535
+    "manifest_plus_core": 2023,
+    "full_read": 14600
   }
   ,"next_task_id": 18
   ,"tasks": {"T-006":{"title":"Publish npm package","status":"done","priority":"medium","depends_on":[],"created":"2026-06-28T10:10:21.975Z","notes":"**AAHP Task:** `T-006`  \n**Status:** blocked  \n**Priority:** medium  \n\n\n\n\n---\n*Auto-created from AAHP manifest · project: AAHP*","github_issue":18,"github_repo":"homeofe/AAHP","completed":"2026-07-14T00:00:00Z"},"T-014":{"title":"Add CLI integration tests for bin/aahp.js [high]","status":"done","priority":"high","depends_on":[],"created":"2026-06-28T10:10:21.975Z","notes":"**AAHP Task:** `T-014`  \n**Status:** ready  \n**Priority:** high  \n\n\n\n\n---\n*Auto-created from AAHP manifest · project: AAHP*","github_issue":14,"github_repo":"homeofe/AAHP","completed":"2026-07-14T00:00:00Z"},"T-015":{"title":"Add `aahp status` quick-look command [medium]","status":"done","priority":"medium","depends_on":[],"created":"2026-06-28T10:10:21.978Z","github_issue":22,"github_repo":"homeofe/AAHP","completed":"2026-07-14T00:00:00Z"},"T-016":{"title":"Add `aahp archive` command for LOG.md rotation [medium]","status":"done","priority":"medium","depends_on":[],"created":"2026-06-28T10:10:21.979Z","github_issue":23,"github_repo":"homeofe/AAHP","completed":"2026-07-14T00:00:00Z"},"T-017":{"title":"Add project-level CLAUDE.md [low]","status":"done","priority":"low","depends_on":[],"created":"2026-06-28T10:10:21.979Z","github_issue":24,"github_repo":"homeofe/AAHP","completed":"2026-07-14T00:00:00Z"}}

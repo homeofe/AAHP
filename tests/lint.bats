@@ -743,6 +743,133 @@ WRAP
     [[ "$output" == *"No injection patterns found"* ]]
 }
 
+# --- The PII scan reads JSON string values too (owner decision 2026-09-28) ---
+#
+# It used to read *.md only, so an address in MANIFEST.json, the file an
+# incoming agent reads first, or in LOG-ARCHIVE.index.json passed lint.
+
+# Set MANIFEST.json field $1 (a top-level key, or "task" for the notes of task
+# T-001) to the JSON text $2, which is inserted verbatim so a test can write an
+# escape the file must keep.
+_manifest_set() {
+    node -e '
+const fs = require("fs");
+const [p, field, raw] = process.argv.slice(1);
+const m = JSON.parse(fs.readFileSync(p, "utf8"));
+if (field === "task") m.tasks = { "T-001": { title: "x", status: "ready", notes: "PLACEHOLDER" } };
+else m[field] = "PLACEHOLDER";
+fs.writeFileSync(p, JSON.stringify(m, null, 2).replace("\"PLACEHOLDER\"", raw));
+' "$TEST_TMPDIR/.ai/handoff/MANIFEST.json" "$1" "$2"
+}
+
+@test "PII in a MANIFEST.json task note is caught, named by file and JSON path" {
+    create_full_handoff
+    _manifest_set task '"Ask stranger@gmail.com before merging."'
+    # Precondition: no Markdown file holds the address, so only the JSON scan can see it.
+    run grep -rl 'stranger@gmail.com' "$TEST_TMPDIR/.ai/handoff" --include='*.md'
+    [ "$status" -eq 1 ]
+
+    run bash "$SCRIPTS_DIR/lint-handoff.sh" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Possible email addresses found"* ]]
+    [[ "$output" == *".ai/handoff/MANIFEST.json (value at /tasks/T-001/notes): stranger@gmail.com"* ]]
+}
+
+@test "without python the node decoder names the same JSON path" {
+    create_full_handoff
+    _manifest_set task '"Ask stranger@gmail.com before merging."'
+    # Hide every python so the decode runs through node, the other implementation.
+    printf 'python3() { return 127; }\npython() { return 127; }\n' > "$TEST_TMPDIR/no-python.bash"
+
+    BASH_ENV="$TEST_TMPDIR/no-python.bash" run bash "$SCRIPTS_DIR/lint-handoff.sh" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    # Proof the python path did not run: check 4 says it could not.
+    [[ "$output" == *"Python not found"* ]]
+    [[ "$output" == *".ai/handoff/MANIFEST.json (value at /tasks/T-001/notes): stranger@gmail.com"* ]]
+}
+
+@test "PII behind a JSON escape in MANIFEST.json quick_context is caught after decoding" {
+    create_full_handoff
+    # The JSON escape for "@" is built at runtime: a literal escape sequence in
+    # this file is exactly what an editing tool may decode on the way in.
+    local bs
+    bs="$(printf '\134')"
+    _manifest_set quick_context "\"Handoff to stranger${bs}u0040gmail.com\""
+    # Precondition: the address is NOT present as bytes, only as an escape.
+    run grep -q 'stranger@gmail.com' "$TEST_TMPDIR/.ai/handoff/MANIFEST.json"
+    [ "$status" -eq 1 ]
+    grep -qF "stranger${bs}u0040gmail.com" "$TEST_TMPDIR/.ai/handoff/MANIFEST.json"
+
+    run bash "$SCRIPTS_DIR/lint-handoff.sh" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *".ai/handoff/MANIFEST.json (value at /quick_context): stranger@gmail.com"* ]]
+}
+
+@test "PII in a LOG-ARCHIVE.index.json entry title is caught" {
+    create_full_handoff
+    printf '{"version":1,"entries":[{"sha256":"%s","title":"## [2026-01-01] x: mailed stranger@gmail.com"}]}\n' \
+        "$(printf '0%.0s' $(seq 1 64))" > "$TEST_TMPDIR/.ai/handoff/LOG-ARCHIVE.index.json"
+    create_manifest_json
+
+    run bash "$SCRIPTS_DIR/lint-handoff.sh" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *".ai/handoff/LOG-ARCHIVE.index.json (value at /entries/0/title): stranger@gmail.com"* ]]
+}
+
+@test "PII in a JSON key is caught and reported as a key" {
+    create_full_handoff
+    _manifest_set task '"x"'
+    node -e '
+const fs = require("fs"); const p = process.argv[1];
+const m = JSON.parse(fs.readFileSync(p, "utf8"));
+m.tasks["T-001"].assigned_to = "agent";
+m.tasks["T-001"]["stranger@gmail.com"] = "x";
+fs.writeFileSync(p, JSON.stringify(m, null, 2));
+' "$TEST_TMPDIR/.ai/handoff/MANIFEST.json"
+
+    run bash "$SCRIPTS_DIR/lint-handoff.sh" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"(key at /tasks/T-001/stranger@gmail.com): stranger@gmail.com"* ]]
+}
+
+@test "an allowlisted address in MANIFEST.json passes, and pii-allowlist.json itself is not scanned" {
+    create_full_handoff
+    # The owner field holds an address that is NOT an approved value. If the
+    # allowlist file were scanned, this entry would report its own owner.
+    cat > "$TEST_TMPDIR/.ai/handoff/pii-allowlist.json" <<'JSON'
+{"version":1,"entries":[{"value":"owner@company.test","kind":"email","reason":"Required operational owner reference","owner":"platform-ops@company.test","expires":"2099-01-01"}]}
+JSON
+    bash "$SCRIPTS_DIR/aahp-manifest.sh" "$TEST_TMPDIR" --quiet --context "Escalate to owner@company.test."
+    grep -q 'owner@company.test' "$TEST_TMPDIR/.ai/handoff/MANIFEST.json"
+
+    run bash "$SCRIPTS_DIR/lint-handoff.sh" "$TEST_TMPDIR"
+    [ "$status" -eq 0 ] || { echo "$output"; false; }
+    [[ "$output" == *"Allowed PII email 'owner@company.test'"* ]]
+    [[ "$output" == *"No unapproved PII detected"* ]]
+    # The exit status above is the discriminating assertion; this names the
+    # finding a scanned allowlist would have produced.
+    [[ "$output" != *"pii-allowlist.json (value at /entries/0/owner)"* ]]
+}
+
+@test "noreply and example.com addresses in MANIFEST.json still pass" {
+    create_full_handoff
+    _manifest_set quick_context '"Co-authored-by 1+bot@users.noreply.github.com; see admin@example.com"'
+
+    run bash "$SCRIPTS_DIR/lint-handoff.sh" "$TEST_TMPDIR"
+    [ "$status" -eq 0 ] || { echo "$output"; false; }
+    [[ "$output" == *"No unapproved PII detected"* ]]
+}
+
+@test "a MANIFEST.json that is not valid JSON is still scanned for PII, as bytes" {
+    create_full_handoff
+    printf '{ "quick_context": "mail stranger@gmail.com", broken }\n' > "$TEST_TMPDIR/.ai/handoff/MANIFEST.json"
+
+    run bash "$SCRIPTS_DIR/lint-handoff.sh" "$TEST_TMPDIR"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Could not decode as JSON"* ]]
+    [[ "$output" == *".ai/handoff/MANIFEST.json:1: stranger@gmail.com"* ]]
+}
+
 # --- Check 4 parses MANIFEST.json once (R13) ---
 
 @test "check 4 starts one Python process, not one per required field" {

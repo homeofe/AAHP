@@ -153,6 +153,15 @@ EOF
     [ "$status" -eq 2 ]
     [[ "$output" == *"the first bash on PATH is 3.2"* ]]
     [[ "$output" == *"refusing to run"* ]]
+    # The refusal names the fix, not only the fault: the macOS install, the PATH
+    # step that makes it the bash bats runs, and how to check it.
+    [[ "$output" == *"to fix it on macOS"* ]]
+    [[ "$output" == *"brew install bash"* ]]
+    [[ "$output" == *"make sure that bash is first on PATH"* ]]
+    [[ "$output" == *"env bash --version"* ]]
+    # And the override, with what it costs.
+    [[ "$output" == *"AAHP_ALLOW_OLD_BASH=1 overrides"* ]]
+    [[ "$output" == *"partial"* ]]
 }
 
 # --- git isolation (test_helper) ---------------------------------------------

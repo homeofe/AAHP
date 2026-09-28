@@ -3,7 +3,33 @@
 > **Append-only.** Never delete or edit past entries.
 > Every agent session adds a new entry at the top.
 > This file is the immutable history of decisions and work done.
-> Entries may be redacted for confidentiality (an internal name or figure replaced by a neutral description); they are never rewritten otherwise.
+> Entries may be redacted for confidentiality: the passage is replaced by the marker `[redacted: <reason>]` (for example `[redacted: internal hostname]`), naming the kind of thing removed and never the thing itself, and nothing else in the entry changes. They are never rewritten otherwise.
+
+---
+
+## [2026-09-28] claude-opus-5.5: owner follow-up decisions
+
+**Agent:** claude-opus-5.5
+**Phase:** implementation
+**Branch:** fix/owner-decisions-followup
+**Tasks:** the owner's answers to the programme's open questions, and technical decisions on the rest
+
+### What was done
+
+- `init --gates` scaffolds `pinnedDep` and, where a handoff set exists, the adopter verify
+  workflow (never into this package itself); lint's PII check reads JSON string values;
+  the propagate and old-bash refusals say how to fix them; LOG redaction has a marker and
+  `aahp archive --reindex` records a redaction in the archive index.
+- Opened homeofe/supply-chain-guard#354 for the scanner false positive and a handoff test
+  that would break on the next aahp bump; merging it is that repository's maintainer's
+  step.
+- The owner's global agent instructions were updated to the STATUS snapshot model.
+
+### Decision
+
+- Kept the propagate and old-bash refusals and `refresh-catalog: true`, each for a
+  determinable reason recorded in STATUS.md, instead of weakening a check to be
+  convenient.
 
 ---
 
@@ -260,30 +286,3 @@
 
 - The tag must be created only after the release PR is green and merged. Tagging triggers
   both OIDC npm publication and the GitHub Release; neither is performed from this branch.
-
----
-
-## [2026-08-31] codex: PR #109 integrated; scanner advanced to v6.0.8
-
-**Agent:** codex
-**Phase:** implementation
-**Branch:** codex/prompt-audit-supply-chain-guard
-**Tasks:** replacement pull request requested by owner
-
-### What was done
-
-- Integrated the exact three CodeQL v4.37.8 action pins from Dependabot PR #109 instead
-  of weakening Layer 2 or merging its red branch directly.
-- Resolved the signed supply-chain-guard v6.0.8 annotated tag to commit
-  `2ba749d08e19b4d5c75c71467233987748f8e8c7` and updated the workflow, policy schema
-  anchor, and regression contract to that immutable commit.
-- Confirmed that README already contains the live `aahp-verify.yml` workflow badge. It was
-  retained as-is rather than adding a duplicate badge. Added `AAHP Govern - available`
-  linked to the shipped consumer template because no standalone govern workflow runs in
-  this repository, and added a dynamic npm-derived Node compatibility badge.
-
-### Decision
-
-- The replacement pull request contains both the repository audit and PR #109's update.
-  The old Dependabot pull request should be closed as superseded only after the new pull
-  request has been created successfully.

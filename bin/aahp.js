@@ -7,7 +7,7 @@
 //
 // Commands:
 //   init [path]       Initialize .ai/handoff/ directory with AAHP templates
-//                     (init --gates scaffolds governance-only config, no handoff)
+//                     (init --gates scaffolds governance config and workflows)
 //   manifest [path]   (Re)generate MANIFEST.json from existing handoff files
 //   lint [path]       Validate handoff files for safety violations
 //   migrate [path]    Migrate an AAHP v1 project to v2/v3
@@ -25,7 +25,7 @@
 
 import { fileURLToPath } from 'node:url'
 import { dirname, join, resolve } from 'node:path'
-import { existsSync, mkdirSync, copyFileSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, copyFileSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { spawn, spawnSync } from 'node:child_process'
 import { constants as osConstants } from 'node:os'
 import { resolveBash, toBashPath } from '../scripts/aahp-config.mjs'
@@ -75,9 +75,10 @@ manifest, lint, migrate, migrate-grounding, verify and archive run bash scripts
 (on Windows: Git Bash or WSL).
 
 Init options:
-  --gates           Scaffold governance-only config (aahp.config.json + a
-                    govern npm script + .github/workflows/aahp-govern.yml);
-                    does NOT create .ai/handoff/
+  --gates           Scaffold governance config: aahp.config.json (with
+                    pinnedDep), a govern npm script, .github/workflows/
+                    aahp-govern.yml, and .github/workflows/aahp-verify.yml
+                    when .ai/handoff/ exists; does NOT create .ai/handoff/
   --force           Overwrite existing files (default: skip existing)
   --with-pii-allowlist  Copy pii-allowlist.json template when needed
 
@@ -114,6 +115,9 @@ Archive options (requires Python 3, as python3 or python on PATH):
   --keep N          Keep the N newest LOG.md entries (default: 10)
   --verify          Check LOG-ARCHIVE.md against its index and that LOG.md
                     holds at most N entries; writes nothing
+  --reindex         Rewrite LOG-ARCHIVE.index.json from LOG-ARCHIVE.md after a
+                    deliberate edit (a redaction, README Section 1.3); prints
+                    every hash it drops and records; writes only the index
 
 Migrate options:
   --yes, -y         Regenerate an existing MANIFEST.json without asking.
@@ -143,6 +147,7 @@ unscoped name aahp is owned by nobody, so never invoke that.
   aahp verify --level ci       # CI gate (no escape hatch)
   aahp archive --keep 20       # Rotate, keeping the 20 newest LOG.md entries
   aahp archive --verify        # Verify LOG archive integrity
+  aahp archive --reindex       # Record a redaction made in LOG-ARCHIVE.md
 `)
 }
 
@@ -280,20 +285,43 @@ function cmdInit(targetPath, flags) {
     console.log('  4. Commit: git add .ai/handoff/ && git commit -m "chore: init AAHP handoff files"')
     console.log('  5. Install the gate: bash node_modules/@elvatis_com/aahp/scripts/install-hooks.sh .')
     console.log('     and copy node_modules/@elvatis_com/aahp/assets/governance/aahp-verify.yml')
-    console.log('     into .github/workflows/ as a required check (README Quickstart step 5)')
+    console.log('     into .github/workflows/ as a required check (README Quickstart step 5).')
+    console.log('     aahp init --gates copies the same workflow, together with the governance gates.')
   }
 }
 
 // ---------------------------------------------------------------------------
-// init --gates - scaffold governance-only adoption (no handoff protocol).
+// init --gates - scaffold governance adoption. Works without a handoff set.
 //
-// Writes three things at the project root, each skip-if-exists (--force to
+// Writes up to four things at the project root, each skip-if-exists (--force to
 // overwrite): a trimmed aahp.config.json, a `govern` npm script (only when a
-// package.json exists), and the portable .github/workflows/aahp-govern.yml
-// copied from the packaged asset. It never touches .ai/handoff/. The scaffolded
-// config enables the two gates that are green on any git repo out of the box
-// (the em-dash ban + internal doc-link check); versionSites/claims/docSync are
-// left for the adopter to add once they have the matching files.
+// package.json exists), the portable .github/workflows/aahp-govern.yml, and,
+// ONLY when .ai/handoff/ exists, the adopter verify workflow
+// .github/workflows/aahp-verify.yml. Both workflows are copied from the packaged
+// assets. It never creates or touches .ai/handoff/.
+//
+// The scaffolded config enables the two gates that are green on any git repo out
+// of the box (the em-dash ban + internal doc-link check) and `pinnedDep: {}`,
+// which turns the doctor pinned-dep gate on: an exact @elvatis_com/aahp version in
+// devDependencies passes, a range fails and an absent pin is `missing`. The
+// Quickstart tells every adopter to pin exactly, and without the key that advice
+// was a `skip` nobody would notice. A repo with no root package.json still reports
+// `skip` (there is nowhere to pin). versionSites/claims/docSync are left for the
+// adopter to add once they have the matching files.
+//
+// Why the verify workflow depends on .ai/handoff/: it runs `aahp verify --level
+// ci`, which gates a handoff set and fails without one. A governance-only repo
+// would get a required check that is red on its first run, so there the step is a
+// note naming how to add it later instead of a file.
+//
+// And why it is never written into @elvatis_com/aahp itself, not even with
+// --force: this package's own .github/workflows/aahp-verify.yml runs the gate
+// from the working tree (`node bin/aahp.js`), because a pull request here may
+// change the gate. The adopter copy runs the CLI from node_modules, which would
+// test the last PUBLISHED gate instead (README Section 9.2). Self is decided by
+// isSelfPackage, the same predicate the doctor pinned-dep gate uses, so the two
+// cannot disagree about which repository is the package. `pinnedDep: {}` is still
+// written there: the gate reports `self` before it reads the key, so it is inert.
 // ---------------------------------------------------------------------------
 
 const GATES_CONFIG = {
@@ -305,6 +333,36 @@ const GATES_CONFIG = {
   docLinks: {
     include: ['README.md', 'CONTRIBUTING.md', 'docs/*.md'],
   },
+  // Empty object = the defaults: @elvatis_com/aahp, devDependencies, exact version.
+  pinnedDep: {},
+}
+
+function isDirectory(path) {
+  try {
+    return statSync(path).isDirectory()
+  } catch {
+    return false
+  }
+}
+
+// Copy one packaged workflow asset into .github/workflows/, with init's
+// skip-if-exists semantics. Returns 'write' or 'skip' for the caller's counters.
+function scaffoldWorkflow(targetPath, name, force) {
+  const asset = join(PACKAGE_ROOT, 'assets', 'governance', name)
+  const wfDir = join(targetPath, '.github', 'workflows')
+  const dest = join(wfDir, name)
+  if (!existsSync(asset)) {
+    console.log(`  skip: ${name} (packaged asset not found)`)
+    return 'skip'
+  }
+  if (existsSync(dest) && !force) {
+    console.log(`  skip: .github/workflows/${name} (already exists, use --force to overwrite)`)
+    return 'skip'
+  }
+  mkdirSync(wfDir, { recursive: true })
+  copyFileSync(asset, dest)
+  console.log(`  write: .github/workflows/${name}`)
+  return 'write'
 }
 
 function cmdInitGates(targetPath, flags) {
@@ -317,6 +375,7 @@ function cmdInitGates(targetPath, flags) {
 
   let wrote = 0
   let skipped = 0
+  let verifyScaffolded = false
 
   // All filesystem writes run under one guard so a permission (EACCES/EPERM) or
   // other I/O error exits cleanly with a message instead of a raw stack trace,
@@ -355,20 +414,27 @@ function cmdInitGates(targetPath, flags) {
     }
 
     // 3. .github/workflows/aahp-govern.yml (copied from the packaged asset)
-    const asset = join(PACKAGE_ROOT, 'assets', 'governance', 'aahp-govern.yml')
-    const wfDir = join(targetPath, '.github', 'workflows')
-    const wfDest = join(wfDir, 'aahp-govern.yml')
-    if (!existsSync(asset)) {
-      console.log('  skip: aahp-govern.yml (packaged asset not found)')
-      skipped++
-    } else if (existsSync(wfDest) && !force) {
-      console.log('  skip: .github/workflows/aahp-govern.yml (already exists, use --force to overwrite)')
-      skipped++
+    if (scaffoldWorkflow(targetPath, 'aahp-govern.yml', force) === 'write') wrote++
+    else skipped++
+
+    // 4. .github/workflows/aahp-verify.yml, only where there is a handoff set to
+    //    gate and the target is not this package itself (see the header comment).
+    //    Like the missing package.json above, both cases are a note, not a skip:
+    //    nothing was declined, so the counters do not move.
+    const effectiveConfig = readJsonSafe(configPath) || GATES_CONFIG
+    if (isSelfPackage(readJsonSafe(join(targetPath, 'package.json')), effectiveConfig)) {
+      console.log(`  note: this is ${pinnedPackageName(effectiveConfig)} itself; .github/workflows/aahp-verify.yml is not written or`)
+      console.log('        replaced, even with --force. Its own verify workflow runs the gate from the working')
+      console.log('        tree, which the adopter copy cannot (README Section 9.2).')
+    } else if (isDirectory(join(targetPath, '.ai', 'handoff'))) {
+      verifyScaffolded = true
+      if (scaffoldWorkflow(targetPath, 'aahp-verify.yml', force) === 'write') wrote++
+      else skipped++
     } else {
-      mkdirSync(wfDir, { recursive: true })
-      copyFileSync(asset, wfDest)
-      console.log('  write: .github/workflows/aahp-govern.yml')
-      wrote++
+      console.log('  note: no .ai/handoff/; skipped .github/workflows/aahp-verify.yml (it runs aahp verify,')
+      console.log('        which gates a handoff set). To add it later: run aahp init and aahp manifest,')
+      console.log('        then aahp init --gates again (existing files are skipped), or copy')
+      console.log('        node_modules/@elvatis_com/aahp/assets/governance/aahp-verify.yml into .github/workflows/')
     }
   } catch (err) {
     if (err.code === 'EACCES' || err.code === 'EPERM') {
@@ -384,9 +450,16 @@ function cmdInitGates(targetPath, flags) {
   console.log()
   console.log('Next steps:')
   console.log('  1. Pin aahp exactly: npm install --save-dev --save-exact @elvatis_com/aahp')
+  console.log('     (the scaffolded pinnedDep makes aahp doctor fail a range or a missing pin),')
+  console.log('     and commit package.json and package-lock.json: the workflows run npm ci.')
   console.log('  2. Tune aahp.config.json (docLinks.include; add versionSites once you keep a CHANGELOG).')
   console.log('  3. Run: npm run govern')
   console.log('     (direct: node node_modules/@elvatis_com/aahp/bin/aahp.js check .)')
+  if (verifyScaffolded) {
+    console.log('  4. Make the aahp-verify job (AAHP Verify) a required status check, and the govern job too.')
+  } else {
+    console.log('  4. Make the govern job (AAHP Govern) a required status check.')
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -774,6 +847,18 @@ function gateGrounding(handoffDir) {
   return { status: 'pass', reason: 'GROUNDING.md present; TRUST.md has a Provenance column' }
 }
 
+// The package the pin gate asserts: pinnedDep.name, default @elvatis_com/aahp.
+function pinnedPackageName(config) {
+  const cfg = (config && typeof config.pinnedDep === 'object' && config.pinnedDep) || null
+  return (cfg && typeof cfg.name === 'string' && cfg.name) || '@elvatis_com/aahp'
+}
+
+// Self-detection, shared by the pin gate and `init --gates`: the repository whose
+// root package.json is named like the pinned package IS that package.
+function isSelfPackage(pkg, config) {
+  return !!pkg && pkg.name === pinnedPackageName(config)
+}
+
 // Distribution-pin gate. Config-driven and opt-in (C-7): the package name, the
 // dependency block, and whether a range is acceptable all come from the optional
 // pinnedDep config. A repo with no root package.json has nowhere to declare a
@@ -786,8 +871,8 @@ function gatePinnedDep(targetPath, pkg, config) {
     return { status: 'skip', reason: notApplicableReason('pinned-dep', targetPath, config) }
   }
   const cfg = (config && typeof config.pinnedDep === 'object' && config.pinnedDep) || null
-  const name = (cfg && typeof cfg.name === 'string' && cfg.name) || '@elvatis_com/aahp'
-  if (pkg && pkg.name === name) return { status: 'self', reason: `this repo is ${name} itself` }
+  const name = pinnedPackageName(config)
+  if (isSelfPackage(pkg, config)) return { status: 'self', reason: `this repo is ${name} itself` }
   if (!cfg) return { status: 'skip', reason: 'distribution pin not asserted (set pinnedDep to enable)' }
   const location = cfg.location === 'dependencies' || cfg.location === 'any' ? cfg.location : 'devDependencies'
   const dev = (pkg && pkg.devDependencies) || {}

@@ -1,8 +1,9 @@
 # aahp-verify.yml - the AAHP handoff gate as a REQUIRED status check, for a
 # repository that installs @elvatis_com/aahp from npm.
 #
-# This is the file an adopter copies to .github/workflows/aahp-verify.yml, and
-# the file scripts/propagate.sh installs there. It is NOT the workflow of the
+# This is the file an adopter copies to .github/workflows/aahp-verify.yml, the
+# file scripts/propagate.sh installs there, and the file `aahp init --gates`
+# writes there when .ai/handoff/ exists. It is NOT the workflow of the
 # same name in this repository's own .github/workflows/: that one runs the gate
 # from the AAHP working tree (`bash scripts/verify-handoff.sh`, `node
 # bin/aahp.js`), because a pull request here may change the gate itself. Neither

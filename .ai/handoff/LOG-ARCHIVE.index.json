@@ -2,8 +2,12 @@
   "version": 1,
   "entries": [
     {
-      "sha256": "b02b0255d40e6aff18b2b9cb281849e5263a127d1ff31ec412345e99ef9d7657",
-      "title": "## [2026-08-31] codex: [redacted] review and Windows/Linux hardening"
+      "sha256": "19910451262a252cef8fb539044852aad55656449a1b8a17a3c95e9d1ed67f4f",
+      "title": "## [2026-08-31] codex: PR #109 integrated; scanner advanced to v6.0.8"
+    },
+    {
+      "sha256": "0ce67a30d9bc721c6417da41ed979c1b80e86adc0f432079b6a9567a246bc02c",
+      "title": "## [2026-08-31] codex: [redacted: private process detail] review and Windows/Linux hardening"
     },
     {
       "sha256": "c1733cc2e660900dd5c6a7a0798832f322bd27bb420ac8f9c75122d7923e732d",

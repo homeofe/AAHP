@@ -84,10 +84,12 @@ npm i -D -E @elvatis_com/aahp       # exact-pinned devDependency; commit package
 
 Pin it exactly, with no range: the workflow in step 5 runs the CLI from
 `node_modules/` after `npm ci`, never from the registry, so the version it runs is the
-one your lockfile records. `aahp doctor` can hold you to the pin, but only once you ask
-it to: its `pinned-dep` gate reports `skip` until `aahp.config.json` carries a
-`pinnedDep` key, and neither `aahp init` nor `aahp init --gates` writes one. Add
-`"pinnedDep": {}` to assert an exact `@elvatis_com/aahp` version in `devDependencies`
+one your lockfile records. `aahp doctor` holds you to the pin once `aahp.config.json`
+carries a `pinnedDep` key: `"pinnedDep": {}` asserts an exact `@elvatis_com/aahp`
+version in `devDependencies`, so a range fails and an absent pin is reported
+`missing`. `aahp init --gates` (described after step 5) writes that key. `aahp init` writes no
+config at all, so in a repository that adopts only the handoff set the `pinned-dep`
+gate reports `skip` until you add `"pinnedDep": {}` yourself
 ([docs/governance.md](docs/governance.md)).
 
 Do not rely on a global install (`npm i -g`). The hooks and the CI workflow look
@@ -156,7 +158,9 @@ the lockfile. That workflow is the off-machine backstop: the local hooks honour
 `AAHP_SKIP_VERIFY=1`, and `--level ci` ignores it. Do not copy this repository's
 own `.github/workflows/aahp-verify.yml` instead. It runs the gate from an AAHP
 checkout (`node bin/aahp.js`), and in any other repository it fails on its first
-run. The same workflow file is what `scripts/propagate.sh` installs (Section 10.1).
+run. The same workflow file is what `scripts/propagate.sh` installs (Section 10.1),
+and what `aahp init --gates` (below) copies when `.ai/handoff/` exists, so a
+repository adopting both halves can run that instead of the `mkdir` and `cp` above.
 Section 9.2 covers the rest of the harness wiring, including the separate, opt-in
 governance workflow.
 
@@ -168,9 +172,15 @@ state, and they have their own scaffolder:
 aahp init --gates
 ```
 
-That writes an `aahp.config.json`, a `govern` npm script, and
-`.github/workflows/aahp-govern.yml` in your repository, and creates no handoff
-files. [docs/governance.md](docs/governance.md) documents each gate and what makes it
+That writes an `aahp.config.json` (with `"pinnedDep": {}`, see step 1), a `govern` npm
+script, and `.github/workflows/aahp-govern.yml` in your repository. It creates no
+handoff files and works in a repository that has none. Where `.ai/handoff/` already
+exists it also copies the adopter verify workflow of step 5; where it does not, it
+writes no verify workflow, because `aahp verify` would fail there on its first run,
+and prints how to add it later (run `aahp init` and `aahp manifest`, then
+`aahp init --gates` again, or copy the file as in step 5). Every file that already
+exists is skipped unless you pass `--force`.
+[docs/governance.md](docs/governance.md) documents each gate and what makes it
 applicable.
 
 ---
@@ -264,8 +274,12 @@ Two files carry session state, and they follow opposite rules:
 - **`LOG.md` is the only journal.** Every session adds one entry at the top; past
   entries are never edited or deleted. The one exception is redaction for
   confidentiality (a secret, a personal detail or an internal name that should never
-  have been written): the passage is replaced by a neutral description, and nothing
-  else in the entry changes.
+  have been written): the passage is replaced by the marker `[redacted: <reason>]`,
+  whose reason names the kind of thing removed and never the thing itself
+  (`[redacted: internal hostname]`, `[redacted: figures]`), and nothing else in the
+  entry changes. The marker is fixed so that every redaction stays visible and can be
+  listed mechanically: `grep -n '\[redacted: ' .ai/handoff/LOG.md .ai/handoff/LOG-ARCHIVE.md`.
+  A past entry changed in any other way, or without the marker, is not a redaction.
 
 The biggest token sink is `LOG.md`, because it only grows. It is therefore split into
 an active file and an archive:
@@ -279,6 +293,17 @@ an active file and an archive:
 **Rule**: When `LOG.md` exceeds 10 entries, older entries move to `LOG-ARCHIVE.md`
 with `aahp archive` (Section 2.9). The archive exists for human review and forensics,
 not for routine agent consumption.
+
+**A redaction inside `LOG-ARCHIVE.md` has one more step.** `LOG-ARCHIVE.index.json`
+records a hash per archived entry, so the edit makes `aahp archive --verify` fail until
+the index records it; that failure is the intended tamper evidence, and it is why the
+step exists. In the same change: replace the passage with the marker, run
+`aahp archive --reindex`, which rewrites the index from the archive and prints every
+hash it drops and records together with the entry title, check that those lines name
+only the entries you redacted, then run `aahp archive --verify` and `aahp manifest` and
+commit the archive, the index and the manifest together. `--reindex` accepts the
+archive as it is, including an edit nobody meant to make, so its output is the part a
+reviewer reads.
 
 **Merging parallel branches.** Because the two files follow opposite rules, their merge
 conflicts resolve differently. A `STATUS.md` conflict is resolved by rewriting the
@@ -334,7 +359,10 @@ that exit code either.
 every file in `.ai/handoff/` except `.aiignore`, which lists those very phrases and
 shapes as patterns. JSON files are scanned twice, as bytes and as their decoded string
 values, so a phrase written behind a `\u` escape in `MANIFEST.json` is still seen. Check
-3 (PII) scans the Markdown files. All three read bytes as text under the C locale, so a
+3 (PII) scans the Markdown files and the decoded string values, keys included, of every
+JSON file except `pii-allowlist.json`, which holds the approved addresses by design; a
+finding in JSON names the file and the JSON Pointer of the value or key
+(`MANIFEST.json (value at /tasks/T-003/notes)`). All three read bytes as text under the C locale, so a
 NUL byte or an invalid UTF-8 byte cannot hide a match, and a scan that could not run
 (grep exit status 2) is counted as a violation, never as a clean result. Check 4 parses
 `MANIFEST.json` once, as UTF-8 whatever the console code page. Check 7 (conflict
@@ -635,6 +663,14 @@ expired entries fail verification. An allowed match suppresses only that exact
 PII finding; secrets and all other verification layers still fail normally.
 The canonical schema is `schema/aahp-pii-allowlist.schema.json`.
 
+The check reads every Markdown handoff file and the string values of every JSON
+handoff file, `MANIFEST.json` (task notes, `assigned_to`, `quick_context`, the file
+summaries) and `LOG-ARCHIVE.index.json` included, decoded so that an address behind a
+JSON escape is seen as an agent reads it. `pii-allowlist.json` itself is not scanned,
+because it holds the approved addresses. An approved address passes wherever it
+appears, and GitHub noreply, `noreply@`, `example.com` and `placeholder` addresses
+pass as before.
+
 ### 2.8 The Verify Gate: `aahp verify`
 
 Linting and checksums are passive. They tell you when handoff state is malformed,
@@ -828,11 +864,12 @@ agents to read quickly. Older entries are rotated into `LOG-ARCHIVE.md` with:
 aahp archive              # keeps the 10 newest entries
 aahp archive --keep 20    # keeps the 20 newest entries instead
 aahp archive --verify     # fails if LOG.md has more than 10 active entries
+aahp archive --reindex    # records a deliberate edit (a redaction) of LOG-ARCHIVE.md
 ```
 
 `aahp archive` requires Python 3 (`python3` or `python` on `PATH`).
 
-A canonical log entry starts with `## [YYYY-MM-DD]`. The default flow keeps the 10 newest entries in `LOG.md`. Entry 11 and older are moved automatically into `LOG-ARCHIVE.md`, and the postcondition verifies by entry hash that no rotated entry was dropped. `LOG-ARCHIVE.index.json` stores the hashes of archived entries so `--verify` also detects later truncation or tampering. `LOG-ARCHIVE.md` and the index are included in `MANIFEST.json` whenever present, so archive changes stay inside the checksum boundary.
+A canonical log entry starts with `## [YYYY-MM-DD]`. The default flow keeps the 10 newest entries in `LOG.md`. Entry 11 and older are moved automatically into `LOG-ARCHIVE.md`, and the postcondition verifies by entry hash that no rotated entry was dropped. `LOG-ARCHIVE.index.json` stores the hashes of archived entries so `--verify` also detects later truncation or tampering, and any other edit of an archived entry. Rotation only adds hashes; `--reindex` is the one step that replaces them, for the redaction Section 1.3 allows: it rewrites the index from `LOG-ARCHIVE.md` as it is, prints every hash it drops and records with the entry title, writes nothing when nothing changed, and never touches `LOG.md` or `LOG-ARCHIVE.md`. `LOG-ARCHIVE.md` and the index are included in `MANIFEST.json` whenever present, so archive changes stay inside the checksum boundary.
 
 ### 2.10 Grounded Reflection Layer
 
@@ -936,7 +973,8 @@ own commands, documented in full in [docs/governance.md](docs/governance.md):
   exit code drives CI.
 - Every config-driven gate reads an optional `aahp.config.json`, is a clean no-op when
   its section is absent, and refuses an invalid config instead of skipping it.
-  `aahp init --gates` scaffolds a minimal config and the portable workflow.
+  `aahp init --gates` scaffolds a minimal config (with `pinnedDep`), the portable
+  governance workflow and, where `.ai/handoff/` exists, the adopter verify workflow.
 
 ---
 
@@ -1646,7 +1684,7 @@ your-project/
 ```
 
 - **Hooks.** `scripts/install-hooks.sh` (shipped by AAHP) installs the pre-commit and pre-push hooks; the harness runs it once at setup. The hooks resolve the vendored `scripts/verify-handoff.sh` first, fall back to `node_modules/@elvatis_com/aahp/bin/aahp.js` when that file exists, and skip when neither resolves (the required CI check is the off-machine backstop once its evaluator paths are protected). The fallback is a filesystem test, never `npx`, so a repository with the hooks installed and no local package makes no registry request. If your installed hooks still contain `npx --no-install aahp`, re-run `scripts/install-hooks.sh`: fixing the source here does not fix the copy in your `.git/hooks/`. See Section 2.8.
-- **CI.** Copy `assets/governance/aahp-verify.yml` out of the installed package (`cp node_modules/@elvatis_com/aahp/assets/governance/aahp-verify.yml .github/workflows/`), or let `scripts/propagate.sh` install it (Section 10.1). It runs `npm ci --ignore-scripts`, then `aahp verify --level ci` (no escape hatch) and `aahp doctor` by path from `node_modules/`, and should be a required status check. Do not copy this repository's own `.github/workflows/aahp-verify.yml`: it runs the gate from an AAHP checkout (`node bin/aahp.js`) and fails in any other repository. Also require trusted review for the workflow, `package.json`, `package-lock.json` and any vendored gate/parser paths, because a `pull_request` workflow otherwise evaluates code, and a lockfile, from the proposed branch. For governance (changelog, version sync, forbidden patterns, doc links) copy the portable `assets/governance/aahp-govern.yml` into your own `.github/workflows/` beside it, or let `aahp init --gates` scaffold it; it runs `aahp check` by invoking `node ./node_modules/@elvatis_com/aahp/bin/aahp.js` directly and is verify-only. If your scaffolded copy still calls `npx --no-install aahp`, re-run `aahp init --gates --force`: that spelling can reach the public registry, and fixing the template here does not fix your copy. **`aahp init --gates --force` only rewrites `aahp-govern.yml`.** If the vulnerable spelling is in your `aahp-verify.yml` instead, which is the common case, replace that file with the shipped adopter copy (the `cp` above), or edit the step yourself: replace `npx --no-install aahp` with `node ./node_modules/@elvatis_com/aahp/bin/aahp.js`, keeping the `npm ci` step that installs the exact-pinned devDependency ahead of it. A step that reads `npx -y @elvatis_com/aahp@<version>` names the scoped package at an exact version, so it is not the unscoped-name hazard, but it downloads that version at run time instead of taking it from your lockfile, and it stays on that version until someone edits the line; the adopter copy runs whatever your lockfile pins.
+- **CI.** Copy `assets/governance/aahp-verify.yml` out of the installed package (`cp node_modules/@elvatis_com/aahp/assets/governance/aahp-verify.yml .github/workflows/`), or let `scripts/propagate.sh` install it (Section 10.1). It runs `npm ci --ignore-scripts`, then `aahp verify --level ci` (no escape hatch) and `aahp doctor` by path from `node_modules/`, and should be a required status check. Do not copy this repository's own `.github/workflows/aahp-verify.yml`: it runs the gate from an AAHP checkout (`node bin/aahp.js`) and fails in any other repository. Also require trusted review for the workflow, `package.json`, `package-lock.json` and any vendored gate/parser paths, because a `pull_request` workflow otherwise evaluates code, and a lockfile, from the proposed branch. For governance (changelog, version sync, forbidden patterns, doc links) copy the portable `assets/governance/aahp-govern.yml` into your own `.github/workflows/` beside it, or let `aahp init --gates` scaffold it; it runs `aahp check` by invoking `node ./node_modules/@elvatis_com/aahp/bin/aahp.js` directly and is verify-only. If your scaffolded copy still calls `npx --no-install aahp`, re-run `aahp init --gates --force`: that spelling can reach the public registry, and fixing the template here does not fix your copy. **`aahp init --gates --force` rewrites `aahp-verify.yml` only where `.ai/handoff/` exists, and then wholesale**, discarding any edit you made to your copy (a `branches:` list for a default branch other than `main`, say). If the vulnerable spelling is in your `aahp-verify.yml`, which is the common case, replace that file with the shipped adopter copy (the `cp` above, or `--force`) and re-apply your edits, or edit the step yourself: replace `npx --no-install aahp` with `node ./node_modules/@elvatis_com/aahp/bin/aahp.js`, keeping the `npm ci` step that installs the exact-pinned devDependency ahead of it. A step that reads `npx -y @elvatis_com/aahp@<version>` names the scoped package at an exact version, so it is not the unscoped-name hazard, but it downloads that version at run time instead of taking it from your lockfile, and it stays on that version until someone edits the line; the adopter copy runs whatever your lockfile pins.
   Both shipped workflows declare their own `permissions:` (`contents: read`) and set
   `persist-credentials: false` on the checkout, so neither inherits your repository's
   `default_workflow_permissions` and neither leaves the job's `GITHUB_TOKEN` in
@@ -1726,7 +1764,7 @@ AAHP distinguishes three terms:
 
 Concretely, `bash node_modules/@elvatis_com/aahp/scripts/propagate.sh <consumer>` (or the same script from an AAHP checkout) does this, in order:
 
-- **Refuses before writing anything** when the target is not the top level of a git work tree (exit 1; a linked worktree qualifies), has no `.ai/handoff/` (exit 2), or cannot run the CI workflow it would install (exit 3): `package.json` must declare `@elvatis_com/aahp` and a `package-lock.json` in the git index must lock it, because that workflow runs the CLI from `node_modules/` after `npm ci`.
+- **Refuses before writing anything** when the target is not the top level of a git work tree (exit 1; a linked worktree qualifies), has no `.ai/handoff/` (exit 2), or cannot run the CI workflow it would install (exit 3): `package.json` must declare `@elvatis_com/aahp` and a `package-lock.json` in the git index must lock it, because that workflow runs the CLI from `node_modules/` after `npm ci`. The exit-3 message lists the commands that fix it, in order: `npm init -y` when there is no `package.json`, `npm install -D -E @elvatis_com/aahp@<version>`, commit `package.json` and `package-lock.json`, rerun propagate. A repository that is not JavaScript adopts AAHP the same way: AAHP needs Node anyway, and a lockfile-pinned devDependency is the only install path with integrity (`npm ci` checks it against the lockfile), so a `package.json` that exists only to pin the tool is enough.
 - **Vendors the gate with everything it executes** into `scripts/`: `verify-handoff.sh`, `_aahp-lib.sh`, `lint-handoff.sh`, `aahp-manifest.sh`, `install-hooks.sh`, and the two files `lint-handoff.sh` runs, `check-conflict-markers.mjs` and `validate-pii-allowlist.py`. A closure check then re-derives that set from the scripts themselves and fails the run if anything they name is missing. Before this, the two helpers were not copied, and the missing module's exit 1 read as "conflict markers found" on every commit.
 - **Installs the hooks** into the directory git runs hooks from (`git rev-parse --git-path hooks`), and the adopter workflow `assets/governance/aahp-verify.yml` as `.github/workflows/aahp-verify.yml`.
 - **Stamps `STATUS.md`, regenerates `MANIFEST.json`, stages the change set, and runs `verify --level precommit` on it** with the local escape hatch cleared. Exit 0 means that baseline passed; a baseline that fails is exit 1, with the change set left staged and nothing committed. The caller commits and pushes.

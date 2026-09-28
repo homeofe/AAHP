@@ -35,6 +35,20 @@ runs `npm ci --ignore-scripts` and then the CLI from `node_modules/`, which is w
 lockfile is required. AAHP's own `.github/workflows/aahp-verify.yml` is NOT
 propagated: it runs the gate from an AAHP checkout and fails anywhere else.
 
+**Consumers that are not JavaScript are supported the same way.** AAHP needs Node
+anyway, and a devDependency locked in `package-lock.json` is the only install path
+with integrity, so such a consumer gets a `package.json` that exists only to pin the
+tool. propagate refuses it until then (exit 3) and prints the commands:
+
+```bash
+cd <consumer>
+npm init -y                            # only when there is no package.json yet
+npm install -D -E @elvatis_com/aahp@<version>
+git add package.json package-lock.json
+git commit -m "chore: pin @elvatis_com/aahp <version>"
+bash scripts/propagate.sh <consumer>   # rerun
+```
+
 propagate then installs the hooks, stamps `STATUS.md`, regenerates `MANIFEST.json`,
 stages the change set and runs `verify --level precommit` on it. The caller reviews,
 commits and pushes. To confirm a clean baseline by hand afterwards:

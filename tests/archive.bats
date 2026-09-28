@@ -134,6 +134,89 @@ for left, right in zip(expected, expected[1:]):
 PY
 }
 
+# --- --reindex: recording a deliberate edit of an archived entry -------------
+#
+# README Section 1.3 allows one edit of a past entry: a redaction, which leaves
+# the marker [redacted: <reason>]. In LOG-ARCHIVE.md that edit changes the entry's
+# hash, so --verify fails until the index records it. These tests hold the
+# recording step to its contract: it fixes exactly that, it prints what it
+# changed, and it writes nothing when nothing changed.
+
+_redact_middle() {
+    local archive="$TEST_TMPDIR/.ai/handoff/LOG-ARCHIVE.md"
+    grep -q "middle body" "$archive"
+    sed 's/middle body/[redacted: test reason] body/' "$archive" > "$archive.new"
+    mv "$archive.new" "$archive"
+    # Prove the edit landed before asserting anything about it.
+    grep -q '\[redacted: test reason\] body' "$archive"
+}
+
+@test "archive --reindex records a redaction in LOG-ARCHIVE.md and prints what it changed" {
+    _write_log_entries
+    bash "$SCRIPTS_DIR/aahp-archive.sh" "$TEST_TMPDIR" --keep 1
+    _redact_middle
+
+    # The tamper evidence works: the unrecorded edit fails verify.
+    run bash "$SCRIPTS_DIR/aahp-archive.sh" "$TEST_TMPDIR" --keep 1 --verify
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"missing indexed archived entries"* ]]
+
+    run bash "$SCRIPTS_DIR/aahp-archive.sh" "$TEST_TMPDIR" --reindex
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"LOG archive reindex: rewrote"* ]]
+    [[ "$output" == *"- dropped "*"## [2026-06-25] Agent: middle"* ]]
+    [[ "$output" == *"+ recorded "*"## [2026-06-25] Agent: middle"* ]]
+    [[ "$output" == *"1 archived entry unchanged."* ]]
+    [[ "$output" == *"including an edit nobody meant to make"* ]]
+    # The redaction itself is untouched; only the index moved.
+    grep -q '\[redacted: test reason\] body' "$TEST_TMPDIR/.ai/handoff/LOG-ARCHIVE.md"
+
+    run bash "$SCRIPTS_DIR/aahp-archive.sh" "$TEST_TMPDIR" --keep 1 --verify
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"LOG archive verify passed"* ]]
+}
+
+@test "archive --reindex writes nothing and says so when the index already matches" {
+    _write_log_entries
+    bash "$SCRIPTS_DIR/aahp-archive.sh" "$TEST_TMPDIR" --keep 1
+    before=$(sha256sum "$TEST_TMPDIR/.ai/handoff/LOG-ARCHIVE.index.json" | awk '{print $1}')
+
+    run bash "$SCRIPTS_DIR/aahp-archive.sh" "$TEST_TMPDIR" --reindex
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"already records the 2 entries"*"nothing written"* ]]
+    after=$(sha256sum "$TEST_TMPDIR/.ai/handoff/LOG-ARCHIVE.index.json" | awk '{print $1}')
+    [ "$before" = "$after" ]
+}
+
+@test "archive --reindex touches neither LOG.md nor LOG-ARCHIVE.md" {
+    _write_log_entries
+    bash "$SCRIPTS_DIR/aahp-archive.sh" "$TEST_TMPDIR" --keep 1
+    _redact_middle
+    log_before=$(sha256sum "$TEST_TMPDIR/.ai/handoff/LOG.md" | awk '{print $1}')
+    arc_before=$(sha256sum "$TEST_TMPDIR/.ai/handoff/LOG-ARCHIVE.md" | awk '{print $1}')
+
+    run bash "$SCRIPTS_DIR/aahp-archive.sh" "$TEST_TMPDIR" --reindex
+    [ "$status" -eq 0 ]
+    [ "$(sha256sum "$TEST_TMPDIR/.ai/handoff/LOG.md" | awk '{print $1}')" = "$log_before" ]
+    [ "$(sha256sum "$TEST_TMPDIR/.ai/handoff/LOG-ARCHIVE.md" | awk '{print $1}')" = "$arc_before" ]
+}
+
+@test "archive --reindex and --verify together are refused" {
+    _write_log_entries
+    bash "$SCRIPTS_DIR/aahp-archive.sh" "$TEST_TMPDIR" --keep 1
+    run bash "$SCRIPTS_DIR/aahp-archive.sh" "$TEST_TMPDIR" --reindex --verify
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"pass one of them"* ]]
+}
+
+@test "archive --reindex without a LOG-ARCHIVE.md fails and writes no index" {
+    _write_log_entries
+    run bash "$SCRIPTS_DIR/aahp-archive.sh" "$TEST_TMPDIR" --reindex
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"there is no archive to reindex"* ]]
+    [ ! -e "$TEST_TMPDIR/.ai/handoff/LOG-ARCHIVE.index.json" ]
+}
+
 @test "manifest indexes LOG-ARCHIVE.md when present" {
     create_status_md
     create_next_actions_md

@@ -194,11 +194,38 @@ EOF
     run bash "$AAHP_ROOT/scripts/propagate.sh" "$TEST_TMPDIR"
     [ "$status" -eq 3 ]
     [[ "$output" == *"declares no $PKG_NAME dependency"* ]]
-    [[ "$output" == *"npm install --save-dev --save-exact $PKG_NAME@$PKG_VERSION"* ]]
+    # The fix, as commands in order: pin, commit both files, rerun.
+    [[ "$output" == *"npm install -D -E $PKG_NAME@$PKG_VERSION"* ]]
+    [[ "$output" == *"git add package.json package-lock.json"* ]]
+    [[ "$output" == *"git commit -m \"chore: pin $PKG_NAME $PKG_VERSION\""* ]]
+    [[ "$output" == *"then rerun propagate:"* ]]
+    [[ "$output" == *"scripts/propagate.sh\" \"$TEST_TMPDIR\""* ]]
+    # A package.json exists here, so creating one is not part of the fix.
+    [[ "$output" != *"npm init -y"* ]]
     [ ! -e "$TEST_TMPDIR/scripts" ]
     [ ! -e "$TEST_TMPDIR/.github" ]
     run git -C "$TEST_TMPDIR" status --porcelain
     [ -z "$output" ]
+}
+
+@test "a target with no package.json at all is told to create one, exit 3" {
+    # A repository that is not JavaScript: the fix is a package.json that exists
+    # only to pin the tool, and the message says so.
+    git -C "$TEST_TMPDIR" rm -q package.json package-lock.json
+    git -C "$TEST_TMPDIR" commit -q -m "not a JavaScript repository"
+    [ ! -e "$TEST_TMPDIR/package.json" ]
+
+    run bash "$AAHP_ROOT/scripts/propagate.sh" "$TEST_TMPDIR"
+    [ "$status" -eq 3 ]
+    [[ "$output" == *"no readable package.json (ENOENT)"* ]]
+    [[ "$output" == *"repository that is not JavaScript"* ]]
+    [[ "$output" == *"npm init -y"* ]]
+    [[ "$output" == *"npm install -D -E $PKG_NAME@$PKG_VERSION"* ]]
+    [[ "$output" == *"git add package.json package-lock.json"* ]]
+    [[ "$output" == *"then rerun propagate:"* ]]
+    [ ! -e "$TEST_TMPDIR/scripts" ]
+    [ ! -e "$TEST_TMPDIR/.github" ]
+    [ ! -e "$TEST_TMPDIR/package.json" ]
 }
 
 @test "a lockfile that is not in the git index is refused, exit 3" {
@@ -210,6 +237,8 @@ EOF
     run bash "$AAHP_ROOT/scripts/propagate.sh" "$TEST_TMPDIR"
     [ "$status" -eq 3 ]
     [[ "$output" == *"package-lock.json is not in the git index"* ]]
+    [[ "$output" == *"add package.json package-lock.json"* ]]
+    [[ "$output" == *"then rerun propagate:"* ]]
     [ ! -e "$TEST_TMPDIR/.github" ]
 }
 

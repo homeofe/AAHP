@@ -27,7 +27,13 @@
 #   2 = target has no .ai/handoff (run `aahp init` there first)
 #   3 = target cannot run the CI workflow: package.json declares no
 #       @elvatis_com/aahp dependency, or no package-lock.json in the git index
-#       locks it
+#       locks it. The message lists the exact commands that fix it.
+#
+# A repository that is not JavaScript is refused the same way, and fixed the same
+# way: AAHP needs Node anyway, and a devDependency locked in package-lock.json is
+# the only install path that carries integrity (npm ci checks every byte against
+# the lockfile). A package.json that exists only to pin the tool is enough; the
+# exit-3 message says how to create one.
 set -euo pipefail
 
 AAHP_DIR="$(cd "$(dirname "$0")/.." && pwd)"
@@ -95,28 +101,59 @@ VERSION="$(cd "$AAHP_DIR" && node -e 'process.stdout.write(JSON.parse(require("f
 # The workflow runs `npm ci --ignore-scripts` and then the CLI by its path in
 # node_modules. Both need the dependency declared AND locked; the lockfile
 # version is what CI will run.
-LOCKED_VERSION="$(cd "$TARGET" && node -e '
+#
+# Every refusal below is exit 3 and ends with the commands that fix it, in order,
+# ready to paste. `npm init -y` is listed only when there is no package.json yet.
+PROPAGATE_CMD="bash \"$AAHP_DIR/scripts/propagate.sh\" \"$TARGET\""
+refuse_unpinned() {
+    local why="$1" steps=""
+    if [ ! -f "$TARGET/package.json" ]; then
+        steps="    npm init -y                  # no package.json yet; one that only pins the tool is enough
+"
+    fi
+    die 3 "$TARGET cannot run the CI workflow propagate installs: $why.
+  The workflow runs 'npm ci --ignore-scripts' and then $PKG_NAME from node_modules,
+  so the target needs a committed package.json and package-lock.json that pin it.
+  A lockfile-pinned devDependency is the only install path with integrity, and it
+  is how a repository that is not JavaScript adopts AAHP too. To fix it, run:
+    cd \"$TARGET\"
+${steps}    npm install -D -E $PKG_NAME@$VERSION
+    git add package.json package-lock.json
+    git commit -m \"chore: pin $PKG_NAME $VERSION\"
+  then rerun propagate:
+    $PROPAGATE_CMD"
+}
+
+LOCK_RC=0
+LOCK_OUT="$(cd "$TARGET" && node -e '
 const fs = require("fs");
 const name = process.argv[1];
-const fail = (why) => { process.stderr.write("  " + why + "\n"); process.exit(3); };
+const fail = (why) => { process.stdout.write(why); process.exit(3); };
 let pkg;
 let lock;
 try { pkg = JSON.parse(fs.readFileSync("package.json", "utf8")); }
-catch (e) { fail("no readable package.json (" + e.code + ")"); }
-const declared = (pkg.devDependencies || {})[name] || (pkg.dependencies || {})[name];
+catch (e) { fail("no readable package.json (" + (e.code || e.name) + ")"); }
+const declared = ((pkg && pkg.devDependencies) || {})[name] || ((pkg && pkg.dependencies) || {})[name];
 if (typeof declared !== "string") fail("package.json declares no " + name + " dependency");
 try { lock = JSON.parse(fs.readFileSync("package-lock.json", "utf8")); }
-catch (e) { fail("no readable package-lock.json (" + e.code + ")"); }
-const entry = (lock.packages || {})["node_modules/" + name] || (lock.dependencies || {})[name];
+catch (e) { fail("no readable package-lock.json (" + (e.code || e.name) + ")"); }
+const entry = ((lock && lock.packages) || {})["node_modules/" + name] || ((lock && lock.dependencies) || {})[name];
 if (!entry || typeof entry.version !== "string") fail("package-lock.json does not lock " + name);
 process.stdout.write(entry.version);
-' "$PKG_NAME")" || die 3 "$TARGET cannot run the CI workflow propagate installs. It executes $PKG_NAME from node_modules after 'npm ci', so declare and lock it first:
-  (cd \"$TARGET\" && npm install --save-dev --save-exact $PKG_NAME@$VERSION)
-then commit package.json and package-lock.json and re-run."
+' "$PKG_NAME")" || LOCK_RC=$?
+if [ "$LOCK_RC" -ne 0 ]; then
+    [ "$LOCK_RC" -eq 3 ] || LOCK_OUT="package.json or package-lock.json could not be read (node exited $LOCK_RC)"
+    refuse_unpinned "$LOCK_OUT"
+fi
+LOCKED_VERSION="$LOCK_OUT"
 
 for f in package.json package-lock.json; do
-    git -C "$TARGET" ls-files --error-unmatch -- "$f" >/dev/null 2>&1 \
-        || die 3 "$f is not in the git index of $TARGET. The workflow's checkout sees only committed files, so 'npm ci' would fail there. git add it, then re-run."
+    if ! git -C "$TARGET" ls-files --error-unmatch -- "$f" >/dev/null 2>&1; then
+        die 3 "$f is not in the git index of $TARGET. The workflow's checkout sees only committed files, so 'npm ci' would fail there. Commit it, then rerun propagate:
+    git -C \"$TARGET\" add package.json package-lock.json
+    git -C \"$TARGET\" commit -m \"chore: pin $PKG_NAME $VERSION\"
+    $PROPAGATE_CMD"
+    fi
 done
 
 TODAY="$(date -u +%Y-%m-%d)"

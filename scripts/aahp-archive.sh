@@ -2,13 +2,28 @@
 # aahp-archive.sh - Rotate and verify AAHP LOG.md archive integrity.
 #
 # Usage:
-#   aahp-archive.sh [path] [--keep N] [--verify]
+#   aahp-archive.sh [path] [--keep N] [--verify | --reindex]
 #
 # Default flow: keep the 10 newest LOG.md entries. Entries older than the
 # 10th entry are moved automatically into LOG-ARCHIVE.md.
 #
 # Entry boundary: a log entry starts at a Markdown H2 whose text begins with
 # "[YYYY-MM-DD]", for example: ## [2026-06-26] Agent: Work summary
+#
+# LOG-ARCHIVE.index.json records one SHA-256 per archived entry, and --verify
+# fails when an indexed entry is no longer in LOG-ARCHIVE.md byte for byte. That
+# is the tamper evidence, and it makes a deliberate edit of an archived entry (a
+# redaction, README Section 1.3) fail too until the index records it.
+#
+# --reindex is that recording step. Rotation only ever ADDS index entries, so
+# before it existed the only way to record a redaction was to recompute the
+# digest by hand and edit the JSON. It rewrites the index from LOG-ARCHIVE.md as
+# it is now, one entry per archived entry, and never runs silently: it prints
+# every hash it drops and every hash it records, with the entry title, so the
+# change a reviewer approves is the change that was made. It accepts ANY edit,
+# including one nobody meant to make, which is why the output and the index diff
+# belong in the same reviewed change as the archive edit. Nothing changed means
+# nothing is written. It writes only the index, never LOG.md or LOG-ARCHIVE.md.
 
 set -euo pipefail
 
@@ -21,6 +36,7 @@ PYTHON_CMD="$(aahp_python_cmd)"
 PROJECT_ROOT="."
 KEEP=10
 VERIFY_ONLY=false
+REINDEX=false
 
 if [ $# -gt 0 ] && [[ ! "$1" == --* ]]; then
     PROJECT_ROOT="$1"
@@ -30,9 +46,14 @@ while [ $# -gt 0 ]; do
     case "$1" in
         --keep) KEEP="$2"; shift 2 ;;
         --verify) VERIFY_ONLY=true; shift ;;
+        --reindex) REINDEX=true; shift ;;
         *) echo "Unknown option: $1" >&2; exit 1 ;;
     esac
 done
+if [ "$VERIFY_ONLY" = true ] && [ "$REINDEX" = true ]; then
+    echo "Error: --verify checks the index and --reindex rewrites it; pass one of them." >&2
+    exit 1
+fi
 
 cd "$PROJECT_ROOT" || { echo "Error: cannot cd into project root: $PROJECT_ROOT" >&2; exit 1; }
 HANDOFF_DIR=".ai/handoff"
@@ -40,7 +61,7 @@ LOG="$HANDOFF_DIR/LOG.md"
 ARCHIVE="$HANDOFF_DIR/LOG-ARCHIVE.md"
 INDEX="$HANDOFF_DIR/LOG-ARCHIVE.index.json"
 
-"$PYTHON_CMD" - "$LOG" "$ARCHIVE" "$INDEX" "$KEEP" "$VERIFY_ONLY" <<'PY'
+"$PYTHON_CMD" - "$LOG" "$ARCHIVE" "$INDEX" "$KEEP" "$VERIFY_ONLY" "$REINDEX" <<'PY'
 import hashlib
 import json
 import re
@@ -52,6 +73,7 @@ archive_path = Path(sys.argv[2])
 index_path = Path(sys.argv[3])
 keep = int(sys.argv[4])
 verify_only = sys.argv[5].lower() == 'true'
+reindex = sys.argv[6].lower() == 'true'
 entry_re = re.compile(r'^## \[[0-9]{4}-[0-9]{2}-[0-9]{2}\]')
 
 def read(path: Path) -> str:
@@ -95,7 +117,7 @@ def render_entries(entries):
 
 if keep < 1:
     raise SystemExit('--keep must be >= 1')
-if not log_path.exists():
+if not log_path.exists() and not reindex:
     raise SystemExit(f'{log_path} not found')
 
 log_preamble, log_entries = split_doc(read(log_path))
@@ -108,6 +130,35 @@ index_entries = read_index(index_path)
 indexed_hashes = [entry.get('sha256') for entry in index_entries]
 if len(indexed_hashes) != len(set(indexed_hashes)):
     raise SystemExit('LOG-ARCHIVE.index.json contains duplicate entries')
+
+if reindex:
+    # Runs BEFORE the missing-entry check below: an index that no longer matches
+    # the archive is the state this step exists to resolve.
+    if not archive_path.exists():
+        raise SystemExit(f'{archive_path} not found; there is no archive to reindex')
+    new_entries = [{'sha256': digest(entry), 'title': title(entry)} for entry in archive_entries]
+    if new_entries == index_entries:
+        print(f'LOG archive reindex: {index_path} already records the {len(new_entries)} '
+              f'entries of {archive_path}; nothing written')
+        raise SystemExit(0)
+    new_hashes = {entry['sha256'] for entry in new_entries}
+    old_hashes = set(indexed_hashes)
+    dropped = [entry for entry in index_entries if entry.get('sha256') not in new_hashes]
+    recorded = [entry for entry in new_entries if entry['sha256'] not in old_hashes]
+    unchanged = len(new_entries) - len(recorded)
+    write_index(index_path, new_entries)
+    print(f'LOG archive reindex: rewrote {index_path} from {archive_path} ({len(new_entries)} entries).')
+    for entry in dropped:
+        print(f"  - dropped  {str(entry.get('sha256'))[:12]}  {entry.get('title', '(untitled)')}")
+    for entry in recorded:
+        print(f"  + recorded {entry['sha256'][:12]}  {entry['title']}")
+    if not dropped and not recorded:
+        print('  (no hash changed: only the order or the titles in the index did)')
+    print(f'  {unchanged} archived entr{"y" if unchanged == 1 else "ies"} unchanged.')
+    print('  --reindex accepts LOG-ARCHIVE.md as it is now, including an edit nobody meant to make.')
+    print('  Review the lines above and commit the index in the same change as the archive edit.')
+    raise SystemExit(0)
+
 missing_indexed = [h for h in indexed_hashes if h not in archive_hashes]
 if missing_indexed:
     raise SystemExit('LOG-ARCHIVE.md is missing indexed archived entries')
